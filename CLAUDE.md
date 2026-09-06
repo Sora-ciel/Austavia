@@ -59,6 +59,17 @@ decide, `storageAccounting.js` and `index.js` act.
 The test suites and what each is for are in [`test/README.md`](test/README.md).
 `npm test` must stay fast and dependency-free; it gates every build.
 
+## Releasing goes by the checklist, not by memory
+
+[`RELEASE.md`](RELEASE.md) has every step in order. Follow it whenever the ask
+is a release — "ship it", "release everything", "cut a version" — rather than
+working out which parts seem to apply.
+
+The two that get skipped when it is done from memory: the version moves **one
+step**, whatever the size of the release, and a pushed tag **is not a release**.
+0.8.50 and 0.8.51 both went out with the site deployed, the installers built and
+nothing at all on the releases page.
+
 ## Two things that are not obvious
 
 **Never put a Cloud Function trigger on `files/{fileId}`.** It is the whole note
