@@ -1,5 +1,5 @@
 <script>
-  import { createEventDispatcher, onMount, onDestroy, getContext } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy, afterUpdate, getContext } from 'svelte';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
   import ScrollingText from '../components/ScrollingText.svelte';
@@ -13,6 +13,7 @@
     extensionOf,
     audioAcceptFor
   } from '../utils/audioTags.js';
+  import { windowRange } from '../utils/listWindow.js';
   import {
     saveMusicTrack,
     deleteMusicTrack,
@@ -95,7 +96,54 @@
   const audioAccept = audioAcceptFor({ native: runningNatively });
 
   $: searchNeedle = search.trim().toLowerCase();
-  $: renderedTracks = visibleTracks;
+
+  // Only the rows on screen are built, and only their covers fetched. Every
+  // track is still in the list and still scrolled to — see utils/listWindow.js
+  // for why a library of a few thousand made the app unclickable without this.
+  let listEl;
+  let rowsEl;
+  let listScrollTop = 0;
+  let listViewport = 0;
+  let rowHeight = 0;
+  let rowsOffset = 0;
+
+  // The scroller holds a title and sometimes a banner above the rows, so the
+  // rows do not begin at scrollTop 0. Measured rather than assumed, because
+  // that header changes height with what is in it.
+  function measureList() {
+    if (!listEl || !rowsEl) return;
+    const row = rowsEl.querySelector('.pl-track');
+    if (row) {
+      const height = row.getBoundingClientRect().height;
+      if (height > 0 && height !== rowHeight) rowHeight = height;
+    }
+    const offset =
+      rowsEl.getBoundingClientRect().top - listEl.getBoundingClientRect().top + listEl.scrollTop;
+    if (Number.isFinite(offset) && offset !== rowsOffset) rowsOffset = offset;
+  }
+
+  function onListScroll() {
+    listScrollTop = listEl?.scrollTop || 0;
+  }
+
+  // After every render, because the first row cannot be measured before it
+  // exists and the header above it changes height with what is in it. A
+  // reactive statement was tried and is wrong here: it re-runs when the values
+  // it names change, and the row count settles immediately — so it measured
+  // once, too early, found no row, and never looked again. The list then kept
+  // the unmeasured fallback for ever: sixteen rows, no padding, and a scrollbar
+  // that said the library was sixteen tracks long.
+  //
+  // Nothing is assigned unless it differs, so this settles rather than looping.
+  afterUpdate(measureList);
+
+  $: rowWindow = windowRange({
+    scrollTop: listScrollTop - rowsOffset,
+    viewportHeight: listViewport,
+    rowHeight,
+    count: visibleTracks.length
+  });
+  $: renderedTracks = visibleTracks.slice(rowWindow.start, rowWindow.end);
   $: loadCoversFor(renderedTracks);
   $: listedTracks = searchNeedle
     ? playlistTracks.filter(track => matchesSearch(track, searchNeedle))
@@ -1103,7 +1151,7 @@
       {/each}
     </div>
 
-    <div class="pl-tracks">
+    <div class="pl-tracks" bind:this={listEl} bind:clientHeight={listViewport} on:scroll={onListScroll}>
       <p class="pl-section-title">
         {selectedPlaylist ? selectedPlaylist.name : 'All music'}
         {#if selectedPlaylist}<span class="pl-count"> — ✓ adds or removes</span>{/if}
@@ -1176,6 +1224,8 @@
       {:else if !listedTracks.length && searchNeedle}
         <div class="pl-empty">Nothing matches “{search}”.</div>
       {:else}
+        <div class="pl-rows" bind:this={rowsEl}>
+        <div style="height:{rowWindow.padTop}px" aria-hidden="true"></div>
         {#each renderedTracks as track (track.id)}
           {@const available = availableIds.has(track.id)}
           {@const inPlaylist = selectedPlaylist?.trackIds.includes(track.id)}
@@ -1242,6 +1292,8 @@
             {/if}
           </div>
         {/each}
+        <div style="height:{rowWindow.padBottom}px" aria-hidden="true"></div>
+        </div>
       {/if}
     </div>
   </div>
