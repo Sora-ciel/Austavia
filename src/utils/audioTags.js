@@ -32,11 +32,34 @@ export function isSupportedAudioFile(file) {
   return SUPPORTED_AUDIO_EXTENSIONS.includes(extensionOf(file.name));
 }
 
-// For the file picker's accept attribute.
+// For the file picker's accept attribute, on a desktop browser.
 export const AUDIO_ACCEPT_ATTRIBUTE = [
   'audio/*',
   ...SUPPORTED_AUDIO_EXTENSIONS.map(ext => `.${ext}`)
 ].join(',');
+
+/**
+ * What to put on the picker, given where it is going to open.
+ *
+ * Nothing, on a phone. Android turns `accept` into a MIME filter and hands it
+ * to whichever provider is showing the files; anything the provider reports a
+ * different type for is greyed out and cannot be chosen at all. Which types it
+ * gets wrong is the provider's business, not ours — and this file already knows
+ * they are unreliable: `isSupportedAudioFile` exists precisely because .m4a and
+ * friends arrive as video/* or with no type at all. Filtering the picker by the
+ * one thing we have already decided not to trust is how a music file ends up
+ * greyed out in a folder full of music.
+ *
+ * Nothing is lost by asking for everything: whatever comes back still goes
+ * through isSupportedAudioFile, so a file that is not audio is dropped exactly
+ * as it was before. The attribute was never the thing keeping them out.
+ *
+ * A desktop browser keeps the list, where it filters by extension, gets it
+ * right, and saves scrolling past documents.
+ */
+export function audioAcceptFor({ native = false } = {}) {
+  return native ? undefined : AUDIO_ACCEPT_ATTRIBUTE;
+}
 
 export async function readAudioTags(file) {
   const fallback = {

@@ -11,7 +11,7 @@
     isSupportedAudioFile,
     SUPPORTED_AUDIO_EXTENSIONS,
     extensionOf,
-    AUDIO_ACCEPT_ATTRIBUTE
+    audioAcceptFor
   } from '../utils/audioTags.js';
   import {
     saveMusicTrack,
@@ -88,6 +88,12 @@
       .filter(Boolean)
       .some(field => String(field).toLowerCase().includes(needle));
   }
+  // Android's picker greys out anything whose MIME the provider disagrees with,
+  // so it is asked for everything there; see audioAcceptFor.
+  const runningNatively =
+    typeof window !== 'undefined' && Boolean(window.Capacitor?.isNativePlatform?.());
+  const audioAccept = audioAcceptFor({ native: runningNatively });
+
   $: searchNeedle = search.trim().toLowerCase();
   $: renderedTracks = visibleTracks;
   $: loadCoversFor(renderedTracks);
@@ -1061,7 +1067,7 @@
     {#if busyMessage}<span class="pl-busy">{busyMessage}</span>{/if}
     <input
       type="file"
-      accept={AUDIO_ACCEPT_ATTRIBUTE}
+      accept={audioAccept}
       multiple
       hidden
       bind:this={fileInput}
