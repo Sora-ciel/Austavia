@@ -14,8 +14,8 @@ android {
         applicationId "com.sora.austavia"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
-        versionName "0.8.52"
+        versionCode 17
+        versionName "0.8.53"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -65,13 +65,33 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
+// google-services.json is what tells this build which Firebase Android app it
+// is, and Google Sign-In is authorised by that package name together with the
+// signing fingerprint. Without the file the plugin is not applied, the app has
+// no Android OAuth configuration, and sign-in fails on the device with a status
+// code and nothing else.
+//
+// Capacitor's template only printed a line about push notifications and carried
+// on. That is how a release APK was built, signed, published and installed with
+// Google Sign-In entirely non-functional, and nothing said so — the one warning
+// went into a Gradle log nobody reads, and the build reported success.
+//
+// A debug build may go without it. A release must not: it is the one that
+// reaches somebody else's phone.
+def servicesJSON = file('google-services.json')
+if (servicesJSON.exists() && servicesJSON.length() > 0) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.hasTask(':app:assembleRelease') || graph.hasTask(':app:bundleRelease')) {
+            throw new GradleException(
+                'android/app/google-services.json is missing, so Google Sign-In would be dead in this build. ' +
+                'Download it from Firebase Console for the com.sora.austavia app and put it in android/app/. ' +
+                'It is gitignored, so a fresh clone will not have it.'
+            )
+        }
     }
-} catch (Exception e) {
-    println "google-services.json not found, google-services plugin not applied. Push Notifications won't work"
+    println "google-services.json not found: Google Sign-In and push notifications are disabled in this build."
 }
 
 

@@ -63,7 +63,12 @@ keystore.properties
 .cxx/
 
 # Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Left commented out by Capacitor's template, which meant this file was one
+# `git add -A` away from a public repository. It carries the Android API key
+# and the OAuth client ids; Google does not treat those as secrets, since they
+# are bound to the package name and signing fingerprint, but publishing them is
+# a decision to take deliberately rather than by omission.
+google-services.json
 
 # Freeline
 freeline.py
