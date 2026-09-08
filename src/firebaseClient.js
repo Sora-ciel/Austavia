@@ -48,6 +48,29 @@ async function ensureNativeGoogleAuthInitialized() {
   await socialLoginInitPromise;
 }
 
+/**
+ * Get the native Google plugin ready before anybody asks for it.
+ *
+ * Everything sign-in needs used to happen after the tap: the plugin's own
+ * bundle was fetched, `initialize` set up Credential Manager, and only then
+ * could the account picker be asked for. Several seconds of a button that
+ * looks broken — long enough to press again, or to decide it does not work.
+ *
+ * None of that depends on who is signing in, so none of it needs to wait for
+ * the tap. Called once the app has settled, it moves the whole delay into time
+ * nobody is watching, and the tap is left with the picker alone.
+ *
+ * Deliberately quiet: this is an optimisation, and a failure here must not
+ * reach anyone. Sign-in still initialises on demand exactly as before — the
+ * promise is shared, so a tap that arrives mid-warm-up waits for the same one
+ * rather than starting a second.
+ */
+export function prewarmGoogleSignIn() {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!googleWebClientId) return;
+  ensureNativeGoogleAuthInitialized().catch(() => {});
+}
+
 async function signInWithGoogleNative(ctx) {
   if (!googleWebClientId) {
     throw new Error('Google sign-in is not configured for this app (missing web client ID).');

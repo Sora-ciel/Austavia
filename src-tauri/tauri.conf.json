@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Austavia",
-  "version": "0.8.53",
+  "version": "0.8.54",
   "identifier": "com.sora.austavia",
   "build": {
     "frontendDist": "../dist",

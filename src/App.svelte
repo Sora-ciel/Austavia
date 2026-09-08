@@ -20,6 +20,7 @@
     isFirebaseConfigured,
     onAuthStateChange,
     signInWithGoogle,
+    prewarmGoogleSignIn,
     signOutUser,
     loadRemoteFile,
     loadRemoteIndex,
@@ -4125,6 +4126,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // process being killed, so the position is written out there too.
     document.addEventListener("visibilitychange", handleVisibilityForMusic);
     window.addEventListener("pagehide", rememberPlaybackPosition);
+    // Ready the Google plugin now rather than when the button is pressed, so
+    // the tap opens the picker instead of starting the work that leads to it.
+    // Idle time, and it never throws — sign-in still initialises on demand.
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => prewarmGoogleSignIn(), { timeout: 4000 });
+    } else {
+      setTimeout(prewarmGoogleSignIn, 1500);
+    }
+
     setupMediaSessionHandlers();
     // What the notification's own buttons do.
     setBackgroundAudioActions({
