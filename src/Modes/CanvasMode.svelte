@@ -11,6 +11,7 @@
   import TaskBlock from '../components/TaskBlock.svelte';
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
+  import { usesPortraitBackground } from '../utils/modeBackground.js';
 
 
   export let mode;
@@ -232,10 +233,20 @@
   function shouldLetNestedScrollerHandleWheel(event) {
     if (!canvasRef || !(event.target instanceof Element)) return false;
 
-    // Deliberately not limited to the focused block. Requiring focus meant the
-    // wheel over a text block that happened not to be marked focused was taken
-    // by the canvas instead, which is why the page moved under the pointer
-    // seemingly at random.
+    // A scroller inside a block only takes the wheel while that block is
+    // focused. Otherwise every block is a hole in the canvas: the pointer sits
+    // over one more often than not, and the board cannot be scrolled at all.
+    //
+    // This was tried before and removed, because it was written as "is the
+    // focused block an ancestor" — so a wheel over a block that was not focused
+    // went to the canvas *and the block still looked like the thing under the
+    // pointer*, which read as the page moving at random. The difference now is
+    // that a block is focused by clicking it, and clicking is also what puts the
+    // caret in it: by the time anyone is reading a note they have clicked it, so
+    // the block that takes the wheel is the one they are working in.
+    //
+    // Scrollers that are not inside a block — a mode's own panel — are
+    // unaffected; there is no block for them to belong to.
     let current = event.target;
     while (current && current !== canvasRef) {
       const style = getComputedStyle(current);
@@ -245,7 +256,8 @@
       const canScrollX = (overflowX === 'auto' || overflowX === 'scroll') && current.scrollWidth > current.clientWidth;
 
       if (canScrollY || canScrollX) {
-        return true;
+        const block = current.closest('[data-block-id]');
+        return !block || block.classList.contains('focused');
       }
 
       current = current.parentElement;
@@ -507,12 +519,16 @@
     refitCanvas();
 
     const onResize = () => {
-      isMobileViewport = window.innerWidth <= MOBILE_BREAKPOINT;
+      isMobileViewport = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
     };
     window.addEventListener('resize', onResize);
+    // Some phones fire this before the new dimensions have settled into a
+    // resize, so both are listened for and the handler is idempotent.
+    window.addEventListener('orientationchange', onResize);
 
     return () => {
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
       stopRightClickPan();
     };
   });

@@ -3,6 +3,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
+  import { usesPortraitBackground } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
 
@@ -16,9 +17,14 @@
 
   // Per-file background image settings — desktop and phone can each have
   // their own image, picked by the same breakpoint the toolbar uses.
-  let isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT;
+  // Which of the two images to show is decided by the shape of the screen, not
+  // its width: a phone turned sideways is still narrower than a desktop, so a
+  // width threshold never reached the wide picture. See modeBackground.js.
+  let isMobileViewport =
+    typeof window !== 'undefined' &&
+    usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
   function updateViewport() {
-    isMobileViewport = window.innerWidth <= MOBILE_BREAKPOINT;
+    isMobileViewport = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
   }
   // ── Idle-hiding scrollbar ────────────────────────────────────────
   // Fades the thumb out after a few seconds of not scrolling so it stops

@@ -43,7 +43,14 @@
     historyKey={id}
     placeholder=""
     on:change={(e) => { content = e.detail; commit(['content'], { pushToHistory: false }); }}
-    on:scroll={(e) => { scrollTop = e.detail; commit(['scrollTop'], { pushToHistory: false }); }}
+    on:scroll={(e) => {
+      // Only while focused. An unfocused block is not scrollable, and the
+      // browser reports a scroll to 0 as it becomes so — saving that would
+      // throw away where somebody had read up to, every time they clicked away.
+      if (!focused) return;
+      scrollTop = e.detail;
+      commit(['scrollTop'], { pushToHistory: false });
+    }}
     on:focus={ensureFocus}
   />
 </BlockShell>

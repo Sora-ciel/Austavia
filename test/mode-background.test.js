@@ -5,6 +5,7 @@ import {
   BACKGROUND_DEFAULTS,
   normalizeBackgroundSettings,
   backgroundImageFor,
+  usesPortraitBackground,
   backgroundLayerStyle
 } from '../src/utils/modeBackground.js';
 
@@ -129,5 +130,37 @@ describe('backgroundLayerStyle', () => {
       { isMobile: true }
     );
     assert.equal(style.image, 'm.png');
+  });
+});
+
+// This was a width threshold, and a phone held sideways is still narrower than
+// a desktop — so rotating never reached the wide picture.
+describe('which of the two images a screen gets', () => {
+  it('gives a phone held upright the tall image', () => {
+    assert.equal(usesPortraitBackground({ width: 412, height: 915 }), true);
+  });
+
+  it('gives the same phone turned sideways the wide one', () => {
+    assert.equal(usesPortraitBackground({ width: 915, height: 412 }), false);
+  });
+
+  it('leaves a desktop on the wide image, however small the window', () => {
+    assert.equal(usesPortraitBackground({ width: 1920, height: 1080 }), false);
+    assert.equal(usesPortraitBackground({ width: 1100, height: 700 }), false);
+  });
+
+  it('lets a tablet follow how it is held, like the phone', () => {
+    assert.equal(usesPortraitBackground({ width: 768, height: 1024 }), true);
+    assert.equal(usesPortraitBackground({ width: 1024, height: 768 }), false);
+  });
+
+  it('does not call an exactly square window portrait', () => {
+    assert.equal(usesPortraitBackground({ width: 800, height: 800 }), false);
+  });
+
+  it('falls back to the wide image on nonsense dimensions', () => {
+    for (const bad of [{}, { width: 0, height: 0 }, { width: NaN, height: 500 }, undefined]) {
+      assert.equal(usesPortraitBackground(bad), false);
+    }
   });
 });

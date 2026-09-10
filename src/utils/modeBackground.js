@@ -62,6 +62,26 @@ export function normalizeBackgroundSettings(raw = {}, { keepImage = value => val
   };
 }
 
+/**
+ * Whether this screen should use the narrow image rather than the wide one.
+ *
+ * Decided by shape, not by size. It used to be a width threshold — the same
+ * 1024px the toolbar uses to decide it is on a phone — and a phone turned
+ * sideways is still under it. So rotating did nothing: the wide picture, which
+ * is the one that suits a wide screen, never appeared on the device that has
+ * two shapes.
+ *
+ * The two images are really a tall one and a wide one. A desktop is always
+ * wider than it is tall and keeps the wide one exactly as before; a phone gets
+ * whichever matches how it is being held.
+ */
+export function usesPortraitBackground({ width = 0, height = 0 } = {}) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return false;
+  return h > w;
+}
+
 /** Which of the two images this screen should show. */
 export function backgroundImageFor(settings, { isMobile = false } = {}) {
   const s = settings || {};

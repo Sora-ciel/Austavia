@@ -293,6 +293,23 @@
      editor imposed on itself, at the same specificity, so the winner depended
      on stylesheet order — the editor defaults to transparent and inherit now,
      and a block's own colours reach it the ordinary way. */
+  /* A block only takes the finger while it is focused.
+     The wheel is decided in CanvasMode, which can inspect what is under the
+     pointer; touch scrolling is the browser's own and has to be settled here.
+     Left scrollable, an unfocused block swallows every drag that begins over
+     it — and on a full board that is most of the screen, so the canvas cannot
+     be moved at all.
+
+     Inert rather than `overflow: hidden`, which was tried first and is wrong:
+     making a scroller unscrollable clamps it to the top, so clicking away from
+     a long note threw away where you had read up to. Untouchable leaves the
+     scroller exactly as it was — the position is still there when you come
+     back. The drag falls through to the canvas, and a tap lands on the block
+     itself, which is what focuses it. */
+  .note:not(.focused) :global(.tiptap-wrap) {
+    pointer-events: none;
+  }
+
   :global(.note .tiptap-wrap) {
     font-size: 1.1rem;
     font-weight: 500;
