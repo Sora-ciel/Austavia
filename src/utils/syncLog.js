@@ -22,7 +22,71 @@ const MAX_ENTRIES = 300;
 // anything long is cut down before it is kept.
 const MAX_VALUE_CHARS = 80;
 
-let entries = [];
+// ── Surviving a restart ───────────────────────────────────────────
+//
+// The log used to live only in memory, which loses it exactly when it is worth
+// most: a sync that hangs on a phone is fixed by force-stopping the app, and
+// force-stopping is what throws away the record of what it was doing. Every
+// time the problem was made to go away, the evidence went with it.
+//
+// So the tail of it is written down and read back on the next run, kept apart
+// from this run's lines. What is carried over is the minutes leading up to the
+// restart — the part describing the state that had to be killed.
+const STORAGE_KEY = 'syncLogTail';
+export const CARRY_OVER_MS = 5 * 60 * 1000;
+// A cap as well as a window, so a loop writing hundreds of lines a second
+// cannot fill storage with five minutes of itself.
+const CARRY_OVER_MAX = 120;
+
+/**
+ * Which lines from the last run are worth keeping, given when this one starts.
+ *
+ * Marked `previous` so a reader can tell what happened before the restart from
+ * what happened after it — the two are almost never the same story, and the
+ * first is usually the one being asked about.
+ */
+export function carryOver(stored, now = Date.now(), window = CARRY_OVER_MS) {
+  if (!Array.isArray(stored)) return [];
+  return stored
+    .filter(entry => entry && Number.isFinite(Number(entry.at)) && now - Number(entry.at) <= window)
+    .slice(-CARRY_OVER_MAX)
+    .map(entry => ({ ...entry, previous: true }));
+}
+
+function readStored() {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    return carryOver(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+  } catch {
+    // Unreadable or unparseable is the same as absent. A diagnostic that
+    // refuses to start because its own history is corrupt helps nobody.
+    return [];
+  }
+}
+
+// Writing on every line would mean a JSON round trip per log entry during the
+// busiest moment there is. Coalesced instead, and flushed when the app is being
+// put away — which on a phone is the last moment there is.
+let writeTimer = null;
+function persistSoon() {
+  if (typeof localStorage === 'undefined' || writeTimer !== null) return;
+  writeTimer = setTimeout(() => {
+    writeTimer = null;
+    persistNow();
+  }, 2000);
+}
+
+export function persistNow() {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const tail = entries.slice(-CARRY_OVER_MAX).map(({ previous, ...rest }) => rest);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tail));
+  } catch {
+    // Storage full or blocked. Logging must never be the thing that throws.
+  }
+}
+
+let entries = readStored();
 let listeners = new Set();
 
 function notify() {
@@ -40,6 +104,7 @@ export function logSync(kind, folder, message, detail = null) {
     ...entries.slice(-(MAX_ENTRIES - 1)),
     { at: Date.now(), kind, folder: folder ?? '', message, detail }
   ];
+  persistSoon();
   notify();
 }
 
@@ -49,6 +114,9 @@ export function getSyncLog() {
 
 export function clearSyncLog() {
   entries = [];
+  // Clearing means clearing, including what was carried over — otherwise the
+  // lines come back on the next start and the button appears not to work.
+  persistNow();
   notify();
 }
 

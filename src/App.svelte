@@ -66,7 +66,8 @@
   import { withoutEmptyValues, unpaintThemeColours } from './utils/syncRules.js';
   // Sync writes down what it decided, so a loop can be read back instead of
   // guessed at. See utils/syncLog.js.
-  import { logSync, describeDifference, getSyncLog } from './utils/syncLog.js';
+  import { logSync, describeDifference, getSyncLog, persistNow } from './utils/syncLog.js';
+  import { stalledLocks, anyHeld } from './utils/syncLocks.js';
   import { buildDiagnostics, formatDiagnostics } from './utils/diagnostics.js';
   // How long a typing save waits, and the ceiling that stops it waiting for
   // ever. See utils/saveScheduling.js.
@@ -1975,6 +1976,48 @@
   // The account's stored-byte record, streamed from storage/{uid}. Null until
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
+  // When each lock last got somewhere, so one that stopped moving can be let
+  // go of. The flags below are cleared in a `finally`, which covers finishing
+  // and covers failing — but not an await that never settles, and that is the
+  // one that leaves sync stuck until the app is force-stopped. See
+  // utils/syncLocks.js.
+  let lockProgress = { upload: null, download: null, bootstrap: null, gate: null };
+
+  function takeLock(name) {
+    lockProgress = { ...lockProgress, [name]: Date.now() };
+  }
+
+  /** Still getting somewhere. Called as each step lands, not once at the start. */
+  function lockProgressed(name) {
+    if (lockProgress[name] === null) return;
+    lockProgress = { ...lockProgress, [name]: Date.now() };
+  }
+
+  function releaseLock(name) {
+    lockProgress = { ...lockProgress, [name]: null };
+  }
+
+  // Absolute rather than incremental, like every other recomputing pass here:
+  // it looks at how long each lock has sat without progress and decides from
+  // that, so it is safe to run at any time and safe to run twice.
+  function releaseStalledSyncLocks() {
+    if (!anyHeld(lockProgress)) return;
+
+    const stalled = stalledLocks(lockProgress);
+    for (const name of stalled) {
+      if (name === 'upload') uploadInProgress = false;
+      if (name === 'download') downloadInProgress = false;
+      if (name === 'bootstrap') cloudBootstrapInProgress = false;
+      if (name === 'gate') cloudSyncGateInProgress = false;
+      releaseLock(name);
+      logSync(
+        'error',
+        currentSaveName,
+        `sync ${name} stopped responding and was released, so syncing can carry on`
+      );
+    }
+  }
+
   let uploadInProgress = false;
   let downloadInProgress = false;
   let fileInputRef;
@@ -3344,6 +3387,7 @@
   async function uploadFilesToCloud(names, options = {}) {
     if (uploadInProgress) return { uploadedCount: 0, uploadedNames: [], failures: [], unsyncable: [] };
     uploadInProgress = true;
+    takeLock('upload');
     try {
       const uploadedNames = [];
       const failures = [];
@@ -3368,11 +3412,17 @@
           failures.push({ fileName, error });
           logSync('error', fileName, error?.message || String(error));
           console.error(`Could not sync "${fileName}" to the cloud:`, error);
+        } finally {
+          // Every file, finished or failed: a folder of pictures on a slow
+          // connection is allowed to take as long as it takes, so long as it
+          // keeps arriving somewhere. Only a run that stops moving is let go of.
+          lockProgressed('upload');
         }
       }
       return { uploadedCount: uploadedNames.length, uploadedNames, failures, unsyncable };
     } finally {
       uploadInProgress = false;
+      releaseLock('upload');
     }
   }
 
@@ -3596,6 +3646,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     if (autoSyncDownloadIntervalId !== null) return;
 
     autoSyncDownloadIntervalId = window.setInterval(() => {
+      // Before asking for anything: a lock that stopped responding blocks every
+      // attempt after it, so the tick that keeps sync honest is also the one
+      // that lets go of it.
+      releaseStalledSyncLocks();
       pullRemoteUpdatesIfNeeded().catch(error => {
         console.error('Auto sync download backstop failed:', error);
       });
@@ -3720,11 +3774,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     persistAutoSyncEnabled(true);
     autoSyncDirty = true;
     cloudSyncGateInProgress = true;
+    takeLock('gate');
     try {
       await pullRemoteUpdatesIfNeeded();
       await remountCurrentSaveIfLoaded();
     } finally {
       cloudSyncGateInProgress = false;
+      releaseLock('gate');
     }
   }
 
@@ -3742,6 +3798,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     if (downloadInProgress) return;
 
     downloadInProgress = true;
+    takeLock('download');
     try {
       await pullRemoteUpdatesIfNeeded({ showInfo: true });
     } catch (error) {
@@ -3749,6 +3806,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       await appAlert(`Download failed: ${error?.message || error}`);
     } finally {
       downloadInProgress = false;
+      releaseLock('download');
     }
   }
 
@@ -3797,6 +3855,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     if (cloudBootstrapInProgress) return;
 
     cloudBootstrapInProgress = true;
+    takeLock('bootstrap');
     try {
       const previousUid = loadSyncedUid();
       const localBeforeSync = await listSavedBlocks();
@@ -3877,6 +3936,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       cloudBootstrapComplete = true;
     } finally {
       cloudBootstrapInProgress = false;
+      releaseLock('bootstrap');
     }
   }
 
@@ -4126,6 +4186,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // process being killed, so the position is written out there too.
     document.addEventListener("visibilitychange", handleVisibilityForMusic);
     window.addEventListener("pagehide", rememberPlaybackPosition);
+    // The log is coalesced while running; this is the last chance to write it,
+    // and a phone being put away is exactly when the process may not come back.
+    window.addEventListener("pagehide", persistNow);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") persistNow();
+    });
     // Ready the Google plugin now rather than when the button is pressed, so
     // the tap opens the picker instead of starting the work that leads to it.
     // Idle time, and it never throws — sign-in still initialises on demand.

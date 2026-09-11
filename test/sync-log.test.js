@@ -13,7 +13,9 @@ import {
   clearSyncLog,
   subscribeSyncLog,
   describeDifference,
-  formatSyncLog
+  formatSyncLog,
+  carryOver,
+  CARRY_OVER_MS
 } from '../src/utils/syncLog.js';
 
 test('the difference between two folders is named exactly', async t => {
@@ -134,5 +136,46 @@ test('the log keeps what matters and lets go of the rest', async t => {
   await t.test('an empty log says so rather than being blank', () => {
     clearSyncLog();
     assert.match(formatSyncLog(), /Nothing logged yet/);
+  });
+});
+
+// A sync that hangs on a phone is fixed by force-stopping the app — which is
+// also what used to throw away the record of what it had been doing. Every time
+// the problem was made to go away, the evidence went with it.
+test('the log carries over a restart', async t => {
+  const NOW = 1_000_000_000_000;
+  const at = msAgo => NOW - msAgo;
+
+  await t.test('keeps the minutes leading up to the restart', () => {
+    const kept = carryOver([{ at: at(1000), kind: 'save', message: 'a' }], NOW);
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0].message, 'a');
+  });
+
+  await t.test('marks them so this run can be told from the last', () => {
+    const kept = carryOver([{ at: at(1000), kind: 'save', message: 'a' }], NOW);
+    assert.equal(kept[0].previous, true);
+  });
+
+  await t.test('drops anything older than the window', () => {
+    const stored = [
+      { at: at(CARRY_OVER_MS + 1), kind: 'save', message: 'old' },
+      { at: at(1000), kind: 'save', message: 'recent' }
+    ];
+    assert.deepEqual(carryOver(stored, NOW).map(e => e.message), ['recent']);
+  });
+
+  await t.test('caps how much is carried, so a loop cannot fill storage', () => {
+    const flood = Array.from({ length: 500 }, (_, i) => ({ at: at(1000), kind: 'save', message: `l${i}` }));
+    const kept = carryOver(flood, NOW);
+    assert.ok(kept.length <= 120, `kept ${kept.length}`);
+    assert.equal(kept[kept.length - 1].message, 'l499', 'the newest lines are the ones kept');
+  });
+
+  await t.test('treats unreadable history as no history', () => {
+    assert.deepEqual(carryOver(null, NOW), []);
+    assert.deepEqual(carryOver(undefined, NOW), []);
+    assert.deepEqual(carryOver('not an array', NOW), []);
+    assert.deepEqual(carryOver([null, { message: 'no timestamp' }, { at: 'soon' }], NOW), []);
   });
 });
