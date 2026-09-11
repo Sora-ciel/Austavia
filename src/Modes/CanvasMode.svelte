@@ -12,6 +12,7 @@
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
+  import { nestedScrollerTakesWheel } from '../utils/scrollOwnership.js';
 
 
   export let mode;
@@ -233,20 +234,12 @@
   function shouldLetNestedScrollerHandleWheel(event) {
     if (!canvasRef || !(event.target instanceof Element)) return false;
 
-    // A scroller inside a block only takes the wheel while that block is
-    // focused. Otherwise every block is a hole in the canvas: the pointer sits
-    // over one more often than not, and the board cannot be scrolled at all.
-    //
-    // This was tried before and removed, because it was written as "is the
-    // focused block an ancestor" — so a wheel over a block that was not focused
-    // went to the canvas *and the block still looked like the thing under the
-    // pointer*, which read as the page moving at random. The difference now is
-    // that a block is focused by clicking it, and clicking is also what puts the
-    // caret in it: by the time anyone is reading a note they have clicked it, so
-    // the block that takes the wheel is the one they are working in.
-    //
-    // Scrollers that are not inside a block — a mode's own panel — are
-    // unaffected; there is no block for them to belong to.
+    // The rule itself is in utils/scrollOwnership.js, with tests named after
+    // what was asked for. It is not here because it was deleted from here once
+    // — it looked like the cause of a different scrolling complaint, nothing
+    // failed when it went, and the only record that anyone had wanted it was a
+    // conversation months earlier. Walking the DOM needs a DOM and stays here;
+    // what gets decided does not.
     let current = event.target;
     while (current && current !== canvasRef) {
       const style = getComputedStyle(current);
@@ -257,13 +250,17 @@
 
       if (canScrollY || canScrollX) {
         const block = current.closest('[data-block-id]');
-        return !block || block.classList.contains('focused');
+        return nestedScrollerTakesWheel({
+          scroller: true,
+          insideBlock: Boolean(block),
+          blockFocused: Boolean(block && block.classList.contains('focused'))
+        });
       }
 
       current = current.parentElement;
     }
 
-    return false;
+    return nestedScrollerTakesWheel({ scroller: false });
   }
 
   function onWheel(event) {

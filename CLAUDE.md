@@ -59,6 +59,39 @@ decide, `storageAccounting.js` and `index.js` act.
 The test suites and what each is for are in [`test/README.md`](test/README.md).
 `npm test` must stay fast and dependency-free; it gates every build.
 
+## A behaviour that was asked for gets a test that says so
+
+Code cannot tell the difference between a rule somebody wanted and an accident
+nobody noticed. Both look like a line you could delete.
+
+Scrolling inside a block only while that block is focused was asked for and
+built on 2026-05-18. On 2026-08-26 it was deleted while fixing a different
+complaint — scrolling escaping into the canvas — because the focus requirement
+looked like the cause. Nothing failed. The commit that removed it recorded a
+confident account of why the rule had been wrong, and from then on that account
+read as history, including to whoever had written it. It was reported again as
+a bug six weeks later.
+
+Three things let that happen, and all three are avoidable:
+
+- **The rule was inside a `.svelte` file**, so no test could reach it. This is
+  the doctrine above, and it applies to interaction rules exactly as it does to
+  sync rules — `utils/scrollOwnership.js` exists for that reason.
+- **The commit that introduced it was one line with no body.** A request is the
+  only reason some code exists; if the commit does not say so, nothing does.
+- **Removing it broke nothing.** A comment can be argued past by somebody who
+  believes they have found the cause. A red test cannot.
+
+So when something is built because it was asked for, write the test in the
+words of the request — `a block only takes the scroll while it is focused`, not
+`returns false when blockFocused is false` — and say in the test file that the
+behaviour was wanted. Then the next person to decide it looks wrong has to read
+that first, and deleting it costs an argument rather than nothing.
+
+Judgement still applies: a request can be superseded, and the user can change
+their mind. The point is that it should be a decision, taken with the intent in
+front of you, and not a tidy-up.
+
 ## Releasing goes by the checklist, not by memory
 
 [`RELEASE.md`](RELEASE.md) has every step in order. Follow it whenever the ask
