@@ -5,6 +5,8 @@ import {
   BACKGROUND_DEFAULTS,
   normalizeBackgroundSettings,
   backgroundImageFor,
+  noteImageFilter,
+  noteImageFilterCss,
   usesPortraitBackground,
   backgroundLayerStyle
 } from '../src/utils/modeBackground.js';
@@ -162,5 +164,59 @@ describe('which of the two images a screen gets', () => {
     for (const bad of [{}, { width: 0, height: 0 }, { width: NaN, height: 500 }, undefined]) {
       assert.equal(usesPortraitBackground(bad), false);
     }
+  });
+});
+
+// Pictures pasted into a note are whatever brightness they happened to be,
+// which on a dark theme is usually a hole burned in the page.
+describe('dimming pictures inside a note', () => {
+  it('follows the wallpaper by default, so one pair of dials covers both', () => {
+    const out = noteImageFilter({ bgOpacity: 40, bgLuminosity: 60, imageOpacity: 100, imageLuminosity: 100 });
+    assert.equal(out.follows, true);
+    assert.equal(out.opacity, 0.4);
+    assert.equal(out.brightness, 0.6);
+  });
+
+  it('uses its own dials once told not to follow', () => {
+    const out = noteImageFilter({
+      imagesFollowBackground: false,
+      bgOpacity: 40, bgLuminosity: 60,
+      imageOpacity: 90, imageLuminosity: 120
+    });
+    assert.equal(out.follows, false);
+    assert.equal(out.opacity, 0.9);
+    assert.equal(out.brightness, 1.2);
+  });
+
+  it('treats a folder saved before these existed as following', () => {
+    const out = noteImageFilter({ bgOpacity: 50, bgLuminosity: 100 });
+    assert.equal(out.follows, true);
+    assert.equal(out.opacity, 0.5);
+  });
+
+  it('clamps nonsense rather than producing an invalid filter', () => {
+    const out = noteImageFilter({
+      imagesFollowBackground: false,
+      imageOpacity: 5000, imageLuminosity: -40
+    });
+    assert.equal(out.opacity, 1);
+    assert.equal(out.brightness, 0);
+  });
+
+  it('asks for no filter at all when nothing would change', () => {
+    assert.equal(noteImageFilterCss({ bgOpacity: 100, bgLuminosity: 100 }), null,
+      'a filter makes a stacking context even when it changes nothing');
+    assert.equal(noteImageFilterCss({}), null);
+  });
+
+  it('writes a filter when something would change', () => {
+    assert.equal(noteImageFilterCss({ bgOpacity: 50, bgLuminosity: 100 }), 'opacity(0.5) brightness(1)');
+  });
+
+  it('normalising keeps the new dials and defaults them to following', () => {
+    const out = normalizeBackgroundSettings({});
+    assert.equal(out.imageOpacity, 100);
+    assert.equal(out.imageLuminosity, 100);
+    assert.equal(out.imagesFollowBackground, true);
   });
 });

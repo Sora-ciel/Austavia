@@ -3,7 +3,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
-  import { usesPortraitBackground } from '../utils/modeBackground.js';
+  import { usesPortraitBackground, noteImageFilterCss } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
 
@@ -87,11 +87,19 @@
   // The scrollbar sits over the background image, so it tracks that image's
   // opacity — but never drops below 20%, or it would vanish entirely on a
   // faint background and leave nothing to grab.
+  // Pictures pasted into the note, dimmed like the wallpaper. Handed down as a
+  // variable rather than applied here, because the pictures live inside the
+  // editor's own markup — this mode does not own them and should not reach in.
+  $: noteImageFilter = noteImageFilterCss(singleNoteSettings);
   $: scrollbarAlpha = Math.max(0.2, bgImage ? bgOpacity : 1);
   $: canvasCssVars =
     `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg};` +
     ` --mode-text-color: ${modeTextColor}; --active-note-bg: ${activeNoteBg};` +
     ` --active-note-text: ${activeNoteText}; --sb-alpha: ${scrollbarAlpha};`;
+
+  // Appended rather than folded in, so a note with nothing to dim carries no
+  // --note-image-filter at all and the rule below stays inert.
+  $: noteImageVars = noteImageFilter ? ` --note-image-filter: ${noteImageFilter};` : '';
 
   $: noteBlocks = blocks.filter(
     block => block.type === 'text' || block.type === 'cleantext'
@@ -260,6 +268,11 @@
   .single-note.has-bg-image .note-meta,
   .single-note.has-bg-image .note-footer { background: transparent; }
   .single-note.has-bg-image :global(.tiptap-wrap) { background: transparent; }
+  /* Only when something is set — an unset variable leaves no filter, so a note
+     with nothing to dim gets no stacking context it did not ask for. */
+  .single-note :global(.tiptap-inner img) {
+    filter: var(--note-image-filter);
+  }
   .single-note > .note-tabs,
   .single-note > .note-meta,
   .single-note > :global(.tiptap-wrap),
@@ -350,7 +363,7 @@
   class:has-bg-image={bgImage}
   class:sb-idle={scrollbarIdle}
   bind:this={canvasRef}
-  style={canvasCssVars}
+  style={canvasCssVars + noteImageVars}
   on:scroll|capture={wakeScrollbar}
   on:pointermove={handleNotePointerMove}
   on:wheel|passive={wakeScrollbar}

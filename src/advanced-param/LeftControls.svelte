@@ -159,6 +159,12 @@
   $: bgOpacity = backgroundSettings?.bgOpacity ?? 100;
   $: bgBlur = backgroundSettings?.bgBlur ?? 0;
   $: bgLuminosity = backgroundSettings?.bgLuminosity ?? 100;
+  // Pictures pasted into the note. They follow the wallpaper unless told not
+  // to, so the two extra dials are only shown once that is turned off — a pair
+  // of sliders that cannot do anything is worse than no sliders.
+  $: imagesFollowBackground = backgroundSettings?.imagesFollowBackground !== false;
+  $: imageOpacity = backgroundSettings?.imageOpacity ?? 100;
+  $: imageLuminosity = backgroundSettings?.imageLuminosity ?? 100;
   $: bgSize = backgroundSettings?.bgSize || 'cover';
 
   function setBgSetting(patch) {
@@ -520,6 +526,21 @@ onMount(() => {
     box-shadow: 0 12px 28px rgba(0,0,0,0.55);
   }
   .bg-panel-row { display: flex; gap: 6px; }
+  .bg-section-divider {
+    height: 1px;
+    background: color-mix(in srgb, var(--left-text-color, #ffffff) 18%, transparent);
+  }
+  .bg-check-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--left-text-color, #ffffff);
+  }
+  .bg-check-row input {
+    accent-color: var(--left-text-color, #ffffff);
+    cursor: pointer;
+  }
   .bg-file-btn {
     flex: 1;
     text-align: center;
@@ -1004,6 +1025,7 @@ onMount(() => {
                 </span>
                 <span class="bg-val">{Math.round(bgLuminosity)}%</span>
               </label>
+
               <div class="bg-slider-row">
                 <span>Fit</span>
                 <div class="bg-size-toggle">
@@ -1011,6 +1033,39 @@ onMount(() => {
                   <button class:active={bgSize === 'contain'} on:click={() => setBgSetting({ bgSize: 'contain' })}>Contain</button>
                 </div>
               </div>
+            {/if}
+            <!-- Outside the wallpaper condition on purpose: a picture pasted
+                 into a note is whatever brightness it happened to be, and that
+                 is worth turning down whether or not the folder has a
+                 background. With none, following simply leaves them alone. -->
+            <div class="bg-section-divider" role="presentation"></div>
+
+            <label class="bg-check-row">
+              <input
+                type="checkbox"
+                checked={imagesFollowBackground}
+                on:change={(e) => setBgSetting({ imagesFollowBackground: e.target.checked })}
+              />
+              <span>Pictures in the note follow these</span>
+            </label>
+
+            {#if !imagesFollowBackground}
+              <label class="bg-slider-row">
+                <span>Picture opacity</span>
+                <span class="bg-slider" style="--fill: {imageOpacity}%">
+                  <input type="range" min="0" max="100" step="1" value={imageOpacity}
+                    on:input={(e) => setBgSetting({ imageOpacity: Number(e.target.value) })} />
+                </span>
+                <span class="bg-val">{Math.round(imageOpacity)}%</span>
+              </label>
+              <label class="bg-slider-row">
+                <span>Picture luminosity</span>
+                <span class="bg-slider" style="--fill: {(imageLuminosity / 200) * 100}%">
+                  <input type="range" min="0" max="200" step="1" value={imageLuminosity}
+                    on:input={(e) => setBgSetting({ imageLuminosity: Number(e.target.value) })} />
+                </span>
+                <span class="bg-val">{Math.round(imageLuminosity)}%</span>
+              </label>
             {/if}
           </div>
         {/if}

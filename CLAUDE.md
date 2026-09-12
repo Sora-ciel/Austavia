@@ -92,6 +92,29 @@ Judgement still applies: a request can be superseded, and the user can change
 their mind. The point is that it should be a decision, taken with the intent in
 front of you, and not a tidy-up.
 
+## Anything new is the theme's colour before it is any other
+
+The app is themed, and that is meant to be the default rather than something
+each new control opts into. A control that picks its own colour looks fine on
+the theme it was written under and wrong on the other ten, and nobody finds out
+until somebody switches.
+
+So a new element takes a colour every theme already provides —
+`--app-text`, `--app-bg`, `--app-surface`, `--app-border`, `--sb-thumb`,
+`--sb-track` — or inherits. No hardcoded hex, and no borrowing a palette that
+happens to be nearby because it is in the same file.
+
+If something should differ from the rest, that is a deliberate thing: give it
+its own named variable, set it in the themes, and say what it is for. The
+difference is then something a theme can express rather than a colour one
+control decided for itself.
+
+This was asked for in as many words — every colour in the app should come from
+the theme, so that anything added later follows without being told. The Bg
+panel's sliders are what the rule is written from: they took the left panel's
+text colour, which is a theme colour, so nothing looked wrong from the inside —
+and they still did not match the mode they were sitting over.
+
 ## Releasing goes by the checklist, not by memory
 
 [`RELEASE.md`](RELEASE.md) has every step in order. Follow it whenever the ask

@@ -17,6 +17,15 @@ export const BACKGROUND_DEFAULTS = {
   // 0–200. 100 leaves the image alone, below blends black in, above white.
   bgLuminosity: 100,
   bgSize: 'cover',
+  // Pictures pasted into a note, dimmed the same way the wallpaper is. A photo
+  // pasted in is whatever brightness it happened to be, which on a dark theme
+  // is usually a hole burned in the page.
+  imageOpacity: 100,
+  imageLuminosity: 100,
+  // On by default, because one pair of controls is the simpler thing to meet
+  // first: the pictures in the note match the picture behind it until somebody
+  // wants them not to.
+  imagesFollowBackground: true,
   // Set when somebody removes a background a theme supplied, so it stays
   // removed for this folder instead of coming straight back on next render.
   bgThemeOptOut: false
@@ -58,8 +67,48 @@ export function normalizeBackgroundSettings(raw = {}, { keepImage = value => val
     bgBlur: Math.max(0, Number(given.bgBlur) || 0),
     bgLuminosity: clampRange(given.bgLuminosity, 0, 200, BACKGROUND_DEFAULTS.bgLuminosity),
     bgSize: given.bgSize === 'contain' ? 'contain' : 'cover',
-    bgThemeOptOut: given.bgThemeOptOut === true
+    bgThemeOptOut: given.bgThemeOptOut === true,
+    imageOpacity: clampRange(given.imageOpacity, 0, 100, BACKGROUND_DEFAULTS.imageOpacity),
+    imageLuminosity: clampRange(given.imageLuminosity, 0, 200, BACKGROUND_DEFAULTS.imageLuminosity),
+    // Absent means following, so a folder saved before these existed behaves
+    // the way it always did rather than suddenly holding two unset dials.
+    imagesFollowBackground: given.imagesFollowBackground !== false
   };
+}
+
+/**
+ * How pictures inside a note should be dimmed.
+ *
+ * Two dials, and a switch deciding whether they are their own or the
+ * wallpaper's. Following is the default: the usual wish is that everything in
+ * the note sits at the same level, and one pair of sliders says that without
+ * having to keep two in step by hand. Turning it off is for the case the
+ * wallpaper wants to be faint and the pictures do not.
+ *
+ * Returned as numbers rather than a CSS string so the caller decides where the
+ * filter goes, and so this can be checked without a browser.
+ */
+export function noteImageFilter(settings) {
+  const s = settings || {};
+  const follows = s.imagesFollowBackground !== false;
+
+  const opacity = clampRange(follows ? s.bgOpacity : s.imageOpacity, 0, 100, 100);
+  const luminosity = clampRange(follows ? s.bgLuminosity : s.imageLuminosity, 0, 200, 100);
+
+  return { opacity: opacity / 100, brightness: luminosity / 100, follows };
+}
+
+/**
+ * The same thing as a CSS filter, or null when it would do nothing.
+ *
+ * Null rather than `filter: none` so a note with nothing to dim carries no
+ * filter at all — a filter creates a stacking context even when it changes
+ * nothing, and that has a habit of moving things that were positioned.
+ */
+export function noteImageFilterCss(settings) {
+  const { opacity, brightness } = noteImageFilter(settings);
+  if (opacity === 1 && brightness === 1) return null;
+  return `opacity(${opacity}) brightness(${brightness})`;
 }
 
 /**
