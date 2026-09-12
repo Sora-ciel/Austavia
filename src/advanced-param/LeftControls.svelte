@@ -49,13 +49,14 @@
 
   $: theme = { ...defaultColors, ...(colors || {}) };
   $: leftCssVars = Object.entries({
-    // Feeds the shared scrollbar and slider colours. The rule across the app is
-    // that a bar is the text colour of whatever it sits in and its groove is the
-    // background — so here that is the panel's own text and panel colour. It was
-    // the *button* text, which is a different colour in most themes and made the
-    // sliders in this panel the only ones not matching the writing beside them.
+    // A bar is the colour of the text around it and its groove is the
+    // background behind it. In this panel the text around it is button text:
+    // almost everything in the left controls is a button, so that is what the
+    // controls read as. `textColor` is a second, usually paler colour that only
+    // the Bg panel's prose was using — which is exactly why that panel looked
+    // like it belonged to something else.
     "--sb-track": theme.panelBg,
-    "--sb-thumb": theme.textColor,
+    "--sb-thumb": theme.buttonText,
     "--left-panel-bg": theme.panelBg,
     "--left-text-color": theme.textColor,
     "--left-button-bg": theme.buttonBg,
@@ -531,14 +532,14 @@ onMount(() => {
   .bg-panel-row { display: flex; gap: 6px; }
   .bg-section-divider {
     height: 1px;
-    background: color-mix(in srgb, var(--left-text-color, #ffffff) 18%, transparent);
+    background: color-mix(in srgb, var(--left-button-text, #ffffff) 18%, transparent);
   }
   .bg-check-row {
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    color: var(--left-text-color, #ffffff);
+    color: var(--left-button-text, #ffffff);
   }
   .bg-check-row input {
     accent-color: var(--sb-thumb, #ffffff);
@@ -569,7 +570,7 @@ onMount(() => {
     align-items: center;
     gap: 8px;
     font-size: 0.78rem;
-    color: var(--left-text-color, #ffffff);
+    color: var(--left-button-text, #ffffff);
   }
   .bg-slider-row > span:first-child { width: 62px; flex-shrink: 0; }
 
@@ -677,9 +678,9 @@ onMount(() => {
   /* Tinted from the panel's own text rather than a fixed blue, which belonged
      to no theme and was simply the colour somebody had to hand. */
   .bg-size-toggle button.active {
-    background: color-mix(in srgb, var(--left-text-color, #ffffff) 22%, transparent);
-    border-color: color-mix(in srgb, var(--left-text-color, #ffffff) 45%, transparent);
-    color: var(--left-text-color, #ffffff);
+    background: color-mix(in srgb, var(--left-button-text, #ffffff) 22%, transparent);
+    border-color: color-mix(in srgb, var(--left-button-text, #ffffff) 45%, transparent);
+    color: var(--left-button-text, #ffffff);
   }
 
   @media (max-width: 1024px) {
