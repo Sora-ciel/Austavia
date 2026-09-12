@@ -65,13 +65,14 @@
 
 
   $: isSimpleNoteMode = Boolean(activeModeDefinition?.settings?.simpleColumns);
-  $: isSingleNoteMode = Boolean(activeModeDefinition?.settings?.singleBackground);
-  // Canvas mode has the same wallpaper Single Note does, so it gets the same
-  // panel. Which settings object the panel writes to is the only difference,
-  // and that is what backgroundSettingsKey answers.
-  $: hasModeBackground = isSingleNoteMode || mode === "default";
-  $: backgroundSettingsKey = isSingleNoteMode ? "single" : "default";
-  $: backgroundSettings = isSingleNoteMode ? singleNoteSettings : canvasBackgroundSettings;
+  // Named for what the flag means rather than for the mode that had it first:
+  // Single Note and Playlist both draw the wallpaper kept in modeSettings.single,
+  // and more modes may. Canvas has the same panel but its own settings, which is
+  // the only difference between them and what backgroundSettingsKey answers.
+  $: usesSharedWallpaper = Boolean(activeModeDefinition?.settings?.singleBackground);
+  $: hasModeBackground = usesSharedWallpaper || mode === "default";
+  $: backgroundSettingsKey = usesSharedWallpaper ? "single" : "default";
+  $: backgroundSettings = usesSharedWallpaper ? singleNoteSettings : canvasBackgroundSettings;
   $: availableAddBlockTypes = activeModeDefinition?.addBlockTypes || [];
   $: canAddBlock = (type) => availableAddBlockTypes.includes(type);
   $: addBlockDefinitions = getBlockDefinitions(availableAddBlockTypes);

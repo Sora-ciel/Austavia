@@ -14,6 +14,8 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
+  import ModeBackground from '../components/ModeBackground.svelte';
+  import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
   import {
     saveMusicTrack,
     deleteMusicTrack,
@@ -89,6 +91,23 @@
       .filter(Boolean)
       .some(field => String(field).toLowerCase().includes(needle));
   }
+  // The folder's wallpaper — the same settings Single Note keeps, not a copy,
+  // so one picture is chosen once and both modes show it. The drawing is
+  // ModeBackground.svelte and the normalising is utils/modeBackground.js, which
+  // is what stops the two from drifting apart.
+  export let backgroundSettings = {};
+
+  let isPortraitScreen =
+    typeof window !== 'undefined' &&
+    usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
+  function updateScreenShape() {
+    isPortraitScreen = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
+  }
+
+  // With a picture behind them the panels get out of its way; without one they
+  // keep the theme's colour, exactly as before. Same rule Single Note uses.
+  $: wallpaper = backgroundImageFor(backgroundSettings, { isMobile: isPortraitScreen });
+
   // Android's picker greys out anything whose MIME the provider disagrees with,
   // so it is asked for everything there; see audioAcceptFor.
   const runningNatively =
@@ -154,6 +173,9 @@
     availableIds = await getAvailableMusicIds();
   }
   onMount(async () => {
+    updateScreenShape();
+    window.addEventListener('resize', updateScreenShape);
+    window.addEventListener('orientationchange', updateScreenShape);
     await refreshAvailability();
     // Only lists stored keys, so it costs nothing on open.
     orphanIds = await findOrphans();
@@ -187,6 +209,8 @@
   }
 
   onDestroy(() => {
+    window.removeEventListener('resize', updateScreenShape);
+    window.removeEventListener('orientationchange', updateScreenShape);
     for (const url of Object.values(coverUrls)) if (url) URL.revokeObjectURL(url);
   });
 
@@ -773,6 +797,8 @@
     width: 100%;
     box-sizing: border-box;
     overflow: hidden;
+    /* so the wallpaper holder sits against this box rather than the page */
+    position: relative;
     /* The whole surface, not just the panels, so no untouched corner is left
        showing the app background through. */
     background: var(--canvas-inner-bg, #000);
@@ -816,6 +842,35 @@
     min-height: 0;
     display: grid;
     grid-template-columns: 210px minmax(0, 1fr);
+  }
+
+  /* The picture sits behind everything and takes no clicks. Clipped to the
+     mode, because a blurred layer is drawn larger than its box on purpose —
+     see modeBackground.js — and would otherwise spill over the toolbar. */
+  .pl-bg-holder {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Above the picture. Without this the panels paint over it and the wallpaper
+     shows only in whatever corner nothing happens to cover. */
+  .playlist-mode > .pl-header,
+  .playlist-mode > .pl-body {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* With a picture behind them the surfaces get out of its way — the same thing
+     Single Note does with its note. Rows, buttons and headings keep their own
+     tints, which are translucent already, so the list stays readable over a
+     photograph. With no picture, nothing changes. */
+  .playlist-mode.has-wallpaper,
+  .playlist-mode.has-wallpaper .pl-sidebar,
+  .playlist-mode.has-wallpaper .pl-tracks {
+    background: transparent;
   }
 
   .pl-sidebar {
@@ -1058,7 +1113,12 @@
   }
 </style>
 
-<div class="playlist-mode" bind:this={canvasRef} style={cssVars}>
+<div class="playlist-mode" class:has-wallpaper={wallpaper} bind:this={canvasRef} style={cssVars}>
+  {#if wallpaper}
+    <div class="pl-bg-holder" aria-hidden="true">
+      <ModeBackground settings={backgroundSettings} isMobile={isPortraitScreen} />
+    </div>
+  {/if}
   <div class="pl-header">
     <button class="pl-btn" on:click={() => fileInput.click()}>＋ Add music</button>
     <button class="pl-btn" on:click={createPlaylist}>＋ Playlist</button>

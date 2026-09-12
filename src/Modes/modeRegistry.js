@@ -39,7 +39,10 @@ export const MODE_DEFINITIONS = {
     id: 'playlist',
     label: 'Playlist Mode',
     addBlockTypes: [],
-    showRightControls: true
+    showRightControls: true,
+    // The same wallpaper Single Note has, from the same settings — one picture
+    // to choose, and changing it in either place changes both.
+    settings: { singleBackground: true }
   },
   birthday: {
     id: 'birthday',

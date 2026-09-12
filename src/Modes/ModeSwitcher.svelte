@@ -121,6 +121,7 @@
     <PlaylistMode
       bind:canvasRef
       {canvasColors}
+      backgroundSettings={singleNoteSettings}
       library={musicLibrary}
       {nowPlayingId}
       {isPlaying}
