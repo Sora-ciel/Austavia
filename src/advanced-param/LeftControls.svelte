@@ -538,7 +538,7 @@ onMount(() => {
     color: var(--left-text-color, #ffffff);
   }
   .bg-check-row input {
-    accent-color: var(--left-text-color, #ffffff);
+    accent-color: var(--sb-thumb, #ffffff);
     cursor: pointer;
   }
   .bg-file-btn {
@@ -570,6 +570,15 @@ onMount(() => {
   }
   .bg-slider-row > span:first-child { width: 62px; flex-shrink: 0; }
 
+  /* Coloured from --sb-thumb and --sb-track, which is what every other slider
+     in the app uses — the player's seek and volume bars among them. They used
+     --left-text-color, which is a theme colour and so looked right from the
+     inside, but it is near-white in nearly every theme: the bars came out the
+     same pale colour whatever was chosen, while the player's followed the
+     theme's accent. Same variables now, so they match.
+
+     The geometry below stays, because it fixes something the shared rule does
+     not. */
   /* The native thumb can only travel between half-a-thumb from each end, so a
      full-width track always leaves a gap the handle can never reach. Draw the
      track ourselves inset by that same half-thumb (--r) and the handle lines
@@ -596,11 +605,13 @@ onMount(() => {
     border-radius: 999px;
     pointer-events: none;
   }
-  .bg-slider::before { background: color-mix(in srgb, var(--left-text-color, #ffffff) 22%, transparent); }
+  .bg-slider::before {
+    background: color-mix(in srgb, var(--sb-thumb, #ffffff) 28%, var(--sb-track, transparent));
+  }
   .bg-slider::after {
     right: auto;
     width: calc((100% - var(--r) * 2) * var(--fill, 0%) / 100%);
-    background: var(--left-text-color, #ffffff);
+    background: var(--sb-thumb, #ffffff);
   }
 
   .bg-slider input[type="range"] {
@@ -636,7 +647,7 @@ onMount(() => {
     height: calc(var(--r) * 2);
     margin-top: 0; /* thumb == track height, so no offset is needed */
     border-radius: 50%;
-    background: var(--left-text-color, #ffffff);
+    background: var(--sb-thumb, #ffffff);
     border: none;
     cursor: pointer;
   }
@@ -644,7 +655,7 @@ onMount(() => {
     width: calc(var(--r) * 2);
     height: calc(var(--r) * 2);
     border-radius: 50%;
-    background: var(--left-text-color, #ffffff);
+    background: var(--sb-thumb, #ffffff);
     border: none;
     cursor: pointer;
   }
