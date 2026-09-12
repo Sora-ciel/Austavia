@@ -49,10 +49,13 @@
 
   $: theme = { ...defaultColors, ...(colors || {}) };
   $: leftCssVars = Object.entries({
-    // Feeds the shared scrollbar/slider colours, so controls like the column
-    // slider follow the theme instead of the browser's default blue.
+    // Feeds the shared scrollbar and slider colours. The rule across the app is
+    // that a bar is the text colour of whatever it sits in and its groove is the
+    // background — so here that is the panel's own text and panel colour. It was
+    // the *button* text, which is a different colour in most themes and made the
+    // sliders in this panel the only ones not matching the writing beside them.
     "--sb-track": theme.panelBg,
-    "--sb-thumb": theme.buttonText,
+    "--sb-thumb": theme.textColor,
     "--left-panel-bg": theme.panelBg,
     "--left-text-color": theme.textColor,
     "--left-button-bg": theme.buttonBg,
@@ -353,8 +356,8 @@ onMount(() => {
   }
 
   .mode-ladder button.active {
-    background: rgba(127, 211, 255, 0.2);
-    border-color: rgba(127, 211, 255, 0.5);
+    background: color-mix(in srgb, var(--left-text-color, #ffffff) 20%, transparent);
+    border-color: color-mix(in srgb, var(--left-text-color, #ffffff) 45%, transparent);
   }
 
 
@@ -570,12 +573,11 @@ onMount(() => {
   }
   .bg-slider-row > span:first-child { width: 62px; flex-shrink: 0; }
 
-  /* Coloured from --sb-thumb and --sb-track, which is what every other slider
-     in the app uses — the player's seek and volume bars among them. They used
-     --left-text-color, which is a theme colour and so looked right from the
-     inside, but it is near-white in nearly every theme: the bars came out the
-     same pale colour whatever was chosen, while the player's followed the
-     theme's accent. Same variables now, so they match.
+  /* Coloured from --sb-thumb and --sb-track like every other slider and
+     scrollbar in the app. In this panel those are the panel's own text and
+     background, so a bar matches the writing next to it — which is the rule
+     everywhere: text colour for text and for bars, background colour for
+     backgrounds.
 
      The geometry below stays, because it fixes something the shared rule does
      not. */
@@ -672,7 +674,13 @@ onMount(() => {
     font-size: 0.76rem;
     cursor: pointer;
   }
-  .bg-size-toggle button.active { background: rgba(139,183,255,0.25); border-color: rgba(139,183,255,0.5); color: #fff; }
+  /* Tinted from the panel's own text rather than a fixed blue, which belonged
+     to no theme and was simply the colour somebody had to hand. */
+  .bg-size-toggle button.active {
+    background: color-mix(in srgb, var(--left-text-color, #ffffff) 22%, transparent);
+    border-color: color-mix(in srgb, var(--left-text-color, #ffffff) 45%, transparent);
+    color: var(--left-text-color, #ffffff);
+  }
 
   @media (max-width: 1024px) {
     /* Phone controls don't need desktop's 42px hit targets — trimming them is

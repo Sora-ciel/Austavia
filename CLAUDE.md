@@ -104,6 +104,21 @@ So a new element takes a colour every theme already provides —
 `--sb-track` — or inherits. No hardcoded hex, and no borrowing a palette that
 happens to be nearby because it is in the same file.
 
+Which one to take is not a judgement call, it is a pairing:
+
+- **Text, icons, scrollbars and slider bars** take the *text* colour of
+  whatever they sit in. A bar is read the way writing is read, so it matches
+  the writing beside it.
+- **Surfaces, grooves and fills** take the *background* colour of whatever they
+  sit in, tinted with that same text colour when they need to stand out —
+  `color-mix(in srgb, <text> 20%, transparent)` rather than a colour picked by
+  eye.
+
+A region sets `--sb-thumb` to its own text colour and `--sb-track` to its own
+background, and everything inside it then follows without being told. That is
+the whole mechanism; the left panel does it, `.app` does it, and a block does
+it.
+
 If something should differ from the rest, that is a deliberate thing: give it
 its own named variable, set it in the themes, and say what it is for. The
 difference is then something a theme can express rather than a colour one
