@@ -1018,7 +1018,7 @@
     width: 15px;
     height: 15px;
     margin: 0 2px 0 0;
-    accent-color: var(--mode-text-color, #fff);
+    /* Colour comes from the shared checkbox in app.css, via --sb-thumb. */
     cursor: pointer;
   }
 

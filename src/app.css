@@ -59,6 +59,63 @@ textarea::placeholder {
 }
 
 
+/* ── Checkboxes, drawn rather than borrowed ───────────────────────
+   A native checkbox takes `accent-color` for its tick and fill and nothing
+   else: the empty box keeps the browser's own grey border, which belongs to no
+   theme and is the state a checkbox is in most of the time. So every checkbox
+   in the app was a grey square whatever was chosen around it.
+
+   Drawn here instead, from the same two variables as the scrollbars and the
+   sliders — --sb-thumb is the ink of whatever region it sits in and --sb-track
+   is that region's background. A checkbox added anywhere is therefore themed
+   already, and a region that sets those two for its scrollbars has set them
+   for this as well without knowing it.
+
+   The tick is the background colour on a filled box, which is the same pairing
+   used everywhere else: ink on ground, ground on ink. */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1.5px solid color-mix(in srgb, var(--sb-thumb, rgba(255, 255, 255, 0.7)) 60%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+input[type="checkbox"]:hover {
+  border-color: var(--sb-thumb, rgba(255, 255, 255, 0.9));
+}
+
+input[type="checkbox"]:checked {
+  background: var(--sb-thumb, rgba(255, 255, 255, 0.9));
+  border-color: var(--sb-thumb, rgba(255, 255, 255, 0.9));
+}
+
+/* The tick: two sides of a box, rotated. Drawn rather than a glyph so it
+   scales with the box and needs no font to be present. */
+input[type="checkbox"]:checked::after {
+  content: '';
+  width: 3px;
+  height: 7px;
+  margin-top: -2px;
+  border: solid var(--sb-track, #000000);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sb-thumb, #ffffff) 55%, transparent);
+  outline-offset: 2px;
+}
+
+
 /* ── Sliders follow the same colors as the scrollbars ──────────────
    Same contract as above: the container sets --sb-track and --sb-thumb, and
    every range input picks them up, so a new slider matches the theme without

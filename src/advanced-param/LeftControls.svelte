@@ -273,8 +273,10 @@ onMount(() => {
   }
 
 
+  /* Not checkboxes: they are drawn by the shared rule in app.css, and a border
+     and padding meant for a text field turns one back into a grey box. */
   .left-controls-wrapper button,
-  .left-controls-wrapper input {
+  .left-controls-wrapper input:not([type="checkbox"]) {
     border-radius: 6px;
     border: 1px solid var(--left-border-color, #444444);
     transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -441,7 +443,7 @@ onMount(() => {
     cursor: not-allowed;
   }
 
-  .left-controls-wrapper input {
+  .left-controls-wrapper input:not([type="checkbox"]) {
     background: var(--left-input-bg, #1d1d1d);
     color: var(--left-text-color, #ffffff);
     padding: 6px 8px;
@@ -542,7 +544,6 @@ onMount(() => {
     color: var(--left-button-text, #ffffff);
   }
   .bg-check-row input {
-    accent-color: var(--sb-thumb, #ffffff);
     cursor: pointer;
   }
   .bg-file-btn {
