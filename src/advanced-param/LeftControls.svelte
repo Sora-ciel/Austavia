@@ -3,6 +3,7 @@
   import { createEventDispatcher, onMount } from "svelte";
   import { getModeDefinition, getModeOptions } from "../Modes/modeRegistry.js";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
+  import { snapToNeutral } from '../utils/sliderSnap.js';
 
   export let mode;
   export let modeLabels = {};
@@ -170,6 +171,19 @@
   $: imageOpacity = backgroundSettings?.imageOpacity ?? 100;
   $: imageLuminosity = backgroundSettings?.imageLuminosity ?? 100;
   $: bgSize = backgroundSettings?.bgSize || 'cover';
+
+  // A 0–200 range has more values than the panel has pixels, so dragging skips
+  // roughly two in five of them — 100 among them, which is the one people want
+  // back. A drag is pulled onto it; the arrow keys are not, because they could
+  // always reach every value and this must not take that away. See
+  // utils/sliderSnap.js.
+  let draggingSlider = false;
+  function startSliderDrag() { draggingSlider = true; }
+  function endSliderDrag() { draggingSlider = false; }
+
+  function luminosityFromEvent(event) {
+    return snapToNeutral(Number(event.target.value), 100, { snapping: draggingSlider });
+  }
 
   function setBgSetting(patch) {
     dispatch('modeSettingChange', { [backgroundSettingsKey]: patch });
@@ -1024,7 +1038,7 @@ onMount(() => {
             {#if bgImage}
               <label class="bg-slider-row">
                 <span>Opacity</span>
-                <span class="bg-slider" style="--fill: {bgOpacity}%">
+                <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {bgOpacity}%">
                   <input type="range" min="0" max="100" step="1" value={bgOpacity}
                     on:input={(e) => setBgSetting({ bgOpacity: Number(e.target.value) })} />
                 </span>
@@ -1032,7 +1046,7 @@ onMount(() => {
               </label>
               <label class="bg-slider-row">
                 <span>Blur</span>
-                <span class="bg-slider" style="--fill: {(bgBlur / 20) * 100}%">
+                <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {(bgBlur / 20) * 100}%">
                   <input type="range" min="0" max="20" step="1" value={bgBlur}
                     on:input={(e) => setBgSetting({ bgBlur: Number(e.target.value) })} />
                 </span>
@@ -1040,9 +1054,9 @@ onMount(() => {
               </label>
               <label class="bg-slider-row">
                 <span>Luminosity</span>
-                <span class="bg-slider" style="--fill: {(bgLuminosity / 200) * 100}%">
+                <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {(bgLuminosity / 200) * 100}%">
                   <input type="range" min="0" max="200" step="1" value={bgLuminosity}
-                    on:input={(e) => setBgSetting({ bgLuminosity: Number(e.target.value) })} />
+                    on:input={(e) => setBgSetting({ bgLuminosity: luminosityFromEvent(e) })} />
                 </span>
                 <span class="bg-val">{Math.round(bgLuminosity)}%</span>
               </label>
@@ -1073,7 +1087,7 @@ onMount(() => {
             {#if !imagesFollowBackground}
               <label class="bg-slider-row">
                 <span>Picture opacity</span>
-                <span class="bg-slider" style="--fill: {imageOpacity}%">
+                <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {imageOpacity}%">
                   <input type="range" min="0" max="100" step="1" value={imageOpacity}
                     on:input={(e) => setBgSetting({ imageOpacity: Number(e.target.value) })} />
                 </span>
@@ -1081,9 +1095,9 @@ onMount(() => {
               </label>
               <label class="bg-slider-row">
                 <span>Picture luminosity</span>
-                <span class="bg-slider" style="--fill: {(imageLuminosity / 200) * 100}%">
+                <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {(imageLuminosity / 200) * 100}%">
                   <input type="range" min="0" max="200" step="1" value={imageLuminosity}
-                    on:input={(e) => setBgSetting({ imageLuminosity: Number(e.target.value) })} />
+                    on:input={(e) => setBgSetting({ imageLuminosity: luminosityFromEvent(e) })} />
                 </span>
                 <span class="bg-val">{Math.round(imageLuminosity)}%</span>
               </label>
