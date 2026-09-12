@@ -117,15 +117,29 @@ export function withoutEmptyValues(value) {
  * there to compare. Undoing the paint before comparing makes the two devices
  * agree, and a colour the person actually picked still reads as a change
  * because that is what the stash holds.
+ *
+ * Everything the paint wrote has to go, not only the colours it replaced. A
+ * later fix added `_themedBgColor` and `_themedTextColor`, recording which theme
+ * had painted a block so that opening a folder could tell paint from a choice —
+ * and those are derived from this device's theme exactly as the colours are. They
+ * were not undone here, so the loop came straight back in the same shape: two
+ * devices on different themes, each downloading the other's copy, repainting,
+ * finding `_themedBgColor` different, and calling that an edit. Every ten
+ * seconds, with nobody touching anything.
+ *
+ * So the test for this is written in terms of what it prevents rather than what
+ * it deletes: a block painted by one theme and a block painted by another must
+ * compare equal, whatever fields the painting happens to write today.
  */
+const THEME_PAINT_KEYS = ['_baseBgColor', '_baseTextColor', '_themedBgColor', '_themedTextColor'];
+
 export function unpaintThemeColours(block) {
   if (!block || typeof block !== 'object') return block;
-  if (block._baseBgColor === undefined && block._baseTextColor === undefined) return block;
+  if (!THEME_PAINT_KEYS.some(key => block[key] !== undefined)) return block;
 
   const restored = { ...block };
   if (block._baseBgColor !== undefined) restored.bgColor = block._baseBgColor;
   if (block._baseTextColor !== undefined) restored.textColor = block._baseTextColor;
-  delete restored._baseBgColor;
-  delete restored._baseTextColor;
+  for (const key of THEME_PAINT_KEYS) delete restored[key];
   return restored;
 }

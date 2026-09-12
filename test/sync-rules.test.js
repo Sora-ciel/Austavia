@@ -273,3 +273,57 @@ test('view state on a block is not content', async t => {
     );
   });
 });
+
+// ── The loop, twice ───────────────────────────────────────────────
+// "Blocks follow theme" writes this device's theme into every block. Two
+// devices on different themes each rewrite what the other wrote, every rewrite
+// reads as an edit, and the folder goes back and forth for as long as both are
+// open with nobody editing anything.
+//
+// It was fixed once by undoing the paint before comparing, and came straight
+// back when painting started recording _themedBgColor as well and that was not
+// undone. So these are written in terms of what must not happen, not in terms
+// of which fields exist: whatever painting writes today, two devices must agree.
+test('a folder painted by two different themes still compares equal', async t => {
+  const painted = (bg, text) => ({
+    id: 'b1',
+    type: 'text',
+    content: 'unchanged',
+    bgColor: bg,
+    textColor: text,
+    _baseBgColor: '#000000',
+    _baseTextColor: '#ffffff',
+    _themedBgColor: bg,
+    _themedTextColor: text
+  });
+
+  await t.test('the two agree once the paint is undone', () => {
+    const onCopperLagoon = unpaintThemeColours(painted('#3a1d18', '#6fe3dc'));
+    const onSomethingElse = unpaintThemeColours(painted('#1b2129', '#ffb454'));
+    assert.deepEqual(onCopperLagoon, onSomethingElse);
+  });
+
+  await t.test('nothing the paint wrote survives the comparison', () => {
+    const out = unpaintThemeColours(painted('#3a1d18', '#6fe3dc'));
+    for (const key of ['_baseBgColor', '_baseTextColor', '_themedBgColor', '_themedTextColor']) {
+      assert.equal(key in out, false, `${key} must not reach the comparison`);
+    }
+  });
+
+  await t.test('the colours the person chose are what is left', () => {
+    const out = unpaintThemeColours(painted('#3a1d18', '#6fe3dc'));
+    assert.equal(out.bgColor, '#000000');
+    assert.equal(out.textColor, '#ffffff');
+  });
+
+  await t.test('a colour picked by hand still reads as a change', () => {
+    const theirs = unpaintThemeColours({ ...painted('#3a1d18', '#6fe3dc'), _baseBgColor: '#cc2929' });
+    const mine = unpaintThemeColours(painted('#1b2129', '#ffb454'));
+    assert.notDeepEqual(theirs, mine, 'a real edit must still be seen');
+  });
+
+  await t.test('a block the theme never touched is handed back untouched', () => {
+    const plain = { id: 'b2', bgColor: '#123456', textColor: '#ffffff' };
+    assert.equal(unpaintThemeColours(plain), plain);
+  });
+});
