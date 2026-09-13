@@ -1253,11 +1253,18 @@
   .playlist-mode > .pl-header { z-index: 2; }
   .playlist-mode > .pl-body { z-index: 1; }
 
-  /* With a picture behind them the surfaces get out of its way — the same thing
+  /* With a picture behind them the panels get out of its way — the same thing
      Single Note does with its note. Rows, buttons and headings keep their own
      tints, which are translucent already, so the list stays readable over a
-     photograph. With no picture, nothing changes. */
-  .playlist-mode.has-wallpaper,
+     photograph. With no picture, nothing changes.
+     
+     The mode itself is deliberately not in this list. It is what the picture is
+     drawn *on*, and a picture at less than full opacity has to land on
+     something: made transparent it landed on whatever was behind the mode,
+     which is the app's own background and near enough black on most themes. So
+     fading the wallpaper faded to black instead of to the colour this mode
+     wears. Single Note keeps its own background for exactly this reason and
+     only clears its inner surfaces. */
   .playlist-mode.has-wallpaper .pl-sidebar,
   .playlist-mode.has-wallpaper .pl-tracks {
     background: transparent;
