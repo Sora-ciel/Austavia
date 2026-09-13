@@ -1,9 +1,10 @@
 <script>
   import ControlIcon from '../components/ControlIcon.svelte';
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onMount, afterUpdate } from "svelte";
   import { getModeDefinition, getModeOptions } from "../Modes/modeRegistry.js";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
+  import { fitControls } from '../utils/controlsOverflow.js';
 
   export let mode;
   export let modeLabels = {};
@@ -76,6 +77,110 @@
   // the only difference between them and what backgroundSettingsKey answers.
   $: usesSharedWallpaper = Boolean(activeModeDefinition?.settings?.singleBackground);
   $: hasModeBackground = usesSharedWallpaper || mode === "default";
+
+  // ── How much of the bar fits on one line ──────────────────────────
+  //
+  // Above the 1024px breakpoint the bar used to hold everything and simply
+  // wrap, which costs a strip of the window on every screen that is not 1920
+  // wide. Now the controls there is no room for go behind a More button, least
+  // used first — the decision, and why it is measured rather than guessed from
+  // breakpoints, is in utils/controlsOverflow.js.
+  //
+  // At 1024 and under nothing changes: the whole bar is already a panel behind
+  // the Menu button, so everything belongs on it.
+  let barWidth = 0;
+  let menuButtonWidth = 0;
+  let controlWidths = {};
+  let moreOpen = false;
+  let moreRef;
+
+  $: presentControls = [
+    'mode',
+    'addBlock',
+    'moveBlock',
+    'clear',
+    'export',
+    'import',
+    'undo',
+    'redo',
+    'fileName',
+    ...(isSimpleNoteMode ? ['columns'] : []),
+    ...(hasModeBackground ? ['bg'] : [])
+  ];
+
+  $: layout = compactUI
+    ? { bar: presentControls, menu: [] }
+    : fitControls({
+        present: presentControls,
+        widths: controlWidths,
+        available: barWidth,
+        gap: 8,
+        menuWidth: menuButtonWidth || 96,
+        // Getting to another mode and putting something on the page are what
+        // the bar is for; they are drawn outside the loop and so must stay.
+        alwaysOnBar: ['mode', 'addBlock']
+      });
+
+  $: barControls = layout.bar.filter((id) => id !== 'mode' && id !== 'addBlock');
+  $: if (!layout.menu.length) moreOpen = false;
+
+  // Widths are read back off the bar rather than written down anywhere: a
+  // control is as wide as this theme's font and this mode's labels make it, and
+  // the only thing that knows that is the browser. A control that has moved
+  // into the menu keeps the width it had on the bar, which is what lets it come
+  // back when the window is widened again.
+  //
+  // Only measured on the wide bar. In the compact panel every control is
+  // stretched to the panel's width, and recording that would say a button is
+  // 236px wide for ever after.
+  // The room the bar has is not the width it currently occupies.
+  //
+  // The header is a wrapping flex row, so when the bar is too wide the header
+  // wraps and hands it a line of its own — at which point it measures as having
+  // plenty of room, having just taken a second line to get it. That is the very
+  // thing being fixed, so what is measured is the room left on the *first* line:
+  // the header's content box, less everything else sitting on it.
+  //
+  // It does not depend on what the bar is holding, which is what stops this from
+  // oscillating: taking a control out never changes the answer, it only changes
+  // whether the answer is enough.
+  function measureAvailable() {
+    const header = menuRef?.closest('.controls');
+    if (!header) return;
+
+    const style = getComputedStyle(header);
+    const gap = parseFloat(style.columnGap || style.gap) || 0;
+    let room =
+      header.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+
+    for (const sibling of header.children) {
+      if (sibling.contains(menuRef)) continue;
+      const width = sibling.getBoundingClientRect().width;
+      if (width) room -= width + gap;
+    }
+
+    if (Math.abs(barWidth - room) > 0.5) barWidth = room;
+  }
+
+  function measureControls() {
+    measureAvailable();
+    if (compactUI || !menuRef) return;
+
+    let changed = false;
+    const next = { ...controlWidths };
+    for (const el of menuRef.querySelectorAll(':scope > [data-control]')) {
+      const id = el.dataset.control;
+      const width = el.getBoundingClientRect().width;
+      if (!width) continue;
+      if (Math.abs((next[id] || 0) - width) > 0.5) {
+        next[id] = width;
+        changed = true;
+      }
+    }
+    if (changed) controlWidths = next;
+  }
+
+  afterUpdate(measureControls);
   $: backgroundSettingsKey = usesSharedWallpaper ? "single" : "default";
   $: backgroundSettings = usesSharedWallpaper ? singleNoteSettings : canvasBackgroundSettings;
   $: availableAddBlockTypes = activeModeDefinition?.addBlockTypes || [];
@@ -210,6 +315,7 @@
 
   function checkWidth() {
     compactUI = window.innerWidth <= 1024;
+    measureAvailable();
   }
 
   function elementContainsTarget(element, target) {
@@ -223,6 +329,7 @@
   // Close when clicking outside to put for after button click on mobile phones and right controls too 
   function handleClickOutside(event) {
     const target = event.target;
+    if (moreOpen && !elementContainsTarget(moreRef, target)) moreOpen = false;
 
     if (
       showMobileMenu &&
@@ -262,9 +369,19 @@ onMount(() => {
   window.addEventListener("resize", checkWidth);
   window.addEventListener("click", handleClickOutside); // << add this
 
+  // The window is not the only thing that changes the room on this line. The
+  // controls on the right of the header grow and shrink on their own — a sync
+  // status appearing, a file name getting longer — and none of that is a window
+  // resize. Watching the header itself catches both.
+  const header = menuRef?.closest('.controls');
+  const watcher =
+    header && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measureAvailable) : null;
+  if (watcher && header) watcher.observe(header);
+
   return () => {
     window.removeEventListener("resize", checkWidth);
     window.removeEventListener("click", handleClickOutside); // << cleanup
+    watcher?.disconnect();
   };
 });
 
@@ -284,6 +401,45 @@ onMount(() => {
     flex-wrap: wrap;
     flex-grow: 1;
     color: var(--left-text-color, inherit);
+  }
+
+  /* What did not fit. The button looks like the others because it is one of
+     them — it is where a control went, not a different kind of thing. */
+  .lc-more {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .lc-more-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 190px;
+    padding: 8px;
+    border-radius: 12px;
+    /* The panel the compact menu uses, so the two are one thing wearing two
+       shapes rather than two panels that have to be kept looking alike. */
+    background: var(--left-panel-bg, #111111f0);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+    /* The Bg panel is anchored inside its own control and has to be able to
+       reach past this box; clipping it would be a panel with no bottom. */
+    overflow: visible;
+  }
+
+  .lc-more-menu > :global([data-control]) {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .lc-more-menu :global(.thin-button-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
   }
 
 
@@ -903,7 +1059,7 @@ onMount(() => {
     class:bg-panel-open={hasModeBackground && bgPanelOpen}
     bind:this={menuRef}
   >
-    <div class="mode-switcher mobile-only">
+    <div class="mode-switcher mobile-only" data-control="mode">
       <button
         bind:this={modeButtonDesktopRef}
         on:click={toggleModeMenu}
@@ -941,7 +1097,7 @@ onMount(() => {
         </div>
       {/if}
     </div>
-    <div class="add-block-menu mobile-only">
+    <div class="add-block-menu mobile-only" data-control="addBlock">
       <button
         bind:this={addBlockButtonDesktopRef}
         on:click={toggleAddBlockMenu}
@@ -959,7 +1115,51 @@ onMount(() => {
         </div>
       {/if}
     </div>
-    <div class="thin-button-row">
+    {#each barControls as id (id)}
+      {@render overflowControl(id)}
+    {/each}
+
+    {#if layout.menu.length}
+      <div class="lc-more" bind:this={moreRef}>
+        <button
+          class="lc-more-btn"
+          class:active={moreOpen}
+          bind:clientWidth={menuButtonWidth}
+          title="The controls there is no room for"
+          aria-expanded={moreOpen}
+          on:click={() => (moreOpen = !moreOpen)}
+        >
+          <ControlIcon name="menu" /> More
+        </button>
+        {#if moreOpen}
+          <div class="lc-more-menu">
+            {#each layout.menu as id (id)}
+              {@render overflowControl(id)}
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="mobile-block-actions">
+      {#each addBlockDefinitions as blockDef}
+        <button on:click={() => addBlock(blockDef.type)}>{blockDef.icon} {blockDef.label}</button>
+      {/each}
+    </div>
+
+    <input
+      type="file"
+      accept="application/json"
+      on:change={importJSON}
+      bind:this={fileInputRef}
+      style="display: none"
+    />
+  </div>
+</div>
+
+{#snippet overflowControl(id)}
+  {#if id === 'moveBlock'}
+    <div data-control="moveBlock" class="thin-button-row">
       <button
         class="thin-action-btn"
         on:click={moveTowardsBottom}
@@ -979,30 +1179,22 @@ onMount(() => {
         <ControlIcon name="up" />
       </button>
     </div>
-    <button on:click={clear}><ControlIcon name="trash" /> Clear</button>
-    <button on:click={exportJSON}><ControlIcon name="export" /> Export</button>
-    <button on:click={triggerFileInput}><ControlIcon name="import" /> Import JSON</button>
-    <button on:click={() => dispatch('undo')}><ControlIcon name="undo" /> Undo</button>
-    <button on:click={() => dispatch('redo')}><ControlIcon name="redo" /> Redo</button>
-
-    <div class="mobile-block-actions">
-      {#each addBlockDefinitions as blockDef}
-        <button on:click={() => addBlock(blockDef.type)}>{blockDef.icon} {blockDef.label}</button>
-      {/each}
-    </div>
-
-    <input
-      type="file"
-      accept="application/json"
-      on:change={importJSON}
-      bind:this={fileInputRef}
-      style="display: none"
-    />
-    <label class="file-name-field">
+  {:else if id === 'clear'}
+    <button data-control="clear" on:click={clear}><ControlIcon name="trash" /> Clear</button>
+  {:else if id === 'export'}
+    <button data-control="export" on:click={exportJSON}><ControlIcon name="export" /> Export</button>
+  {:else if id === 'import'}
+    <button data-control="import" on:click={triggerFileInput}><ControlIcon name="import" /> Import JSON</button>
+  {:else if id === 'undo'}
+    <button data-control="undo" on:click={() => dispatch('undo')}><ControlIcon name="undo" /> Undo</button>
+  {:else if id === 'redo'}
+    <button data-control="redo" on:click={() => dispatch('redo')}><ControlIcon name="redo" /> Redo</button>
+  {:else if id === 'fileName'}
+    <label data-control="fileName" class="file-name-field">
       <input bind:value={currentSaveName} placeholder="File name" />
     </label>
-    {#if isSimpleNoteMode}
-      <label class="simple-columns-control mobile-only">
+  {:else if id === 'columns'}
+      <label data-control="columns" class="simple-columns-control mobile-only">
         Columns
         <input
           type="range"
@@ -1014,10 +1206,8 @@ onMount(() => {
         />
         <span class="simple-columns-value">{simpleNoteColumnCount}</span>
       </label>
-    {/if}
-
-    {#if hasModeBackground}
-      <div class="bg-settings-wrap">
+  {:else if id === 'bg'}
+      <div data-control="bg" class="bg-settings-wrap">
         <button
           class:active={bgPanelOpen}
           on:click={() => (bgPanelOpen = !bgPanelOpen)}
@@ -1105,7 +1295,5 @@ onMount(() => {
           </div>
         {/if}
       </div>
-    {/if}
-
-  </div>
-</div>
+  {/if}
+{/snippet}
