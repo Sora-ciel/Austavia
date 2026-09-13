@@ -12,12 +12,17 @@ const ALLOWED_TAGS = new Set([
   'STRONG', 'B', 'EM', 'I', 'U', 'S', 'CODE', 'PRE',
   'UL', 'OL', 'LI', 'BLOCKQUOTE',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-  'A', 'IMG'
+  'A', 'IMG', 'HR'
 ]);
 
+// Only what a tag needs. A span keeps the one attribute that says it is a
+// separator and nothing else — the styling hangs off that attribute rather
+// than off a class, so a separator written in a task survives being read back
+// without letting arbitrary classes through with it.
 const ALLOWED_ATTRS = {
   A: ['href', 'title'],
-  IMG: ['src', 'alt', 'title', 'width', 'height', 'data-align']
+  IMG: ['src', 'alt', 'title', 'width', 'height', 'data-align'],
+  SPAN: ['data-inline-separator']
 };
 
 // data: is allowed for images only — that's how a freshly pasted picture

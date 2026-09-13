@@ -153,18 +153,21 @@ export function shortcutFor(textBefore) {
  * else, so that it can start after or before something else on the same line,
  * including images."
  *
- * A separator on an empty line is the page-break it has always been, full
- * width, with the writing above and below it. On a line that already holds
- * something — words, a picture, either side of the caret — breaking the line in
- * two is not what was asked for, so it goes in the line instead.
+ * It shares the line when there is something before it and nothing after: it
+ * starts where the writing stopped and runs to the far edge of the line. That
+ * is the shape that was asked for, and it is why "nothing after" matters — a
+ * line that reaches the edge cannot have writing sitting in its way, so a
+ * separator typed in front of something is the full-width break instead.
  *
- * `hasContentAfter` is the only part this cannot see for itself: the text handed
- * to a shortcut stops at the caret, and what sits after it is a question for
+ * On an empty line it is the full-width break it has always been.
+ *
+ * `hasContentAfter` is the part this cannot see for itself: the text handed to
+ * a shortcut stops at the caret, and what sits after it is a question for
  * whoever has the document.
  */
 export function separatorIsInline(found, { hasContentAfter = false } = {}) {
   if (!found || found.kind !== 'horizontalRule') return false;
-  return found.index > 0 || Boolean(hasContentAfter);
+  return found.index > 0 && !hasContentAfter;
 }
 
 /**

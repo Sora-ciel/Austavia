@@ -35,6 +35,7 @@
   let wrapEl;
   let element;
   let editor;
+  let separatorWatcher;
   // Set while an undo or redo is being written into the editor, so the update
   // it causes isn't recorded as a fresh edit.
   let applyingHistory = false;
@@ -169,6 +170,30 @@
   // the right thing it still does it, and these only get a turn where it gave
   // up. A rule that matches and then finds it cannot wrap the block returns
   // nothing, which is exactly the case of typing "- " inside a heading.
+  // Every separator currently on screen, so they can be re-measured together
+  // when the editor changes shape. A Set rather than a query each time: these
+  // are node views and they know when they are gone.
+  const drawnSeparators = new Set();
+
+  // Its width is whatever is left of the line.
+  //
+  // Zeroed before measuring, or a second pass measures the room it is already
+  // filling and the line grows by its own width every time. A pixel is left
+  // spare so a rounding error cannot push it onto the next line — where it
+  // would measure a full line's worth of room and stay there.
+  function fitSeparator(dom) {
+    const line = dom?.parentElement;
+    if (!line) return;
+
+    dom.style.width = '0px';
+    const room = line.getBoundingClientRect().right - dom.getBoundingClientRect().left;
+    dom.style.width = `${Math.max(0, Math.floor(room) - 1)}px`;
+  }
+
+  function fitSeparators() {
+    for (const dom of drawnSeparators) fitSeparator(dom);
+  }
+
   // A separator that sits in a line rather than breaking it.
   //
   // An <hr> is a block: it takes the whole width and pushes whatever was beside
@@ -192,6 +217,37 @@
 
     renderHTML() {
       return ['span', { 'data-inline-separator': '', class: 'tiptap-inline-sep' }];
+    },
+
+    // Drawn by hand because its width is a measurement, not a length.
+    //
+    // It has to start where the writing stopped and finish at the far edge of
+    // the line, and CSS cannot express that: an inline box has no way to ask
+    // for "the rest of the line". Flex would do it and breaks inline text —
+    // every `<strong>` becomes its own flex item and the spaces between them
+    // are dropped. Absolute positioning gets one end or the other, never both:
+    // with `left` at its static position the box shrink-wraps, and with
+    // `left: 0` it starts at the beginning of the line rather than at the text.
+    //
+    // So the room is measured and written on as a width. `ignoreMutation` keeps
+    // the editor from treating that as somebody typing.
+    addNodeView() {
+      return () => {
+        const dom = document.createElement('span');
+        dom.className = 'tiptap-inline-sep';
+        dom.setAttribute('data-inline-separator', '');
+        dom.contentEditable = 'false';
+        drawnSeparators.add(dom);
+        fitSeparator(dom);
+
+        return {
+          dom,
+          ignoreMutation: () => true,
+          destroy() {
+            drawnSeparators.delete(dom);
+          }
+        };
+      };
     },
 
     // Tasks are stored as markdown, and a node the serialiser has never heard
@@ -508,6 +564,9 @@
         lastPushedContent = value;
         if (!applyingHistory) recordText(historyKey, value, e.state.selection.from);
         dispatch('change', value);
+        // A separator's width is the room left on its line, and writing is what
+        // changes that room.
+        fitSeparators();
       },
       onFocus({ event }) {
         dispatch('focus', event);
@@ -522,6 +581,19 @@
     if (initialScrollTop && wrapEl) {
       requestAnimationFrame(() => { wrapEl.scrollTop = initialScrollTop; });
     }
+
+    // The other thing that changes the room on a line is the line getting
+    // wider or narrower — a block resized, a window resized, a panel opened.
+    //
+    // Both an observer and the window's own event, for the reason written up
+    // over the control bar: an observer reports nothing while the page is not
+    // being drawn, and a window resize arrives either way. Between them the
+    // width is right whichever way the line changed.
+    if (typeof ResizeObserver !== 'undefined' && element) {
+      separatorWatcher = new ResizeObserver(fitSeparators);
+      separatorWatcher.observe(element);
+    }
+    window.addEventListener('resize', fitSeparators);
   });
 
   // Sync external content changes (e.g. switching notes)
@@ -535,6 +607,8 @@
   }
 
   onDestroy(() => {
+    separatorWatcher?.disconnect();
+    window.removeEventListener('resize', fitSeparators);
     editor?.destroy();
   });
 
@@ -759,15 +833,15 @@
     margin: 0.8em 0;
   }
 
-  /* The separator that shares a line. Sized in em so it keeps its proportions
-     against whatever it is sitting beside, and centred on the line so it reads
-     as a divider rather than an underscore. */
-  :global(.tiptap-inline-sep) {
+  /* The separator that shares a line. Its width is written on by the node view
+     — it is the room left on the line, which no length can express — so there
+     is none here. Centred on the line so it reads as a divider rather than an
+     underscore. */
+  :global(.tiptap-inline-sep),
+  :global([data-inline-separator]) {
     display: inline-block;
-    width: 4em;
-    max-width: 40%;
     height: 0;
-    margin: 0 0.45em;
+    margin: 0 0 0 0.45em;
     vertical-align: middle;
     border-top: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   }

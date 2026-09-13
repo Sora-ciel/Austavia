@@ -76,15 +76,22 @@ textarea::placeholder {
    --selection-bg and --selection-text are there for a region whose own colours
    are not those: Playlist mode wears its music block's colour rather than the
    mode's, and says so. */
+/* The two colours of wherever a thing is, named once.
+   
+   The chain runs from the most local outwards: a block sets --text and --bg on
+   itself, Single Note mode sets --active-note-*, a mode surface sets
+   --mode-text-color and --canvas-inner-bg, and .app seeds --app-text and
+   --app-bg. Declared on everything rather than inherited, so each element works
+   the chain out from what *it* has inherited — which is what makes "the colours
+   of where this is" true at any depth without anybody opting in. */
+* {
+  --region-ink: var(--text, var(--active-note-text, var(--mode-text-color, var(--app-text, #ffffff))));
+  --region-paper: var(--bg, var(--active-note-bg, var(--canvas-inner-bg, var(--app-bg, #000000))));
+}
+
 ::selection {
-  background: var(
-    --selection-bg,
-    var(--text, var(--active-note-text, var(--mode-text-color, var(--app-text, #ffffff))))
-  );
-  color: var(
-    --selection-text,
-    var(--bg, var(--active-note-bg, var(--canvas-inner-bg, var(--app-bg, #000000))))
-  );
+  background: var(--selection-bg, var(--region-ink));
+  color: var(--selection-text, var(--region-paper));
 }
 
 
@@ -290,6 +297,21 @@ img {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Hovering turns a link inside out: the letters take the colour of what they
+   are written on and keep their shape as an outline in the colour they were.
+   The same two colours as everything else here, so it is right on every theme
+   without naming one.
+
+   `paint-order` is what makes it an outline rather than a thickening — the
+   stroke is drawn first and the fill covers its inner half, so the letters keep
+   their weight instead of closing up at small sizes. */
+.tiptap a:hover,
+.ProseMirror a:hover {
+  color: var(--region-paper);
+  -webkit-text-stroke: 0.7px var(--region-ink);
+  paint-order: stroke fill;
 }
 
 a {

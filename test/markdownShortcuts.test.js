@@ -118,19 +118,22 @@ test('a separator on an empty line is still the full-width one', () => {
   assert.equal(separatorIsInline(shortcutFor('---')), false);
 });
 
-test('a separator after writing shares the line instead of breaking it', () => {
+test('a separator after writing starts there and runs to the far edge', () => {
   assert.equal(separatorIsInline(shortcutFor('some writing ---')), true);
+  assert.equal(separatorIsInline(shortcutFor(`${LEAF}---`)), true, 'after a picture too');
 });
 
-test('a separator after a picture shares the line with the picture', () => {
-  assert.equal(separatorIsInline(shortcutFor(`${LEAF}---`)), true);
-});
-
-test('a separator typed before something else shares that line too', () => {
+test('a separator with writing in its way is the full-width break instead', () => {
+  // It reaches the edge of the line, so it cannot share the line with anything
+  // sitting to its right.
+  assert.equal(
+    separatorIsInline(shortcutFor('some writing ---'), { hasContentAfter: true }),
+    false
+  );
   assert.equal(
     separatorIsInline(shortcutFor('---'), { hasContentAfter: true }),
-    true,
-    'the caret sees nothing before it, but the line is not empty'
+    false,
+    'including one typed in front of writing that is already there'
   );
 });
 
