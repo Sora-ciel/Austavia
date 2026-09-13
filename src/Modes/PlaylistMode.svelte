@@ -17,6 +17,7 @@
   import { windowRange } from '../utils/listWindow.js';
   import { sizeGroups, clustersFromHashes, planDeduplication } from '../utils/duplicateTracks.js';
   import { tracksTheLibraryLacks, playableIds } from '../utils/nowPlaying.js';
+  import { surfaceBlock, surfaceColors } from '../utils/modeSurface.js';
   import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
   import ModeBackground from '../components/ModeBackground.svelte';
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
@@ -33,6 +34,9 @@
 
   export let canvasColors = {};
   export let canvasRef;
+  // The folder's blocks, for one thing only: the music block whose colour this
+  // mode wears. See utils/modeSurface.js.
+  export let blocks = [];
   // { tracks: [{id, title, artist, album, year, lyrics, …}], playlists: [...] }
   export let library = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
@@ -46,10 +50,18 @@
 
   const defaultCanvasColors = { outerBg: '#000000', innerBg: '#000000' };
   $: canvasTheme = { ...defaultCanvasColors, ...(canvasColors || {}) };
-  $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
+
+  // This mode is the music block with the walls taken away, so it wears that
+  // block's colour — the same thing Single Note mode does with its note, and
+  // the reason fading the wallpaper there fades to the note rather than to
+  // black. With no music block in the folder it is the theme's own background
+  // for the mode. The decision is in utils/modeSurface.js, which both modes
+  // call so the two cannot drift apart.
+  $: surface = surfaceColors(surfaceBlock(blocks, 'music'), canvasTheme);
+  $: modeTextColor = surface.text;
   $: cssVars =
     `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg};` +
-    ` --mode-text-color: ${modeTextColor};`;
+    ` --pl-surface: ${surface.bg}; --mode-text-color: ${modeTextColor};`;
 
   // What a run has produced but not yet committed.
   //
@@ -1119,9 +1131,9 @@
     position: relative;
     /* The whole surface, not just the panels, so no untouched corner is left
        showing the app background through. */
-    background: var(--canvas-inner-bg, #000);
+    background: var(--pl-surface, var(--canvas-inner-bg, #000));
     color: var(--mode-text-color, #fff);
-    --sb-track: var(--canvas-inner-bg);
+    --sb-track: var(--pl-surface, var(--canvas-inner-bg));
     --sb-thumb: var(--mode-text-color);
     --pl-line: color-mix(in srgb, var(--mode-text-color, #fff) 14%, transparent);
     --pl-soft: color-mix(in srgb, var(--mode-text-color, #fff) 8%, transparent);
@@ -1180,7 +1192,7 @@
     border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 26%, transparent);
     /* Opaque on purpose: it sits over the wallpaper and over the track list,
        and a translucent menu on a photograph cannot be read. */
-    background: var(--canvas-inner-bg, #000);
+    background: var(--pl-surface, var(--canvas-inner-bg, #000));
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   }
   .pl-menu-item {
@@ -1256,7 +1268,7 @@
     overflow-y: auto;
     padding: 10px;
     border-right: 1px solid var(--pl-line);
-    background: var(--canvas-inner-bg, #000);
+    background: var(--pl-surface, var(--canvas-inner-bg, #000));
   }
 
   /* Explicit background here too: without it the track list showed the app
@@ -1265,7 +1277,7 @@
     min-height: 0;
     overflow-y: auto;
     padding: 10px 12px;
-    background: var(--canvas-inner-bg, #000);
+    background: var(--pl-surface, var(--canvas-inner-bg, #000));
   }
 
   .pl-section-title {
@@ -1457,7 +1469,7 @@
     margin-bottom: 6px;
     border-radius: 8px;
     border: 1px solid var(--pl-line);
-    background: var(--canvas-inner-bg, #000);
+    background: var(--pl-surface, var(--canvas-inner-bg, #000));
   }
   .pl-bulk .pl-btn { padding: 5px 9px; font-size: 0.79rem; }
   .pl-btn-danger { border-color: color-mix(in srgb, #ff6b6b 60%, transparent); }
@@ -1471,7 +1483,7 @@
     font-size: 0.79rem;
     cursor: pointer;
   }
-  .pl-bulk-select option { background: var(--canvas-inner-bg, #000); color: var(--mode-text-color, #fff); }
+  .pl-bulk-select option { background: var(--pl-surface, var(--canvas-inner-bg, #000)); color: var(--mode-text-color, #fff); }
 
   .pl-track.selected {
     background: color-mix(in srgb, var(--mode-text-color, #fff) 12%, transparent);

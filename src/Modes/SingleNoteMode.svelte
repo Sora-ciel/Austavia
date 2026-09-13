@@ -3,6 +3,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
+  import { surfaceColors } from '../utils/modeSurface.js';
   import { usesPortraitBackground, noteImageFilterCss } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
@@ -82,8 +83,13 @@
 
   $: canvasTheme = { ...defaultCanvasColors, ...(canvasColors || {}) };
   $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
-  $: activeNoteBg = noteBlock?.bgColor || canvasTheme.innerBg;
-  $: activeNoteText = noteBlock?.textColor || getReadableTextColor(activeNoteBg);
+  // The note's own colour, or the theme's for the mode when there is no note.
+  // Shared with Playlist mode through utils/modeSurface.js: that mode was asked
+  // to look "like in Single Note mode", and two copies of a rule that is meant
+  // to match are two things to keep matching.
+  $: noteSurface = surfaceColors(noteBlock, canvasTheme);
+  $: activeNoteBg = noteSurface.bg;
+  $: activeNoteText = noteSurface.text;
   // The scrollbar sits over the background image, so it tracks that image's
   // opacity — but never drops below 20%, or it would vanish entirely on a
   // faint background and leave nothing to grab.
