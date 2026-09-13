@@ -457,6 +457,9 @@
      to a plain (and imprecise) editor.commands.focus() on the outer wrap. */
   :global(.tiptap-inner) {
     flex: 1 1 auto;
+    /* Contains the floated pictures. This is the clearfix that used to sit
+       after the text, without the empty block at the end of the content. */
+    display: flow-root;
     outline: none;
     min-height: 80px;
     padding: 12px;
@@ -471,6 +474,12 @@
   }
 
   :global(.tiptap-inner p) { margin: 0; }
+
+  /* A negative margin on the last line was tried here, to give back the leading
+     under it. It does nothing: a scroller's overflow area is the union of the
+     boxes inside it, and margins — positive or negative — are not part of it.
+     The only way to make a scrollbar appear later is to make the boxes smaller,
+     which is what the line height and the padding do. */
 
   /* Images and their drag-to-resize corner */
   :global(.tiptap-img-wrap) {
@@ -499,13 +508,7 @@
     width: fit-content;
     margin: 10px auto;
   }
-  /* Paragraphs after a floated image still start beside it; this keeps the
-     block itself from collapsing around the float. */
-  :global(.tiptap-inner)::after {
-    content: '';
-    display: block;
-    clear: both;
-  }
+
 
   /* Alignment bar, only while the pointer is on the image */
   :global(.tiptap-img-bar) {

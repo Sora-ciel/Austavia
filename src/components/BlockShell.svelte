@@ -310,14 +310,59 @@
     pointer-events: none;
   }
 
-  :global(.note .tiptap-wrap) {
+  /* `:not(.tiptap-inline)` is not a filter, it is specificity.
+   *
+   * The editor's own `.tiptap-wrap` rule carries Svelte's scoping class, so it
+   * weighs the same as a plain `.note .tiptap-wrap` and which of the two wins
+   * comes down to the order the stylesheets happen to be in — which differs
+   * between the dev server and the build. Blocks were 1.1rem in the app and
+   * 1.05rem while working on them, and nothing said so. The same trap is
+   * written up over --active-note-bg in TipTapEditor; this is the second time.
+   *
+   * It excludes the inline editor a task row uses, which is right anyway: that
+   * one takes its size from the row around it. */
+  :global(.note .tiptap-wrap:not(.tiptap-inline)) {
     font-size: 1.1rem;
     font-weight: 500;
     font-family: var(--block-body-font, inherit);
+    /* Tighter than the 1.6 an editor has by default.
+     *
+     * A block raised a scrollbar while its last line was still perfectly
+     * readable, which is what was reported. The space it was scrolling to was
+     * the last line's own leading: a 1.6 line box is about a third empty, half
+     * of it under the glyphs, and a scroller counts that box rather than the
+     * writing in it.
+     *
+     * Margins cannot take it back — a scroller's overflow area is the union of
+     * the boxes inside it and ignores margins entirely — so the box itself is
+     * smaller. At 1.5 the dead band under the last line is a fifth shorter, and
+     * with the top padding trimmed to match, a block of this size fits the line
+     * that used to hang half-off. */
+    line-height: 1.5;
   }
   :global(.note .tiptap-inner) {
     color: var(--text);
-    padding: 8px;
+    /* Tighter at the top than the 8px it was, which with the trim below is what
+       stops a block raising a scrollbar while its last line is still readable. */
+    padding: 6px 8px 8px;
+    /* Trims the half-leading off the first and last lines.
+     *
+     * A line box is taller than the letters in it, split above and below, and a
+     * scroller measures boxes rather than letters — so a block whose last line
+     * was perfectly readable still reported itself as overflowing and put up a
+     * scrollbar for a few pixels of nothing. This is the only thing in CSS that
+     * takes that space back: margins cannot, because a scroller's overflow area
+     * is the union of the boxes in it and ignores margins entirely.
+     *
+     * A browser that does not know it ignores it and behaves as it did before,
+     * which is why the line height and the padding were tightened as well
+     * rather than leaving all of it to this.
+     *
+     * Blocks only. Single Note mode is one note filling the window, its notes
+     * are long enough that the last line is rarely the question, and trimming
+     * there would move its first line up for no reason anybody asked for. */
+    text-box-trim: trim-both;
+    text-box-edge: cap alphabetic;
   }
   .resize-handle {
     position: absolute;
