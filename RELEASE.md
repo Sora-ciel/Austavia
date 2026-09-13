@@ -90,8 +90,25 @@ firebase deploy --only hosting
 
 Then **open it and confirm it is the build you just made** — the diagnostics
 button reports the version, which is the quickest way to be sure the upload was
-not a no-op. `firebase hosting:rollback` puts the previous version back if it
-is wrong.
+not a no-op.
+
+### Putting it back
+
+Hosting keeps every version it has served, so the site can be returned to an
+earlier one at any time. There is no `firebase hosting:rollback`; it was
+written here once and does not exist in the CLI. Two ways that do:
+
+- **The console.** Hosting → the site's release history → the ⋮ beside an
+  earlier release → *Rollback*. One click, takes effect immediately, and the
+  rollback is itself recorded as a new release.
+- **The CLI**, for a version that is on a channel:
+  `firebase hosting:clone <site>:<channel> <site>:live`.
+
+The apps do not roll back the same way. Every installer stays on its GitHub
+release, so going back means installing the older one — and on Android that
+needs the app uninstalled first, because `versionCode` only ever goes up and
+the installer refuses to move it backwards. Uninstalling takes the folders
+with it; anything not synced to the cloud is gone with them.
 
 ### 5. The apps
 
