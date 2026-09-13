@@ -23,10 +23,15 @@
  * Making a playlist goes next to the playlists, as a `＋` at the end of the row
  * of names — that is where someone looks for it, and it costs nothing there.
  *
- * The rest — re-reading tags, export, import, cleaning up after a failed import
- * — are things done occasionally and deliberately. They go behind one button.
- * None of them is removed; a toolbar that quietly drops an action is worse than
- * a crowded one.
+ * The rest — re-reading tags, export, import — are things done occasionally and
+ * deliberately. They go behind one button. None of them is removed; a toolbar
+ * that quietly drops an action is worse than a crowded one.
+ *
+ * Two of them stay behind that button at every width: removing duplicates and
+ * cleaning up after a failed import. They are housekeeping — used once in a
+ * while, never in a hurry — and a wide window is not a reason to spend a button
+ * on them. It is also what keeps the bar on one line on a laptop, which is the
+ * same complaint as the phone's with more room to hide it.
  *
  * ## Why this is a module
  *
@@ -52,6 +57,7 @@ export const PLAYLIST_ACTIONS = [
   'scan',
   'export',
   'import',
+  'dedupe',
   'cleanUp'
 ];
 
@@ -59,6 +65,11 @@ export const PLAYLIST_ACTIONS = [
  * The four that stay on the bar when space is short, in bar order.
  */
 export const COMPACT_BAR = ['add', 'play', 'shuffle', 'select'];
+
+/**
+ * Housekeeping: behind the overflow button however much room there is.
+ */
+export const ALWAYS_MENU = ['dedupe', 'cleanUp'];
 
 /**
  * Below this width the toolbar collapses.
@@ -84,7 +95,13 @@ export function isCompactToolbar({ width } = {}) {
  * the overflow button. Every action is in exactly one of them, always.
  */
 export function toolbarLayout({ compact = false } = {}) {
-  if (!compact) return { bar: [...PLAYLIST_ACTIONS], strip: [], menu: [] };
+  if (!compact) {
+    return {
+      bar: PLAYLIST_ACTIONS.filter((id) => !ALWAYS_MENU.includes(id)),
+      strip: [],
+      menu: [...ALWAYS_MENU]
+    };
+  }
 
   return {
     bar: [...COMPACT_BAR],

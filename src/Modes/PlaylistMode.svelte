@@ -15,6 +15,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
+  import { sizeGroups, clustersFromHashes, planDeduplication } from '../utils/duplicateTracks.js';
   import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
   import ModeBackground from '../components/ModeBackground.svelte';
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
@@ -107,6 +108,11 @@
   function updateScreenShape() {
     isPortraitScreen = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
     screenWidth = window.innerWidth;
+    // The toolbar's own width is now a measurement of a window that no longer
+    // exists. Forgetting it falls back to the window until the browser reports
+    // the new one, which stops a stale narrow reading from surviving a window
+    // being made wider.
+    headerWidth = 0;
   }
 
   // How much of the toolbar there is room for. The decision, and the
@@ -124,7 +130,8 @@
   //
   // Neither can be wrong in the direction that matters: the toolbar never has
   // more room than the window it is in, so the smaller of the two is the room
-  // there really is.
+  // there really is — and a toolbar width is forgotten when the window changes,
+  // so a stale one cannot outlive what it measured.
   let headerWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
   let screenWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
   let moreOpen = false;
@@ -563,6 +570,112 @@
     if (!orphanIds.length) await appDialogs.alert('No leftover files — nothing to clean up.');
   }
 
+  // ── Removing copies of the same file ──────────────────────────────
+  //
+  // The deciding is in utils/duplicateTracks.js: which files are worth
+  // reading, which are really the same, and which copy stays. What is here is
+  // the reading, the asking and the deleting, which need a store and a person.
+  //
+  // The work is proportional to how many files share a length with another
+  // one, not to the size of the library — see that file for why.
+  async function hashOfTrack(trackId) {
+    if (!crypto?.subtle) return null;
+    const blob = await loadMusicTrack(trackId);
+    if (!blob) return null;
+    const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function removeDuplicates() {
+    if (busyMessage) return;
+
+    // No way to compare files means no way to be sure two are the same, and
+    // "probably the same" is not a reason to delete somebody's music.
+    if (!crypto?.subtle) {
+      await appDialogs.alert('This device cannot compare files, so duplicates cannot be found safely.');
+      return;
+    }
+
+    const startedAt = Date.now();
+    busyMessage = 'Measuring files…';
+    try {
+      const sized = [];
+      for (const track of tracks) {
+        if (!availableIds.has(track.id)) continue; // nothing of it on this device
+        const blob = await loadMusicTrack(track.id);
+        if (blob) sized.push({ id: track.id, size: blob.size });
+      }
+
+      const groups = sizeGroups(sized);
+      const sizeById = new Map(sized.map(entry => [entry.id, entry.size]));
+      const candidates = groups.flat();
+
+      const hashed = [];
+      let read = 0;
+      for (const id of candidates) {
+        busyMessage = `Comparing ${++read} of ${candidates.length}…`;
+        try {
+          const hash = await hashOfTrack(id);
+          if (hash) hashed.push({ id, size: sizeById.get(id), hash });
+        } catch (error) {
+          // Left out rather than guessed at; see clustersFromHashes.
+          console.warn('Could not read a file while looking for duplicates:', id, error);
+        }
+      }
+
+      const clusters = clustersFromHashes(hashed);
+      const plan = planDeduplication({ tracks, playlists }, clusters, { playingId: nowPlayingId });
+
+      logSync(
+        'duplicates',
+        '',
+        `checked ${sized.length} track(s), read ${candidates.length}, found ${plan.removedCount} clone(s) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
+      );
+
+      busyMessage = '';
+      if (!plan.changed) {
+        await appDialogs.alert(
+          sized.length
+            ? 'No duplicates — every file in your library is a different file.'
+            : 'Nothing to compare yet.'
+        );
+        return;
+      }
+
+      const ok = await appConfirm(
+        plan.removedCount === 1
+          ? 'One track is a copy of another — exactly the same file. Remove the copy?'
+          : `${plan.removedCount} tracks are copies of others — exactly the same files. Remove the copies?`
+      );
+      if (!ok) return;
+
+      for (const id of plan.removedIds) {
+        if (coverUrls[id]) URL.revokeObjectURL(coverUrls[id]);
+      }
+      const dropped = new Set(plan.removedIds);
+      coverUrls = Object.fromEntries(Object.entries(coverUrls).filter(([id]) => !dropped.has(id)));
+
+      // Not waited for, for the reason written out over removeSelected: the
+      // library is the record of what you have, and reclaiming the space is
+      // the storage engine's business. An interrupted delete leaves orphans,
+      // which the sweep already finds and offers to remove.
+      deleteMusicTracks(plan.removedIds)
+        .then(() => refreshAvailability())
+        .catch(error => console.warn('Freeing duplicate audio did not finish:', error));
+
+      updateLibrary({ ...library, tracks: plan.tracks, playlists: plan.playlists });
+      dispatch(
+        'notify',
+        plan.removedCount === 1 ? 'Removed one duplicate.' : `Removed ${plan.removedCount} duplicates.`
+      );
+    } catch (error) {
+      console.error('Looking for duplicates failed:', error);
+      dispatch('notify', `Could not finish looking for duplicates: ${error?.message || error}`);
+    } finally {
+      busyMessage = '';
+    }
+  }
+
   // ── Selecting several tracks at once ──────────────────────────────
   // Checkboxes stay out of the way until you ask for them — with the Select
   // button, a right-click, or a long-press on touch. Acts on what's currently
@@ -948,6 +1061,13 @@
       label: 'Import',
       title: 'Restore a library exported from another device',
       run: () => importInput.click()
+    },
+    dedupe: {
+      glyph: '⧉',
+      label: 'Remove duplicates',
+      title: 'Find tracks stored twice — the same file — and remove the copies',
+      disabled: !tracks.length || !!busyMessage,
+      run: removeDuplicates
     },
     cleanUp: {
       glyph: '🧹',

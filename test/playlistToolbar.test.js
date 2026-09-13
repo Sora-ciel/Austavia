@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   PLAYLIST_ACTIONS,
+  ALWAYS_MENU,
   COMPACT_WIDTH,
   isCompactToolbar,
   toolbarLayout
@@ -18,11 +19,20 @@ test('on a phone the toolbar keeps four buttons, not nine', () => {
   assert.deepEqual(bar, ['add', 'play', 'shuffle', 'select']);
 });
 
-test('on a wide screen every button stays on the bar', () => {
-  const { bar, strip, menu } = toolbarLayout({ compact: false });
-  assert.deepEqual(bar, PLAYLIST_ACTIONS);
+test('a wide screen keeps everything else on the bar', () => {
+  const { bar, strip } = toolbarLayout({ compact: false });
+  assert.deepEqual(bar, ['add', 'newPlaylist', 'play', 'shuffle', 'select', 'scan', 'export', 'import']);
   assert.deepEqual(strip, []);
-  assert.deepEqual(menu, []);
+});
+
+test('housekeeping is behind one button however much room there is', () => {
+  assert.deepEqual(toolbarLayout({ compact: false }).menu, ALWAYS_MENU);
+  for (const id of ALWAYS_MENU) {
+    assert.ok(
+      toolbarLayout({ compact: true }).menu.includes(id),
+      `${id} is done once in a while and never in a hurry`
+    );
+  }
 });
 
 test('making a playlist moves next to the playlists, not into the menu', () => {
