@@ -322,12 +322,17 @@
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
     font-family: Arial, Helvetica, sans-serif;
-    /* A quarter larger than a block's 1.05rem, which is what was asked for.
-       This mode is one note filling the window rather than a card on a board,
-       so it can afford the size — and the headings are in `em`, so they come up
-       with it and the note keeps its proportions. */
-    font-size: 1.3125rem;
-    line-height: 1.6;
+    /* A sixth larger than a block's 1.05rem. A quarter was tried first and was
+       too much: this mode is one note filling the window rather than a card on
+       a board, but it is still writing rather than a headline. The headings are
+       in `em`, so they come up with the body and the note keeps its
+       proportions.
+
+       The line spacing is halved rather than the line height. 1.6 puts 0.6em
+       between one line and the next; 1.3 puts 0.3em, which is half the gap and
+       reads tighter without the lines touching. */
+    font-size: 1.225rem;
+    line-height: 1.3;
   }
   :global(.single-note .tiptap-inner) {
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
