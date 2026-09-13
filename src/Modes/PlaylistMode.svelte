@@ -1320,6 +1320,10 @@
   .pl-sidebar {
     min-height: 0;
     overflow-y: auto;
+    /* Names are cut short instead; nothing here is worth scrolling sideways
+       for. The row of names on a narrow screen overrides this, because there
+       the sideways scroll is the whole design. */
+    overflow-x: hidden;
     padding: 10px;
     border-right: 1px solid var(--pl-line);
     background: var(--pl-surface, var(--canvas-inner-bg, #000));
@@ -1347,6 +1351,9 @@
     align-items: center;
     gap: 6px;
     width: 100%;
+    /* Without this the row is 100% *plus* its padding and border, so the column
+       scrolled sideways by twenty pixels whatever the playlist was called. */
+    box-sizing: border-box;
     padding: 7px 9px;
     border-radius: 8px;
     cursor: pointer;
@@ -1361,8 +1368,28 @@
     border-color: color-mix(in srgb, var(--mode-text-color, #fff) 45%, transparent);
     background: var(--pl-soft);
   }
-  .pl-playlist-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pl-count { opacity: 0.55; font-size: 0.75rem; }
+  /* A long name is cut short rather than made to fit, and the column never
+     scrolls sideways to chase it.
+     
+     The floor is the point of the `min-width`: truncating purely on what is
+     left over leaves about six letters, which is not enough to tell two
+     playlists apart. Fourteen characters' worth is reserved first and the
+     count beside it gives way — the number is a detail, the name is how you
+     find the thing. */
+  .pl-playlist-name {
+    flex: 1 1 auto;
+    min-width: min(14ch, 100%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pl-count {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    opacity: 0.55;
+    font-size: 0.75rem;
+  }
 
   .pl-track {
     display: flex;
@@ -1607,6 +1634,16 @@
       border-radius: 999px;
       border-color: var(--pl-line);
       padding: 6px 12px;
+      /* One line box for every chip, names and the ＋ alike, so they sit level
+         however big the glyph inside them is. */
+      line-height: 20px;
+    }
+    /* The delete × is the other thing that can make a chip taller than its
+       neighbours; here it lives inside the same line box as the name. */
+    .pl-sidebar .pl-icon-btn {
+      padding: 0 2px;
+      font-size: 0.9rem;
+      line-height: 20px;
     }
     .pl-playlist-name { flex: 0 0 auto; max-width: 38vw; }
   }
@@ -1617,9 +1654,6 @@
     justify-content: center;
     min-width: 38px;
     font-size: 0.95rem;
-    /* Matched to the name chips' line box so it sits level with them rather
-       than standing a few pixels taller. */
-    line-height: 18px;
   }
 </style>
 
