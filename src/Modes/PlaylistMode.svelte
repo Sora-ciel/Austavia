@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher, onMount, onDestroy, afterUpdate, getContext } from 'svelte';
   import { getReadableTextColor } from '../utils/readableColor.js';
+  import { logSync } from '../utils/syncLog.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
   import ScrollingText from '../components/ScrollingText.svelte';
   import { ensureMusicCover, forgetCoverlessTrack } from '../utils/musicCovers.js';
@@ -296,6 +297,14 @@
     // interrupted import holds everything up to the last chunk.
     const CHUNK = 25;
 
+    // Timed and written down, because how long an import takes is a question
+    // about this machine's disk that cannot be answered from anywhere else. A
+    // benchmark here measured blobs already in memory and missed the reading of
+    // the files entirely, which is at least half of it. The app says what it
+    // actually did instead, and it lands in the sync log and the diagnostics.
+    const copyStartedAt = performance.now();
+    let copiedBytes = 0;
+
     for (let start = 0; start < files.length; start += CHUNK) {
       const chunk = files.slice(start, start + CHUNK);
 
@@ -310,6 +319,7 @@
 
       try {
         await saveMusicTracks(entries);
+        for (const entry of entries) copiedBytes += entry.file?.size || 0;
         for (const { id, file } of entries) {
           // No tags yet — that is pass two. The file name stands in until then.
           added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
@@ -331,6 +341,17 @@
         if (outOfSpace) break;
       }
     }
+    const copySeconds = (performance.now() - copyStartedAt) / 1000;
+    const copiedMB = Math.round(copiedBytes / 1024 / 1024);
+    if (copiedMB) {
+      logSync(
+        'import',
+        '',
+        `copied ${added.length} file(s), ${copiedMB} MB in ${copySeconds.toFixed(1)}s`,
+        { megabytesPerSecond: +(copiedMB / Math.max(copySeconds, 0.001)).toFixed(1) }
+      );
+    }
+
     const importedCount = added.length;
     if (importedCount) {
       // `tracks` already includes the overlay, so the committed list is built
@@ -369,6 +390,10 @@
 
     scanning = true;
     stopScanRequested = false;
+    // The other half of an import, timed separately: this pass opens every
+    // file again to read its tags and artwork. Which of the two dominates is
+    // the thing worth knowing before trying to make either faster.
+    const scanStartedAt = performance.now();
 
     // Worked on a local copy and merged back in batches: saving the library
     // rewrites the whole folder, so doing it per track would cost far more
@@ -442,6 +467,12 @@
     }
 
     commit();
+    const scanSeconds = (performance.now() - scanStartedAt) / 1000;
+    if (done) {
+      logSync('import', '', `read tags for ${done} of ${targets.length} in ${scanSeconds.toFixed(1)}s`, {
+        secondsPerTrack: +(scanSeconds / Math.max(done, 1)).toFixed(2)
+      });
+    }
     // Fresh object URLs for whatever artwork turned up.
     for (const url of Object.values(coverUrls)) if (url) URL.revokeObjectURL(url);
     coverUrls = {};
