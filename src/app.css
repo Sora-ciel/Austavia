@@ -59,36 +59,28 @@ textarea::placeholder {
 }
 
 
-/* ── Selected text wears its region's colours, swapped ────────────
-   Highlighting a word reverses the two colours of wherever that word is: the
-   highlight takes the region's text colour and the letters take its
-   background. It was the browser's own blue everywhere before, which belonged
-   to no theme and was the one thing on screen that never changed with one.
+/* ── The two colours of wherever a thing is ───────────────────────
+   Named once, so anything that needs "the colours of where this is" has them.
 
-   The chain runs from the most local outwards, so a word is highlighted in the
-   colours of the thing it is actually sitting on: a block sets --text and --bg
-   on itself, Single Note mode sets --active-note-text and --active-note-bg, a
-   mode surface sets --mode-text-color and --canvas-inner-bg, and .app seeds
-   --app-text and --app-bg for everything else. Nothing has to opt in, which is
-   the point — anything added later is highlighted correctly without being
-   told.
-
-   --selection-bg and --selection-text are there for a region whose own colours
-   are not those: Playlist mode wears its music block's colour rather than the
-   mode's, and says so. */
-/* The two colours of wherever a thing is, named once.
-   
    The chain runs from the most local outwards: a block sets --text and --bg on
    itself, Single Note mode sets --active-note-*, a mode surface sets
    --mode-text-color and --canvas-inner-bg, and .app seeds --app-text and
    --app-bg. Declared on everything rather than inherited, so each element works
-   the chain out from what *it* has inherited — which is what makes "the colours
-   of where this is" true at any depth without anybody opting in. */
+   the chain out from what *it* has inherited — which is what makes this true at
+   any depth without anybody opting in. */
 * {
   --region-ink: var(--text, var(--active-note-text, var(--mode-text-color, var(--app-text, #ffffff))));
   --region-paper: var(--bg, var(--active-note-bg, var(--canvas-inner-bg, var(--app-bg, #000000))));
 }
 
+/* Highlighting a word reverses those two: the highlight takes the region's
+   text colour and the letters take its background. It was the browser's own
+   blue before, which belonged to no theme and was the one thing on screen that
+   never changed with one.
+
+   --selection-bg and --selection-text are there for a region whose own colours
+   are not those: Playlist mode wears its music block's colour rather than the
+   mode's, and says so. */
 ::selection {
   background: var(--selection-bg, var(--region-ink));
   color: var(--selection-text, var(--region-paper));
@@ -299,11 +291,13 @@ img {
   text-underline-offset: 2px;
 }
 
-/* Hovering lifts a link a little off its own colour. Outlined letters were
-   tried first and read as a novelty; this says the same thing quietly. */
+/* Hovering hides the letters: they take the colour of what they are written
+   on. The underline keeps the writing's colour, so the link is still findable
+   and still obviously a link — it is the text that goes, not the whole thing. */
 .tiptap a:hover,
 .ProseMirror a:hover {
-  color: color-mix(in srgb, var(--region-ink) 78%, #ffffff);
+  color: var(--region-paper);
+  text-decoration-color: var(--region-ink);
 }
 
 a {
