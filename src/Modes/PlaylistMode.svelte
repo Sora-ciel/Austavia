@@ -15,6 +15,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
+  import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
   import ModeBackground from '../components/ModeBackground.svelte';
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
   import {
@@ -105,7 +106,32 @@
     usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
   function updateScreenShape() {
     isPortraitScreen = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
+    screenWidth = window.innerWidth;
   }
+
+  // How much of the toolbar there is room for. The decision, and the
+  // measurements that prompted it, are in utils/playlistToolbar.js; here we
+  // only draw what it says.
+  //
+  // Two measurements, and the smaller wins.
+  //
+  // The toolbar's own width is the honest one: the mode does not always have
+  // the whole window, because the controls panel takes a slice of it. But a
+  // bound width comes from a ResizeObserver, and an observer reports nothing
+  // while the page is not being drawn — the same trap as the artwork loading,
+  // further down this file. The window's width is delivered by an event, which
+  // arrives either way.
+  //
+  // Neither can be wrong in the direction that matters: the toolbar never has
+  // more room than the window it is in, so the smaller of the two is the room
+  // there really is.
+  let headerWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+  let screenWidth = typeof window !== 'undefined' ? window.innerWidth : 0;
+  let moreOpen = false;
+  let moreEl;
+  $: compact = isCompactToolbar({ width: Math.min(headerWidth || Infinity, screenWidth || Infinity) });
+  $: layout = toolbarLayout({ compact });
+  $: if (!compact) moreOpen = false;
 
   // With a picture behind them the panels get out of its way; without one they
   // keep the theme's colour, exactly as before. Same rule Single Note uses.
@@ -847,7 +873,102 @@
     busyMessage = '';
     event.target.value = '';
   }
+
+  // One description per action, drawn wherever the layout puts it — the bar,
+  // the playlist strip or the overflow menu. They are written once here rather
+  // than once per place, so a button cannot come to mean two different things
+  // depending on the width of the window.
+  //
+  // `glyph` is what a compact button shows on its own; `label` is the words,
+  // which the menu always shows and the bar drops when it is short of room.
+  $: playlistActions = {
+    add: {
+      glyph: '＋',
+      label: 'Add music',
+      title: 'Add music files from this device',
+      run: () => fileInput.click()
+    },
+    newPlaylist: {
+      glyph: '＋',
+      label: 'Playlist',
+      title: 'Make a new playlist',
+      run: createPlaylist
+    },
+    play: {
+      icon: 'play',
+      label: 'Play',
+      title: 'Play this list',
+      disabled: !listedTracks.length,
+      run: playAll
+    },
+    shuffle: {
+      icon: 'shuffle',
+      label: `Shuffle${shuffle ? ': on' : ''}`,
+      title: 'Shuffle — play this list in a random order',
+      on: shuffle,
+      pressed: shuffle,
+      run: () => dispatch('toggleShuffle')
+    },
+    select: {
+      glyph: '☑',
+      label: selectionMode ? 'Done selecting' : 'Select songs',
+      title: 'Pick several tracks to delete or add to a playlist',
+      disabled: !tracks.length,
+      on: selectionMode,
+      run: () => (selectionMode ? exitSelectionMode() : (selectionMode = true))
+    },
+    scan: scanning
+      ? {
+          glyph: '■',
+          label: 'Stop scan',
+          title: 'Stop reading tags',
+          run: () => (stopScanRequested = true)
+        }
+      : {
+          glyph: '↻',
+          label: pendingScanCount
+            ? `Scan ${pendingScanCount} track${pendingScanCount === 1 ? '' : 's'}`
+            : 'Re-read tags',
+          title: pendingScanCount
+            ? 'Read titles and artwork for the tracks still waiting'
+            : 'Re-read titles and artwork for every track',
+          disabled: !tracks.length || !!busyMessage,
+          on: pendingScanCount > 0,
+          run: () => scanPendingTags({ force: pendingScanCount === 0 })
+        },
+    export: {
+      glyph: '⬇',
+      label: 'Export',
+      title: 'Save the whole library to a file',
+      disabled: !tracks.length,
+      run: exportLibrary
+    },
+    import: {
+      glyph: '⬆',
+      label: 'Import',
+      title: 'Restore a library exported from another device',
+      run: () => importInput.click()
+    },
+    cleanUp: {
+      glyph: '🧹',
+      label: 'Clean up',
+      title: 'Delete audio left on this device by an import that failed',
+      disabled: !!busyMessage,
+      run: cleanUpOrphans
+    }
+  };
+
+  function runAction(action) {
+    moreOpen = false;
+    action.run();
+  }
+
+  function closeMoreOnOutside(event) {
+    if (!moreOpen || !moreEl) return;
+    if (!moreEl.contains(event.target)) moreOpen = false;
+  }
 </script>
+
 
 <style>
   .playlist-mode {
@@ -878,6 +999,11 @@
     padding: 10px 12px;
     border-bottom: 1px solid var(--pl-line);
   }
+  /* The four buttons, the search box and the overflow button on one line. The
+     busy message is allowed to wrap under them, because it is temporary and
+     losing it would be worse than a second row while something is running. */
+  .pl-header.compact { gap: 6px; padding: 8px 10px; }
+  .pl-header.compact .pl-search { flex: 1 1 110px; min-width: 100px; max-width: none; }
 
   .pl-btn {
     border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 30%, transparent);
@@ -890,6 +1016,52 @@
     transition: background 0.15s ease;
   }
   .pl-btn-icon { display: inline-flex; align-items: center; gap: 6px; }
+  .pl-glyph { line-height: 1; }
+
+  /* Short of room, a button is its glyph and nothing else. The words are still
+     on it as a title and an aria-label, so the button is still named for a
+     screen reader and for anyone who holds it. */
+  .pl-btn.square {
+    padding: 7px 9px;
+    min-width: 34px;
+    justify-content: center;
+    font-size: 0.95rem;
+  }
+
+  .pl-more { position: relative; display: inline-flex; }
+
+  .pl-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 5;
+    min-width: 190px;
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 26%, transparent);
+    /* Opaque on purpose: it sits over the wallpaper and over the track list,
+       and a translucent menu on a photograph cannot be read. */
+    background: var(--canvas-inner-bg, #000);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  }
+  .pl-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    color: var(--mode-text-color, #fff);
+    font-size: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+  }
+  .pl-menu-item:hover:not(:disabled) { background: var(--pl-soft); }
+  .pl-menu-item:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pl-menu-item.on { background: color-mix(in srgb, var(--mode-text-color, #fff) 20%, transparent); }
   .pl-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--mode-text-color, #fff) 18%, transparent); }
   .pl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .pl-btn.on {
@@ -1163,15 +1335,58 @@
   .pl-empty { opacity: 0.6; font-size: 0.85rem; padding: 20px 4px; line-height: 1.5; }
   .pl-busy { font-size: 0.8rem; opacity: 0.8; }
 
+  /* Narrow enough that the playlists cannot have a column of their own, they
+     become a single row of names above the music.
+     
+     What was here before gave them 30vh whether there were twenty of them or
+     one: 249px of a 812px phone, mostly empty, and a panel that scrolled
+     vertically — which was the complaint. A row is as tall as one name, and it
+     scrolls sideways only when there are more names than fit. */
   @media (max-width: 1024px) {
-    .pl-body { grid-template-columns: minmax(0, 1fr); }
+    /* The row of names takes what it needs and the music takes the rest.
+       Without the explicit rows both are `auto`, which shares the height
+       between them — and the strip ends up taller than the panel it replaced. */
+    .pl-body {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+    }
     .pl-sidebar {
-      max-height: 30vh;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
       border-right: none;
       border-bottom: 1px solid var(--pl-line);
     }
+    .pl-sidebar .pl-section-title { display: none; }
+    .pl-playlist {
+      width: auto;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      border-color: var(--pl-line);
+      padding: 6px 12px;
+    }
+    .pl-playlist-name { flex: 0 0 auto; max-width: 38vw; }
+  }
+
+  /* Only drawn where the toolbar has given the action away — see
+     utils/playlistToolbar.js. */
+  .pl-playlist-new {
+    justify-content: center;
+    min-width: 38px;
+    font-size: 0.95rem;
+    /* Matched to the name chips' line box so it sits level with them rather
+       than standing a few pixels taller. */
+    line-height: 18px;
   }
 </style>
+
+<svelte:window
+  on:pointerdown={closeMoreOnOutside}
+  on:keydown={(event) => event.key === 'Escape' && (moreOpen = false)}
+/>
 
 <div class="playlist-mode" class:has-wallpaper={wallpaper} bind:this={canvasRef} style={cssVars}>
   {#if wallpaper}
@@ -1179,59 +1394,71 @@
       <ModeBackground settings={backgroundSettings} isMobile={isPortraitScreen} />
     </div>
   {/if}
-  <div class="pl-header">
-    <button class="pl-btn" on:click={() => fileInput.click()}>＋ Add music</button>
-    <button class="pl-btn" on:click={createPlaylist}>＋ Playlist</button>
-    <button class="pl-btn pl-btn-icon" on:click={playAll} disabled={!listedTracks.length}>
-      <PlayerIcon name="play" size={15} /> Play
-    </button>
-    <button
-      class="pl-btn pl-btn-icon"
-      class:on={shuffle}
-      title="Shuffle — play this list in a random order"
-      aria-pressed={shuffle}
-      on:click={() => dispatch('toggleShuffle')}
-    ><PlayerIcon name="shuffle" size={15} /> Shuffle{shuffle ? ': on' : ''}</button>
-    <button
-      class="pl-btn"
-      class:on={selectionMode}
-      on:click={() => (selectionMode ? exitSelectionMode() : (selectionMode = true))}
-      disabled={!tracks.length}
-      title="Pick several tracks to delete or add to a playlist"
-    >☑ Select songs</button>
-    {#if scanning}
-      <button class="pl-btn" on:click={() => (stopScanRequested = true)}>■ Stop scan</button>
-    {:else}
+  <div class="pl-header" class:compact bind:clientWidth={headerWidth}>
+    {#each layout.bar as id (id)}
+      {@const action = playlistActions[id]}
       <button
-        class="pl-btn"
-        class:on={pendingScanCount > 0}
-        on:click={() => scanPendingTags({ force: pendingScanCount === 0 })}
-        disabled={!tracks.length || !!busyMessage}
-        title={pendingScanCount
-          ? 'Read titles and artwork for the tracks still waiting'
-          : 'Re-read titles and artwork for every track'}
-      >↻ {pendingScanCount ? `Scan ${pendingScanCount} track${pendingScanCount === 1 ? '' : 's'}` : 'Re-read tags'}</button>
-    {/if}
-    <button class="pl-btn" on:click={exportLibrary} disabled={!tracks.length}>⬇ Export</button>
-    <button class="pl-btn" on:click={() => importInput.click()}>⬆ Import</button>
-    <button
-      class="pl-btn"
-      on:click={cleanUpOrphans}
-      disabled={!!busyMessage}
-      title="Delete audio left on this device by an import that failed"
-    >🧹 Clean up</button>
+        class="pl-btn pl-btn-icon"
+        class:square={compact}
+        class:on={action.on}
+        title={action.title}
+        aria-label={action.label}
+        aria-pressed={action.pressed === undefined ? undefined : action.pressed}
+        disabled={action.disabled}
+        on:click={() => runAction(action)}
+      >
+        {#if action.icon}
+          <PlayerIcon name={action.icon} size={15} />
+        {:else}
+          <span class="pl-glyph">{action.glyph}</span>
+        {/if}
+        {#if !compact}<span>{action.label}</span>{/if}
+      </button>
+    {/each}
+
     <label class="pl-search">
       <span class="pl-search-icon" aria-hidden="true">⌕</span>
       <input
         type="search"
         bind:value={search}
-        placeholder="Search title, artist, album…"
+        placeholder={compact ? 'Search…' : 'Search title, artist, album…'}
         aria-label="Search music"
       />
       {#if search}
         <button class="pl-search-clear" title="Clear search" on:click={() => (search = '')}>×</button>
       {/if}
     </label>
+
+    {#if layout.menu.length}
+      <div class="pl-more" bind:this={moreEl}>
+        <button
+          class="pl-btn pl-btn-icon square"
+          class:on={moreOpen}
+          title="Everything else"
+          aria-label="Everything else"
+          aria-expanded={moreOpen}
+          on:click={() => (moreOpen = !moreOpen)}
+        ><span class="pl-glyph">⋯</span></button>
+        {#if moreOpen}
+          <div class="pl-menu">
+            {#each layout.menu as id (id)}
+              {@const action = playlistActions[id]}
+              <button
+                class="pl-menu-item"
+                class:on={action.on}
+                title={action.title}
+                disabled={action.disabled}
+                on:click={() => runAction(action)}
+              >
+                <span class="pl-glyph">{action.glyph}</span>
+                <span>{action.label}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
+
     {#if busyMessage}<span class="pl-busy">{busyMessage}</span>{/if}
     <input
       type="file"
@@ -1269,6 +1496,14 @@
           <button class="pl-icon-btn" title="Delete playlist" on:click|stopPropagation={() => deletePlaylist(playlist.id)}>×</button>
         </div>
       {/each}
+      {#if layout.strip.includes('newPlaylist')}
+        <button
+          class="pl-playlist pl-playlist-new"
+          title={playlistActions.newPlaylist.title}
+          aria-label={playlistActions.newPlaylist.label}
+          on:click={() => runAction(playlistActions.newPlaylist)}
+        >＋</button>
+      {/if}
     </div>
 
     <div class="pl-tracks" bind:this={listEl} bind:clientHeight={listViewport} on:scroll={onListScroll}>
