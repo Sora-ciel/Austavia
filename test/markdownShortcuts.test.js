@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   shortcutFor,
   markShortcutFor,
-  separatorIsInline,
+  separatorFillsLine,
   LEAF
 } from '../src/utils/markdownShortcuts.js';
 
@@ -114,31 +114,16 @@ test('turning a line back to normal is not something ordinary writing does', () 
   assert.equal(shortcutFor('a. '), null, 'a lettered point is writing, not a shortcut');
 });
 
-test('a separator on an empty line is still the full-width one', () => {
-  assert.equal(separatorIsInline(shortcutFor('---')), false);
+test('a separator on an empty line fills the whole line, as it always did', () => {
+  assert.equal(separatorFillsLine(), true);
 });
 
 test('a separator after writing starts there and runs to the far edge', () => {
-  assert.equal(separatorIsInline(shortcutFor('some writing ---')), true);
-  assert.equal(separatorIsInline(shortcutFor(`${LEAF}---`)), true, 'after a picture too');
+  assert.equal(separatorFillsLine({ hasContentAfter: false }), true);
 });
 
-test('a separator with writing in its way is the full-width break instead', () => {
-  // It reaches the edge of the line, so it cannot share the line with anything
-  // sitting to its right.
-  assert.equal(
-    separatorIsInline(shortcutFor('some writing ---'), { hasContentAfter: true }),
-    false
-  );
-  assert.equal(
-    separatorIsInline(shortcutFor('---'), { hasContentAfter: true }),
-    false,
-    'including one typed in front of writing that is already there'
-  );
+test('a separator with something already beside it is a short divider', () => {
+  // Filling the line would shove whatever followed onto the next one.
+  assert.equal(separatorFillsLine({ hasContentAfter: true }), false);
 });
 
-test('only a separator is ever asked about sharing a line', () => {
-  assert.equal(separatorIsInline(shortcutFor('# ')), false);
-  assert.equal(separatorIsInline(null), false);
-  assert.equal(separatorIsInline(), false);
-});

@@ -6,7 +6,7 @@
   import Image from '@tiptap/extension-image';
   import { ListItem } from '@tiptap/extension-list-item';
   import { Markdown } from 'tiptap-markdown';
-  import { shortcutFor, markShortcutFor, separatorIsInline } from '../utils/markdownShortcuts.js';
+  import { shortcutFor, markShortcutFor, separatorFillsLine } from '../utils/markdownShortcuts.js';
   import {
     initTextHistory,
     recordText,
@@ -175,7 +175,23 @@
   // are node views and they know when they are gone.
   const drawnSeparators = new Set();
 
-  // Its width is whatever is left of the line.
+  /** Whether anything real follows this separator on its line. */
+  function hasContentAfter(dom) {
+    for (let next = dom.nextSibling; next; next = next.nextSibling) {
+      // The editor leaves scaffolding of its own at the end of a line — an
+      // empty image after a trailing inline node, a <br> to give an empty line
+      // height. Every piece of it is named ProseMirror-something, and none of
+      // it is content. Counting the <br> was enough to make a separator on an
+      // empty line come out three ems long.
+      if (next.nodeType === 1 && /(^|\s)ProseMirror-/.test(next.className || '')) continue;
+      if (next.nodeType === 3 && !next.nodeValue.trim()) continue;
+      return true;
+    }
+    return false;
+  }
+
+  // Its width is whatever is left of the line, or a short divider when
+  // something is already sitting beside it — see utils/markdownShortcuts.js.
   //
   // Zeroed before measuring, or a second pass measures the room it is already
   // filling and the line grows by its own width every time. A pixel is left
@@ -186,6 +202,11 @@
     if (!line) return;
 
     dom.style.width = '0px';
+    if (!separatorFillsLine({ hasContentAfter: hasContentAfter(dom) })) {
+      dom.style.width = '3em';
+      return;
+    }
+
     const room = line.getBoundingClientRect().right - dom.getBoundingClientRect().left;
     dom.style.width = `${Math.max(0, Math.floor(room) - 1)}px`;
   }
@@ -209,7 +230,10 @@
     inline: true,
     group: 'inline',
     atom: true,
-    selectable: false,
+    // Selectable, which is what lets a backspace take it: the editor deletes an
+    // atom by selecting it first, and an unselectable one simply refuses to go.
+    // Being easy to get rid of is half the reason it lives on a line at all.
+    selectable: true,
 
     parseHTML() {
       return [{ tag: 'span[data-inline-separator]' }];
@@ -242,7 +266,10 @@
 
         return {
           dom,
-          ignoreMutation: () => true,
+          // Only the width we write on it. Ignoring *everything* also ignores
+          // the browser removing it, so a backspace deleted it on screen, the
+          // editor never heard, and it came straight back on the next redraw.
+          ignoreMutation: (mutation) => mutation.type === 'attributes',
           destroy() {
             drawnSeparators.delete(dom);
           }
@@ -289,7 +316,7 @@
       return [
         new InputRule({
           find: finder(shortcutFor),
-          handler: ({ chain, range, match, state }) => {
+          handler: ({ chain, range, match }) => {
             const found = match.data;
             const run = chain().deleteRange(range);
 
@@ -320,20 +347,11 @@
               case 'codeBlock':
                 run.setNode('codeBlock', found.language ? { language: found.language } : {});
                 break;
-              case 'horizontalRule': {
-                // Whether the line already holds something the separator should
-                // sit beside. What comes after the caret is the part the module
-                // cannot see, so it is measured here.
-                const { $to } = state.selection;
-                const hasContentAfter = $to.parentOffset < $to.parent.content.size;
-
-                if (separatorIsInline(found, { hasContentAfter })) {
-                  run.insertContent({ type: 'inlineSeparator' });
-                } else {
-                  run.setHorizontalRule();
-                }
+              // Always the one that lives on a line. How wide it is gets
+              // worked out once it is there and can be measured.
+              case 'horizontalRule':
+                run.insertContent({ type: 'inlineSeparator' });
                 break;
-              }
               default:
                 return;
             }

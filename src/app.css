@@ -299,19 +299,11 @@ img {
   text-underline-offset: 2px;
 }
 
-/* Hovering turns a link inside out: the letters take the colour of what they
-   are written on and keep their shape as an outline in the colour they were.
-   The same two colours as everything else here, so it is right on every theme
-   without naming one.
-
-   `paint-order` is what makes it an outline rather than a thickening — the
-   stroke is drawn first and the fill covers its inner half, so the letters keep
-   their weight instead of closing up at small sizes. */
+/* Hovering lifts a link a little off its own colour. Outlined letters were
+   tried first and read as a novelty; this says the same thing quietly. */
 .tiptap a:hover,
 .ProseMirror a:hover {
-  color: var(--region-paper);
-  -webkit-text-stroke: 0.7px var(--region-ink);
-  paint-order: stroke fill;
+  color: color-mix(in srgb, var(--region-ink) 78%, #ffffff);
 }
 
 a {

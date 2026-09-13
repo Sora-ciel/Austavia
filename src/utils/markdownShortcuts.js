@@ -147,27 +147,29 @@ export function shortcutFor(textBefore) {
 }
 
 /**
- * Whether a separator should sit in the line rather than break it.
+ * How wide a separator is: the rest of the line, or a short divider.
  *
- * Asked for: "for the separator to be able to be on the same line as something
- * else, so that it can start after or before something else on the same line,
- * including images."
+ * Every separator lives on a line now. It used to be two things — a block rule
+ * that took a line of its own and an inline one that shared a line — and one
+ * kind is easier to live with: a separator on a line has a caret position
+ * either side of it, so it can be walked past, typed around and deleted with a
+ * backspace like anything else. A block rule has none of that.
  *
- * It shares the line when there is something before it and nothing after: it
- * starts where the writing stopped and runs to the far edge of the line. That
- * is the shape that was asked for, and it is why "nothing after" matters — a
- * line that reaches the edge cannot have writing sitting in its way, so a
- * separator typed in front of something is the full-width break instead.
+ * On an empty line it starts at the margin and runs the full width, which is
+ * what the block one looked like; after writing it starts where the writing
+ * stopped and runs to the far edge. Both are the same thing: it fills what is
+ * left of the line.
  *
- * On an empty line it is the full-width break it has always been.
+ * Unless something is already sitting there. A separator between two things is
+ * a short divider, because the alternative is filling the line and shoving
+ * whatever followed onto the next one.
  *
  * `hasContentAfter` is the part this cannot see for itself: the text handed to
  * a shortcut stops at the caret, and what sits after it is a question for
  * whoever has the document.
  */
-export function separatorIsInline(found, { hasContentAfter = false } = {}) {
-  if (!found || found.kind !== 'horizontalRule') return false;
-  return found.index > 0 && !hasContentAfter;
+export function separatorFillsLine({ hasContentAfter = false } = {}) {
+  return !hasContentAfter;
 }
 
 /**
