@@ -5,7 +5,9 @@ import {
   sizeGroups,
   clustersFromHashes,
   chooseSurvivor,
-  planDeduplication
+  planDeduplication,
+  sameNameClusters,
+  SAME_NAME
 } from '../src/utils/duplicateTracks.js';
 
 // Named after the request: "if there's one or more copy of a music, like the
@@ -147,4 +149,99 @@ test('called with nothing, it does nothing', () => {
   assert.deepEqual(plan.removedIds, []);
   assert.deepEqual(sizeGroups(), []);
   assert.deepEqual(clustersFromHashes(), []);
+});
+
+// The wider net, asked for as: "if they have the exact same name, then delete
+// the one with the least amount of bytes — to remove the lesser quality
+// duplicate when the music is supposed to be the same."
+
+test('the same name at two qualities leaves the bigger file', () => {
+  const tracks = [
+    { id: 'small', title: 'Nightcall' },
+    { id: 'big', title: 'Nightcall' }
+  ];
+  const clusters = sameNameClusters(tracks);
+  const plan = planDeduplication({ tracks }, clusters, {
+    sizes: { small: 3_000_000, big: 9_000_000 }
+  });
+
+  assert.deepEqual(plan.removedIds, ['small']);
+  assert.deepEqual(plan.tracks.map((t) => t.id), ['big']);
+  assert.equal(plan.sameNameCount, 1);
+  assert.equal(plan.identicalCount, 0);
+});
+
+test('the same name is the same name whatever the spacing and the case', () => {
+  const clusters = sameNameClusters([
+    { id: 'a', title: 'Nightcall' },
+    { id: 'b', title: '  nightcall ' }
+  ]);
+  assert.deepEqual(clusters, [{ ids: ['a', 'b'], rule: SAME_NAME }]);
+});
+
+test('two songs called the same thing by two artists are left alone', () => {
+  const clusters = sameNameClusters([
+    { id: 'a', title: 'Intro', artist: 'One Band' },
+    { id: 'b', title: 'Intro', artist: 'Another Band' }
+  ]);
+  assert.deepEqual(clusters, [], 'an artist that disagrees is evidence they are different songs');
+});
+
+test('an artist nobody filled in does not split a group', () => {
+  const clusters = sameNameClusters([
+    { id: 'a', title: 'Intro', artist: 'One Band' },
+    { id: 'b', title: 'Intro' }
+  ]);
+  assert.equal(clusters.length, 1, 'a missing artist is not evidence either way');
+});
+
+test('a track with no name at all is never matched on it', () => {
+  assert.deepEqual(sameNameClusters([{ id: 'a' }, { id: 'b' }]), []);
+  assert.deepEqual(sameNameClusters([{ id: 'a', title: '   ' }, { id: 'b', title: '' }]), []);
+});
+
+test('the file name stands in until the tags have been read', () => {
+  const clusters = sameNameClusters([
+    { id: 'a', fileName: 'Nightcall' },
+    { id: 'b', title: 'nightcall' }
+  ]);
+  assert.equal(clusters.length, 1);
+});
+
+test('a pair caught by both passes is decided once, not twice', () => {
+  // Byte-identical files also share a name, so the same pair arrives from both.
+  const tracks = [{ id: 'a', title: 'Song' }, { id: 'b', title: 'Song' }];
+  const plan = planDeduplication(
+    { tracks },
+    [['a', 'b'], { ids: ['a', 'b', 'c'], rule: SAME_NAME }],
+    { sizes: { a: 10, b: 20, c: 5 } }
+  );
+
+  assert.equal(plan.removedCount, 2);
+  assert.ok(!plan.removedIds.includes('b'), 'the biggest file stays, and stays once');
+  assert.equal(new Set(plan.removedIds).size, plan.removedIds.length);
+  assert.ok(!plan.removedIds.includes(plan.tracks[0]?.id ?? ''), 'never delete the copy that stays');
+});
+
+test('with the wider net switched off, only identical files go', () => {
+  const tracks = [
+    { id: 'a', title: 'Song' },
+    { id: 'b', title: 'Song' }
+  ];
+  const plan = planDeduplication({ tracks }, clustersFromHashes([
+    { id: 'a', size: 10, hash: 'aaa' },
+    { id: 'b', size: 20, hash: 'bbb' }
+  ]));
+
+  assert.equal(plan.changed, false, 'a shared name is not a reason unless it was asked for');
+});
+
+test('the one you are listening to survives the wider net too', () => {
+  const tracks = [{ id: 'small', title: 'Song' }, { id: 'big', title: 'Song' }];
+  const plan = planDeduplication({ tracks }, sameNameClusters(tracks), {
+    sizes: { small: 1, big: 100 },
+    playingId: 'small'
+  });
+
+  assert.deepEqual(plan.removedIds, ['big']);
 });

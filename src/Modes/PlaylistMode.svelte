@@ -15,7 +15,12 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
-  import { sizeGroups, clustersFromHashes, planDeduplication } from '../utils/duplicateTracks.js';
+  import {
+    sizeGroups,
+    clustersFromHashes,
+    planDeduplication,
+    sameNameClusters
+  } from '../utils/duplicateTracks.js';
   import { tracksTheLibraryLacks, playableIds } from '../utils/nowPlaying.js';
   import { surfaceBlock, surfaceColors } from '../utils/modeSurface.js';
   import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
@@ -604,8 +609,19 @@
     return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  // Asked for before it runs rather than after it has found something: the
+  // wider net deletes files that are not identical, so which promise is being
+  // made has to be a choice somebody made on purpose. Off every time it opens —
+  // not remembered — because it is the answer to "is this library one where a
+  // shared name means a shared song", and that is worth re-reading each time.
+  let dedupeOpen = false;
+  let dedupeSameName = false;
+  $: if (!dedupeOpen) dedupeSameName = false;
+
   async function removeDuplicates() {
     if (busyMessage) return;
+    const alsoSameName = dedupeSameName;
+    dedupeOpen = false;
 
     // No way to compare files means no way to be sure two are the same, and
     // "probably the same" is not a reason to delete somebody's music.
@@ -642,29 +658,56 @@
       }
 
       const clusters = clustersFromHashes(hashed);
-      const plan = planDeduplication({ tracks, playlists }, clusters, { playingId: nowPlayingId });
+
+      // Only tracks whose audio is actually here: the wider net keeps the
+      // biggest file, and a track this device does not hold has no size to
+      // compare and nothing to keep.
+      const named = alsoSameName
+        ? sameNameClusters(tracks.filter(track => sizeById.has(track.id)))
+        : [];
+
+      const plan = planDeduplication({ tracks, playlists }, [...clusters, ...named], {
+        playingId: nowPlayingId,
+        sizes: sizeById
+      });
 
       logSync(
         'duplicates',
         '',
-        `checked ${sized.length} track(s), read ${candidates.length}, found ${plan.removedCount} clone(s) in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
+        `checked ${sized.length} track(s), read ${candidates.length}, found ${plan.identicalCount} copy/copies` +
+          `${alsoSameName ? ` and ${plan.sameNameCount} same-name` : ''} in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`
       );
 
       busyMessage = '';
       if (!plan.changed) {
         await appDialogs.alert(
           sized.length
-            ? 'No duplicates — every file in your library is a different file.'
+            ? alsoSameName
+              ? 'No duplicates — no two files are the same, and no two share a name.'
+              : 'No duplicates — every file in your library is a different file.'
             : 'Nothing to compare yet.'
         );
         return;
       }
 
-      const ok = await appConfirm(
-        plan.removedCount === 1
-          ? 'One track is a copy of another — exactly the same file. Remove the copy?'
-          : `${plan.removedCount} tracks are copies of others — exactly the same files. Remove the copies?`
-      );
+      // The two findings are counted apart because they are two different
+      // promises: one is proven, the other is a judgement about a name.
+      const parts = [];
+      if (plan.identicalCount) {
+        parts.push(
+          plan.identicalCount === 1
+            ? '1 track is exactly the same file as another'
+            : `${plan.identicalCount} tracks are exactly the same file as another`
+        );
+      }
+      if (plan.sameNameCount) {
+        parts.push(
+          plan.sameNameCount === 1
+            ? '1 track has the same name as a bigger one'
+            : `${plan.sameNameCount} tracks have the same name as a bigger one`
+        );
+      }
+      const ok = await appConfirm(`${parts.join(', and ')}. Remove ${plan.removedCount === 1 ? 'it' : 'them'}?`);
       if (!ok) return;
 
       for (const id of plan.removedIds) {
@@ -1094,9 +1137,9 @@
     dedupe: {
       glyph: '⧉',
       label: 'Remove duplicates',
-      title: 'Find tracks stored twice — the same file — and remove the copies',
+      title: 'Find tracks stored twice and remove the copies',
       disabled: !tracks.length || !!busyMessage,
-      run: removeDuplicates
+      run: () => (dedupeOpen = true)
     },
     cleanUp: {
       glyph: '🧹',
@@ -1432,6 +1475,34 @@
     font-size: 0.82rem;
   }
   .pl-recover span { flex: 1 1 240px; min-width: 0; }
+
+  /* Asked before it runs, not after — see removeDuplicates. Laid out as prose
+     rather than a row of controls because the thing being chosen is which
+     promise is being made, and that takes a sentence. */
+  .pl-dedupe {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 35%, transparent);
+    background: var(--pl-soft);
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+  .pl-dedupe-lead { margin: 0; opacity: 0.85; }
+  .pl-dedupe-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    cursor: pointer;
+  }
+  .pl-dedupe-check input { margin-top: 2px; flex: 0 0 auto; }
+  .pl-dedupe-check strong { display: block; font-weight: 600; }
+  .pl-dedupe-check span { opacity: 0.85; }
+  .pl-dedupe-check strong { opacity: 1; }
+  .pl-dedupe-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .pl-recover .pl-btn { padding: 5px 10px; font-size: 0.78rem; }
 
   .pl-select-row {
@@ -1676,6 +1747,30 @@
         {selectedPlaylist ? selectedPlaylist.name : 'All music'}
         {#if selectedPlaylist}<span class="pl-count"> — ✓ adds or removes</span>{/if}
       </p>
+
+      {#if dedupeOpen}
+        <div class="pl-dedupe">
+          <p class="pl-dedupe-lead">
+            Looks for tracks stored more than once and removes the copies. Playlists keep the
+            copy that stays, in its place.
+          </p>
+          <label class="pl-dedupe-check">
+            <input type="checkbox" bind:checked={dedupeSameName} />
+            <span>
+              <strong>Also remove tracks with the same name, keeping the biggest file.</strong>
+              These are <em>not</em> identical files. It is for the same song imported twice at
+              two qualities — the smaller one is deleted on the strength of its name alone.
+              Tracks that share a name but name different artists are left alone.
+            </span>
+          </label>
+          <div class="pl-dedupe-actions">
+            <button class="pl-btn" on:click={removeDuplicates} disabled={!!busyMessage}>
+              Find duplicates
+            </button>
+            <button class="pl-btn" on:click={() => (dedupeOpen = false)}>Cancel</button>
+          </div>
+        </div>
+      {/if}
 
       {#if orphanIds.length}
         <div class="pl-recover">

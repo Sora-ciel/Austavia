@@ -47,6 +47,11 @@
  * meant.
  */
 
+/** Clusters that really are the same file, byte for byte. */
+export const IDENTICAL = 'identical';
+/** Clusters that only share a name — the wider net, off unless asked for. */
+export const SAME_NAME = 'sameName';
+
 /**
  * Files that share their length with at least one other file.
  *
@@ -109,8 +114,17 @@ function metadataScore(track) {
  * Exported because it is the part somebody will want to argue with, and an
  * argument is easier against something that can be called on its own.
  */
-export function chooseSurvivor(ids = [], { tracks = [], playlists = [], playingId = null } = {}) {
+export function chooseSurvivor(
+  ids = [],
+  { tracks = [], playlists = [], playingId = null, sizes = null, preferLargest = false } = {}
+) {
   if (playingId && (ids || []).includes(playingId)) return playingId;
+
+  const sizeOf = (id) => {
+    if (!sizes) return 0;
+    const value = sizes instanceof Map ? sizes.get(id) : sizes[id];
+    return Number.isFinite(Number(value)) ? Number(value) : 0;
+  };
 
   const byId = new Map((tracks || []).map((track) => [track.id, track]));
   const order = new Map((tracks || []).map((track, index) => [track.id, index]));
@@ -128,6 +142,13 @@ export function chooseSurvivor(ids = [], { tracks = [], playlists = [], playingI
   return candidates
     .slice()
     .sort((a, b) => {
+      // For a group that only shares a name, the biggest file is the whole
+      // point: at the same length, more bytes is more of the recording.
+      if (preferLargest) {
+        const bySize = sizeOf(b) - sizeOf(a);
+        if (bySize) return bySize;
+      }
+
       const byMetadata = metadataScore(byId.get(b)) - metadataScore(byId.get(a));
       if (byMetadata) return byMetadata;
 
@@ -148,21 +169,83 @@ export function chooseSurvivor(ids = [], { tracks = [], playlists = [], playingI
  * should be true and hands it back, so it can be run against a library in a
  * test without a store, and run twice without doing anything the second time.
  */
-export function planDeduplication(library = {}, clusters = [], { playingId = null } = {}) {
+/**
+ * Clusters, however they were handed over, as `{ ids, rule }` with nothing
+ * appearing in two of them.
+ *
+ * Overlap is not a hypothetical: two files that are byte-identical also share a
+ * name, so the same pair arrives from both passes. Left alone that produces two
+ * answers about which copy stays — and a replacement map where the copy that
+ * stays is itself deleted. Merging anything that touches into one group means
+ * the question is asked once. A group made of both kinds is the wider rule,
+ * since that rule already covers the narrower one.
+ */
+function mergeClusters(clusters = []) {
+  const merged = [];
+
+  for (const raw of clusters || []) {
+    const ids = Array.isArray(raw) ? raw : raw?.ids;
+    if (!Array.isArray(ids) || ids.length < 2) continue;
+    const rule = Array.isArray(raw) ? IDENTICAL : raw?.rule || IDENTICAL;
+
+    const overlapping = merged.filter((group) => ids.some((id) => group.ids.has(id)));
+    const group = overlapping[0] || { ids: new Set(), rule: IDENTICAL };
+
+    for (const other of overlapping.slice(1)) {
+      for (const id of other.ids) group.ids.add(id);
+      if (other.rule === SAME_NAME) group.rule = SAME_NAME;
+      merged.splice(merged.indexOf(other), 1);
+    }
+
+    for (const id of ids) group.ids.add(id);
+    if (rule === SAME_NAME) group.rule = SAME_NAME;
+    if (!overlapping.length) merged.push(group);
+  }
+
+  return merged.map((group) => ({ ids: [...group.ids], rule: group.rule }));
+}
+
+export function planDeduplication(
+  library = {},
+  clusters = [],
+  { playingId = null, sizes = null } = {}
+) {
   const tracks = Array.isArray(library?.tracks) ? library.tracks : [];
   const playlists = Array.isArray(library?.playlists) ? library.playlists : [];
 
   /** every clone -> the copy that stays */
   const replacement = new Map();
-  for (const cluster of clusters || []) {
-    if (!Array.isArray(cluster) || cluster.length < 2) continue;
-    const survivor = chooseSurvivor(cluster, { tracks, playlists, playingId });
+  let identicalCount = 0;
+  let sameNameCount = 0;
+
+  for (const cluster of mergeClusters(clusters)) {
+    const survivor = chooseSurvivor(cluster.ids, {
+      tracks,
+      playlists,
+      playingId,
+      sizes,
+      preferLargest: cluster.rule === SAME_NAME
+    });
     if (!survivor) continue;
-    for (const id of cluster) if (id !== survivor) replacement.set(id, survivor);
+
+    for (const id of cluster.ids) {
+      if (id === survivor) continue;
+      replacement.set(id, survivor);
+      if (cluster.rule === SAME_NAME) sameNameCount += 1;
+      else identicalCount += 1;
+    }
   }
 
   if (!replacement.size) {
-    return { tracks, playlists, removedIds: [], removedCount: 0, changed: false };
+    return {
+      tracks,
+      playlists,
+      removedIds: [],
+      removedCount: 0,
+      identicalCount: 0,
+      sameNameCount: 0,
+      changed: false
+    };
   }
 
   const keptTracks = tracks.filter((track) => !replacement.has(track?.id));
@@ -189,6 +272,82 @@ export function planDeduplication(library = {}, clusters = [], { playingId = nul
     playlists: keptPlaylists,
     removedIds: [...replacement.keys()],
     removedCount: replacement.size,
+    identicalCount,
+    sameNameCount,
     changed: true
   };
+}
+
+/**
+ * ## The wider net: the same song saved twice at different quality
+ *
+ * Asked for: "a wider thing that we can check or not, to delete the not
+ * exactly duplicates. Basically if they have the exact same name, then delete
+ * the one with the least amount of bytes — to remove the lesser quality
+ * duplicate when the music is supposed to be the same. Put it as a check that
+ * is unchecked by default that says clearly what it does."
+ *
+ * This is a different promise from the one above and it is worth being plain
+ * about the difference. The exact-copy pass can say *this is the same file*;
+ * this one can only say *these are called the same thing*. It deletes music
+ * that is not identical, on the strength of a name, and the bigger file is kept
+ * because at equal length more bytes is more of the recording. That is a guess,
+ * a good one for a library where the same album got imported twice at two
+ * bitrates and a bad one for anybody who names things loosely. Which is why it
+ * is off until somebody turns it on.
+ *
+ * Two things narrow it, both for the same reason — the cost of being wrong here
+ * is somebody's music:
+ *
+ * - **A group with two different artists in it is left alone.** Two songs
+ *   called "Intro" by two bands are two songs, and the artist saying so is
+ *   evidence. A missing artist is not evidence either way, so it does not
+ *   split a group; two artists that disagree do, and then the whole group is
+ *   declined rather than guessed at.
+ * - **The name is compared after trimming and without case.** "Song" and
+ *   "song " are the same name to a person, and this has to match what a person
+ *   means by it.
+ */
+
+/** The name two tracks have to share, or null when there is nothing to compare. */
+export function comparableName(track) {
+  const raw = track?.title ?? track?.fileName ?? '';
+  const name = String(raw).trim().toLowerCase();
+  return name || null;
+}
+
+function comparableArtist(track) {
+  const artist = String(track?.artist ?? '').trim().toLowerCase();
+  return artist || null;
+}
+
+/**
+ * Groups of tracks that share a name, and are not contradicted by their artist.
+ *
+ * `tracks` are library records. Returns clusters in the shape planDeduplication
+ * takes, tagged so it knows to keep the biggest file rather than the
+ * best-labelled one.
+ */
+export function sameNameClusters(tracks = []) {
+  const byName = new Map();
+
+  for (const track of tracks || []) {
+    if (!track?.id) continue;
+    const name = comparableName(track);
+    if (!name) continue;
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(track);
+  }
+
+  const clusters = [];
+  for (const group of byName.values()) {
+    if (group.length < 2) continue;
+
+    const artists = new Set(group.map(comparableArtist).filter(Boolean));
+    if (artists.size > 1) continue; // two names that disagree; not ours to decide
+
+    clusters.push({ ids: group.map((track) => track.id), rule: SAME_NAME });
+  }
+
+  return clusters;
 }
