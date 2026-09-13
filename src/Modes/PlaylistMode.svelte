@@ -16,6 +16,7 @@
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
   import { sizeGroups, clustersFromHashes, planDeduplication } from '../utils/duplicateTracks.js';
+  import { tracksTheLibraryLacks, playableIds } from '../utils/nowPlaying.js';
   import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
   import ModeBackground from '../components/ModeBackground.svelte';
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
@@ -208,6 +209,11 @@
   async function refreshAvailability() {
     availableIds = await getAvailableMusicIds();
   }
+
+  // What can actually be played, which during an import is more than the store
+  // has got round to listing — see utils/nowPlaying.js. Everywhere below asks
+  // this rather than the listing.
+  $: playable = playableIds(availableIds, addedNotYetCommitted);
   onMount(async () => {
     updateScreenShape();
     window.addEventListener('resize', updateScreenShape);
@@ -601,7 +607,7 @@
     try {
       const sized = [];
       for (const track of tracks) {
-        if (!availableIds.has(track.id)) continue; // nothing of it on this device
+        if (!playable.has(track.id)) continue; // nothing of it on this device
         const blob = await loadMusicTrack(track.id);
         if (blob) sized.push({ id: track.id, size: blob.size });
       }
@@ -857,9 +863,20 @@
   }
 
   function playSelection() {
-    const queue = visibleTracks.filter(t => selectedIds.has(t.id) && availableIds.has(t.id));
+    const queue = visibleTracks.filter(t => selectedIds.has(t.id) && playable.has(t.id));
     if (!queue.length) return;
-    dispatch('play', { trackId: queue[0].id, queue: queue.map(t => t.id) });
+    startPlaying(queue[0].id, queue.map(t => t.id));
+  }
+
+  // The records for anything the library has not got yet travel with the
+  // request, so the player can name what it is playing during an import — see
+  // utils/nowPlaying.js. On any ordinary day this carries nothing.
+  function startPlaying(trackId, queueIds) {
+    dispatch('play', {
+      trackId,
+      queue: queueIds,
+      tracks: tracksTheLibraryLacks(queueIds, tracks, library?.tracks)
+    });
   }
 
   async function removeTrack(trackId) {
@@ -903,12 +920,12 @@
   }
 
   function playTrack(track) {
-    if (!availableIds.has(track.id)) return;
-    dispatch('play', { trackId: track.id, queue: listedTracks.map(t => t.id) });
+    if (!playable.has(track.id)) return;
+    startPlaying(track.id, listedTracks.map(t => t.id));
   }
 
   function playAll() {
-    const first = listedTracks.find(t => availableIds.has(t.id));
+    const first = listedTracks.find(t => playable.has(t.id));
     if (first) playTrack(first);
   }
 
@@ -1212,8 +1229,17 @@
   .playlist-mode > .pl-header,
   .playlist-mode > .pl-body {
     position: relative;
-    z-index: 1;
   }
+
+  /* The toolbar above the list, not merely above the wallpaper.
+     
+     Both of these used to be z-index: 1, which made each of them a stacking
+     context of its own — and then the later one in the document wins whatever
+     its children say. So the overflow menu, at z-index 5 inside the toolbar,
+     still came out underneath the music: it was competing with its parent's
+     neighbour, not with the list. */
+  .playlist-mode > .pl-header { z-index: 2; }
+  .playlist-mode > .pl-body { z-index: 1; }
 
   /* With a picture behind them the surfaces get out of its way — the same thing
      Single Note does with its note. Rows, buttons and headings keep their own
@@ -1702,7 +1728,7 @@
         <div class="pl-rows" bind:this={rowsEl}>
         <div style="height:{rowWindow.padTop}px" aria-hidden="true"></div>
         {#each renderedTracks as track (track.id)}
-          {@const available = availableIds.has(track.id)}
+          {@const available = playable.has(track.id)}
           {@const inPlaylist = selectedPlaylist?.trackIds.includes(track.id)}
           <div
             class="pl-track"

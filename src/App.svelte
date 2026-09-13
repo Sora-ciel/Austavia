@@ -79,6 +79,7 @@
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
+  import { nowPlayingRecord } from './utils/nowPlaying.js';
   import {
     startBackgroundAudio,
     stopBackgroundAudio,
@@ -1051,7 +1052,12 @@
     musicDuration = Number.isFinite(audioEl.duration) ? audioEl.duration : 0;
   }
 
-  $: nowPlayingTrack = musicLibrary.tracks?.find(t => t.id === nowPlayingId) || null;
+  // Records handed over by whatever asked for the music, for the tracks the
+  // library has not caught up with. Empty except during an import; see
+  // utils/nowPlaying.js for why the player needs them at all.
+  let handedOverTracks = [];
+
+  $: nowPlayingTrack = nowPlayingRecord(nowPlayingId, musicLibrary.tracks, handedOverTracks);
 
   // The cover sits behind a veil of the theme's own panel colour, so the art
   // tints the control rather than fighting the palette. The veil keeps a little
@@ -5209,7 +5215,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:focusToggle={handleFocusToggle}
       on:swapBlocks={(e) => swapBlocksInMode(e.detail)}
       on:libraryChange={(e) => handleLibraryChange(e.detail)}
-      on:play={(e) => playMusicTrack(e.detail.trackId, e.detail.queue)}
+      on:play={(e) => {
+        if (Array.isArray(e.detail.tracks)) handedOverTracks = e.detail.tracks;
+        playMusicTrack(e.detail.trackId, e.detail.queue);
+      }}
       on:toggle={toggleMusic}
       on:stop={stopMusic}
       on:toggleShuffle={toggleShuffle}
