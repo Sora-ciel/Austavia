@@ -17,6 +17,8 @@
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
+  import MusicPlayer from '../components/MusicPlayer.svelte';
+  import { ALL_MUSIC } from '../utils/playlistPlayback.js';
 
   export let blocks = [];
   export let focusedBlockId = null;
@@ -24,6 +26,11 @@
   export let leftControlColors = {};
   export let canvasRef;
   export let columnCount = 2;
+  // The music library and what the app's one player is doing with it, so a
+  // music block here is the same player as on the canvas.
+  export let library = { tracks: [], playlists: [] };
+  export let nowPlayingId = null;
+  export let isPlaying = false;
   const dispatch = createEventDispatcher();
 
   const defaultCanvasColors = {
@@ -549,14 +556,6 @@
     }
   }
 
-  function handleMusicFileChange(event, block) {
-    ensureFocus(block.id);
-    const file = event.target.files?.[0];
-    if (!file) return;
-    updateBlock(block.id, { trackUrl: URL.createObjectURL(file) }, { changedKeys: ['trackUrl'] });
-    event.target.value = '';
-  }
-
   let newTaskTextByBlock = {};
 
   function addTask(block) {
@@ -969,9 +968,12 @@ input[type="text"] {
   padding: 0 8px 8px;
 }
 
-.music-content audio {
-  width: 100%;
-  margin-bottom: 6px;
+/* The player draws its own rows and needs a height to scroll them in; without
+   this it grows with the library instead. */
+.music-content {
+  display: flex;
+  min-height: 0;
+  max-height: 320px;
 }
 
 .url-edit-popup {
@@ -1135,28 +1137,16 @@ input[type="text"] {
 
           {:else if block.type === 'music'}
             <div class="music-content" data-focus-guard>
-              <audio controls src={block.trackUrl} data-focus-guard></audio>
-              <input
-                type="text"
-                placeholder="Title"
-                value={block.title || ''}
-                on:input={(e) => updateBlock(block.id, { title: e.target.value })}
-                on:focus={() => ensureFocus(block.id)}
-                data-focus-guard
-              />
-              <input
-                type="text"
-                placeholder="Track URL"
-                value={block.trackUrl || ''}
-                on:input={(e) => updateBlock(block.id, { trackUrl: e.target.value })}
-                on:focus={() => ensureFocus(block.id)}
-                data-focus-guard
-              />
-              <input
-                type="file"
-                accept="audio/*"
-                on:change={(event) => handleMusicFileChange(event, block)}
-                data-focus-guard
+              <MusicPlayer
+                playlistId={block.playlistId ?? ALL_MUSIC}
+                ownPickerButton
+                {library}
+                {nowPlayingId}
+                {isPlaying}
+                on:change={(e) =>
+                  updateBlock(block.id, { playlistId: e.detail.playlistId }, { changedKeys: ['playlistId'] })}
+                on:play
+                on:toggle
               />
             </div>
           {:else if block.type === 'embed'}

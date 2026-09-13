@@ -94,6 +94,11 @@
       bind:canvasRef
       {canvasColors}
       {leftControlColors}
+      library={musicLibrary}
+      {nowPlayingId}
+      {isPlaying}
+      on:play
+      on:toggle
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}
       on:touchend={onTouchEnd}
