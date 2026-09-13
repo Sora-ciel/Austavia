@@ -54,6 +54,22 @@ const BOUNDARY = '(?:^|\\s|%leaf%)';
  */
 const RULES = [
   {
+    // Back to ordinary writing, whatever the line had become.
+    //
+    // Every other shortcut turns a line into something; there was no way to
+    // turn one back, and the case that hurts is a line that is *waiting* —
+    // an empty heading typed by mistake, a list nobody wanted — where there is
+    // no text to select and nothing obvious to undo.
+    //
+    // Two markers for one meaning, on purpose. `\ ` is the markdown escape
+    // character, which already means "no formatting here", and `. ` is the one
+    // to reach for on a keyboard where the backslash is a two-hand affair. A
+    // line that genuinely begins with either is close enough to never.
+    kind: 'paragraph',
+    pattern: /^\s*(\\|\.)\s$/,
+    extra: () => ({})
+  },
+  {
     kind: 'heading',
     pattern: /^(#{1,6})\s$/,
     extra: (match) => ({ level: match[1].length })
@@ -128,6 +144,27 @@ export function shortcutFor(textBefore) {
     if (match) return found(rule, match, rule.extra(match));
   }
   return null;
+}
+
+/**
+ * Whether a separator should sit in the line rather than break it.
+ *
+ * Asked for: "for the separator to be able to be on the same line as something
+ * else, so that it can start after or before something else on the same line,
+ * including images."
+ *
+ * A separator on an empty line is the page-break it has always been, full
+ * width, with the writing above and below it. On a line that already holds
+ * something — words, a picture, either side of the caret — breaking the line in
+ * two is not what was asked for, so it goes in the line instead.
+ *
+ * `hasContentAfter` is the only part this cannot see for itself: the text handed
+ * to a shortcut stops at the caret, and what sits after it is a question for
+ * whoever has the document.
+ */
+export function separatorIsInline(found, { hasContentAfter = false } = {}) {
+  if (!found || found.kind !== 'horizontalRule') return false;
+  return found.index > 0 || Boolean(hasContentAfter);
 }
 
 /**

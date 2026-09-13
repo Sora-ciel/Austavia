@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { shortcutFor, markShortcutFor, LEAF } from '../src/utils/markdownShortcuts.js';
+import {
+  shortcutFor,
+  markShortcutFor,
+  separatorIsInline,
+  LEAF
+} from '../src/utils/markdownShortcuts.js';
 
 // Named after the request: "make it so that we can aggregate markdowns, so that
 // for example we can use the '# ' markdown to have a title and then add '- ' to
@@ -93,4 +98,44 @@ test('a separator needs its own space, not the middle of a word', () => {
   assert.equal(shortcutFor('well---known'), null);
   assert.equal(shortcutFor('done ---')?.kind, 'horizontalRule');
   assert.equal(shortcutFor('---')?.kind, 'horizontalRule', 'on its own line as well');
+});
+
+// Asked for later: a shortcut back to ordinary writing, a separator that can
+// share a line, and the bullet taking the weight of the title it belongs to.
+
+test('a line that was waiting to be a title can be put back to normal text', () => {
+  assert.equal(shortcutFor('\\ ')?.kind, 'paragraph');
+  assert.equal(shortcutFor('. ')?.kind, 'paragraph', 'and without reaching for a backslash');
+});
+
+test('turning a line back to normal is not something ordinary writing does', () => {
+  assert.equal(shortcutFor('...'), null);
+  assert.equal(shortcutFor('1. ')?.kind, 'orderedList', 'a numbered list still wins');
+  assert.equal(shortcutFor('a. '), null, 'a lettered point is writing, not a shortcut');
+});
+
+test('a separator on an empty line is still the full-width one', () => {
+  assert.equal(separatorIsInline(shortcutFor('---')), false);
+});
+
+test('a separator after writing shares the line instead of breaking it', () => {
+  assert.equal(separatorIsInline(shortcutFor('some writing ---')), true);
+});
+
+test('a separator after a picture shares the line with the picture', () => {
+  assert.equal(separatorIsInline(shortcutFor(`${LEAF}---`)), true);
+});
+
+test('a separator typed before something else shares that line too', () => {
+  assert.equal(
+    separatorIsInline(shortcutFor('---'), { hasContentAfter: true }),
+    true,
+    'the caret sees nothing before it, but the line is not empty'
+  );
+});
+
+test('only a separator is ever asked about sharing a line', () => {
+  assert.equal(separatorIsInline(shortcutFor('# ')), false);
+  assert.equal(separatorIsInline(null), false);
+  assert.equal(separatorIsInline(), false);
 });

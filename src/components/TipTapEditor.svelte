@@ -1,12 +1,12 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-  import { Editor, Extension, InputRule } from '@tiptap/core';
+  import { Editor, Extension, InputRule, Node as TipTapNode } from '@tiptap/core';
   import StarterKit from '@tiptap/starter-kit';
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
   import { ListItem } from '@tiptap/extension-list-item';
   import { Markdown } from 'tiptap-markdown';
-  import { shortcutFor, markShortcutFor } from '../utils/markdownShortcuts.js';
+  import { shortcutFor, markShortcutFor, separatorIsInline } from '../utils/markdownShortcuts.js';
   import {
     initTextHistory,
     recordText,
@@ -169,6 +169,45 @@
   // the right thing it still does it, and these only get a turn where it gave
   // up. A rule that matches and then finds it cannot wrap the block returns
   // nothing, which is exactly the case of typing "- " inside a heading.
+  // A separator that sits in a line rather than breaking it.
+  //
+  // An <hr> is a block: it takes the whole width and pushes whatever was beside
+  // it onto another line. That is right for a page break on an empty line and
+  // wrong for "a separator on the same line as something else, before or after,
+  // including images", which is what was asked for. So there are two, and
+  // utils/markdownShortcuts.js says which one a given line gets.
+  //
+  // It carries no text and cannot be typed into, which is what `atom` means
+  // here — it behaves as one object to the caret, like a picture does.
+  const InlineSeparator = TipTapNode.create({
+    name: 'inlineSeparator',
+    inline: true,
+    group: 'inline',
+    atom: true,
+    selectable: false,
+
+    parseHTML() {
+      return [{ tag: 'span[data-inline-separator]' }];
+    },
+
+    renderHTML() {
+      return ['span', { 'data-inline-separator': '', class: 'tiptap-inline-sep' }];
+    },
+
+    // Tasks are stored as markdown, and a node the serialiser has never heard
+    // of throws rather than being skipped. Three dashes is what was typed and
+    // what it reads back as.
+    addStorage() {
+      return {
+        markdown: {
+          serialize(state) {
+            state.write('---');
+          }
+        }
+      };
+    }
+  });
+
   // A list item may begin with anything, not only a paragraph.
   //
   // This is what makes a title able to become a list item while staying a
@@ -194,11 +233,18 @@
       return [
         new InputRule({
           find: finder(shortcutFor),
-          handler: ({ chain, range, match }) => {
+          handler: ({ chain, range, match, state }) => {
             const found = match.data;
             const run = chain().deleteRange(range);
 
             switch (found.kind) {
+              // Back to ordinary writing. clearNodes lifts the line out of
+              // whatever is wrapping it — a list, a quote — as well as turning
+              // it back into a paragraph, which is the difference between this
+              // and setParagraph on its own.
+              case 'paragraph':
+                run.clearNodes().unsetAllMarks();
+                break;
               case 'heading':
                 run.setNode('heading', { level: found.level });
                 break;
@@ -218,9 +264,20 @@
               case 'codeBlock':
                 run.setNode('codeBlock', found.language ? { language: found.language } : {});
                 break;
-              case 'horizontalRule':
-                run.setHorizontalRule();
+              case 'horizontalRule': {
+                // Whether the line already holds something the separator should
+                // sit beside. What comes after the caret is the part the module
+                // cannot see, so it is measured here.
+                const { $to } = state.selection;
+                const hasContentAfter = $to.parentOffset < $to.parent.content.size;
+
+                if (separatorIsInline(found, { hasContentAfter })) {
+                  run.insertContent({ type: 'inlineSeparator' });
+                } else {
+                  run.setHorizontalRule();
+                }
                 break;
+              }
               default:
                 return;
             }
@@ -432,6 +489,7 @@
         // words, anywhere the caret is — instead of being forced onto its own
         // full-width line. allowBase64 so pasted data: URLs render too.
         ResizableImage.configure({ inline: true, allowBase64: true }),
+        InlineSeparator,
         AggregateMarkdown,
         Placeholder.configure({ placeholder }),
       ],
@@ -680,23 +738,51 @@
   :global(.tiptap-inner ul, .tiptap-inner ol) { padding-left: 1.4em; margin: 0.3em 0; }
   :global(.tiptap-inner li) { margin: 0.15em 0; }
 
+  /* These three were white, which is a colour that belongs to no theme and was
+     invisible on half of them. currentColor is the writing's own colour
+     wherever the editor happens to be — a block's, a note's, a mode's — so they
+     follow it without being told, which is the rule in CLAUDE.md. */
   :global(.tiptap-inner blockquote) {
-    border-left: 3px solid rgba(255,255,255,0.25);
+    border-left: 3px solid color-mix(in srgb, currentColor 30%, transparent);
     margin: 0.4em 0;
     padding-left: 10px;
-    color: rgba(255,255,255,0.6);
+    color: color-mix(in srgb, currentColor 70%, transparent);
   }
 
   :global(.tiptap-inner hr) {
     border: none;
-    border-top: 1px solid rgba(255,255,255,0.15);
+    /* The browser's own stylesheet gives an <hr> `color: gray`, so currentColor
+       on one is grey rather than the writing's colour — measured, after this
+       rule looked right and came out the wrong colour anyway. */
+    color: inherit;
+    border-top: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     margin: 0.8em 0;
+  }
+
+  /* The separator that shares a line. Sized in em so it keeps its proportions
+     against whatever it is sitting beside, and centred on the line so it reads
+     as a divider rather than an underscore. */
+  :global(.tiptap-inline-sep) {
+    display: inline-block;
+    width: 4em;
+    max-width: 40%;
+    height: 0;
+    margin: 0 0.45em;
+    vertical-align: middle;
+    border-top: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  }
+
+  /* The bullet takes the weight of what it belongs to: next to a title it is a
+     title's bullet. The marker is drawn from the item's own font, so this is
+     the whole of it. */
+  :global(.tiptap-inner li:has(> h1, > h2, > h3)) {
+    font-weight: 700;
   }
 
   /* Empty placeholder */
   :global(.tiptap-inner p.is-editor-empty:first-child::before) {
     content: attr(data-placeholder);
-    color: rgba(255,255,255,0.25);
+    color: color-mix(in srgb, currentColor 40%, transparent);
     pointer-events: none;
     float: left;
     height: 0;
