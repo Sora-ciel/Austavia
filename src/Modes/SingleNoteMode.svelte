@@ -322,7 +322,11 @@
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
     font-family: Arial, Helvetica, sans-serif;
-    font-size: 1.05rem;
+    /* A quarter larger than a block's 1.05rem, which is what was asked for.
+       This mode is one note filling the window rather than a card on a board,
+       so it can afford the size — and the headings are in `em`, so they come up
+       with it and the note keeps its proportions. */
+    font-size: 1.3125rem;
     line-height: 1.6;
   }
   :global(.single-note .tiptap-inner) {
