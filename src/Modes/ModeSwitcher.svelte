@@ -148,6 +148,7 @@
       bind:canvasRef
       {canvasColors}
       {singleNoteSettings}
+      fileKey={openFolder}
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}
       on:touchend={onTouchEnd}

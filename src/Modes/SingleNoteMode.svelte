@@ -4,6 +4,12 @@
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import { surfaceColors } from '../utils/modeSurface.js';
+  import {
+    STORAGE_KEY as LAST_NOTE_KEY,
+    chooseOpenNote,
+    rememberedNote,
+    withRememberedNote
+  } from '../utils/lastNote.js';
   import { usesPortraitBackground, noteImageFilterCss } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
@@ -12,6 +18,8 @@
   export let focusedBlockId = null;
   export let canvasColors = {};
   export let canvasRef;
+  /** The open file's name, used only to remember which note was last read. */
+  export let fileKey = '';
   export let singleNoteSettings = {};
 
   const dispatch = createEventDispatcher();
@@ -110,19 +118,51 @@
   $: noteBlocks = blocks.filter(
     block => block.type === 'text' || block.type === 'cleantext'
   );
-  let selectedNoteId = null;
-  $: if (!selectedNoteId && noteBlocks.length) {
-    selectedNoteId = noteBlocks[0].id;
+  // Which note was open last time, per file. Local to this device and never
+  // synced — see utils/lastNote.js for why, and for the deciding.
+  //
+  // Read from storage at the moment it is needed and written straight back,
+  // rather than kept in a variable here. A variable would put the store in the
+  // reactive graph, where the statement that writes it feeds the statement that
+  // reads it and Svelte refuses to compile the cycle. Re-reading also means a
+  // second tab's choice is respected rather than overwritten from a stale copy.
+  function readLastOpen() {
+    try {
+      const raw = localStorage.getItem(LAST_NOTE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
   }
+
+  function rememberOpenNote(noteId, key) {
+    if (!noteId || !key) return;
+    const store = readLastOpen();
+    const next = withRememberedNote(store, key, noteId);
+    if (next === store) return;
+    try {
+      localStorage.setItem(LAST_NOTE_KEY, JSON.stringify(next));
+    } catch {
+      // A browser with storage turned off simply opens the first note.
+    }
+  }
+
+  let selectedNoteId = null;
   $: if (!noteBlocks.length) {
     selectedNoteId = null;
   }
   $: if (
-    selectedNoteId &&
-    !noteBlocks.some(block => block.id === selectedNoteId)
+    noteBlocks.length &&
+    (!selectedNoteId || !noteBlocks.some(block => block.id === selectedNoteId))
   ) {
-    selectedNoteId = noteBlocks[0]?.id ?? null;
+    selectedNoteId = chooseOpenNote({
+      notes: noteBlocks,
+      remembered: rememberedNote(readLastOpen(), fileKey)
+    });
   }
+
+  $: rememberOpenNote(selectedNoteId, fileKey);
   $: noteBlock =
     noteBlocks.find(block => block.id === selectedNoteId) || null;
   $: noteContent = noteBlock?.content ?? '';
