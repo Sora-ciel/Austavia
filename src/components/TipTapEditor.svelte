@@ -1,10 +1,12 @@
 <script>
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-  import { Editor } from '@tiptap/core';
+  import { Editor, Extension, InputRule } from '@tiptap/core';
   import StarterKit from '@tiptap/starter-kit';
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
+  import { ListItem } from '@tiptap/extension-list-item';
   import { Markdown } from 'tiptap-markdown';
+  import { shortcutFor, markShortcutFor } from '../utils/markdownShortcuts.js';
   import {
     initTextHistory,
     recordText,
@@ -154,6 +156,97 @@
     applyHistory(isRedo ? redoText(historyKey) : undoText(historyKey));
     return true;
   }
+
+  // Markdown shortcuts that work wherever you are, rather than only from a
+  // plain paragraph at the start of a line.
+  //
+  // What each run of characters means is decided in utils/markdownShortcuts.js,
+  // where it can be argued with without an editor. This is the carrying out,
+  // which needs a document.
+  //
+  // These run after StarterKit's own, and ProseMirror stops at the first rule
+  // whose handler actually changes something — so where the editor already did
+  // the right thing it still does it, and these only get a turn where it gave
+  // up. A rule that matches and then finds it cannot wrap the block returns
+  // nothing, which is exactly the case of typing "- " inside a heading.
+  // A list item may begin with anything, not only a paragraph.
+  //
+  // This is what makes a title able to become a list item while staying a
+  // title. The stock rule is `paragraph block*`, so wrapping a heading in a
+  // list is refused outright — which is why typing "- " inside one left the
+  // marker sitting there as text. `- # Title` is ordinary markdown and
+  // round-trips as ordinary markdown; nothing that was valid before stops
+  // being valid.
+  const AnyBlockListItem = ListItem.extend({ content: 'block+' });
+
+  const AggregateMarkdown = Extension.create({
+    name: 'aggregateMarkdown',
+
+    addInputRules() {
+      // TipTap wants { index, text, data } back from a finder — an object, not
+      // a match array. Handing it an array makes it read `.text` off it, get
+      // undefined, and throw on the length of it.
+      const finder = (decide) => (text) => {
+        const found = decide(text);
+        return found ? { index: found.index, text: found.text, data: found } : null;
+      };
+
+      return [
+        new InputRule({
+          find: finder(shortcutFor),
+          handler: ({ chain, range, match }) => {
+            const found = match.data;
+            const run = chain().deleteRange(range);
+
+            switch (found.kind) {
+              case 'heading':
+                run.setNode('heading', { level: found.level });
+                break;
+              // The block keeps whatever it already is — a heading stays a
+              // heading inside its new list item, which is the aggregating
+              // that was asked for and what AnyBlockListItem above allows.
+              case 'bulletList':
+                run.toggleBulletList();
+                break;
+              case 'orderedList':
+                run.toggleOrderedList();
+                if (found.start > 1) run.updateAttributes('orderedList', { start: found.start });
+                break;
+              case 'blockquote':
+                run.toggleBlockquote();
+                break;
+              case 'codeBlock':
+                run.setNode('codeBlock', found.language ? { language: found.language } : {});
+                break;
+              case 'horizontalRule':
+                run.setHorizontalRule();
+                break;
+              default:
+                return;
+            }
+
+            run.run();
+          }
+        }),
+
+        new InputRule({
+          find: finder(markShortcutFor),
+          handler: ({ chain, range, match }) => {
+            const found = match.data;
+            const mark = { bold: 'bold', italic: 'italic', strike: 'strike', code: 'code' }[found.kind];
+            if (!mark) return;
+
+            chain()
+              .deleteRange(range)
+              .insertContent({ type: 'text', marks: [{ type: mark }], text: found.content })
+              // Or everything typed afterwards is bold as well.
+              .unsetMark(mark)
+              .run();
+          }
+        })
+      ];
+    }
+  });
 
   // StarterKit ships no image node, so markdown like ![alt](url) had nothing
   // to become and silently did nothing. Add the node, and give it a width that
@@ -325,7 +418,8 @@
         // History off: the editor's own would be a second, competing undo
         // stack that dies with the component. Text history is kept per block
         // in utils/textHistory.js instead, so it outlives a remount.
-        StarterKit.configure({ history: false }),
+        StarterKit.configure({ history: false, listItem: false }),
+        AnyBlockListItem,
         // html:true so setContent can parse BOTH legacy markdown content and the
         // HTML we now store. We store HTML (getHTML) because markdown collapses
         // consecutive blank lines — HTML keeps every empty paragraph.
@@ -338,6 +432,7 @@
         // words, anywhere the caret is — instead of being forced onto its own
         // full-width line. allowBase64 so pasted data: URLs render too.
         ResizableImage.configure({ inline: true, allowBase64: true }),
+        AggregateMarkdown,
         Placeholder.configure({ placeholder }),
       ],
       content: content || '',
