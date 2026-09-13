@@ -126,3 +126,21 @@ test('called with nothing, it decides nothing', () => {
   assert.deepEqual(bar, []);
   assert.deepEqual(menu, []);
 });
+
+test('told it has less room than it is using, it gives something up', () => {
+  // This is the lever the call site pulls when the header has wrapped: it
+  // cannot measure the room it should have had, so it says "less than this"
+  // and lets the next measurement, of an unwrapped bar, tell the truth. If
+  // this ever stops removing a control, the bar sits wrapped for ever.
+  const using = Object.values(widths).reduce((a, b) => a + b, 0) + 8 * (present.length - 1);
+  const { bar, menu } = fitControls({
+    present,
+    widths,
+    available: using - 1,
+    gap: 8,
+    menuWidth: 90
+  });
+
+  assert.ok(menu.length >= 1, 'a pixel short has to cost at least one control');
+  assert.ok(bar.length < present.length);
+});

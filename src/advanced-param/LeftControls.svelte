@@ -133,32 +133,70 @@
   // Only measured on the wide bar. In the compact panel every control is
   // stretched to the panel's width, and recording that would say a button is
   // 236px wide for ever after.
-  // The room the bar has is not the width it currently occupies.
+  // The room the bar has is not always the width it currently occupies.
   //
-  // The header is a wrapping flex row, so when the bar is too wide the header
-  // wraps and hands it a line of its own — at which point it measures as having
-  // plenty of room, having just taken a second line to get it. That is the very
-  // thing being fixed, so what is measured is the room left on the *first* line:
-  // the header's content box, less everything else sitting on it.
+  // When everything fits, it is: the bar grows to fill the header's line, so
+  // the width it is given is exactly the width it may use. That measurement
+  // costs nothing and does not depend on what the bar is holding, which is what
+  // keeps this from chasing its own tail.
   //
-  // It does not depend on what the bar is holding, which is what stops this from
-  // oscillating: taking a control out never changes the answer, it only changes
-  // whether the answer is enough.
+  // When it does not fit, the number is a lie in the expensive direction. The
+  // header is a wrapping row, so an overlong bar makes the header wrap and hands
+  // the bar a whole line of its own — at which point it measures as having more
+  // room than ever, having just taken a second line to get it. So a bar that has
+  // wrapped anything is told it has a pixel less than it is using, which puts
+  // one control into the menu; the next pass measures an unwrapped bar and gets
+  // the truth. It settles in a frame or two and never oscillates, because the
+  // squeeze only ever applies while something is still wrapped.
+  //
+  // Arithmetic was tried first — the header's width, less each of the other
+  // things on it — and it is not worth repeating. Margins have to be counted or
+  // a band of widths around 1320px wraps anyway; and once they are counted, the
+  // `margin-left: auto` that pushes the right-hand controls over reads as a
+  // thousand pixels of cost rather than as the free space it actually is.
+  function rowOf(el) {
+    const box = el.getBoundingClientRect();
+    return box.height ? Math.round(box.top) : null;
+  }
+
   function measureAvailable() {
     const header = menuRef?.closest('.controls');
-    if (!header) return;
+    if (!header || compactUI) return;
 
-    const style = getComputedStyle(header);
-    const gap = parseFloat(style.columnGap || style.gap) || 0;
-    let room =
-      header.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+    const items = [...menuRef.querySelectorAll(':scope > [data-control]')];
+    const moreButton = menuRef.querySelector('.lc-more');
+    const onBar = moreButton ? [...items, moreButton] : items;
+    if (!onBar.length) return;
 
+    const rows = new Set();
+    for (const el of onBar) {
+      const row = rowOf(el);
+      if (row !== null) rows.add(row);
+    }
     for (const sibling of header.children) {
       if (sibling.contains(menuRef)) continue;
-      const width = sibling.getBoundingClientRect().width;
-      if (width) room -= width + gap;
+      const row = rowOf(sibling);
+      if (row !== null) rows.add(row);
     }
 
+    const style = getComputedStyle(menuRef);
+    const gap = parseFloat(style.columnGap || style.gap) || 0;
+    const using = onBar.reduce(
+      (total, el, index) => total + el.getBoundingClientRect().width + (index ? gap : 0),
+      0
+    );
+
+    // Measured the same way as every other width, and not with a clientWidth
+    // binding. clientWidth leaves out the border, so the button was counted two
+    // or three pixels wider here than it was budgeted for over there — and a
+    // squeeze of one pixel cannot survive a discrepancy of three. The bar sat
+    // wrapped at every width under 1175 because of it.
+    if (moreButton) {
+      const width = moreButton.getBoundingClientRect().width;
+      if (width && Math.abs(menuButtonWidth - width) > 0.5) menuButtonWidth = width;
+    }
+
+    const room = rows.size > 1 ? using - 1 : menuRef.getBoundingClientRect().width;
     if (Math.abs(barWidth - room) > 0.5) barWidth = room;
   }
 
@@ -1124,7 +1162,6 @@ onMount(() => {
         <button
           class="lc-more-btn"
           class:active={moreOpen}
-          bind:clientWidth={menuButtonWidth}
           title="The controls there is no room for"
           aria-expanded={moreOpen}
           on:click={() => (moreOpen = !moreOpen)}
