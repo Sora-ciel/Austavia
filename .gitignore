@@ -35,3 +35,10 @@ dist-ssr
 
 # packaged installers, staged for a GitHub release
 release/
+
+# old copies of src/ kept around by hand. Untracked and meant to stay that way:
+# a release's `git add -A` swept both into the version-bump commit once — 106
+# files instead of three — and it was only caught because the commit was read
+# before it was pushed.
+src let's say version 4/
+version 5 src/
