@@ -291,13 +291,18 @@ img {
   text-underline-offset: 2px;
 }
 
-/* Hovering hides the letters: they take the colour of what they are written
-   on. The underline keeps the writing's colour, so the link is still findable
-   and still obviously a link — it is the text that goes, not the whole thing. */
+/* Hovering takes the underline away rather than the writing: the line beneath
+   takes the colour of what it is drawn on and the words are left alone. The
+   underline is the whole of what marks a link here, so losing it under the
+   pointer is the smallest thing that can say "this one". */
 .tiptap a:hover,
 .ProseMirror a:hover {
-  color: var(--region-paper);
-  text-decoration-color: var(--region-ink);
+  /* Explicit, because the starter template's `a:hover { color: #535bf2 }` is
+     still further down this file and takes over the moment this rule stops
+     naming a colour — the writing turned indigo on hover the first time this
+     was tried without it. */
+  color: inherit;
+  text-decoration-color: var(--region-paper);
 }
 
 a {
