@@ -59,6 +59,35 @@ textarea::placeholder {
 }
 
 
+/* ── Selected text wears its region's colours, swapped ────────────
+   Highlighting a word reverses the two colours of wherever that word is: the
+   highlight takes the region's text colour and the letters take its
+   background. It was the browser's own blue everywhere before, which belonged
+   to no theme and was the one thing on screen that never changed with one.
+
+   The chain runs from the most local outwards, so a word is highlighted in the
+   colours of the thing it is actually sitting on: a block sets --text and --bg
+   on itself, Single Note mode sets --active-note-text and --active-note-bg, a
+   mode surface sets --mode-text-color and --canvas-inner-bg, and .app seeds
+   --app-text and --app-bg for everything else. Nothing has to opt in, which is
+   the point — anything added later is highlighted correctly without being
+   told.
+
+   --selection-bg and --selection-text are there for a region whose own colours
+   are not those: Playlist mode wears its music block's colour rather than the
+   mode's, and says so. */
+::selection {
+  background: var(
+    --selection-bg,
+    var(--text, var(--active-note-text, var(--mode-text-color, var(--app-text, #ffffff))))
+  );
+  color: var(
+    --selection-text,
+    var(--bg, var(--active-note-bg, var(--canvas-inner-bg, var(--app-bg, #000000))))
+  );
+}
+
+
 /* ── Checkboxes, drawn rather than borrowed ───────────────────────
    A native checkbox takes `accent-color` for its tick and fill and nothing
    else: the empty box keeps the browser's own grey border, which belongs to no

@@ -1177,6 +1177,10 @@
     background: var(--pl-surface, var(--canvas-inner-bg, #000));
     color: var(--mode-text-color, #fff);
     --sb-track: var(--pl-surface, var(--canvas-inner-bg));
+    /* This mode wears the music block's colour rather than the theme's for the
+       mode, so it says which background a highlight should show through to;
+       see the ::selection rule in app.css. */
+    --selection-text: var(--pl-surface, var(--canvas-inner-bg));
     --sb-thumb: var(--mode-text-color);
     --pl-line: color-mix(in srgb, var(--mode-text-color, #fff) 14%, transparent);
     --pl-soft: color-mix(in srgb, var(--mode-text-color, #fff) 8%, transparent);
