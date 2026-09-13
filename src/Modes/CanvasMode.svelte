@@ -12,7 +12,7 @@
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
-  import { nestedScrollerTakesWheel } from '../utils/scrollOwnership.js';
+  import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../utils/scrollOwnership.js';
 
 
   export let mode;
@@ -231,15 +231,16 @@
   }
 
 
-  function shouldLetNestedScrollerHandleWheel(event) {
-    if (!canvasRef || !(event.target instanceof Element)) return false;
+  // What is under the pointer, as the rule in utils/scrollOwnership.js needs it.
+  //
+  // The rule is not here because it was deleted from here once — it looked like
+  // the cause of a different scrolling complaint, nothing failed when it went,
+  // and the only record that anyone had wanted it was a conversation months
+  // earlier. Walking the DOM needs a DOM and stays here; what gets decided does
+  // not.
+  function nestedScrollerUnderPointer(event) {
+    if (!canvasRef || !(event.target instanceof Element)) return { scroller: false };
 
-    // The rule itself is in utils/scrollOwnership.js, with tests named after
-    // what was asked for. It is not here because it was deleted from here once
-    // — it looked like the cause of a different scrolling complaint, nothing
-    // failed when it went, and the only record that anyone had wanted it was a
-    // conversation months earlier. Walking the DOM needs a DOM and stays here;
-    // what gets decided does not.
     let current = event.target;
     while (current && current !== canvasRef) {
       const style = getComputedStyle(current);
@@ -250,29 +251,42 @@
 
       if (canScrollY || canScrollX) {
         const block = current.closest('[data-block-id]');
-        return nestedScrollerTakesWheel({
+        return {
           scroller: true,
           insideBlock: Boolean(block),
           blockFocused: Boolean(block && block.classList.contains('focused'))
-        });
+        };
       }
 
       current = current.parentElement;
     }
 
-    return nestedScrollerTakesWheel({ scroller: false });
+    return { scroller: false };
   }
 
   function onWheel(event) {
     if (!canvasRef) return;
 
     if (!event.ctrlKey) {
-      if (shouldLetNestedScrollerHandleWheel(event)) return;
+      const found = nestedScrollerUnderPointer(event);
+      if (nestedScrollerTakesWheel(found)) return;
 
       const canScrollHorizontally = canvasRef.scrollWidth > canvasRef.clientWidth;
       const canScrollVertically = canvasRef.scrollHeight > canvasRef.clientHeight;
-      const hasSingleScrollableAxis = canScrollHorizontally !== canScrollVertically;
 
+      // A block that has been refused the wheel still gets it from the browser
+      // unless the canvas takes it, so here the canvas takes it — on both axes,
+      // since it is now the only thing moving. Everywhere else the browser's
+      // own scrolling is left alone: it has the inertia and the two axes, and
+      // there is nothing under the pointer to protect the canvas from.
+      if (canvasMustTakeWheel(found)) {
+        if (event.cancelable) event.preventDefault();
+        if (canScrollVertically) canvasRef.scrollTop += event.deltaY;
+        if (canScrollHorizontally) canvasRef.scrollLeft += event.deltaX;
+        return;
+      }
+
+      const hasSingleScrollableAxis = canScrollHorizontally !== canScrollVertically;
       if (!hasSingleScrollableAxis) return;
 
       if (event.cancelable) event.preventDefault();

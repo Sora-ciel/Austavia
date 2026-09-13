@@ -92,6 +92,18 @@ Judgement still applies: a request can be superseded, and the user can change
 their mind. The point is that it should be a decision, taken with the intent in
 front of you, and not a tidy-up.
 
+**A test on the deciding is not a test on the behaviour.** The same scrolling
+rule was reported a third time while every test for it was green. They were
+green because they were right: the module said an unfocused block does not take
+the wheel, and it did say so. What nothing checked was whether the refusal was
+carried out — the browser had not been told, and its own default is to scroll
+whatever is under the pointer, so the block it had just been refused got it
+anyway. The canvas only stepped in when exactly one of its axes could scroll.
+
+So when the deciding lives in a module, ask what the call site has to *do* to
+make the answer real, and test that part too. A decision that nothing enforces
+is a comment with a test suite.
+
 ## Anything new is the theme's colour before it is any other
 
 The app is themed, and that is meant to be the default rather than something

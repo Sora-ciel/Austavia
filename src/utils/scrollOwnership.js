@@ -50,3 +50,27 @@ export function nestedScrollerTakesWheel({
   if (!insideBlock) return true;
   return blockFocused;
 }
+
+/**
+ * Whether the canvas has to take the wheel itself rather than letting the
+ * browser sort it out.
+ *
+ * The rule above says who *should* have the gesture. Saying so is not enough:
+ * when a block is denied the wheel, the browser has not been told, and its own
+ * default is to scroll the nearest scrollable thing under the pointer — which
+ * is the block that was just denied. So a decision to refuse is only carried
+ * out if the canvas also prevents the default and scrolls itself.
+ *
+ * That is the hole this fell through. The canvas only took over when exactly
+ * one of its axes could scroll; on a board wide and tall enough to scroll both
+ * ways it returned early and left the gesture to the browser, which handed it
+ * straight back to the unfocused block. The rule was right, the tests were
+ * green, and scrolling over a block still moved the block.
+ *
+ * Only when something scrollable really is under the pointer. Everywhere else
+ * the browser's own scrolling is better than ours — it has the inertia and the
+ * two axes — and there is nothing to protect the canvas from.
+ */
+export function canvasMustTakeWheel(found) {
+  return Boolean(found?.scroller) && !nestedScrollerTakesWheel(found);
+}

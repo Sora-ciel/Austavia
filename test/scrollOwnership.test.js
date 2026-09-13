@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { nestedScrollerTakesWheel } from '../src/utils/scrollOwnership.js';
+import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../src/utils/scrollOwnership.js';
 
 // These tests are named after what was asked for, not after how it is built.
 // The rule they cover was requested, shipped on 2026-05-18, and deleted on
@@ -45,4 +45,32 @@ test('nothing scrollable under the pointer means the canvas scrolls', () => {
 test('called with nothing, the canvas keeps the wheel', () => {
   assert.equal(nestedScrollerTakesWheel(), false);
   assert.equal(nestedScrollerTakesWheel(undefined), false);
+});
+
+// Refusing is not the same as being obeyed. The browser's default is to scroll
+// whatever is under the pointer, so the canvas has to take the gesture itself
+// or the block it just refused gets it anyway — which is how "a block only
+// takes the scroll while it is focused" stayed broken with these tests green.
+
+test('a block that was refused the scroll does not get it from the browser', () => {
+  assert.equal(
+    canvasMustTakeWheel({ scroller: true, insideBlock: true, blockFocused: false }),
+    true
+  );
+});
+
+test('a block that is allowed the scroll is left to scroll itself', () => {
+  assert.equal(
+    canvasMustTakeWheel({ scroller: true, insideBlock: true, blockFocused: true }),
+    false
+  );
+});
+
+test("a mode's own panel keeps the browser's scrolling, inertia and all", () => {
+  assert.equal(canvasMustTakeWheel({ scroller: true, insideBlock: false }), false);
+});
+
+test('with nothing scrollable under the pointer the canvas need not step in', () => {
+  assert.equal(canvasMustTakeWheel({ scroller: false }), false);
+  assert.equal(canvasMustTakeWheel(), false);
 });
