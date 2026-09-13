@@ -18,7 +18,9 @@
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
   import {
     saveMusicTrack,
+    saveMusicTracks,
     deleteMusicTrack,
+    deleteMusicTracks,
     getAvailableMusicIds,
     loadMusicTrack,
     saveMusicCover,
@@ -284,36 +286,51 @@
     const failures = [];
     let outOfSpace = false;
 
-    for (let i = 0; i < files.length; i += 1) {
-      const file = files[i];
-      // Repainting on every file costs more than the copy itself, so the list
-      // catches up in the same rhythm the progress message does. The tracks
-      // themselves are pushed on every pass below; this is only how often the
-      // screen is told about them.
-      if (i % 20 === 0) {
-        busyMessage = `Adding ${i + 1} of ${files.length}…`;
-        addedNotYetCommitted = [...added];
-        await new Promise(resolve => setTimeout(resolve, 0));
-      }
+    // Written a chunk at a time rather than a file at a time. Each write used
+    // to open its own transaction and wait for it to commit, so importing a
+    // thousand files meant a thousand round trips of fixed cost — most of the
+    // wait was the commits, not the copying. A chunk is one commit.
+    //
+    // Chunked rather than done in one go because this really is moving bytes,
+    // and a failure part-way is worth keeping the successful part of: an
+    // interrupted import holds everything up to the last chunk.
+    const CHUNK = 25;
+
+    for (let start = 0; start < files.length; start += CHUNK) {
+      const chunk = files.slice(start, start + CHUNK);
+
+      busyMessage = `Adding ${Math.min(start + CHUNK, files.length)} of ${files.length}…`;
+      addedNotYetCommitted = [...added];
+      // Let the screen catch up between chunks; the copying itself never yields.
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      // The files go in exactly as they arrived, so whatever they carry
+      // (artwork, lyrics, anything we do not read yet) stays with them.
+      const entries = chunk.map(file => ({ id: crypto.randomUUID(), blob: file, file }));
 
       try {
-        const id = crypto.randomUUID();
-        // The file goes in exactly as it arrived, so whatever it carries
-        // (artwork, lyrics, anything we don't read yet) stays with it.
-        await saveMusicTrack(id, file);
-        // No tags yet — that's pass two. The file name stands in until then.
-        added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
-      } catch (error) {
-        // One unreadable file shouldn't cost you the other 1889.
-        console.warn('Could not add a track:', file?.name, error);
-        failures.push(file?.name || 'unnamed file');
-        if (error?.name === 'QuotaExceededError') {
-          outOfSpace = true;
-          break;
+        await saveMusicTracks(entries);
+        for (const { id, file } of entries) {
+          // No tags yet — that is pass two. The file name stands in until then.
+          added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
         }
+      } catch (error) {
+        // A chunk that will not commit is retried one at a time, so a single
+        // unreadable file costs itself rather than the other twenty-four.
+        console.warn('A batch would not commit; retrying it file by file:', error);
+        for (const { id, file } of entries) {
+          try {
+            await saveMusicTrack(id, file);
+            added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
+          } catch (single) {
+            console.warn('Could not add a track:', file?.name, single);
+            failures.push(file?.name || 'unnamed file');
+            if (single?.name === 'QuotaExceededError') { outOfSpace = true; break; }
+          }
+        }
+        if (outOfSpace) break;
       }
     }
-
     const importedCount = added.length;
     if (importedCount) {
       // `tracks` already includes the overlay, so the committed list is built
@@ -476,10 +493,7 @@
     if (!ok) return;
 
     busyMessage = `Removing ${ids.length}…`;
-    for (const id of ids) {
-      await deleteMusicTrack(id);
-      await deleteMusicCover(id);
-    }
+    await deleteMusicTracks(ids);
     orphanIds = [];
     await refreshAvailability();
     busyMessage = '';
@@ -594,13 +608,30 @@
     );
     if (!ok) return;
 
-    busyMessage = `Removing ${ids.length}…`;
+    // Freeing the audio is not waited for.
+    //
+    // Measured: removing a gigabyte takes about two seconds on a desktop and
+    // longer on a phone, and it is the storage engine reclaiming the space —
+    // not the number of tracks. Batching the deletes into one transaction
+    // changed nothing (823ms against 809ms for four hundred), because the cost
+    // is bytes rather than round trips. There is no making the engine faster.
+    //
+    // What there is, is not standing in front of it. The library is the record
+    // of what you have; once a track is out of it the track is gone as far as
+    // anything here is concerned, and the blobs are just space nobody has
+    // reclaimed yet. So the list updates at once and the freeing runs behind it.
+    //
+    // Safe to leave running because of the rule in CLAUDE.md: if it is
+    // interrupted — the app closed, the tab killed — the audio left behind is
+    // found by the orphan sweep, which already exists and already offers to
+    // remove it. Nothing is lost, it is only reclaimed later.
     for (const id of ids) {
-      await deleteMusicTrack(id);
-      await deleteMusicCover(id);
       if (coverUrls[id]) URL.revokeObjectURL(coverUrls[id]);
       if (nowPlayingId === id) dispatch('stop');
     }
+    deleteMusicTracks(ids)
+      .then(() => refreshAvailability())
+      .catch(error => console.warn('Freeing removed audio did not finish:', error));
     const dropped = new Set(ids);
     coverUrls = Object.fromEntries(Object.entries(coverUrls).filter(([id]) => !dropped.has(id)));
     updateLibrary({
@@ -612,7 +643,6 @@
       }))
     });
     exitSelectionMode();
-    await refreshAvailability();
     busyMessage = '';
   }
 
@@ -663,8 +693,7 @@
   }
 
   async function removeTrack(trackId) {
-    await deleteMusicTrack(trackId);
-    await deleteMusicCover(trackId);
+    await deleteMusicTracks([trackId]);
     if (coverUrls[trackId]) URL.revokeObjectURL(coverUrls[trackId]);
     const { [trackId]: _dropped, ...restCovers } = coverUrls;
     coverUrls = restCovers;

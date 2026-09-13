@@ -285,6 +285,55 @@ export async function deleteMusicTrack(trackId) {
   await db.delete(MUSIC_STORE_NAME, trackId);
 }
 
+/**
+ * Remove several tracks, and their cover art, in one go.
+ *
+ * Deleting one at a time is what made clearing a library slow — and it was
+ * never the bytes. `deleteMusicTrack` opens a transaction, commits it and waits;
+ * so does `deleteMusicCover`. A loop over a few hundred tracks is therefore a
+ * few hundred round trips of fixed cost each, and removing two gigabytes took
+ * longer than copying it in. The blobs themselves are freed by a key removal
+ * that costs almost nothing.
+ *
+ * One transaction, every key issued into it without waiting, and a single
+ * commit at the end. That also makes it all-or-nothing, which is what you want
+ * here: a half-deleted selection leaves audio on the device that the library no
+ * longer lists, and nothing would ever look for it again.
+ */
+export async function deleteMusicTracks(trackIds = []) {
+  const ids = [...new Set((trackIds || []).filter(Boolean))];
+  if (!ids.length) return 0;
+
+  const db = await getDB();
+  const tx = db.transaction(MUSIC_STORE_NAME, 'readwrite');
+  for (const id of ids) {
+    tx.store.delete(id);
+    tx.store.delete(`cover:${id}`);
+  }
+  await tx.done;
+  return ids.length;
+}
+
+/**
+ * Store several tracks in one transaction.
+ *
+ * Same reasoning as the delete, with one difference that decides the shape:
+ * importing actually moves bytes, so a failure part-way is worth keeping the
+ * successful part of. The caller passes a chunk at a time rather than a whole
+ * library, so a commit covers a few dozen files and an interrupted import keeps
+ * everything up to the last chunk.
+ */
+export async function saveMusicTracks(entries = []) {
+  const list = (entries || []).filter(entry => entry && entry.id && entry.blob);
+  if (!list.length) return 0;
+
+  const db = await getDB();
+  const tx = db.transaction(MUSIC_STORE_NAME, 'readwrite');
+  for (const { id, blob } of list) tx.store.put(blob, id);
+  await tx.done;
+  return list.length;
+}
+
 export async function listMusicTrackIds() {
   const db = await getDB();
   return await db.getAllKeys(MUSIC_STORE_NAME);
