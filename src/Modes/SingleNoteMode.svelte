@@ -202,12 +202,11 @@
     }
   }
 
-  function focusScroll(el) {
-    if (!el) return;
-    if (window.innerWidth <= 1024) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
+  // A focusScroll that centred the editor on a phone used to live here; see the
+  // note in SimpleNoteMode for why it is gone. In short: the browser already
+  // scrolls the caret into view, and doing it again — smoothly, and aimed at
+  // the middle of the element rather than the caret — is what made the note
+  // jump away and come back the first time it was touched.
 
 
   function getNoteLabel(block, index) {
@@ -454,10 +453,7 @@
         on:change={(e) => {
           updateBlock(noteBlock.id, { content: e.detail }, { pushToHistory: false, changedKeys: ['content'] });
         }}
-        on:focus={(e) => {
-          focusScroll(e.detail?.target);
-          ensureFocus(noteBlock.id);
-        }}
+        on:focus={() => ensureFocus(noteBlock.id)}
       />
     {/key}
 

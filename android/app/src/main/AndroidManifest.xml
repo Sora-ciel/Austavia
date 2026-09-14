@@ -9,12 +9,29 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- adjustResize, or the toolbar leaves the screen whenever the
+             keyboard opens.
+
+             With no windowSoftInputMode the system chooses, and for a window
+             that is one full-screen WebView it chooses to pan: it slides the
+             whole window up to keep the caret above the keyboard, carrying the
+             controls off the top with it, and nothing in the page can scroll
+             them back because from the page's point of view nothing moved.
+
+             The site has `interactive-widget=resizes-content` on its viewport
+             meta for the same reason, and that is the right fix in a browser —
+             but it is a Chrome setting about Chrome's own viewport, and it has
+             no say over how Android resizes this Activity. The app needed its
+             own half of the answer. Resizing shrinks the WebView to the room
+             above the keyboard, so 100dvh shrinks with it, the app re-lays out,
+             and the editor's own scroller puts the caret on screen. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>

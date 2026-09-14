@@ -435,11 +435,19 @@
   }
 
 
-  function focusScroll(el) {
-    if (!el) return;
-      if (window.innerWidth <= 1024)
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
+  // There was a focusScroll here that centred the editor on screen whenever it
+  // took focus on a phone. It is gone, and this is why.
+  //
+  // The browser already puts the caret on screen when an editable is focused —
+  // that is not something an app has to arrange. Doing it as well meant two
+  // scrolls racing: ours, smooth, aimed at the middle of the *element*, and the
+  // browser's, aimed at the *caret*, a moment later once the keyboard had
+  // opened and the viewport had changed. The note jumped somewhere and came
+  // back, once, the first time each note was touched — which is exactly how it
+  // was reported.
+  //
+  // Only the first time because only the first focus opens the keyboard; after
+  // that there is no viewport change for the browser to correct for.
 
   function blockKey(block) {
     return `${block.id}-${block._version || 0}`;
@@ -1099,10 +1107,7 @@ input[type="text"] {
               on:change={(e) => {
                 updateBlock(block.id, { content: e.detail }, { pushToHistory: false, changedKeys: ['content'] });
               }}
-              on:focus={(e) => {
-                focusScroll(e.detail?.target);
-                ensureFocus(block.id);
-              }}
+              on:focus={() => ensureFocus(block.id)}
             />
           {:else if block.type === 'image'}
             {#if hasImageSource(block)}
