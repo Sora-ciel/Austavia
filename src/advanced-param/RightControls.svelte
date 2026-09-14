@@ -145,9 +145,26 @@
     resizeHandler = () => evaluate();
     outsideClickHandler = (event) => {
       if (!isOpen) return;
-      if (!rightControlsRef?.contains(event.target)) {
-        isOpen = false;
-      }
+      if (!rightControlsRef) return;
+
+      // Asked where the click *started*, not where its target is now.
+      //
+      // `contains(event.target)` reads the DOM after the fact, and by the time
+      // a window listener runs the clicked button may not be in the document
+      // any more: pressing "Advanced settings" swaps the panel's page, which
+      // removes the very button that was pressed. A detached node is contained
+      // by nothing, so the panel decided the click had been outside itself and
+      // shut -- every time, from the one button whose whole job is to stay in
+      // there. The same for "< Settings" coming back.
+      //
+      // composedPath() is taken when the event is dispatched, so it still
+      // holds the panel whatever the click went on to change. `contains` is
+      // kept after it for anything that does not implement composedPath.
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      if (path.includes(rightControlsRef)) return;
+      if (rightControlsRef.contains(event.target)) return;
+
+      isOpen = false;
     };
     window.addEventListener("resize", resizeHandler);
     window.addEventListener("click", outsideClickHandler);
@@ -565,6 +582,20 @@
         />
       {:else}
         <div class="tab-section">
+          <h4>⚙️ Advanced</h4>
+          <button
+            class="create-theme-btn"
+            type="button"
+            on:click={() => {
+              settingsPage = 'advanced';
+              dispatch('advancedOpened');
+            }}
+          >
+            Advanced settings ›
+          </button>
+        </div>
+
+        <div class="tab-section">
           <h4>📂 Saved Files</h4>
           <button class="create-theme-btn" type="button" on:click={handleCreateNewFile}>
             ➕ New File
@@ -708,19 +739,6 @@
           />
         </div>
 
-        <div class="tab-section">
-          <h4>⚙️ Advanced</h4>
-          <button
-            class="create-theme-btn"
-            type="button"
-            on:click={() => {
-              settingsPage = 'advanced';
-              dispatch('advancedOpened');
-            }}
-          >
-            Advanced settings ›
-          </button>
-        </div>
       {/if}
       </div>
     </div>
