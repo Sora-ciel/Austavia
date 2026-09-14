@@ -103,13 +103,26 @@ textarea::placeholder {
    phone sizes. Inter carries 100 to 900, so the weight is the font's own now
    and the stroke is gone.
 
-   `bolder` rather than a number, because bold means "heavier than what is
-   around it" and that is not one weight. Against a 400 paragraph it steps to
-   700; inside a heading, already 700, it steps to 900 — where a flat 700 would
-   have been the same weight as the heading and marked nothing at all. */
+   900, and the number is measured rather than picked. Rendering the same words
+   at each weight and counting the ink says what the eye is actually given:
+   700 is 37% darker than 400, 800 is 51%, and 900 is 66%. 700 is what `bolder`
+   resolves to and what a static family would ship, and it was still reported as
+   only just noticeable — twice. 900 is the end of Inter's axis and there is
+   nothing beyond it short of changing the typeface.
+
+   The writing around it stays at 400. Making *that* lighter widens the gap just
+   as well — 350 against 800 measures the same 65% — but it thins every word in
+   the app to buy it, which is the wrong side of the trade on a phone in
+   daylight and on the light themes.
+
+   One number: if this reads as shouting, 800 is the step back.
+
+   `-webkit-font-smoothing` is not a lever here, in case it looks like one. It
+   does nothing outside macOS, and nothing at all on the two platforms this is
+   read on. */
 strong,
 b {
-  font-weight: bolder;
+  font-weight: 900;
 }
 
 
