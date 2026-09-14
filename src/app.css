@@ -130,15 +130,20 @@ textarea::placeholder {
    Simple Note mode, which forced every text block to bold and left bold with
    almost nothing left to say.
 
+   900 was tried and backed off: it read as blurred rather than heavy. That is
+   the counters closing -- the holes in a, e and o -- and at reading sizes a
+   word whose counters have filled in stops being read as letters. 800 keeps
+   them open and still carries 2.2x the ink of the writing beside it.
+
    One number in each direction: 350 if the writing reads as too thin on a
-   phone in daylight, 800 if the bold reads as shouting.
+   phone in daylight, 700 if the bold still fills in.
 
    `-webkit-font-smoothing` is not a lever here, in case it looks like one. It
    does nothing outside macOS, and nothing at all on the two platforms this is
    read on. */
 strong,
 b {
-  font-weight: 900;
+  font-weight: 800;
 }
 
 

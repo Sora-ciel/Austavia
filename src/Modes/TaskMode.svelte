@@ -641,9 +641,11 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  /* 900, the same as bold everywhere else. At 700 a task's bold was a step
-     weaker than a note's for no reason anybody chose. */
-  .task-text :global(strong) { font-weight: 900; }
+  /* No weight here on purpose. This said 700, which made a task's bold a step
+     weaker than a note's for no reason anybody chose, and saying 800 instead
+     would only be the same mistake with today's number in it. `strong` is
+     given its weight once, in app.css, and a task takes it like everything
+     else does. */
   .task-text :global(em) { font-style: italic; }
   .task-text :global(s) { opacity: 0.7; }
 

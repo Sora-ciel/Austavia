@@ -58,8 +58,14 @@ test('the writing is lighter than bold has any need of', () => {
   );
 });
 
-test('bold goes to the end of the weight axis', () => {
-  assert.deepEqual(weightsIn(css, 'strong,\nb {'), ['900']);
+test('bold is heavy without filling in', () => {
+  // 900 was live briefly and came back as "a little bit like it's blurry",
+  // which is the counters — the holes in a, e and o — closing at reading
+  // sizes. A word whose counters have filled in is read as a shape rather than
+  // as letters, so the end of the axis is not automatically the right end of
+  // it.
+  const [weight] = weightsIn(css, 'strong,\nb {');
+  assert.equal(weight, '800');
 });
 
 test('there is room between the two for bold to be seen in', () => {
@@ -102,10 +108,15 @@ test('no mode quietly makes all of its writing heavy', () => {
 });
 
 test('bold in a task is the same bold as bold anywhere else', () => {
-  // It was capped at 700 here, so a task's bold was a step weaker than a
-  // note's — a difference no theme asked for and nobody could have chosen on
-  // purpose.
-  assert.deepEqual(weightsIn(taskMode, '.task-text :global(strong)'), ['900']);
+  // By taking it rather than by repeating it. This was capped at 700 here, so
+  // a task's bold was a step weaker than a note's — a difference no theme
+  // asked for and nobody could have chosen on purpose. Writing today's number
+  // in instead would have left the same trap for the next change.
+  assert.deepEqual(
+    weightsIn(taskMode, '.task-text :global(strong)'),
+    [],
+    'a task should not have its own opinion about how heavy bold is'
+  );
 });
 
 test('a link is not made semi-bold on its way past', () => {
