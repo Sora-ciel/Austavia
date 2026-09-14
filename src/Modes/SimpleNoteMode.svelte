@@ -789,10 +789,18 @@
   background: transparent;
   color: var(--text-color);
   /* The app's own face, which carries every weight between 100 and 900 —
-       see the @font-face in app.css. Arial was named here and has two. */
-    font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
+     see the @font-face in app.css. Arial was named here and has two. */
+  font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
   font-size: 1em;
-  font-weight: bold;
+  /* Inherited, and emphatically not bold.
+
+     This said `font-weight: bold`, so every word in every Simple Note text
+     block was 700 and the bold inside it was 900 -- a quarter more ink, where
+     everywhere else in the app it is two and a half times as much. Bold was
+     reported as barely visible three times and this was the reason each time;
+     the typeface was changed twice looking for it. Whatever a block is
+     sitting in decides the weight, the same as the rest of the app. */
+  font-weight: inherit;
   min-height: 50px;
   /* don't lock height in grid cards — grow with content */
   flex: unset;

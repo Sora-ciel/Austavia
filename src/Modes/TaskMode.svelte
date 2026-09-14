@@ -641,7 +641,9 @@
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .task-text :global(strong) { font-weight: 700; }
+  /* 900, the same as bold everywhere else. At 700 a task's bold was a step
+     weaker than a note's for no reason anybody chose. */
+  .task-text :global(strong) { font-weight: 900; }
   .task-text :global(em) { font-style: italic; }
   .task-text :global(s) { opacity: 0.7; }
 

@@ -39,7 +39,17 @@
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
+  /* Asked for: "make the regular less bold". 300 rather than 400, which is
+     what widens the gap to bold without touching bold again.
+
+     This needs Inter and only works because of it. Arial, which was named
+     here before, ships exactly two faces: Regular and Bold. Asking it for 300
+     renders the identical pixels as 400 -- measured, 0% difference in ink --
+     so on Arial a lighter regular is not a small change, it is no change.
+     Segoe UI would manage it on Windows and Roboto on Android, but neither
+     exists on the other's platform, which is the whole reason the face is
+     bundled rather than borrowed. */
+  font-weight: 300;
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
@@ -110,12 +120,18 @@ textarea::placeholder {
    only just noticeable — twice. 900 is the end of Inter's axis and there is
    nothing beyond it short of changing the typeface.
 
-   The writing around it stays at 400. Making *that* lighter widens the gap just
-   as well — 350 against 800 measures the same 65% — but it thins every word in
-   the app to buy it, which is the wrong side of the trade on a phone in
-   daylight and on the light themes.
+   Measured in the browser, rendering the same word to a canvas and counting
+   the ink, Inter against the 400 it used to sit on:
 
-   One number: if this reads as shouting, 800 is the step back.
+       300  -23%      700  +50%      800  +69%      900  +89%
+
+   So the pair now in use, 300 against 900, is bold carrying two and a half
+   times the ink of the writing beside it. It was 1.9x at 400/900, and 1.3x in
+   Simple Note mode, which forced every text block to bold and left bold with
+   almost nothing left to say.
+
+   One number in each direction: 350 if the writing reads as too thin on a
+   phone in daylight, 800 if the bold reads as shouting.
 
    `-webkit-font-smoothing` is not a lever here, in case it looks like one. It
    does nothing outside macOS, and nothing at all on the two platforms this is
@@ -373,7 +389,10 @@ img {
 }
 
 a {
-  font-weight: 500;
+  /* Inherited, not 500. The starter's 500 passed unnoticed beside a 400 body;
+     beside a 300 one every link in a note turns semi-bold. A link is marked
+     out by being a link. */
+  font-weight: inherit;
   color: #646cff;
   text-decoration: inherit;
 }
