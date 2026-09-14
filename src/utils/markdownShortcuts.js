@@ -49,6 +49,27 @@ export const LEAF = '%leaf%';
 const BOUNDARY = '(?:^|\\s|%leaf%)';
 
 /**
+ * Where a line effectively begins.
+ *
+ * A block shortcut turns the whole line into something, so it only means
+ * anything at the start of one — which is why every rule below is anchored.
+ * The anchor was `^` alone, and that is wrong next to a picture: an image here
+ * is an *inline* node, so it sits inside the paragraph rather than being a
+ * block of its own, and the text the editor hands these rules starts "%leaf%".
+ * Nothing matched, and typing "# " after a picture left two characters sitting
+ * there.
+ *
+ * So a picture counts as the start of the line as well. Reported as: "after an
+ * image we should be able to put a title, I saw that this doesn't work" — and
+ * it was every block shortcut, not only the title.
+ *
+ * It is still an anchor. The alternation can only succeed at the beginning of
+ * the string or immediately after a picture, so a dash in the middle of a word
+ * is still a dash.
+ */
+const BLOCK_START = '(?:^|%leaf%)';
+
+/**
  * In order. The first that matches is the answer, so anything narrower has to
  * come before anything wider.
  */
@@ -66,32 +87,32 @@ const RULES = [
     // to reach for on a keyboard where the backslash is a two-hand affair. A
     // line that genuinely begins with either is close enough to never.
     kind: 'paragraph',
-    pattern: /^\s*(\\|\.)\s$/,
+    pattern: new RegExp(`${BLOCK_START}\\s*(\\\\|\\.)\\s$`),
     extra: () => ({})
   },
   {
     kind: 'heading',
-    pattern: /^(#{1,6})\s$/,
+    pattern: new RegExp(`${BLOCK_START}(#{1,6})\\s$`),
     extra: (match) => ({ level: match[1].length })
   },
   {
     kind: 'bulletList',
-    pattern: /^\s*([-+*])\s$/,
+    pattern: new RegExp(`${BLOCK_START}\\s*([-+*])\\s$`),
     extra: () => ({})
   },
   {
     kind: 'orderedList',
-    pattern: /^\s*(\d+)[.)]\s$/,
+    pattern: new RegExp(`${BLOCK_START}\\s*(\\d+)[.)]\\s$`),
     extra: (match) => ({ start: Number(match[1]) || 1 })
   },
   {
     kind: 'blockquote',
-    pattern: /^\s*>\s$/,
+    pattern: new RegExp(`${BLOCK_START}\\s*>\\s$`),
     extra: () => ({})
   },
   {
     kind: 'codeBlock',
-    pattern: /^\s*```([a-z]*)\s$/,
+    pattern: new RegExp(`${BLOCK_START}\\s*\`\`\`([a-z]*)\\s$`),
     extra: (match) => ({ language: match[1] || null })
   },
   {
@@ -117,8 +138,10 @@ const MARKS = [
 
 function found(rule, match, extra = {}) {
   // The boundary, where there is one, is not part of the marker: it is the
-  // space or the picture that came before it and has to stay.
-  const boundary = /^(\s|%leaf%)/.exec(match[0]);
+  // space or the picture that came before it and has to stay. Taken whole —
+  // a picture and any spaces after it — so that what gets replaced is the
+  // marker and nothing in front of it.
+  const boundary = /^(?:%leaf%)?\s*/.exec(match[0]);
   const leading = boundary ? boundary[0].length : 0;
   return {
     kind: rule.kind,

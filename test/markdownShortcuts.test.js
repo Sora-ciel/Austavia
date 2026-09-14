@@ -114,6 +114,47 @@ test('turning a line back to normal is not something ordinary writing does', () 
   assert.equal(shortcutFor('a. '), null, 'a lettered point is writing, not a shortcut');
 });
 
+// Reported later: "after an image we should be able to put a title, I saw that
+// this doesn't work". It was not only the title. An image here is an inline
+// node, so it sits inside the paragraph and the text these rules are handed
+// starts with the picture — and every block shortcut was anchored to the start
+// of the string, so none of them fired after one.
+
+test('a title can be started straight after a picture', () => {
+  const found = shortcutFor(`${LEAF}# `);
+  assert.equal(found?.kind, 'heading');
+  assert.equal(found.level, 1);
+  assert.equal(found.index, LEAF.length, 'the picture stays where it is');
+  assert.equal(found.text, '# ', 'and only the marker is replaced');
+});
+
+test('every kind of title works after a picture, not just the big one', () => {
+  for (let level = 1; level <= 6; level += 1) {
+    const found = shortcutFor(`${LEAF}${'#'.repeat(level)} `);
+    assert.equal(found?.kind, 'heading');
+    assert.equal(found.level, level);
+  }
+});
+
+test('the other block shortcuts work after a picture too', () => {
+  // Same anchor, same bug. Fixing it for titles alone would have left the rest
+  // to be reported one at a time.
+  assert.equal(shortcutFor(`${LEAF}- `)?.kind, 'bulletList');
+  assert.equal(shortcutFor(`${LEAF}1. `)?.kind, 'orderedList');
+  assert.equal(shortcutFor(`${LEAF}> `)?.kind, 'blockquote');
+  assert.equal(shortcutFor(`${LEAF}\`\`\` `)?.kind, 'codeBlock');
+  assert.equal(shortcutFor(`${LEAF}. `)?.kind, 'paragraph');
+});
+
+test('a picture is the start of a line, and nothing else is', () => {
+  // The anchor is still an anchor. It can only give way at the beginning of
+  // the text or immediately after a picture, so writing is left alone.
+  assert.equal(shortcutFor('some writing # '), null);
+  assert.equal(shortcutFor('a-b '), null);
+  assert.equal(shortcutFor('see item 1. '), null);
+  assert.equal(shortcutFor(`${LEAF}####### `), null, 'seven is still not a heading');
+});
+
 test('a separator on an empty line fills the whole line, as it always did', () => {
   assert.equal(separatorFillsLine(), true);
 });

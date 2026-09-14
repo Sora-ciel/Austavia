@@ -1107,15 +1107,11 @@ onMount(() => {
   {#if compactUI}
 
 
+    <!-- Mode first, then Menu. Asked for: "the mode should always be the first
+         button". It is the same order the bar has on a computer, where Mode
+         leads and everything else follows it, and the one control that is
+         never behind anything else should not be the one you reach past. -->
     <div class="mobile-quick-actions" bind:this={mobileQuickActionsRef}>
-        <button
-      class="compact-toggle-btn"
-      bind:this={toggleRef}
-      on:click={() => (showMobileMenu = !showMobileMenu)}
-    >
-      <ControlIcon name={showMobileMenu ? 'close' : 'menu'} />
-      {showMobileMenu ? "Close" : "Menu"}
-      </button>
       <div class="mode-switcher">
         <button
           bind:this={modeButtonRef}
@@ -1155,6 +1151,14 @@ onMount(() => {
         {/if}
       </div>
 
+      <button
+        class="compact-toggle-btn"
+        bind:this={toggleRef}
+        on:click={() => (showMobileMenu = !showMobileMenu)}
+      >
+        <ControlIcon name={showMobileMenu ? 'close' : 'menu'} />
+        {showMobileMenu ? "Close" : "Menu"}
+      </button>
     </div>
   {/if}
 

@@ -1,27 +1,32 @@
+// The names as they are shown. No "Mode" on the end: the list they appear in is
+// the mode picker, the button they sit on says the mode, and the word was on
+// every line of a list where every line is one. Asked for in as many words --
+// "in the place where you can choose multiple modes let's remove the mode part
+// of the names".
 export const MODE_DEFINITIONS = {
   default: {
     id: 'default',
-    label: 'Canvas Mode',
+    label: 'Canvas',
     addBlockTypes: ['text', 'image', 'music', 'embed'],
     showRightControls: true
   },
   simple: {
     id: 'simple',
-    label: 'Simple Note Mode',
+    label: 'Simple Note',
     addBlockTypes: ['text', 'image', 'music', 'embed'],
     showRightControls: true,
     settings: { simpleColumns: true }
   },
   single: {
     id: 'single',
-    label: 'Single Note Mode',
+    label: 'Single Note',
     addBlockTypes: ['text'],
     showRightControls: true,
     settings: { singleBackground: true }
   },
   habit: {
     id: 'habit',
-    label: 'Habit Tracker Mode',
+    label: 'Habit Tracker',
     addBlockTypes: [],
     // The right panel carries themes, saved files and the cloud — none of
     // which is about blocks, and all of which is wanted here as much as
@@ -31,13 +36,13 @@ export const MODE_DEFINITIONS = {
   },
   task: {
     id: 'task',
-    label: 'Task Mode',
+    label: 'Task',
     addBlockTypes: ['text', 'image', 'music', 'embed', 'task'],
     showRightControls: true
   },
   playlist: {
     id: 'playlist',
-    label: 'Playlist Mode',
+    label: 'Playlist',
     addBlockTypes: [],
     showRightControls: true,
     // The same wallpaper Single Note has, from the same settings — one picture
@@ -46,7 +51,7 @@ export const MODE_DEFINITIONS = {
   },
   birthday: {
     id: 'birthday',
-    label: 'Birthday Mode',
+    label: 'Birthday',
     addBlockTypes: [],
     showRightControls: false,
     requiresUnlock: true
