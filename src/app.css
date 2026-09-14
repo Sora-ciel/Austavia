@@ -1,5 +1,43 @@
+/* ── The app's typeface ───────────────────────────────────────────
+   Inter, carried with the app rather than fetched.
+
+   The themes have named Inter since they were written and nothing ever
+   loaded it, so every one of them quietly fell back to whatever system font
+   was to hand. That is why bold looked weak: a system sans gives exactly two
+   weights, 400 and 700, and the gap between them is small at reading size.
+   This is one variable file covering 100 to 900, so 700 against 400 is a real
+   step and 600 or 800 are there if they are ever wanted.
+
+   Bundled, not linked, for two reasons: the app runs offline on a phone and a
+   desktop, where a request to Google would simply fail; and a font request
+   carries the reader's address to a third party on every load, which is not a
+   thing to do quietly. 133KB for the two Latin ranges, licence beside them in
+   public/fonts/OFL.txt.
+
+   `swap` so the writing is readable while it loads rather than invisible. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -60,21 +98,18 @@ textarea::placeholder {
 
 
 /* ── Bold, and visibly so ─────────────────────────────────────────
-   700 against 400 is the whole of what a bold face gives, and in the system
-   sans at reading size that is about seven per cent wider and not much darker
-   — on a phone it was reported as hard to tell apart from the writing around
-   it. Asking for 800 or 900 does nothing: no heavier face is loaded to switch
-   to, and `font-synthesis: none` above means the browser will not invent one.
+   A hairline stroke used to be added here to make bold look bold, because the
+   system sans it fell back to had only 400 and 700 and the gap read as weak at
+   phone sizes. Inter carries 100 to 900, so the weight is the font's own now
+   and the stroke is gone.
 
-   A hairline stroke in the text's own colour adds the weight the font cannot.
-   In `em`, so it stays proportional — a bold word inside a heading is stroked
-   as much heavier as the heading is bigger — and in `currentColor`, so it is
-   the writing's own colour on every theme and never a second colour to keep in
-   step. */
+   `bolder` rather than a number, because bold means "heavier than what is
+   around it" and that is not one weight. Against a 400 paragraph it steps to
+   700; inside a heading, already 700, it steps to 900 — where a flat 700 would
+   have been the same weight as the heading and marked nothing at all. */
 strong,
 b {
-  font-weight: 700;
-  -webkit-text-stroke: 0.025em currentColor;
+  font-weight: bolder;
 }
 
 

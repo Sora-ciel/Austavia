@@ -788,7 +788,9 @@
 :global(.container .tiptap-wrap) {
   background: transparent;
   color: var(--text-color);
-  font-family: Arial, Helvetica, sans-serif;
+  /* The app's own face, which carries every weight between 100 and 900 —
+       see the @font-face in app.css. Arial was named here and has two. */
+    font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
   font-size: 1em;
   font-weight: bold;
   min-height: 50px;

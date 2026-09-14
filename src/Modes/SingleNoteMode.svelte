@@ -360,7 +360,9 @@
   :global(.single-note .tiptap-wrap) {
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
-    font-family: Arial, Helvetica, sans-serif;
+    /* The app's own face, which carries every weight between 100 and 900 —
+       see the @font-face in app.css. Arial was named here and has two. */
+    font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
     font-size: 1.05rem;
     line-height: 1.6;
   }

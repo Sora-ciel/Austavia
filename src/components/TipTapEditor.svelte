@@ -666,7 +666,9 @@
     background: var(--active-note-bg, transparent);
     color: var(--active-note-text, inherit);
     box-sizing: border-box;
-    font-family: Arial, Helvetica, sans-serif;
+    /* The app's own face, which carries every weight between 100 and 900 —
+       see the @font-face in app.css. Arial was named here and has two. */
+    font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
     font-size: 1.05rem;
     line-height: 1.6;
     cursor: text;
