@@ -808,7 +808,6 @@
   :global(.tiptap-inner h2) { font-size: 1.35em; font-weight: 700; margin: 0.5em 0 0.25em; }
   :global(.tiptap-inner h3) { font-size: 1.15em; font-weight: 600; margin: 0.4em 0 0.2em; }
 
-  :global(.tiptap-inner strong) { font-weight: 700; }
   :global(.tiptap-inner em) { font-style: italic; }
   :global(.tiptap-inner s) { text-decoration: line-through; }
   :global(.tiptap-inner code) {

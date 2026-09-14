@@ -59,6 +59,25 @@ textarea::placeholder {
 }
 
 
+/* ── Bold, and visibly so ─────────────────────────────────────────
+   700 against 400 is the whole of what a bold face gives, and in the system
+   sans at reading size that is about seven per cent wider and not much darker
+   — on a phone it was reported as hard to tell apart from the writing around
+   it. Asking for 800 or 900 does nothing: no heavier face is loaded to switch
+   to, and `font-synthesis: none` above means the browser will not invent one.
+
+   A hairline stroke in the text's own colour adds the weight the font cannot.
+   In `em`, so it stays proportional — a bold word inside a heading is stroked
+   as much heavier as the heading is bigger — and in `currentColor`, so it is
+   the writing's own colour on every theme and never a second colour to keep in
+   step. */
+strong,
+b {
+  font-weight: 700;
+  -webkit-text-stroke: 0.025em currentColor;
+}
+
+
 /* ── The two colours of wherever a thing is ───────────────────────
    Named once, so anything that needs "the colours of where this is" has them.
 
