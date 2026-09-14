@@ -8,11 +8,10 @@
  * But one for PC and one for mobile. I think it'll also help for me to find a
  * good size for a default too."
  *
- * That last sentence is the reason this exists and it is worth keeping in
- * sight: the size of the writing had been changed twice by guessing, applied,
- * looked at, and rewound. A number you can drag settles that in the time it
- * takes to read a line, and whatever it settles on is what the defaults below
- * should eventually say.
+ * That last sentence is the reason this exists, and it has already paid: the
+ * size of the writing had been changed twice by guessing, applied, looked at,
+ * and rewound. A number you can drag settles that in the time it takes to read
+ * a line, and the 109 in DEFAULT_SCALES below is what came back from doing it.
  *
  * ## Two numbers, and which one is in force
  *
@@ -53,7 +52,13 @@
  */
 export const MOBILE_BREAKPOINT = 1024;
 
-/** Percent of the browser's own text size. */
+/**
+ * Percent of the browser's own text size, where 100 is "leave it alone".
+ *
+ * This is the neutral, not the default: it is what an unreadable stored value
+ * falls back to and what the slider's middle means. What each of the two starts
+ * at is DEFAULT_SCALES below.
+ */
 export const DEFAULT_SCALE = 100;
 
 /**
@@ -72,9 +77,19 @@ export const MAX_SCALE = 160;
 /** Kept on this device, like every other app-wide preference here. */
 export const STORAGE_KEY = 'typeScale';
 
+/**
+ * Where each of the two starts.
+ *
+ * 109 on a computer is not a guess: it is the number that came back from
+ * building the slider and living with it -- "I have seen that 109% on PC so
+ * let's make this the new PC default". Finding it was the reason the setting
+ * was asked for, and this line is the setting paying for itself.
+ *
+ * A phone stays at 100 until the same thing happens for a phone.
+ */
 export const DEFAULT_SCALES = Object.freeze({
-  desktop: DEFAULT_SCALE,
-  mobile: DEFAULT_SCALE
+  desktop: 109,
+  mobile: 100
 });
 
 /** The two it can be. */
@@ -88,7 +103,7 @@ export const DEVICES = Object.freeze(['desktop', 'mobile']);
  * goes". That exact mistake shipped once in `isCompactToolbar` and was caught
  * by its test rather than by looking at it.
  */
-export function clampScale(value) {
+export function clampScale(value, fallback = DEFAULT_SCALE) {
   // Coerced only from a number or a string that has something in it. `Number()`
   // on its own is not a filter: null, '' and [] all come back as 0, which is
   // finite, survives the check below and clamps to the smallest size there is.
@@ -100,7 +115,7 @@ export function clampScale(value) {
       : typeof value === 'string' && value.trim() !== ''
         ? Number(value)
         : NaN;
-  if (!Number.isFinite(number)) return DEFAULT_SCALE;
+  if (!Number.isFinite(number)) return fallback;
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(number)));
 }
 
@@ -140,8 +155,8 @@ export function cssScale(percent) {
 export function normaliseScales(scales) {
   const source = scales && typeof scales === 'object' ? scales : {};
   return {
-    desktop: clampScale(source.desktop ?? DEFAULT_SCALE),
-    mobile: clampScale(source.mobile ?? DEFAULT_SCALE)
+    desktop: clampScale(source.desktop, DEFAULT_SCALES.desktop),
+    mobile: clampScale(source.mobile, DEFAULT_SCALES.mobile)
   };
 }
 
@@ -165,11 +180,13 @@ export function readScales(raw) {
 export function withScale(scales, { device, value } = {}) {
   const pair = normaliseScales(scales);
   if (!DEVICES.includes(device)) return pair;
-  return { ...pair, [device]: clampScale(value) };
+  return { ...pair, [device]: clampScale(value, DEFAULT_SCALES[device]) };
 }
 
 /** Whether anything has been changed from the defaults, for a Reset to offer. */
 export function isDefault(scales) {
   const pair = normaliseScales(scales);
-  return pair.desktop === DEFAULT_SCALE && pair.mobile === DEFAULT_SCALE;
+  return (
+    pair.desktop === DEFAULT_SCALES.desktop && pair.mobile === DEFAULT_SCALES.mobile
+  );
 }

@@ -5090,8 +5090,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:moveUp={moveFocusedBlockUp}
       on:moveDown={moveFocusedBlockDown}
       on:modeSettingChange={handleModeSettingChange}
-      {typeScales}
-      on:typeScaleChange={handleTypeScaleChange}
     />
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->
@@ -5246,6 +5244,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <div class="right-controls">
       <RightControls
         {collectDiagnostics}
+        {typeScales}
+        on:typeScaleChange={handleTypeScaleChange}
         {savedList}
         {storageUsage}
         {load}

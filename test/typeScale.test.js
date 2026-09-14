@@ -87,10 +87,20 @@ test('the multiplier is short enough to read in an inspector', () => {
   assert.equal(String(cssScale(133)).length <= 5, true, String(cssScale(133)));
 });
 
-test('both sizes start at the browser default, so nothing changes until asked', () => {
-  assert.deepEqual(DEFAULT_SCALES, { desktop: DEFAULT_SCALE, mobile: DEFAULT_SCALE });
+test('a computer starts at 109, which is the number the slider found', () => {
+  // "I have seen that 109% on PC so let's make this the new PC default." The
+  // setting was asked for partly to find this, so the number living here is
+  // the point rather than an afterthought.
+  assert.equal(DEFAULT_SCALES.desktop, 109);
+  assert.equal(DEFAULT_SCALES.mobile, DEFAULT_SCALE, 'a phone waits for its own answer');
+  assert.equal(scaleFor({ width: 1440, scales: undefined }), 109, 'with nothing stored at all');
+  assert.equal(scaleFor({ width: 390, scales: undefined }), 100);
+});
+
+test('the two defaults are what Reset goes back to, not a flat 100', () => {
   assert.equal(isDefault(DEFAULT_SCALES), true);
-  assert.equal(isDefault({ desktop: 100, mobile: 110 }), false);
+  assert.equal(isDefault({ desktop: 100, mobile: 100 }), false, '100 on a computer is a choice now');
+  assert.equal(isDefault({ desktop: 109, mobile: 110 }), false);
 });
 
 test('a preference that cannot be read goes back to the default', () => {
@@ -103,9 +113,10 @@ test('a preference that cannot be read goes back to the default', () => {
 });
 
 test('a preference stored by an older build is read as far as it goes', () => {
-  // Half a pair is not a broken pair.
+  // Half a pair is not a broken pair, and the half that is missing takes that
+  // device's own default rather than a shared one.
   assert.deepEqual(readScales('{"desktop":120}'), { desktop: 120, mobile: 100 });
-  assert.deepEqual(normaliseScales({ mobile: 140 }), { desktop: 100, mobile: 140 });
+  assert.deepEqual(normaliseScales({ mobile: 140 }), { desktop: 109, mobile: 140 });
 });
 
 test('a stored size from outside the slider is brought back inside it', () => {

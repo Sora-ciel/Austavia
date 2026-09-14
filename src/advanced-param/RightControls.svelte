@@ -1,5 +1,8 @@
 <script>
   import ControlIcon from '../components/ControlIcon.svelte';
+  import AdvancedSettingsPage from './AdvancedSettingsPage.svelte';
+  import { DEFAULT_SCALES } from '../utils/typeScale.js';
+  export let typeScales = DEFAULT_SCALES;
   export let savedList = [];
   // The server's stored-byte record for this account: { bytes, limit, full }.
   // Null when signed out, or before the first snapshot arrives.
@@ -70,6 +73,10 @@
 
   let pc = true; // default until detected
   let isOpen = true;
+  // Which page the settings area is showing. The panel is a place rather than
+  // a list now: 'main' is what it has always shown, 'advanced' replaces it with
+  // the settings that are set once and lived with.
+  let settingsPage = 'main';
   let hasMounted = false;
   let resizeHandler;
   let outsideClickHandler;
@@ -544,6 +551,13 @@
 
     <div class="dropdown-content">
       <div class="controls-scroll">
+      {#if settingsPage === 'advanced'}
+        <AdvancedSettingsPage
+          {typeScales}
+          on:typeScaleChange
+          on:back={() => (settingsPage = 'main')}
+        />
+      {:else}
         <div class="tab-section">
           <h4>📂 Saved Files</h4>
           <button class="create-theme-btn" type="button" on:click={handleCreateNewFile}>
@@ -688,6 +702,17 @@
           />
         </div>
 
+        <div class="tab-section">
+          <h4>⚙️ Advanced</h4>
+          <button
+            class="create-theme-btn"
+            type="button"
+            on:click={() => (settingsPage = 'advanced')}
+          >
+            Advanced settings ›
+          </button>
+        </div>
+      {/if}
       </div>
     </div>
   </details>
