@@ -18,7 +18,8 @@ const widths = {
   bg: 45,
   export: 96,
   import: 142,
-  clear: 85
+  clear: 85,
+  text: 52
 };
 const present = Object.keys(widths);
 const at = (available) => fitControls({ present, widths, available, gap: 8, menuWidth: 90 });
@@ -51,19 +52,37 @@ test('the bar reads the same order however many controls are on it', () => {
 
 test('the least likely to be used are the first to go', () => {
   // Just too narrow for everything: whatever leaves is the tail of the priority
-  // list, and Clear — the rarest, and the destructive one — is always in it.
+  // list. Text size is the first out — a setting nobody opens twice — and
+  // Clear, the rarest of the buttons and the destructive one, follows it.
   const full = fitControls({ present, widths, available: 4000 });
   const total = Object.values(widths).reduce((a, b) => a + b, 0) + 8 * (present.length - 1);
   const { menu } = at(total - 1);
 
   assert.equal(full.menu.length, 0);
-  assert.ok(menu.length >= 1);
-  assert.ok(menu.includes('clear'));
+  // Two, not one: the Menu button has to appear to hold them, and it is wider
+  // than the one control that left to make room for it. That is the shape of
+  // the first step every time and not a quirk of these numbers.
+  assert.deepEqual(menu, ['clear', 'text']);
 
-  const byPriority = [...menu].sort(
-    (a, b) => CONTROL_PRIORITY.indexOf(a) - CONTROL_PRIORITY.indexOf(b)
-  );
-  assert.deepEqual(byPriority, CONTROL_PRIORITY.slice(-menu.length));
+  // Compared against the priority list with only the controls this bar has in
+  // it. Comparing against the whole list passes only while the menu is short
+  // enough not to reach `columns`, which this mode does not have.
+  const ranked = CONTROL_PRIORITY.filter((id) => present.includes(id));
+
+  for (let available = total - 1; available > 420; available -= 29) {
+    const { menu: hidden } = at(available);
+    if (!hidden.length) continue;
+    const byPriority = [...hidden].sort(
+      (a, b) => CONTROL_PRIORITY.indexOf(a) - CONTROL_PRIORITY.indexOf(b)
+    );
+    assert.deepEqual(
+      byPriority,
+      ranked.slice(-hidden.length),
+      `at ${available}px the menu was not the tail of the list: ${hidden.join(', ')}`
+    );
+  }
+
+  assert.ok(at(900).menu.includes('clear'), 'and Clear is behind the menu well before phone size');
 });
 
 test('a rare button never sits on the bar while a common one is in the menu', () => {

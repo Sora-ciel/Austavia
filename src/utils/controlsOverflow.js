@@ -65,7 +65,11 @@ export const CONTROL_PRIORITY = [
   'bg',
   'export',
   'import',
-  'clear'
+  'clear',
+  // Last off the bar, which is to say first into the menu. A text size is set
+  // once and then lived with; of everything here it is the control a hand goes
+  // to least often, so it is the one whose place on the bar is worth least.
+  'text'
 ];
 
 /** Left to right, as the bar has always read. */
@@ -80,7 +84,10 @@ export const CONTROL_ORDER = [
   'redo',
   'fileName',
   'columns',
-  'bg'
+  'bg',
+  // Next to Bg, because they are the two panels rather than the two buttons,
+  // and somebody looking for a setting looks where the last setting was.
+  'text'
 ];
 
 /** The bar is never empty: without this a narrow enough window hides the lot. */

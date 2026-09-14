@@ -81,6 +81,15 @@
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
   import {
+    STORAGE_KEY as TYPE_SCALE_STORAGE_KEY,
+    MOBILE_BREAKPOINT as TYPE_SCALE_MOBILE_BREAKPOINT,
+    DEFAULT_SCALES,
+    readScales,
+    withScale,
+    scaleFor,
+    cssScale
+  } from './utils/typeScale.js';
+  import {
     startBackgroundAudio,
     stopBackgroundAudio,
     setBackgroundAudioActions
@@ -701,6 +710,98 @@
     } catch {
       /* ignore persistence failures */
     }
+  }
+
+  // How big the writing is, as a pair: one size for a window the size of a
+  // computer's and one for a phone's. Which of the two is in force is decided
+  // by the width on screen rather than by the platform -- see
+  // utils/typeScale.js, where that choice and its reasons live.
+  //
+  // Kept on this device, like the other app-wide preferences above it. The cost
+  // is that setting the phone's size from a computer does not reach the phone;
+  // the alternative is a synced preference whose two halves each belong to a
+  // different machine, which is a thing sync has no way to think about.
+  let typeScales = { ...DEFAULT_SCALES };
+
+  function loadTypeScales() {
+    if (typeof localStorage === 'undefined') return { ...DEFAULT_SCALES };
+    try {
+      return readScales(localStorage.getItem(TYPE_SCALE_STORAGE_KEY));
+    } catch {
+      return { ...DEFAULT_SCALES };
+    }
+  }
+
+  function persistTypeScales(scales) {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(TYPE_SCALE_STORAGE_KEY, JSON.stringify(scales));
+    } catch {
+      /* ignore persistence failures */
+    }
+  }
+
+  // Written onto the root element rather than into a stylesheet, because the
+  // value is a preference and the stylesheet is a build artefact. app.css reads
+  // it as `font-size: calc(100% * var(--type-scale))`.
+  function applyTypeScale() {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+    const percent = scaleFor({ width: window.innerWidth, scales: typeScales });
+    document.documentElement.style.setProperty('--type-scale', String(cssScale(percent)));
+  }
+
+  function handleTypeScaleChange(event) {
+    typeScales = withScale(typeScales, event.detail || {});
+    persistTypeScales(typeScales);
+    applyTypeScale();
+  }
+
+  // Which of the two sizes is in force is a function of the window, and the
+  // window changes without anybody touching the setting: rotated, resized,
+  // dragged to another monitor, or shrunk by a keyboard sliding up.
+  //
+  // A `resize` listener on its own is an event path, and an event path is only
+  // ever as right as the last event it heard. So there are several, they are
+  // deliberately overlapping, and every one of them works the answer out again
+  // from the window rather than nudging it -- which is what makes it safe to
+  // run at any moment and safe to run twice.
+  //
+  //   resize, orientationchange  the window changing under the app
+  //   the media query            the one question actually being asked, and it
+  //                              is answered by the browser rather than by
+  //                              arithmetic on a width
+  //   visibilitychange           the look-again: whatever changed while the app
+  //                              was in the background, nobody was listening for
+  //   ResizeObserver             the page's own box, for a change that resizes
+  //                              the view without resizing the window
+  //
+  // None of these is load-bearing alone, and that is the point.
+  function watchTypeScale() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return () => {};
+
+    const recompute = () => applyTypeScale();
+    window.addEventListener('resize', recompute);
+    window.addEventListener('orientationchange', recompute);
+    document.addEventListener('visibilitychange', recompute);
+
+    // The same breakpoint the module decides on, asked of the browser. Kept in
+    // step by importing it rather than by typing 1024 again.
+    const query = window.matchMedia?.(`(max-width: ${TYPE_SCALE_MOBILE_BREAKPOINT}px)`);
+    query?.addEventListener?.('change', recompute);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(recompute);
+      observer.observe(document.documentElement);
+    }
+
+    return () => {
+      window.removeEventListener('resize', recompute);
+      window.removeEventListener('orientationchange', recompute);
+      document.removeEventListener('visibilitychange', recompute);
+      query?.removeEventListener?.('change', recompute);
+      observer?.disconnect();
+    };
   }
 
   function loadSyncedUid() {
@@ -1734,6 +1835,10 @@
   }
 
   onMount(() => {
+    typeScales = loadTypeScales();
+    applyTypeScale();
+    const stopWatchingTypeScale = watchTypeScale();
+
     const storedCustomThemes = loadStoredCustomThemes();
     if (storedCustomThemes.length) {
       customThemes = storedCustomThemes;
@@ -1772,6 +1877,8 @@
     } else {
       currentThemePreviewBg = DEFAULT_PREVIEW_BG;
     }
+
+    return stopWatchingTypeScale;
   });
 
   function themeShadowIsDisabled(shadow) {
@@ -4983,6 +5090,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:moveUp={moveFocusedBlockUp}
       on:moveDown={moveFocusedBlockDown}
       on:modeSettingChange={handleModeSettingChange}
+      {typeScales}
+      on:typeScaleChange={handleTypeScaleChange}
     />
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->

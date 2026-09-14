@@ -5,6 +5,14 @@
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
   import { fitControls } from '../utils/controlsOverflow.js';
+  import {
+    DEFAULT_SCALES,
+    DEFAULT_SCALE,
+    MIN_SCALE,
+    MAX_SCALE,
+    deviceFor,
+    isDefault as typeScalesAreDefault
+  } from '../utils/typeScale.js';
 
   export let mode;
   export let modeLabels = {};
@@ -16,6 +24,7 @@
   export let colors = {};
   export let birthdayModeUnlocked = false;
   export let birthdayUnlockMessage = '';
+  export let typeScales = DEFAULT_SCALES;
 
 
   const dispatch = createEventDispatcher();
@@ -105,7 +114,10 @@
     'redo',
     'fileName',
     ...(isSimpleNoteMode ? ['columns'] : []),
-    ...(hasModeBackground ? ['bg'] : [])
+    ...(hasModeBackground ? ['bg'] : []),
+    // Unconditional, unlike Bg: the size of the writing is a question in every
+    // mode, including the ones with no background to set.
+    'text'
   ];
 
   $: layout = compactUI
@@ -300,6 +312,7 @@
   // their own image; which slot is read/written follows the same
   // <=1024px breakpoint (compactUI) the rest of the toolbar already uses.
   let bgPanelOpen = false;
+  let textPanelOpen = false;
   $: bgImageKey = compactUI ? 'backgroundImageMobile' : 'backgroundImage';
   // Read from and written to whichever mode is showing, so one panel serves
   // both. Everything below is otherwise identical between them.
@@ -326,6 +339,21 @@
 
   function luminosityFromEvent(event) {
     return snapToNeutral(Number(event.target.value), 100, { snapping: draggingSlider });
+  }
+
+  // Which of the two numbers the window on screen is currently using, so the
+  // panel can say so. Bound from the window rather than guessed at, and the
+  // same 1024 the rest of the layout turns at.
+  let viewportWidth = typeof window === 'undefined' ? 0 : window.innerWidth;
+  $: activeTypeDevice = deviceFor({ width: viewportWidth });
+
+  function setTypeScale(device, value) {
+    dispatch('typeScaleChange', { device, value });
+  }
+
+  function resetTypeScales() {
+    setTypeScale('desktop', DEFAULT_SCALE);
+    setTypeScale('mobile', DEFAULT_SCALE);
   }
 
   function setBgSetting(patch) {
@@ -740,6 +768,43 @@ onMount(() => {
     box-shadow: 0 12px 28px rgba(0,0,0,0.55);
   }
   .bg-panel-row { display: flex; gap: 6px; }
+
+  /* Text size panel. It borrows the Bg panel's box so the two settings look
+     like the same kind of thing, and only says what is different about it.
+
+     Every colour here is taken, not chosen: the writing is the panel's own
+     text colour and the surfaces are that colour mixed into nothing, so a
+     theme moves all of it without this file being told. */
+  .text-panel-note {
+    font-size: 0.72rem;
+    line-height: 1.45;
+    opacity: 0.65;
+  }
+
+  /* The one that is in force right now. Marked rather than hidden: seeing the
+     other number is the point of having both in one panel, and a slider you
+     can move but cannot see the effect of needs saying so. */
+  .bg-slider-row.text-row-live {
+    background: color-mix(in srgb, var(--left-button-text, #ffffff) 10%, transparent);
+    border-radius: 8px;
+    margin: 0 -4px;
+    padding: 3px 4px;
+  }
+
+  .text-reset-btn {
+    background: transparent;
+    border: 1px solid color-mix(in srgb, var(--left-button-text, #ffffff) 30%, transparent);
+    color: inherit;
+    border-radius: 8px;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+  }
+  .text-reset-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
   .bg-section-divider {
     height: 1px;
     background: color-mix(in srgb, var(--left-button-text, #ffffff) 18%, transparent);
@@ -1035,6 +1100,8 @@ onMount(() => {
   }
 </style>
 
+<svelte:window bind:innerWidth={viewportWidth} />
+
 <div class="left-controls-wrapper" style={leftCssVars}>
   <!-- Toggle button for <= 1024px -->
   {#if compactUI}
@@ -1094,7 +1161,7 @@ onMount(() => {
   <!-- Controls -->
   <div
     class="left-controls {showMobileMenu ? 'show' : ''}"
-    class:bg-panel-open={hasModeBackground && bgPanelOpen}
+    class:bg-panel-open={(hasModeBackground && bgPanelOpen) || textPanelOpen}
     bind:this={menuRef}
   >
     <div class="mode-switcher mobile-only" data-control="mode">
@@ -1329,6 +1396,70 @@ onMount(() => {
                 <span class="bg-val">{Math.round(imageLuminosity)}%</span>
               </label>
             {/if}
+          </div>
+        {/if}
+      </div>
+  {:else if id === 'text'}
+      <div data-control="text" class="bg-settings-wrap text-settings-wrap">
+        <button
+          class:active={textPanelOpen}
+          on:click={() => (textPanelOpen = !textPanelOpen)}
+        >
+          Text size
+        </button>
+        {#if textPanelOpen}
+          <div class="bg-panel">
+            <div class="text-panel-note">
+              The size of the writing, in every mode at once. Which of the two
+              is in use follows the width of the window, so narrowing this one
+              shows you the phone's.
+            </div>
+
+            <label class="bg-slider-row" class:text-row-live={activeTypeDevice === 'desktop'}>
+              <span>Computer</span>
+              <span
+                class="bg-slider"
+                style="--fill: {((typeScales.desktop - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100}%"
+              >
+                <input
+                  type="range"
+                  min={MIN_SCALE}
+                  max={MAX_SCALE}
+                  step="1"
+                  value={typeScales.desktop}
+                  on:input={(e) => setTypeScale('desktop', Number(e.target.value))}
+                />
+              </span>
+              <span class="bg-val">{typeScales.desktop}%</span>
+            </label>
+
+            <label class="bg-slider-row" class:text-row-live={activeTypeDevice === 'mobile'}>
+              <span>Phone</span>
+              <span
+                class="bg-slider"
+                style="--fill: {((typeScales.mobile - MIN_SCALE) / (MAX_SCALE - MIN_SCALE)) * 100}%"
+              >
+                <input
+                  type="range"
+                  min={MIN_SCALE}
+                  max={MAX_SCALE}
+                  step="1"
+                  value={typeScales.mobile}
+                  on:input={(e) => setTypeScale('mobile', Number(e.target.value))}
+                />
+              </span>
+              <span class="bg-val">{typeScales.mobile}%</span>
+            </label>
+
+            <div class="bg-section-divider" role="presentation"></div>
+
+            <button
+              class="text-reset-btn"
+              disabled={typeScalesAreDefault(typeScales)}
+              on:click={resetTypeScales}
+            >
+              Back to {DEFAULT_SCALE}% for both
+            </button>
           </div>
         {/if}
       </div>

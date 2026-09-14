@@ -39,6 +39,17 @@
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
+
+  /* Every size in the app is in rem, so this one number moves all of them --
+     every mode at once, without a mode knowing it exists. Set from the Text
+     panel in the controls; see src/utils/typeScale.js for which of the two
+     stored numbers is in force and why width decides it.
+
+     100% rather than 16px on purpose: it is the size the browser was already
+     going to use, so somebody who has turned their own text size up keeps it
+     and this multiplies what they chose instead of overruling it. */
+  --type-scale: 1;
+  font-size: calc(100% * var(--type-scale));
   /* Asked for: "make the regular less bold". 300 rather than 400, which is
      what widens the gap to bold without touching bold again.
 
