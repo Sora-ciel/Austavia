@@ -14,7 +14,10 @@
     listSavedBlocks,
     loadMusicTrack,
     saveMusicLibrary,
-    loadMusicLibrary
+    loadMusicLibrary,
+    listFolderSnapshots,
+    putFolderSnapshots,
+    deleteFolderSnapshot
   } from './storage.js';
   import {
     isFirebaseConfigured,
@@ -80,6 +83,11 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
+  import {
+    worthKeeping as folderSnapshotWorthKeeping,
+    snapshotOf as folderSnapshotOf,
+    withSnapshot as withFolderSnapshot
+  } from './utils/folderSnapshots.js';
   import {
     STORAGE_KEY as TYPE_SCALE_STORAGE_KEY,
     MOBILE_BREAKPOINT as TYPE_SCALE_MOBILE_BREAKPOINT,
@@ -802,6 +810,92 @@
       query?.removeEventListener?.('change', recompute);
       observer?.disconnect();
     };
+  }
+
+  /**
+   * Keep what a folder held, before something else replaces it.
+   *
+   * Called at the two places a cloud copy is written over a local one. The
+   * deciding -- whether anything is actually being lost, how many to keep, how
+   * much room they may take -- is in utils/folderSnapshots.js; this is the part
+   * that has a database.
+   *
+   * It never throws. Losing the snapshot is bad; refusing to apply the
+   * download because the snapshot failed would be worse, and would leave the
+   * folder in the one state nobody asked for.
+   */
+  async function keepReplacedCopy(fileName, current, incoming) {
+    try {
+      if (!folderSnapshotWorthKeeping({ current, incoming })) return;
+      const snapshot = folderSnapshotOf(current, { takenAt: Date.now() });
+      const kept = withFolderSnapshot(await listFolderSnapshots(fileName), snapshot);
+      await putFolderSnapshots(fileName, kept);
+      logSync('snapshot', fileName, 'kept the copy this replaced', {
+        blocks: snapshot.blockCount,
+        characters: snapshot.characterCount,
+        nowKeeping: kept.length
+      });
+    } catch (error) {
+      console.error('Could not keep the replaced copy of', fileName, error);
+    }
+  }
+
+  /** Puts a kept copy back, as an ordinary local save so it syncs onward. */
+  async function restoreFolderSnapshot(fileName, takenAt) {
+    const snapshots = await listFolderSnapshots(fileName);
+    const found = snapshots.find((snapshot) => Number(snapshot?.takenAt) === Number(takenAt));
+    if (!found?.payload) return false;
+
+    // The copy on its way out is kept too, so restoring is itself undoable --
+    // picking the wrong one from the list must not be the end of the matter.
+    const current = await loadBlocks(fileName);
+    await keepReplacedCopy(fileName, current, found.payload);
+
+    // Stamped now, deliberately. A restore is a decision made on this device at
+    // this moment, and giving it the old stamp would have every other device
+    // ignore it as stale -- which is the failure this whole feature exists for.
+    await saveBlocks(fileName, {
+      blocks: found.payload.blocks,
+      modeOrders: found.payload.modeOrders,
+      modeSettings: found.payload.modeSettings
+    });
+    logSync('restore', fileName, 'put back a kept copy', {
+      takenAt,
+      blocks: found.blockCount,
+      characters: found.characterCount
+    });
+
+    savedList = await listSavedBlocks();
+    autoSyncDirty = true;
+    if (fileName === currentSaveName) await remountCurrentSaveIfLoaded();
+    return true;
+  }
+
+  // Read when the Advanced page opens, and again after anything changes it.
+  // Not held live: a list of replaced copies is looked at rarely and reading it
+  // on every sync tick would be work nobody asked for.
+  let folderSnapshots = [];
+
+  async function refreshFolderSnapshots() {
+    try {
+      folderSnapshots = currentSaveName ? await listFolderSnapshots(currentSaveName) : [];
+    } catch {
+      folderSnapshots = [];
+    }
+  }
+
+  async function handleRestoreSnapshot(event) {
+    const takenAt = event.detail?.takenAt;
+    if (!takenAt) return;
+    const restored = await restoreFolderSnapshot(currentSaveName, takenAt);
+    await refreshFolderSnapshots();
+    if (!restored) await appAlert('That copy could not be found any more.');
+  }
+
+  async function handleForgetSnapshot(event) {
+    const takenAt = event.detail?.takenAt;
+    if (!takenAt) return;
+    folderSnapshots = await deleteFolderSnapshot(currentSaveName, takenAt);
   }
 
   function loadSyncedUid() {
@@ -3703,6 +3797,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           localModifiedAt,
           aheadByMs: remoteModifiedAt - localModifiedAt
         });
+        await keepReplacedCopy(fileName, localPayload, remotePayload);
         await saveBlocks(fileName, remotePayload);
         rememberCloudSyncForFile(fileName, Number(remoteMeta?.lastSyncedAt || Date.now()));
         downloadedAny = true;
@@ -4031,6 +4126,14 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       for (const remoteName of remoteNames) {
         const remotePayload = await loadRemoteFile(remoteName);
         if (remotePayload) {
+          // Bootstrap says the cloud wins, and mostly it should. But a device
+          // that had work of its own is exactly where that hurts, so what it
+          // had is kept before the cloud takes over.
+          await keepReplacedCopy(
+            remoteName,
+            savedList.includes(remoteName) ? await loadBlocks(remoteName) : null,
+            remotePayload
+          );
           await saveBlocks(remoteName, remotePayload);
           rememberCloudSyncForFile(remoteName, Number(remotePayload?.lastSyncedAt || Date.now()));
         }
@@ -5245,7 +5348,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       <RightControls
         {collectDiagnostics}
         {typeScales}
+        {folderSnapshots}
+        {currentSaveName}
         on:typeScaleChange={handleTypeScaleChange}
+        on:advancedOpened={refreshFolderSnapshots}
+        on:restoreSnapshot={handleRestoreSnapshot}
+        on:forgetSnapshot={handleForgetSnapshot}
         {savedList}
         {storageUsage}
         {load}

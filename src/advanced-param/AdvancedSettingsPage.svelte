@@ -26,6 +26,9 @@
   } from '../utils/typeScale.js';
 
   export let typeScales = DEFAULT_SCALES;
+  /** The replaced copies kept for the folder that is open, newest first. */
+  export let folderSnapshots = [];
+  export let currentSaveName = '';
 
   const dispatch = createEventDispatcher();
 
@@ -49,6 +52,31 @@
   $: isDefaultPair =
     typeScales.desktop === DEFAULT_SCALES.desktop &&
     typeScales.mobile === DEFAULT_SCALES.mobile;
+
+  // The wording lives here rather than in the module, which is the only place
+  // that knows nothing about a language or the width it has to fit.
+  const when = (takenAt) =>
+    new Date(Number(takenAt) || 0).toLocaleString(undefined, {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const sizeLabel = (snapshot) => {
+    const blocks = snapshot.blockCount === 1 ? '1 block' : `${snapshot.blockCount} blocks`;
+    return `${blocks}, ${Number(snapshot.characterCount || 0).toLocaleString()} characters`;
+  };
+
+  // Asked for once, and only then done. Putting a folder back is a rewrite of
+  // everything in it, which is exactly the kind of thing that should not
+  // happen on a stray click.
+  let confirmingTakenAt = null;
+
+  function restore(takenAt) {
+    confirmingTakenAt = null;
+    dispatch('restoreSnapshot', { takenAt });
+  }
 </script>
 
 <svelte:window bind:innerWidth={viewportWidth} />
@@ -106,6 +134,73 @@
     >
       Back to the defaults
     </button>
+  </div>
+
+  <div class="tab-section">
+    <h4>⏮️ Replaced copies</h4>
+    <p class="advanced-note">
+      When a folder is replaced by a copy from the cloud, what was here is kept.
+      {#if currentSaveName}
+        These are for <strong>{currentSaveName}</strong>, on this device only.
+      {/if}
+    </p>
+
+    {#if !folderSnapshots.length}
+      <p class="advanced-note empty">
+        Nothing has been replaced in this folder. Copies appear here on their own.
+      </p>
+    {:else}
+      <ul class="snapshot-list">
+        {#each folderSnapshots as snapshot (snapshot.takenAt)}
+          <li class="snapshot">
+            <div class="snapshot-when">{when(snapshot.takenAt)}</div>
+            <div class="snapshot-size">{sizeLabel(snapshot)}</div>
+            {#if confirmingTakenAt === snapshot.takenAt}
+              <div class="snapshot-confirm">
+                <span>Replace the folder with this?</span>
+                <div class="snapshot-actions">
+                  <button
+                    class="create-theme-btn"
+                    type="button"
+                    on:click={() => restore(snapshot.takenAt)}
+                  >
+                    Yes, put it back
+                  </button>
+                  <button
+                    class="create-theme-btn"
+                    type="button"
+                    on:click={() => (confirmingTakenAt = null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            {:else}
+              <div class="snapshot-actions">
+                <button
+                  class="create-theme-btn"
+                  type="button"
+                  on:click={() => (confirmingTakenAt = snapshot.takenAt)}
+                >
+                  Restore
+                </button>
+                <button
+                  class="create-theme-btn"
+                  type="button"
+                  on:click={() => dispatch('forgetSnapshot', { takenAt: snapshot.takenAt })}
+                >
+                  Forget
+                </button>
+              </div>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <p class="advanced-note">
+        Putting one back is itself kept, so choosing the wrong one is not the end
+        of it.
+      </p>
+    {/if}
   </div>
 </div>
 
@@ -182,5 +277,57 @@
   .create-theme-btn:disabled {
     opacity: 0.4;
     cursor: default;
+  }
+
+  .advanced-note.empty {
+    opacity: 0.5;
+  }
+
+  .snapshot-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .snapshot {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    /* Taken, not chosen: the panel's own writing mixed into nothing, so a
+       theme moves this with everything else. */
+    background: color-mix(in srgb, currentColor 9%, transparent);
+  }
+
+  .snapshot-when {
+    font-size: 0.8rem;
+  }
+
+  .snapshot-size {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+
+  .snapshot-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 0.72rem;
+  }
+
+  .snapshot-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 3px;
+  }
+
+  .snapshot-actions .create-theme-btn {
+    flex: 1;
+    font-size: 0.72rem;
+    padding: 4px 6px;
   }
 </style>

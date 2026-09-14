@@ -97,7 +97,8 @@ function notify() {
 
 /**
  * Writes one line. `kind` is a short tag ('save', 'skip', 'upload', 'download',
- * 'remount', 'error'); `detail` is anything worth keeping alongside it.
+ * 'remount', 'snapshot', 'restore', 'error'); `detail` is anything worth
+ * keeping alongside it.
  */
 export function logSync(kind, folder, message, detail = null) {
   entries = [

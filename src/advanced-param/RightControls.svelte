@@ -3,6 +3,8 @@
   import AdvancedSettingsPage from './AdvancedSettingsPage.svelte';
   import { DEFAULT_SCALES } from '../utils/typeScale.js';
   export let typeScales = DEFAULT_SCALES;
+  export let folderSnapshots = [];
+  export let currentSaveName = '';
   export let savedList = [];
   // The server's stored-byte record for this account: { bytes, limit, full }.
   // Null when signed out, or before the first snapshot arrives.
@@ -554,7 +556,11 @@
       {#if settingsPage === 'advanced'}
         <AdvancedSettingsPage
           {typeScales}
+          {folderSnapshots}
+          {currentSaveName}
           on:typeScaleChange
+          on:restoreSnapshot
+          on:forgetSnapshot
           on:back={() => (settingsPage = 'main')}
         />
       {:else}
@@ -707,7 +713,10 @@
           <button
             class="create-theme-btn"
             type="button"
-            on:click={() => (settingsPage = 'advanced')}
+            on:click={() => {
+              settingsPage = 'advanced';
+              dispatch('advancedOpened');
+            }}
           >
             Advanced settings ›
           </button>

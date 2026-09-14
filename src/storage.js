@@ -9,12 +9,21 @@ const FILE_STORE_NAME = 'block-files';
 const MUSIC_STORE_NAME = 'music-library';
 // Key under which the device-local playlist library is kept.
 const MUSIC_LIBRARY_KEY = 'library:index';
+// The copy a folder had before something replaced it, so a sync that goes
+// wrong has a way back. One record per folder holding a short list, newest
+// first; see utils/folderSnapshots.js for what goes in it and what is dropped.
+//
+// Device-local and never uploaded, on purpose: a snapshot is what *this*
+// device was holding, which is precisely what no other device has.
+const SNAPSHOT_STORE_NAME = 'folder-snapshots';
 // Bumped from 2: this DB name/origin was previously shared with an unrelated
 // project that left an IndexedDB at version 5 on some machines, and IndexedDB
 // refuses to open at a lower version than what already exists there
 // (VersionError). The upgrade callback below is idempotent (only creates
 // stores if missing), so raising this is safe and doesn't touch existing data.
-const DB_VERSION = 7;
+// Bumped to 8 for the folder-snapshots store. The upgrade only creates stores
+// that are missing, so raising it adds the store and touches nothing else.
+const DB_VERSION = 8;
 const FILE_FIELDS = ['content', 'src', 'trackUrl', 'title', 'tasks'];
 
 function asPayloadWithTimestamp(payload, updatedAt = Date.now()) {
@@ -56,6 +65,9 @@ export async function getDB() {
       }
       if (!db.objectStoreNames.contains(MUSIC_STORE_NAME)) {
         db.createObjectStore(MUSIC_STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(SNAPSHOT_STORE_NAME)) {
+        db.createObjectStore(SNAPSHOT_STORE_NAME);
       }
     }
   });
@@ -256,6 +268,34 @@ export async function deleteBlocks(name) {
   const db = await getDB();
   await db.delete(STORE_NAME, name);
   await clearSaveFiles(db, name);
+  await db.delete(SNAPSHOT_STORE_NAME, name);
+}
+
+// ── Replaced copies ──────────────────────────────────────────────────
+// Stored whole rather than split into the file store the way a live folder is.
+// A snapshot is written once and read only if somebody asks for it back, so
+// the splitting buys nothing and costs a second thing to keep in step.
+
+/** The replaced copies kept for a folder, newest first. */
+export async function listFolderSnapshots(name) {
+  const db = await getDB();
+  const stored = await db.get(SNAPSHOT_STORE_NAME, name);
+  return Array.isArray(stored) ? stored : [];
+}
+
+/** Writes the whole list back, which is what the trimming rules produce. */
+export async function putFolderSnapshots(name, snapshots) {
+  const db = await getDB();
+  await db.put(SNAPSHOT_STORE_NAME, Array.isArray(snapshots) ? snapshots : [], name);
+}
+
+/** Forgets one, by the moment it was taken. */
+export async function deleteFolderSnapshot(name, takenAt) {
+  const kept = (await listFolderSnapshots(name)).filter(
+    (snapshot) => Number(snapshot?.takenAt) !== Number(takenAt)
+  );
+  await putFolderSnapshots(name, kept);
+  return kept;
 }
 
 export async function listSavedBlocks() {
