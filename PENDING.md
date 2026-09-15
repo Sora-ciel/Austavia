@@ -113,6 +113,11 @@ In order, each landing and released on its own:
   0.8.58; `dropEffect` in 0.8.59 was meant to remove the remaining flash of the
   no-drop pointer. A browser ignores `dropEffect` outside a real drag, so this
   needs a hand on a mouse.
+- **Playback with a real library.** The search-pool fix and the remembered
+  playlist were checked with a seeded library of three tracks and no audio: the
+  deciding has tests, and opening/leaving/restarting/deleting was exercised in
+  the browser. What could not be tried here is a track actually ending and
+  autoplay stepping to the next one, which needs music on the device.
 - **A text size for phones.** Computers settled at 109%; the phone number is
   still the neutral 100 in `typeScale.js`, waiting for somebody to drag the
   slider and say.

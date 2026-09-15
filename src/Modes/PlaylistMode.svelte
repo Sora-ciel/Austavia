@@ -15,6 +15,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
+  import { playbackPool, openingPlaylist } from '../utils/playlistPlayback.js';
   import {
     sizeGroups,
     clustersFromHashes,
@@ -92,7 +93,43 @@
   );
   $: playlists = Array.isArray(library?.playlists) ? library.playlists : [];
 
+  // Which playlist you had open, kept on this device.
+  //
+  // It was null on every entry, so coming back to Playlist mode always dropped
+  // you into All music whatever you had been listening to -- and pressing play
+  // then started something else. Device-local and never synced, like the
+  // remembered note: which playlist you are looking at is a fact about this
+  // screen, not about the folder.
+  const OPEN_PLAYLIST_KEY = 'lastOpenPlaylist';
+
+  function rememberedPlaylistId() {
+    try {
+      return typeof localStorage === 'undefined' ? null : localStorage.getItem(OPEN_PLAYLIST_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function rememberPlaylistId(id) {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      if (id) localStorage.setItem(OPEN_PLAYLIST_KEY, id);
+      else localStorage.removeItem(OPEN_PLAYLIST_KEY);
+    } catch {
+      // A browser with storage off simply opens on All music.
+    }
+  }
+
   let selectedPlaylistId = null;
+  // Settled once the library has arrived, because a playlist that no longer
+  // exists has to fall back to All music rather than to nothing -- and until
+  // the library is here, nothing can be checked against it.
+  let openingPlaylistSettled = false;
+  $: if (!openingPlaylistSettled && library) {
+    openingPlaylistSettled = true;
+    selectedPlaylistId = openingPlaylist(library, rememberedPlaylistId());
+  }
+  $: if (openingPlaylistSettled) rememberPlaylistId(selectedPlaylistId);
   $: selectedPlaylist = playlists.find(p => p.id === selectedPlaylistId) || null;
   $: playlistTracks = selectedPlaylist
     ? selectedPlaylist.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean)
@@ -974,11 +1011,19 @@
     });
   }
 
+  // What plays next comes from the playlist you are in, not from what a search
+  // has narrowed the screen to -- see playbackPool in utils/playlistPlayback.js.
+  // Searching for one song and playing it used to leave a queue of one, which
+  // then looped for ever.
   function playTrack(track) {
     if (!playable.has(track.id)) return;
-    startPlaying(track.id, listedTracks.map(t => t.id));
+    const queue = playbackPool({ pool: playlistTracks, chosen: track })
+      .filter(t => playable.has(t.id));
+    startPlaying(track.id, queue.map(t => t.id));
   }
 
+  // Where it starts is what you are looking at; what follows is the playlist.
+  // Pressing play after a search should begin with the first thing you found.
   function playAll() {
     const first = listedTracks.find(t => playable.has(t.id));
     if (first) playTrack(first);

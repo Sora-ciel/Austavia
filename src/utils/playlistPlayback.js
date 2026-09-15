@@ -86,3 +86,55 @@ export function isQueuePlaying(queue, nowPlayingId, isPlaying) {
   if (!isPlaying || !nowPlayingId) return false;
   return (queue || []).some((t) => t?.id === nowPlayingId);
 }
+
+/**
+ * The tracks that "next" walks through, when something is played from a list.
+ *
+ * ## What was asked for
+ *
+ * "Make it so that even if you search a music, the music your autoplay chooses
+ * on are still the playlist you are in[']s pool. Because if not, then you can
+ * end up with only one music going in loop, and so far this is not our aim."
+ *
+ * Playing a track handed the queue whatever was *listed* — and a search filters
+ * the listing. So searching for a song and playing it left a queue of one, and
+ * the player looped that song for ever. The narrower the search, the worse:
+ * finding exactly what you wanted was the surest way to hear nothing else.
+ *
+ * A search narrows what you can *see*. It was never meant to narrow what plays.
+ * So the pool is the playlist you are in — or the whole library, when that is
+ * what you are looking at — whatever the search box says.
+ *
+ * Choosing several tracks by hand is the exception, and stays as it is: a
+ * selection is a pool somebody built on purpose, not a view of a larger one.
+ *
+ * `chosen` is put at the front if it somehow is not in the pool at all, so that
+ * pressing play on a track always plays *that* track. Nothing should produce
+ * that today; it costs one comparison to make it impossible tomorrow.
+ */
+export function playbackPool({ pool = [], chosen = null } = {}) {
+  const tracks = (Array.isArray(pool) ? pool : []).filter(Boolean);
+  if (!chosen) return tracks;
+  return tracks.some((t) => t?.id === chosen.id) ? tracks : [chosen, ...tracks];
+}
+
+/**
+ * Which playlist to open on, given what was remembered.
+ *
+ * ## What was asked for
+ *
+ * "Keep in memory the last music you listened to, so that when you go back it's
+ * actually the music you listened to and not another one."
+ *
+ * Playlist mode opened on "All music" every single time, whatever you had been
+ * listening to, so going back and pressing play started something else.
+ *
+ * `null` means All music, which is both a real choice somebody can make and the
+ * answer when what was remembered is gone. A playlist deleted on this device or
+ * another must not leave the mode pointing at nothing — the same rule the
+ * remembered note follows, for the same reason.
+ */
+export function openingPlaylist(library, rememberedId) {
+  if (!rememberedId) return null;
+  return findPlaylist(library, rememberedId) ? rememberedId : null;
+}

@@ -7,7 +7,9 @@ import {
   resolveQueue,
   playlistLabel,
   stepTrack,
-  isQueuePlaying
+  isQueuePlaying,
+  playbackPool,
+  openingPlaylist
 } from '../src/utils/playlistPlayback.js';
 
 const t = (id, title = id) => ({ id, title });
@@ -94,4 +96,70 @@ test('a block shows as playing only when the track is one of its own', () => {
   assert.equal(isQueuePlaying(evening, 'b', true), false, 'another block’s track');
   assert.equal(isQueuePlaying(evening, 'c', false), false, 'paused');
   assert.equal(isQueuePlaying(evening, null, true), false);
+});
+
+// Named after the request: "make it so that even if you search a music, the
+// music your autoplay chooses on are still the playlist you are in's pool.
+// Because if not, then you can end up with only one music going in loop, and so
+// far this is not our aim." And: "keep in memory the last music you listened to,
+// so that when you go back it's actually the music you listened to and not
+// another one."
+
+const song = (id, title = id) => ({ id, title });
+
+test('searching for one song does not leave it playing on loop', () => {
+  // The bug in one line. Playing handed the queue whatever was listed, and a
+  // search filters the listing — so finding exactly what you wanted was the
+  // surest way to hear nothing else afterwards.
+  const playlist = [song('a'), song('b'), song('c')];
+  const listed = [song('b')]; // what a search for "b" left on screen
+  const queue = playbackPool({ pool: playlist, chosen: listed[0] });
+
+  assert.equal(queue.length, 3);
+  assert.notDeepEqual(queue.map((t) => t.id), ['b']);
+  assert.equal(stepTrack(queue, 'b', 1).id, 'c', 'and next goes on through the playlist');
+});
+
+test('a search narrows what you see, never what plays next', () => {
+  const playlist = [song('a'), song('b'), song('c')];
+  assert.deepEqual(
+    playbackPool({ pool: playlist, chosen: song('a') }).map((t) => t.id),
+    ['a', 'b', 'c']
+  );
+});
+
+test('the whole library is a pool like any other', () => {
+  // With no playlist open, what you are looking at is everything, and that is
+  // what should carry on playing.
+  const library = [song('a'), song('b')];
+  assert.deepEqual(playbackPool({ pool: library }).map((t) => t.id), ['a', 'b']);
+});
+
+test('pressing play on a track always plays that track', () => {
+  // Nothing should produce a chosen track outside its own pool today. It costs
+  // one comparison to make it impossible tomorrow.
+  const queue = playbackPool({ pool: [song('a')], chosen: song('z') });
+  assert.deepEqual(queue.map((t) => t.id), ['z', 'a']);
+});
+
+test('an empty pool is an empty queue, not a crash', () => {
+  assert.deepEqual(playbackPool({ pool: [] }), []);
+  assert.deepEqual(playbackPool({}), []);
+  assert.deepEqual(playbackPool(), []);
+  assert.deepEqual(playbackPool({ pool: [null, undefined] }), []);
+});
+
+test('the playlist you were in is the one you come back to', () => {
+  const library = { tracks: [], playlists: [{ id: 'p1', name: 'Night', trackIds: [] }] };
+  assert.equal(openingPlaylist(library, 'p1'), 'p1');
+});
+
+test('a playlist that is gone opens on all music rather than on nothing', () => {
+  // Deleted here or on another device. Pointing at a playlist that is not there
+  // is how the mode would come back empty with no way to say why.
+  const library = { tracks: [], playlists: [{ id: 'p1', name: 'Night', trackIds: [] }] };
+  assert.equal(openingPlaylist(library, 'gone'), null);
+  assert.equal(openingPlaylist(library, null), null);
+  assert.equal(openingPlaylist(library, undefined), null);
+  assert.equal(openingPlaylist({ playlists: [] }, 'p1'), null);
 });
