@@ -7,6 +7,7 @@
   import { ListItem } from '@tiptap/extension-list-item';
   import { Markdown } from 'tiptap-markdown';
   import { shortcutFor, markShortcutFor, separatorFillsLine } from '../utils/markdownShortcuts.js';
+  import { imagesFrom, hasImage } from '../utils/pastedImages.js';
   import {
     initTextHistory,
     recordText,
@@ -301,6 +302,54 @@
   // being valid.
   const AnyBlockListItem = ListItem.extend({ content: 'block+' });
 
+  /**
+   * A picture pasted into a note becomes a picture in the note.
+   *
+   * There was no paste handling here at all, and the window-level one in
+   * App.svelte steps aside for anything editable on purpose -- so a picture
+   * pasted into writing went nowhere, on every platform. Reported from a phone,
+   * where the keyboard says so out loud.
+   *
+   * Reads as a data URL and inserts it, which is what the image extension is
+   * configured for (`allowBase64`). The picture then travels with the note like
+   * any other, rather than pointing at wherever it was copied from.
+   */
+  function handleImagePaste(view, event) {
+    const clipboard = event?.clipboardData;
+    if (!hasImage(clipboard)) return false;
+
+    // The picture wins over whatever came with it. Copying an image in a
+    // browser also puts the <img> markup on the clipboard, and copying one in a
+    // file manager also puts its path there as text; inserting either alongside
+    // the picture is noise at best and a link that rots at worst.
+    event.preventDefault();
+    const pictures = imagesFrom(clipboard);
+
+    // Reading a file is asynchronous and ProseMirror wants an answer now, so
+    // the answer is "handled" and the insert follows.
+    (async () => {
+      for (const picture of pictures) {
+        try {
+          const src = await readAsDataUrl(picture);
+          if (src) editor.chain().focus().setImage({ src }).run();
+        } catch (error) {
+          console.error('Could not paste a picture:', error);
+        }
+      }
+    })();
+
+    return true;
+  }
+
+  function readAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
   const AggregateMarkdown = Extension.create({
     name: 'aggregateMarkdown',
 
@@ -571,6 +620,7 @@
       editorProps: {
         attributes: { class: 'tiptap-inner', spellcheck: 'false' },
         handleKeyDown: handleHistoryKeys,
+        handlePaste: handleImagePaste,
       },
       onUpdate({ editor: e }) {
         const value =

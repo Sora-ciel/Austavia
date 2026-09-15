@@ -965,6 +965,54 @@
     );
   }
 
+  /**
+   * Where a picture handed over by the Android keyboard arrives.
+   *
+   * A keyboard inserts a picture through `InputConnection.commitContent`, not
+   * through the clipboard, so none of the paste handling sees it. The Android
+   * side reads the bytes and calls this with a data URL; see
+   * ImagePasteWebView.java for the half that declares the app accepts pictures
+   * at all, which is what the keyboard was complaining about.
+   *
+   * Put on `window` because a native `evaluateJavascript` has nothing else to
+   * call. Returns a string rather than throwing, so the Android side can say
+   * whether it worked without parsing an exception.
+   */
+  function receivePictureFromKeyboard(dataUrl) {
+    try {
+      if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return 'not a picture';
+
+      // Into whatever is being written in, if anything is. The editor keeps its
+      // own reference on the element, which is how the paste handler reaches it
+      // too.
+      const writing = document.activeElement?.closest?.('.ProseMirror');
+      if (writing?.editor) {
+        writing.editor.chain().focus().setImage({ src: dataUrl }).run();
+        return 'inserted';
+      }
+
+      // Nothing focused: it becomes a picture block, which is what pasting one
+      // outside a note already does.
+      const blob = dataUrlToBlobForPaste(dataUrl);
+      if (!blob) return 'unreadable';
+      addImageBlockFromFile(new File([blob], `pasted-${Date.now()}.png`, { type: blob.type }));
+      return 'added as a block';
+    } catch (error) {
+      console.error('Could not take a picture from the keyboard:', error);
+      return 'failed';
+    }
+  }
+
+  function dataUrlToBlobForPaste(dataUrl) {
+    const [meta, encoded] = String(dataUrl).split(',', 2);
+    if (!encoded) return null;
+    const type = /data:([^;]+)/.exec(meta)?.[1] || 'image/png';
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+
   function loadSyncedUid() {
     if (typeof localStorage === 'undefined') return '';
     try {
@@ -4502,6 +4550,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     if (!firebaseReady) authStateResolved = true;
     countTheWait();
+    window.__austaviaPasteImage = receivePictureFromKeyboard;
 
     // The gate releases when the device is offline, so it has to hear about it
     // changing either way -- coming back online while held is worth waiting a
@@ -4656,6 +4705,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     observedControlsEl = null;
     stopAuthListener?.();
     stopConnectionWatch?.();
+    if (window.__austaviaPasteImage === receivePictureFromKeyboard) {
+      delete window.__austaviaPasteImage;
+    }
     if (gateTimer) clearInterval(gateTimer);
     stopStorageUsageListener?.();
     stopRemoteIndexWatch();

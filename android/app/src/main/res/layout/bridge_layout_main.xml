@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Capacitor's own bridge_layout_main.xml, with one line changed: the WebView is
+  com.sora.austavia.ImagePasteWebView rather than com.getcapacitor.CapacitorWebView.
+
+  Android resource merging lets an app's layout override a library's of the same
+  name, and this is the only way to get a WebView subclass into a Capacitor
+  activity — the bridge inflates this file by name and finds the view by id.
+
+  ImagePasteWebView extends CapacitorWebView, so everything Capacitor does here
+  still happens. It adds one thing: declaring that the app accepts pictures, so
+  the keyboard stops saying it does not.
+
+  Worth knowing if Capacitor is upgraded: if the library's version of this file
+  gains anything, this copy has to gain it too, because this one wins.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.getcapacitor.BridgeActivity"
+    >
+
+    <com.sora.austavia.ImagePasteWebView
+        android:id="@+id/webview"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
