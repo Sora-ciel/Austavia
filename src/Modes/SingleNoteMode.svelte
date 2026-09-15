@@ -372,10 +372,21 @@
     padding: 12px;
   }
 
+  /* Half the height it was, on a computer and on a phone alike: 58px for one
+     small button was most of a line of writing given over to nothing.
+
+     The height was never really the footer's. A button carries about 10px of
+     padding above and below from the browser, which is fine on a button with a
+     word in it and absurd on a single character -- 21 of the 42 pixels the
+     button occupied were that. So the padding comes off the button and the
+     footer's own is evened out, which lands at 29px.
+
+     The horizontal side is deliberately untouched: where the button sits and
+     how much room it has across the footer were already right. */
   .note-footer {
     display: flex;
     justify-content: flex-end;
-    padding: 6px 12px 10px;
+    padding: 4px 12px;
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
   }
 
@@ -384,6 +395,7 @@
     border: none;
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
     font-size: 1.1rem;
+    padding: 0 6px;
     cursor: pointer;
   }
 
