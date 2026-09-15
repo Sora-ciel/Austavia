@@ -7,6 +7,7 @@ import {
   findEmbeddedDataUrls,
   payloadCarriesDataUrl
 } from './utils/syncRules.js';
+import { attachmentKey } from './utils/attachmentIdentity.js';
 // What may be written to themes/, and which of two copies of one theme wins.
 // See utils/themeSync.js.
 import {
@@ -682,23 +683,48 @@ export async function uploadAttachmentFromDataUrl(dataUrl, options = {}) {
   if (!ctx) return null;
 
   const uid = options.uid || requireUser(ctx.auth.currentUser).uid;
+  const fileId = String(options.fileId || 'unknown-file');
+  const blockId = String(options.blockId || 'unknown-block');
+  const field = String(options.field || 'attachment');
+  const scope = getStorageUserPath(uid, `attachments/${fileId}/${blockId}/${field}`);
+
+  // Asked before anything is read.
+  //
+  // Everything below this line is expensive on a picture pasted into a note,
+  // where the data URL is millions of characters: decoding the base64 back into
+  // bytes, then hashing every one of those characters to name the object. That
+  // work used to happen before the "already uploaded" check, so every save
+  // while typing in such a note paid all of it in order to be told the picture
+  // had not changed -- six times in seventy seconds, in one log.
+  //
+  // The fingerprint is length plus a slice from each end, which is constant
+  // time; see utils/attachmentIdentity.js. It only answers "this exact string
+  // again, in this session", and a miss falls through to the exact path below,
+  // which is unchanged. Object names are untouched, so nothing already in
+  // storage is orphaned or re-uploaded.
+  const quickKey = attachmentKey(scope, dataUrl);
+  if (quickKey) {
+    const known = uploadedAttachmentUrls.get(quickKey);
+    if (known) return known;
+  }
+
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   const mime = blob.type || 'application/octet-stream';
   const ext = inferExtensionFromMime(mime);
-  const fileId = String(options.fileId || 'unknown-file');
-  const blockId = String(options.blockId || 'unknown-block');
-  const field = String(options.field || 'attachment');
   // Named after the bytes rather than the clock. Uploading is not a one-time
   // event: the copy on this device keeps its base64, so the same picture comes
   // back round on every later edit of the note. With a random name each pass
   // left another copy in Storage; named this way a repeat simply overwrites the
   // one already there, and the link stays the same.
   const objectName = `${hashText(dataUrl)}.${ext}`;
-  const objectPath = `${getStorageUserPath(uid, `attachments/${fileId}/${blockId}/${field}`)}/${objectName}`;
+  const objectPath = `${scope}/${objectName}`;
 
   const cached = uploadedAttachmentUrls.get(objectPath);
-  if (cached) return cached;
+  if (cached) {
+    if (quickKey) uploadedAttachmentUrls.set(quickKey, cached);
+    return cached;
+  }
 
   const storageRef = ctx.storageApi.ref(ctx.storage, objectPath);
 
@@ -709,6 +735,7 @@ export async function uploadAttachmentFromDataUrl(dataUrl, options = {}) {
 
   const downloadUrl = await ctx.storageApi.getDownloadURL(storageRef);
   uploadedAttachmentUrls.set(objectPath, downloadUrl);
+  if (quickKey) uploadedAttachmentUrls.set(quickKey, downloadUrl);
   return downloadUrl;
 }
 
