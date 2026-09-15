@@ -929,11 +929,16 @@
   // still leaves an editor holding a document, and the lock only ever covered
   // the part after Firebase had answered anyway.
   $: workspaceHeld =
-    workspaceGate.hold || cloudBootstrapInProgress || cloudSyncGateInProgress;
+    workspaceGate.hold
+    || cloudBootstrapInProgress
+    || cloudSyncGateInProgress
+    || resumeCheckInProgress;
 
   $: gateMessage = cloudBootstrapInProgress || cloudSyncGateInProgress
     ? 'Syncing with the cloud… editing resumes in a moment.'
-    : `Checking for newer work before you start… (${workspaceGate.reason})`;
+    : resumeCheckInProgress
+      ? 'Checking for newer work…'
+      : `Checking for newer work before you start… (${workspaceGate.reason})`;
 
   // The wait is counted from a plain interval rather than a reactive block.
   // Reactively starting a timer that writes the value the gate reads is a cycle
@@ -2464,6 +2469,12 @@
   let cloudBootstrapInProgress = false;
   let cloudBootstrapComplete = false;
   let cloudSyncGateInProgress = false;
+  let pullInFlight = false;
+  // Held while the app checks the cloud on coming back, the same way it is held
+  // at startup: readable, scrollable, not editable. Without it, the first thing
+  // somebody does on returning to a phone is type into a copy that is about to
+  // be replaced.
+  let resumeCheckInProgress = false;
   // What the last upload attempt actually said, so a folder that will not go up
   // says so on screen. It used to fail into the console alone, where nobody
   // running the packaged app can see it, which is how an account could stop
@@ -3914,6 +3925,25 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   async function pullRemoteUpdatesIfNeeded(options = {}) {
     if (!autoSyncEnabled || !firebaseReady || !authUser || uploadInProgress || cloudBootstrapInProgress) return false;
 
+    // One at a time.
+    //
+    // Three things ask for a pull -- the timer, the index subscription, and
+    // coming back to the app -- and returning to a phone set all three off at
+    // once. Nothing stopped them overlapping: the fingerprint that skips
+    // repeated work is only written at the end, so three passes all read the
+    // same stale value, all decided the same folder was behind, and all fetched
+    // it. Three downloads, three snapshots of the copy being replaced, and
+    // three remounts of the workspace, for one change.
+    if (pullInFlight) return false;
+    pullInFlight = true;
+    try {
+      return await runPull(options);
+    } finally {
+      pullInFlight = false;
+    }
+  }
+
+  async function runPull(options = {}) {
     const remoteIndex = options.remoteIndex || await loadRemoteIndex();
     const remoteEntries = Object.entries(remoteIndex || {});
     const remoteFingerprint = remoteEntries
@@ -4054,10 +4084,48 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       return;
     }
 
-    refreshRemoteIndexWatch();
-    pullRemoteUpdatesIfNeeded().catch(error => {
+    checkCloudOnResume();
+  }
+
+  /**
+   * Coming back to the app is a startup in every way that matters.
+   *
+   * The device has been away, another one may have written, and the first thing
+   * somebody does on returning to a phone is carry on typing -- into a copy
+   * that is about to be replaced. Startup holds the workspace for exactly this
+   * reason; resuming did not, and a phone left in a pocket is away far longer
+   * than an app takes to start.
+   *
+   * So the same hold, with the same shape: readable and scrollable, not
+   * editable, and released as soon as the check is done. The check is quick now
+   * that a device which is up to date does no folder reads at all -- for most
+   * resumes this is a flicker or nothing.
+   */
+  async function checkCloudOnResume() {
+    if (!autoSyncEnabled || !firebaseReady || !authUser) return;
+    if (resumeCheckInProgress) return;
+
+    resumeCheckInProgress = true;
+    // The same escape as the startup gate, for the same reason: a check that
+    // never answers must not leave somebody unable to write.
+    const giveUp = setTimeout(() => {
+      if (!resumeCheckInProgress) return;
+      resumeCheckInProgress = false;
+      logSync('error', currentSaveName, 'started editing without checking the cloud first', {
+        reason: 'the cloud did not answer on resume',
+        waitedMs: GATE_TIMEOUT_MS
+      });
+    }, GATE_TIMEOUT_MS);
+
+    try {
+      refreshRemoteIndexWatch();
+      await pullRemoteUpdatesIfNeeded();
+    } catch (error) {
       console.error('Auto sync download on resume failed:', error);
-    });
+    } finally {
+      clearTimeout(giveUp);
+      resumeCheckInProgress = false;
+    }
   }
 
   async function autoSyncUploadTick(options = {}) {
@@ -4779,6 +4847,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     startAutoSyncDownloadBackstop();
     document.addEventListener('visibilitychange', handleVisibilityForSync);
+    // visibilitychange is the reliable one on a desktop and the late one on a
+    // phone: an Android WebView can be back in front of somebody before it
+    // fires, which is the gap between coming back and the check starting.
+    // focus and pageshow arrive on paths visibilitychange misses, and the check
+    // itself refuses to run twice, so asking three times costs nothing.
+    window.addEventListener('focus', checkCloudOnResume);
+    window.addEventListener('pageshow', checkCloudOnResume);
     // Closing the tab or window is the other last-safe-moment.
     window.addEventListener('pagehide', flushPendingSave);
 
@@ -4805,6 +4880,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     stopStorageUsageListener?.();
     stopRemoteIndexWatch();
     document.removeEventListener('visibilitychange', handleVisibilityForSync);
+    window.removeEventListener('focus', checkCloudOnResume);
+    window.removeEventListener('pageshow', checkCloudOnResume);
     window.removeEventListener('pagehide', flushPendingSave);
     if (autoSyncUploadIntervalId !== null) {
       window.clearInterval(autoSyncUploadIntervalId);
