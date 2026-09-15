@@ -1,3 +1,21 @@
+// `dragDropEnabled: false` in tauri.conf.json, and why, since JSON cannot say
+// so itself and the next person to read that file will find a bare `false`.
+//
+// Tauri turns drag-and-drop interception on by default: the native webview
+// takes the gesture so that file drops can be delivered to Rust. On Windows
+// that takes it away from the page entirely — starting a drag inside the app
+// gives the no-drop cursor and nothing can be moved, because the page never
+// sees a dragover it could accept.
+//
+// Nothing is lost by turning it off. The page already handles its own drops
+// (`handleModeDrop` in App.svelte takes dropped pictures and videos), and
+// nothing on this side listens for them.
+//
+// It only became visible once pictures could be pasted into a note. Blocks on
+// the canvas are moved with pointer events and never used drag-and-drop, so
+// until there were pictures inside writing there was nothing in the app that
+// needed the gesture at all.
+
 /// Keep the page running when the window is not on screen.
 ///
 /// Music stopped whenever the desktop window was minimised. Nothing in the app
