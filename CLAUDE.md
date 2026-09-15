@@ -142,6 +142,21 @@ panel's sliders are what the rule is written from: they took the left panel's
 text colour, which is a theme colour, so nothing looked wrong from the inside —
 and they still did not match the mode they were sitting over.
 
+## What is still owed is written down, not remembered
+
+[`PENDING.md`](PENDING.md) is the list. It exists because the same list was
+reconstructed from memory twice and both times something fell off it.
+
+Add to it when something is found and not fixed, and say enough that it can be
+picked up cold: what the symptom was, what was measured, and what was already
+tried and rejected. An entry that only names a task is worth little — the entry
+for the editor's containment is worth having precisely because it records that
+the obvious fix breaks scrolling, so nobody spends the afternoon rediscovering
+that.
+
+Take from it when starting work, and delete the entry in the same commit as the
+fix.
+
 ## Releasing goes by the checklist, not by memory
 
 [`RELEASE.md`](RELEASE.md) has every step in order. Follow it whenever the ask
