@@ -15,6 +15,8 @@
     loadMusicTrack,
     saveMusicLibrary,
     loadMusicLibrary,
+    loadSaveMeta,
+    loadAllSaveMeta,
     listFolderSnapshots,
     putFolderSnapshots,
     deleteFolderSnapshot
@@ -1001,6 +1003,23 @@
       console.error('Could not take a picture from the keyboard:', error);
       return 'failed';
     }
+  }
+
+  /**
+   * Stops anything that would change the folder while it is being checked.
+   *
+   * `beforeinput` is the one that matters: typing, deleting, pasting, dropping
+   * and undo all announce themselves through it, so refusing it there covers
+   * every way writing happens without having to guess at keys. The rest are
+   * belt and braces for the paths that do not go through an editor.
+   *
+   * Capture phase, so it lands before the editor's own handlers rather than
+   * after they have already acted.
+   */
+  function refuseWhileHeld(event) {
+    if (!workspaceHeld) return;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function dataUrlToBlobForPaste(dataUrl) {
@@ -3794,54 +3813,81 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   // Returns { [fileName]: { fingerprint, attachmentFingerprint } } - per file,
   // so the caller can tell exactly which files changed instead of just
   // "something in the account changed."
-  async function buildLocalSyncFingerprint() {
-    const names = await listSavedBlocks();
+  /**
+   * What each folder's state is, for deciding what needs sending.
+   *
+   * The fingerprint is the folder's own `updatedAt`, and that is the whole of
+   * "has this changed": a local save restamps it whenever the content differs
+   * and skips the write entirely when it does not, so the number moving and the
+   * folder changing are the same event.
+   *
+   * It used to be read by loading every folder, which hydrates every attachment
+   * in the account into base64 to look at one integer. Now the timestamps come
+   * from the records directly, and a folder is only opened when it is a
+   * candidate for upload -- which, in the ordinary case of nothing having
+   * changed, is none of them.
+   */
+  async function buildLocalSyncFingerprint({ attachmentsFor = null } = {}) {
+    const meta = await loadAllSaveMeta();
     const perFile = {};
+    for (const [fileName, times] of Object.entries(meta)) {
+      perFile[fileName] = { fingerprint: Number(times?.updatedAt || 0), attachmentFingerprint: null };
+    }
+
+    const wanted = attachmentsFor
+      ? attachmentsFor.filter((name) => perFile[name])
+      : Object.keys(perFile);
+
     await Promise.all(
-      names.map(async fileName => {
-        const payload = await loadBlocks(fileName);
-        const blocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
-        // What counts as an attachment is any picture, wherever it sits. Only
-        // image blocks were looked at here, so a note that gained a picture
-        // pasted into its text looked unchanged, the attachment pass was
-        // skipped, and the base64 was written to the database inline.
-        //
-        // Embedded pictures are summarised by how many there are and how long
-        // they are rather than by their bytes: the signature is only compared
-        // for equality, and holding megabytes of base64 in it to do that would
-        // be a waste.
-        const attachmentSignature = blocks
-          .map(block => {
-            if (block?.type === 'image') {
-              return `${block.id}:${block.src || ''}:${block.content || ''}:${block.trackUrl || ''}`;
-            }
-
-            const written = [block?.src, block?.content, block?.trackUrl];
-            if (Array.isArray(block?.tasks)) {
-              for (const task of block.tasks) written.push(task?.text);
-            }
-
-            let count = 0;
-            let bytes = 0;
-            for (const value of written) {
-              if (typeof value !== 'string' || !value.includes('data:')) continue;
-              for (const match of value.match(/data:[a-z0-9.+-]+\/[a-z0-9.+-]+[^"')\s>]*/gi) || []) {
-                count += 1;
-                bytes += match.length;
-              }
-            }
-            return count ? `${block.id}:embedded:${count}:${bytes}` : '';
-          })
-          .filter(Boolean)
-          .join('|');
-
-        perFile[fileName] = {
-          fingerprint: Number(payload?.updatedAt || 0),
-          attachmentFingerprint: attachmentSignature
-        };
+      wanted.map(async (fileName) => {
+        perFile[fileName].attachmentFingerprint = await attachmentSignatureFor(fileName);
       })
     );
+
     return perFile;
+  }
+
+  /**
+   * A summary of the pictures a folder holds, for deciding whether the
+   * attachments need re-uploading alongside it.
+   *
+   * What counts as an attachment is any picture, wherever it sits. Only image
+   * blocks were looked at once, so a note that gained a picture pasted into its
+   * text looked unchanged, the attachment pass was skipped, and the base64 was
+   * written to the database inline.
+   *
+   * Embedded pictures are summarised by how many there are and how long they
+   * are rather than by their bytes: the signature is only compared for
+   * equality, and holding megabytes of base64 in it to do that would be a
+   * waste.
+   */
+  async function attachmentSignatureFor(fileName) {
+    const payload = await loadBlocks(fileName);
+    const blocks = Array.isArray(payload?.blocks) ? payload.blocks : [];
+    return blocks
+      .map(block => {
+        if (block?.type === 'image') {
+          return `${block.id}:${block.src || ''}:${block.content || ''}:${block.trackUrl || ''}`;
+        }
+
+        const written = [block?.src, block?.content, block?.trackUrl];
+        if (Array.isArray(block?.tasks)) {
+          for (const task of block.tasks) written.push(task?.text);
+        }
+
+        let count = 0;
+        let bytes = 0;
+        for (const value of written) {
+          if (typeof value !== 'string' || !value.includes('data:')) continue;
+          for (const match of value.match(/data:[a-z0-9.+-]+\/[a-z0-9.+-]+[^"')\s>]*/gi) || []) {
+            count += 1;
+            bytes += match.length;
+          }
+        }
+        return count ? `${block.id}:embedded:${count}:${bytes}` : '';
+      })
+      .filter(Boolean)
+      .join('|');
   }
 
 
@@ -3883,8 +3929,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // device is a flash for no reason, so it's tracked separately.
     let openFileChanged = false;
     for (const [fileName, remoteMeta] of remoteEntries) {
-      const localPayload = savedList.includes(fileName) ? await loadBlocks(fileName) : null;
-      const localModifiedAt = Number(localPayload?.modifiedAt || localPayload?.updatedAt || 0);
+      // The stamp, not the folder. This used to open every folder in the
+      // account on every tick -- hydrating every attachment into base64 -- to
+      // compare two integers.
+      const localMeta = savedList.includes(fileName) ? await loadSaveMeta(fileName) : null;
+      const localModifiedAt = Number(localMeta?.modifiedAt || localMeta?.updatedAt || 0);
       const remoteModifiedAt = Number(remoteMeta?.modifiedAt || remoteMeta?.updatedAt || 0);
 
       // Work done here and not yet sent must not be thrown away for a cloud copy
@@ -3898,9 +3947,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       // would stop a fresh sign-in ever receiving anything.
       const lastSent = lastAutoSyncFingerprintByFile[fileName];
       const hasUnsentWork =
-        lastSent !== undefined && Number(localPayload?.updatedAt || 0) !== lastSent;
+        lastSent !== undefined && Number(localMeta?.updatedAt || 0) !== lastSent;
 
-      if (localPayload && hasUnsentWork && remoteModifiedAt > localModifiedAt) {
+      if (localMeta && hasUnsentWork && remoteModifiedAt > localModifiedAt) {
         logSync('skip', fileName, 'cloud copy is newer, but local changes are still unsent', {
           remoteModifiedAt,
           localModifiedAt,
@@ -3909,7 +3958,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         continue;
       }
 
-      if (!localPayload || remoteModifiedAt > localModifiedAt) {
+      if (!localMeta || remoteModifiedAt > localModifiedAt) {
         const remotePayload = await loadRemoteFile(fileName);
         if (!remotePayload) continue;
         logSync('download', fileName, 'cloud copy is newer, taking it', {
@@ -3917,7 +3966,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           localModifiedAt,
           aheadByMs: remoteModifiedAt - localModifiedAt
         });
-        await keepReplacedCopy(fileName, localPayload, remotePayload);
+        // Opened here, where it is genuinely needed: this is the copy about to
+        // be replaced, and keeping it is the point.
+        await keepReplacedCopy(
+          fileName,
+          localMeta ? await loadBlocks(fileName) : null,
+          remotePayload
+        );
         await saveBlocks(fileName, remotePayload);
         rememberCloudSyncForFile(fileName, Number(remoteMeta?.lastSyncedAt || Date.now()));
         downloadedAny = true;
@@ -4017,28 +4072,32 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       return;
     }
 
-    // Only re-upload files whose own fingerprint moved since the last tick -
-    // editing one note used to re-save every saved file in the account.
+    // Only the folders whose own stamp moved since the last tick. Editing one
+    // note used to re-save every folder in the account; and before this, simply
+    // working out that nothing had changed opened every one of them.
     const changedNames = force
       ? fileNames
-      : fileNames.filter(fileName => {
-          const current = perFile[fileName];
-          return current.fingerprint !== lastAutoSyncFingerprintByFile[fileName]
-            || current.attachmentFingerprint !== lastAutoSyncAttachmentFingerprintByFile[fileName];
-        });
+      : fileNames.filter(
+          fileName => perFile[fileName].fingerprint !== lastAutoSyncFingerprintByFile[fileName]
+        );
 
     if (!changedNames.length) {
       autoSyncDirty = false;
       return;
     }
 
+    // Only now, and only for these, is a folder actually opened -- the
+    // attachment summary is the one part that needs to see the content.
+    await Promise.all(
+      changedNames.map(async fileName => {
+        perFile[fileName].attachmentFingerprint = await attachmentSignatureFor(fileName);
+      })
+    );
+
     for (const fileName of changedNames) {
-      const current = perFile[fileName];
       logSync('upload', fileName, 'queued for upload', {
-        because: current.fingerprint !== lastAutoSyncFingerprintByFile[fileName]
-          ? 'updatedAt moved'
-          : 'attachments changed',
-        updatedAt: current.fingerprint,
+        because: 'updatedAt moved',
+        updatedAt: perFile[fileName].fingerprint,
         lastSent: lastAutoSyncFingerprintByFile[fileName] ?? '(never)'
       });
     }
@@ -4242,16 +4301,34 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         return;
       }
 
-      // Existing account: cloud is source of truth during bootstrap.
+      // Existing account: the cloud wins, but only where it has anything to
+      // say. This downloaded and rewrote every folder in the account on every
+      // single launch -- seventeen full downloads and seventeen full writes for
+      // a device that was already up to date -- which is most of what "waiting
+      // for the sync" was. Now a folder is fetched when its stamp is ahead of
+      // this device's, and a device that is current fetches nothing at all.
+      const localMeta = await loadAllSaveMeta();
+      const behind = [];
       for (const remoteName of remoteNames) {
+        const mine = localMeta[remoteName];
+        const remoteAt = Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0);
+        const localAt = Number(mine?.modifiedAt || mine?.updatedAt || 0);
+        if (!mine || remoteAt > localAt) behind.push(remoteName);
+      }
+
+      logSync('download', '', behind.length ? 'fetching the folders that moved' : 'already up to date', {
+        folders: remoteNames.length,
+        fetching: behind.length
+      });
+
+      for (const remoteName of behind) {
         const remotePayload = await loadRemoteFile(remoteName);
         if (remotePayload) {
-          // Bootstrap says the cloud wins, and mostly it should. But a device
-          // that had work of its own is exactly where that hurts, so what it
-          // had is kept before the cloud takes over.
+          // A device that had work of its own is exactly where "the cloud wins"
+          // hurts, so what it had is kept before the cloud takes over.
           await keepReplacedCopy(
             remoteName,
-            savedList.includes(remoteName) ? await loadBlocks(remoteName) : null,
+            localMeta[remoteName] ? await loadBlocks(remoteName) : null,
             remotePayload
           );
           await saveBlocks(remoteName, remotePayload);
@@ -4259,11 +4336,27 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         }
       }
 
+      // What the cloud already has is not owed an upload. Without this, the
+      // first tick after every launch queued every folder in the account
+      // because nothing had been recorded as sent yet -- the account uploading
+      // itself to itself, once per start.
+      const afterFetch = await loadAllSaveMeta();
+      for (const [fileName, times] of Object.entries(afterFetch)) {
+        const remoteAt = Number(
+          remoteIndex[fileName]?.modifiedAt || remoteIndex[fileName]?.updatedAt || 0
+        );
+        if (remoteAt && remoteAt >= Number(times?.modifiedAt || 0)) {
+          lastAutoSyncFingerprintByFile[fileName] = Number(times?.updatedAt || 0);
+        }
+      }
+
       savedList = await listSavedBlocks();
       // The loop above refreshed IndexedDB, but the open folder is still the
-      // copy read at boot — reopen it so cloud edits made elsewhere show up
-      // immediately instead of only after reopening the folder by hand.
-      await openCurrentOrFirstSave();
+      // copy read at boot — reopen it, and only when it was one of the ones
+      // that changed.
+      if (behind.includes(currentSaveName) || !savedList.includes(currentSaveName)) {
+        await openCurrentOrFirstSave();
+      }
       cloudBootstrapComplete = true;
       autoSyncDirty = false;
     } catch (error) {
@@ -5131,9 +5224,23 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   overflow: hidden; /* so canvas doesn’t spill */
 }
 
+/* Held, not hidden. The mode keeps its pointer events so it can be scrolled
+   and panned; what loses them is everything that would change something.
+
+   A child with pointer-events: none passes the wheel and the touch up to its
+   scrolling parent, so a note can still be read through to the end while its
+   own writing cannot be clicked into. */
 .modes.sync-lock-active {
+  opacity: 0.85;
+}
+
+.modes.sync-lock-active :global(.ProseMirror),
+.modes.sync-lock-active :global(button),
+.modes.sync-lock-active :global(input),
+.modes.sync-lock-active :global(textarea),
+.modes.sync-lock-active :global([draggable='true']),
+.modes.sync-lock-active :global([contenteditable='true']) {
   pointer-events: none;
-  opacity: 0.8;
 }
 
 /* Qualified by the base class so it wins on specificity: the plain
@@ -5541,7 +5648,24 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     </div>
   {/if}
 
-  <div class="modes" class:sync-lock-active={workspaceHeld} role="region" aria-label="Workspace" on:dragover={handleModeDragOver} on:drop={handleModeDrop}>
+  <!-- Readable while it is held, not hidden. Asked for: "the folder can show
+       itself and you should be able to move around it, just not edit it while
+       it syncs". Scrolling and reading are safe -- nothing written against a
+       stale copy comes of them -- so only the things that would change it are
+       stopped, in the capture phase before anything else sees them. -->
+  <div
+    class="modes"
+    class:sync-lock-active={workspaceHeld}
+    role="region"
+    aria-label="Workspace"
+    on:beforeinput|capture={refuseWhileHeld}
+    on:paste|capture={refuseWhileHeld}
+    on:cut|capture={refuseWhileHeld}
+    on:drop|capture={refuseWhileHeld}
+    on:dragstart|capture={refuseWhileHeld}
+    on:dragover={handleModeDragOver}
+    on:drop={handleModeDrop}
+  >
     {#if workspaceHeld}
       <div class="sync-lock-banner" style={overlayThemeStyle}>{gateMessage}</div>
     {:else if syncFailureNotice}
@@ -5550,45 +5674,39 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         <button type="button" class="sync-failed-dismiss" on:click={() => (syncFailureNotice = '')}>Dismiss</button>
       </div>
     {/if}
-    <!-- Not mounted while the workspace is held. Asked for in as many
-         words: the pop-up that stops editing has to come before the mode
-         is mounted, because a mounted mode is an editor holding a document
-         and blocking its pointer events does not change that. -->
-    {#if !workspaceHeld}
-      <ModeArea
-        {mode}
-        openFolder={currentSaveName}
-        {canvasBackgroundSettings}
-        blocks={modeOrderedBlocks}
-        {simpleNoteColumnCount}
-        {singleNoteSettings}
-        {taskAddDirection}
-        {musicLibrary}
-        {nowPlayingId}
-        {isPlaying}
-        shuffle={musicShuffle}
-        {groupedBlocks}
-        {focusedBlockId}
-        modeLabels={MODE_LABELS}
-        bind:canvasRef
-        canvasColors={canvasTheme}
-        leftControlColors={leftTheme}
-        on:update={updateBlockHandler}
-        on:delete={deleteBlockHandler}
-        on:focusToggle={handleFocusToggle}
-        on:swapBlocks={(e) => swapBlocksInMode(e.detail)}
-        on:libraryChange={(e) => handleLibraryChange(e.detail)}
-        on:play={(e) => {
-          if (Array.isArray(e.detail.tracks)) handedOverTracks = e.detail.tracks;
-          playMusicTrack(e.detail.trackId, e.detail.queue);
-        }}
-        on:toggle={toggleMusic}
-        on:stop={stopMusic}
-        on:toggleShuffle={toggleShuffle}
-        on:notify={(e) => appAlert(e.detail)}
-        on:modeSettingChange={handleModeSettingChange}
-      />
-    {/if}
+    <ModeArea
+      {mode}
+      openFolder={currentSaveName}
+      {canvasBackgroundSettings}
+      blocks={modeOrderedBlocks}
+      {simpleNoteColumnCount}
+      {singleNoteSettings}
+      {taskAddDirection}
+      {musicLibrary}
+      {nowPlayingId}
+      {isPlaying}
+      shuffle={musicShuffle}
+      {groupedBlocks}
+      {focusedBlockId}
+      modeLabels={MODE_LABELS}
+      bind:canvasRef
+      canvasColors={canvasTheme}
+      leftControlColors={leftTheme}
+      on:update={updateBlockHandler}
+      on:delete={deleteBlockHandler}
+      on:focusToggle={handleFocusToggle}
+      on:swapBlocks={(e) => swapBlocksInMode(e.detail)}
+      on:libraryChange={(e) => handleLibraryChange(e.detail)}
+      on:play={(e) => {
+        if (Array.isArray(e.detail.tracks)) handedOverTracks = e.detail.tracks;
+        playMusicTrack(e.detail.trackId, e.detail.queue);
+      }}
+      on:toggle={toggleMusic}
+      on:stop={stopMusic}
+      on:toggleShuffle={toggleShuffle}
+      on:notify={(e) => appAlert(e.detail)}
+      on:modeSettingChange={handleModeSettingChange}
+    />
   </div>
 </div>
 

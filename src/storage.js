@@ -298,6 +298,50 @@ export async function deleteFolderSnapshot(name, takenAt) {
   return kept;
 }
 
+/**
+ * A folder's timestamps, without reading the folder.
+ *
+ * `loadBlocks` hydrates: it walks every block, pulls each attachment out of the
+ * file store and turns it back into a data URL. That is right when the folder
+ * is about to be shown and badly wrong when all anybody wanted was a number.
+ *
+ * Both sync paths wanted only the number -- "is the cloud copy newer than
+ * mine", "has this folder changed since I last sent it" -- and both were
+ * hydrating every folder in the account to find out, on every tick. On an
+ * account with pictures that is megabytes of base64 built and thrown away
+ * before the app can decide it has nothing to do.
+ */
+export async function loadSaveMeta(name) {
+  const db = await getDB();
+  const stored = await db.get(STORE_NAME, name);
+  if (!stored) return null;
+  const updatedAt = Number(stored.updatedAt || 0);
+  return {
+    updatedAt,
+    modifiedAt: Number(stored.modifiedAt || updatedAt || 0)
+  };
+}
+
+/** The same for every folder, in one pass over the store. */
+export async function loadAllSaveMeta() {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const store = tx.objectStore(STORE_NAME);
+  const [keys, values] = await Promise.all([store.getAllKeys(), store.getAll()]);
+  await tx.done;
+
+  const meta = {};
+  keys.forEach((key, index) => {
+    const stored = values[index];
+    const updatedAt = Number(stored?.updatedAt || 0);
+    meta[String(key)] = {
+      updatedAt,
+      modifiedAt: Number(stored?.modifiedAt || updatedAt || 0)
+    };
+  });
+  return meta;
+}
+
 export async function listSavedBlocks() {
   const db = await getDB();
   const keys = await db.getAllKeys(STORE_NAME);
