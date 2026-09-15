@@ -86,6 +86,7 @@
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
   import { startupGate, releasedWithoutSyncing, GATE_TIMEOUT_MS } from './utils/startupGate.js';
+  import { owesUpload, shouldTakeCloudCopy, receivedFromCloud } from './utils/syncOwing.js';
   import {
     worthKeeping as folderSnapshotWorthKeeping,
     snapshotOf as folderSnapshotOf,
@@ -960,7 +961,17 @@
   // Said once, when it settles. A release that gave up rather than succeeded
   // means this device is about to be written against a copy nobody checked,
   // which is the state the gate exists to avoid.
-  $: if (!workspaceGate.hold && !gateOutcomeLogged && remembersAccount && autoSyncEnabled) {
+  // Not while the bootstrap is still fetching: the workspace stays held by it
+  // either way, so saying "started editing without checking" would be both
+  // alarming and untrue. Seen on a phone fetching a folder with a picture in
+  // it, where eight seconds is not long.
+  $: if (
+    !workspaceGate.hold
+    && !gateOutcomeLogged
+    && !cloudBootstrapInProgress
+    && remembersAccount
+    && autoSyncEnabled
+  ) {
     gateOutcomeLogged = true;
     logSync(
       releasedWithoutSyncing(workspaceGate.reason) ? 'error' : 'skip',
@@ -3406,6 +3417,25 @@
 
   function handleModeDragOver(event) {
     event.preventDefault();
+
+    // Say what kind of drop this is, not just that one is allowed.
+    //
+    // preventDefault alone makes a drop legal; the pointer is drawn from
+    // `dropEffect`, which starts as "none" until something sets it. That is the
+    // flash of the no-entry cursor at the start of a drag -- a frame or two of
+    // the browser saying nothing may be dropped here, before the element under
+    // the pointer gets round to allowing it.
+    //
+    // Something dragged in from outside is a copy; something dragged from
+    // inside the page is being moved.
+    const transfer = event.dataTransfer;
+    if (!transfer) return;
+    const fromOutside = Array.from(transfer.types || []).includes('Files');
+    try {
+      transfer.dropEffect = fromOutside ? 'copy' : 'move';
+    } catch {
+      // Some browsers refuse this outside a real drag; the drop still works.
+    }
   }
 
   async function handlePaste(event) {
@@ -3976,8 +4006,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       // device that has never uploaded has nothing owed, and blocking there
       // would stop a fresh sign-in ever receiving anything.
       const lastSent = lastAutoSyncFingerprintByFile[fileName];
-      const hasUnsentWork =
-        lastSent !== undefined && Number(localMeta?.updatedAt || 0) !== lastSent;
+      const hasUnsentWork = owesUpload({ lastSent, localUpdatedAt: localMeta?.updatedAt });
 
       if (localMeta && hasUnsentWork && remoteModifiedAt > localModifiedAt) {
         logSync('skip', fileName, 'cloud copy is newer, but local changes are still unsent', {
@@ -3988,7 +4017,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         continue;
       }
 
-      if (!localMeta || remoteModifiedAt > localModifiedAt) {
+      if (shouldTakeCloudCopy({
+        hasLocalCopy: Boolean(localMeta),
+        lastSent,
+        localUpdatedAt: localMeta?.updatedAt,
+        localModifiedAt,
+        remoteModifiedAt
+      })) {
         const remotePayload = await loadRemoteFile(fileName);
         if (!remotePayload) continue;
         logSync('download', fileName, 'cloud copy is newer, taking it', {
@@ -4005,6 +4040,25 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         );
         await saveBlocks(fileName, remotePayload);
         rememberCloudSyncForFile(fileName, Number(remoteMeta?.lastSyncedAt || Date.now()));
+
+        // A copy that was just taken from the cloud owes the cloud nothing.
+        //
+        // Without this the device deadlocks. `lastSent` still names whatever
+        // this device last uploaded, the local stamp is now the downloaded
+        // one, and the two differ -- so the guard above decides there is unsent
+        // work and refuses every newer copy from then on. Nothing ever clears
+        // it, because there genuinely is nothing to upload, so the upload tick
+        // never runs and never updates `lastSent` either. It only breaks when
+        // somebody happens to edit.
+        //
+        // Seen as nine consecutive refusals over a hundred seconds, all naming
+        // the same pair of numbers, while the other device went on writing.
+        lastAutoSyncFingerprintByFile[fileName] = receivedFromCloud(remotePayload);
+        // Not recorded, on purpose: working it out means opening the folder,
+        // and the only cost of leaving it unknown is that the next upload --
+        // if there ever is one -- checks the attachments once.
+        delete lastAutoSyncAttachmentFingerprintByFile[fileName];
+
         downloadedAny = true;
         if (fileName === currentSaveName) openFileChanged = true;
       }
@@ -4401,6 +4455,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           );
           await saveBlocks(remoteName, remotePayload);
           rememberCloudSyncForFile(remoteName, Number(remotePayload?.lastSyncedAt || Date.now()));
+          // As above: what was just fetched is not owed back.
+          lastAutoSyncFingerprintByFile[remoteName] = receivedFromCloud(remotePayload);
+          delete lastAutoSyncAttachmentFingerprintByFile[remoteName];
         }
       }
 
