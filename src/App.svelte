@@ -83,6 +83,7 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
+  import { startupGate, releasedWithoutSyncing, GATE_TIMEOUT_MS } from './utils/startupGate.js';
   import {
     worthKeeping as folderSnapshotWorthKeeping,
     snapshotOf as folderSnapshotOf,
@@ -896,6 +897,72 @@
     const takenAt = event.detail?.takenAt;
     if (!takenAt) return;
     folderSnapshots = await deleteFolderSnapshot(currentSaveName, takenAt);
+  }
+
+  // Held shut until the cloud copy is here, so nothing can be written against
+  // the old one. Both halves of the condition -- an account, and auto sync --
+  // are read from this device rather than waited on, so the hold is in place on
+  // the first frame instead of after Firebase has finished waking up. See
+  // utils/startupGate.js for what lifts it, of which the timeout matters most.
+  let gateStartedAt = Date.now();
+  let gateWaitedMs = 0;
+  let gateTimer = null;
+  let gateOutcomeLogged = false;
+  const remembersAccount = Boolean(loadSyncedUid());
+  const wasOnline = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false);
+  let deviceOnline = wasOnline();
+
+  $: workspaceGate = startupGate({
+    remembersAccount,
+    autoSyncEnabled,
+    firebaseConfigured: firebaseReady,
+    authResolved: authStateResolved,
+    signedIn: Boolean(authUser),
+    bootstrapComplete: cloudBootstrapComplete,
+    online: deviceOnline,
+    waitedMs: gateWaitedMs
+  });
+
+  // Mounting is what the request was about: pointer-events on a mounted mode
+  // still leaves an editor holding a document, and the lock only ever covered
+  // the part after Firebase had answered anyway.
+  $: workspaceHeld =
+    workspaceGate.hold || cloudBootstrapInProgress || cloudSyncGateInProgress;
+
+  $: gateMessage = cloudBootstrapInProgress || cloudSyncGateInProgress
+    ? 'Syncing with the cloud… editing resumes in a moment.'
+    : `Checking for newer work before you start… (${workspaceGate.reason})`;
+
+  // The wait is counted from a plain interval rather than a reactive block.
+  // Reactively starting a timer that writes the value the gate reads is a cycle
+  // -- workspaceGate depends on gateWaitedMs, the block that sets gateWaitedMs
+  // depends on workspaceGate -- and Svelte refuses to compile it. Started once
+  // on mount, it ticks one direction only and stops itself when the gate opens.
+  function countTheWait() {
+    if (typeof window === 'undefined') return;
+    gateStartedAt = Date.now();
+    gateTimer = window.setInterval(() => {
+      gateWaitedMs = Date.now() - gateStartedAt;
+      if (!workspaceGate.hold) {
+        clearInterval(gateTimer);
+        gateTimer = null;
+      }
+    }, 250);
+  }
+
+  // Said once, when it settles. A release that gave up rather than succeeded
+  // means this device is about to be written against a copy nobody checked,
+  // which is the state the gate exists to avoid.
+  $: if (!workspaceGate.hold && !gateOutcomeLogged && remembersAccount && autoSyncEnabled) {
+    gateOutcomeLogged = true;
+    logSync(
+      releasedWithoutSyncing(workspaceGate.reason) ? 'error' : 'skip',
+      currentSaveName,
+      releasedWithoutSyncing(workspaceGate.reason)
+        ? 'started editing without checking the cloud first'
+        : 'workspace opened',
+      { reason: workspaceGate.reason, waitedMs: gateWaitedMs }
+    );
   }
 
   function loadSyncedUid() {
@@ -2180,6 +2247,11 @@
   let savedList = [];
   let firebaseReady = isFirebaseConfigured();
   let authUser = null;
+  // Whether Firebase has said anything yet, which is not the same as being
+  // signed out. Until it has, "no user" means "not asked", and the startup gate
+  // has to tell those apart to know whether it is still worth waiting.
+  let authStateResolved = false;
+  let stopConnectionWatch = null;
   // The account's stored-byte record, streamed from storage/{uid}. Null until
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
@@ -4428,9 +4500,24 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     loadLocalMusicLibrary();
     adjustCanvasPadding();
 
+    if (!firebaseReady) authStateResolved = true;
+    countTheWait();
+
+    // The gate releases when the device is offline, so it has to hear about it
+    // changing either way -- coming back online while held is worth waiting a
+    // little longer for, not a reason to open.
+    const notedConnection = () => { deviceOnline = wasOnline(); };
+    window.addEventListener('online', notedConnection);
+    window.addEventListener('offline', notedConnection);
+    stopConnectionWatch = () => {
+      window.removeEventListener('online', notedConnection);
+      window.removeEventListener('offline', notedConnection);
+    };
+
     if (firebaseReady) {
       stopAuthListener = onAuthStateChange(user => {
         authUser = user;
+        authStateResolved = true;
         // Signing in is the moment this device's themes and the account's
         // themes need to agree. Not awaited: sync is a background nicety and
         // must never hold up the app starting.
@@ -4568,6 +4655,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     controlsResizeObserver?.disconnect();
     observedControlsEl = null;
     stopAuthListener?.();
+    stopConnectionWatch?.();
+    if (gateTimer) clearInterval(gateTimer);
     stopStorageUsageListener?.();
     stopRemoteIndexWatch();
     document.removeEventListener('visibilitychange', handleVisibilityForSync);
@@ -5400,48 +5489,54 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     </div>
   {/if}
 
-  <div class="modes" class:sync-lock-active={cloudBootstrapInProgress || cloudSyncGateInProgress} role="region" aria-label="Workspace" on:dragover={handleModeDragOver} on:drop={handleModeDrop}>
-    {#if cloudBootstrapInProgress || cloudSyncGateInProgress}
-      <div class="sync-lock-banner" style={overlayThemeStyle}>Syncing with the cloud… editing resumes in a moment.</div>
+  <div class="modes" class:sync-lock-active={workspaceHeld} role="region" aria-label="Workspace" on:dragover={handleModeDragOver} on:drop={handleModeDrop}>
+    {#if workspaceHeld}
+      <div class="sync-lock-banner" style={overlayThemeStyle}>{gateMessage}</div>
     {:else if syncFailureNotice}
       <div class="sync-lock-banner sync-failed" style={overlayThemeStyle} role="alert">
         <span class="sync-failed-text">{syncFailureNotice}</span>
         <button type="button" class="sync-failed-dismiss" on:click={() => (syncFailureNotice = '')}>Dismiss</button>
       </div>
     {/if}
-    <ModeArea
-      {mode}
-      openFolder={currentSaveName}
-      {canvasBackgroundSettings}
-      blocks={modeOrderedBlocks}
-      {simpleNoteColumnCount}
-      {singleNoteSettings}
-      {taskAddDirection}
-      {musicLibrary}
-      {nowPlayingId}
-      {isPlaying}
-      shuffle={musicShuffle}
-      {groupedBlocks}
-      {focusedBlockId}
-      modeLabels={MODE_LABELS}
-      bind:canvasRef
-      canvasColors={canvasTheme}
-      leftControlColors={leftTheme}
-      on:update={updateBlockHandler}
-      on:delete={deleteBlockHandler}
-      on:focusToggle={handleFocusToggle}
-      on:swapBlocks={(e) => swapBlocksInMode(e.detail)}
-      on:libraryChange={(e) => handleLibraryChange(e.detail)}
-      on:play={(e) => {
-        if (Array.isArray(e.detail.tracks)) handedOverTracks = e.detail.tracks;
-        playMusicTrack(e.detail.trackId, e.detail.queue);
-      }}
-      on:toggle={toggleMusic}
-      on:stop={stopMusic}
-      on:toggleShuffle={toggleShuffle}
-      on:notify={(e) => appAlert(e.detail)}
-      on:modeSettingChange={handleModeSettingChange}
-    />
+    <!-- Not mounted while the workspace is held. Asked for in as many
+         words: the pop-up that stops editing has to come before the mode
+         is mounted, because a mounted mode is an editor holding a document
+         and blocking its pointer events does not change that. -->
+    {#if !workspaceHeld}
+      <ModeArea
+        {mode}
+        openFolder={currentSaveName}
+        {canvasBackgroundSettings}
+        blocks={modeOrderedBlocks}
+        {simpleNoteColumnCount}
+        {singleNoteSettings}
+        {taskAddDirection}
+        {musicLibrary}
+        {nowPlayingId}
+        {isPlaying}
+        shuffle={musicShuffle}
+        {groupedBlocks}
+        {focusedBlockId}
+        modeLabels={MODE_LABELS}
+        bind:canvasRef
+        canvasColors={canvasTheme}
+        leftControlColors={leftTheme}
+        on:update={updateBlockHandler}
+        on:delete={deleteBlockHandler}
+        on:focusToggle={handleFocusToggle}
+        on:swapBlocks={(e) => swapBlocksInMode(e.detail)}
+        on:libraryChange={(e) => handleLibraryChange(e.detail)}
+        on:play={(e) => {
+          if (Array.isArray(e.detail.tracks)) handedOverTracks = e.detail.tracks;
+          playMusicTrack(e.detail.trackId, e.detail.queue);
+        }}
+        on:toggle={toggleMusic}
+        on:stop={stopMusic}
+        on:toggleShuffle={toggleShuffle}
+        on:notify={(e) => appAlert(e.detail)}
+        on:modeSettingChange={handleModeSettingChange}
+      />
+    {/if}
   </div>
 </div>
 
