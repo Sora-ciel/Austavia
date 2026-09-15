@@ -88,6 +88,7 @@
   />
 {:else if mode === 'simple'}
     <SimpleNoteMode
+      {openFolder}
       {blocks}
       {focusedBlockId}
       columnCount={simpleNoteColumnCount}

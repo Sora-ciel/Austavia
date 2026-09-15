@@ -6,6 +6,7 @@
    */
   import BlockShell from './BlockShell.svelte';
   import TipTapEditor from './TipTapEditor.svelte';
+  import { rememberScroll } from '../utils/scrollMemory.js';
 
   export let id;
   export let initialPosition = { x: 100, y: 100 };
@@ -16,9 +17,10 @@
   export let initialScrollTop = 0;
   export let focused = false;
   export let canvasScale = 1;
+  /** The folder this block belongs to, for remembering where it was read to. */
+  export let fileKey = '';
 
   let content = initialContent;
-  let scrollTop = initialScrollTop;
 </script>
 
 <BlockShell
@@ -30,7 +32,7 @@
   {focused}
   {canvasScale}
   label="Text"
-  fields={{ content, scrollTop }}
+  fields={{ content }}
   on:update
   on:delete
   on:focusToggle
@@ -48,8 +50,12 @@
       // browser reports a scroll to 0 as it becomes so — saving that would
       // throw away where somebody had read up to, every time they clicked away.
       if (!focused) return;
-      scrollTop = e.detail;
-      commit(['scrollTop'], { pushToHistory: false });
+      // To this device, not into the block. It used to be a field on the block
+      // and so travelled with the folder, which meant a copy arriving from
+      // another device wrote its scroll positions over this one's — every
+      // download threw every note back to wherever that machine had been
+      // reading. See utils/scrollMemory.js.
+      rememberScroll(fileKey, id, e.detail);
     }}
     on:focus={ensureFocus}
   />

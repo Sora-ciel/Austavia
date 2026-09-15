@@ -18,8 +18,10 @@
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import MusicPlayer from '../components/MusicPlayer.svelte';
+  import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
 
+  export let openFolder = '';
   export let blocks = [];
   export let focusedBlockId = null;
   export let canvasColors = {};
@@ -1113,10 +1115,12 @@ input[type="text"] {
             <TipTapEditor
               content={block.content}
               historyKey={block.id}
+              initialScrollTop={recallScroll(openFolder, block.id)}
               placeholder="Type your note here..."
               on:change={(e) => {
                 updateBlock(block.id, { content: e.detail }, { pushToHistory: false, changedKeys: ['content'] });
               }}
+              on:scroll={(e) => rememberScroll(openFolder, block.id, e.detail)}
               on:focus={() => ensureFocus(block.id)}
             />
           {:else if block.type === 'image'}

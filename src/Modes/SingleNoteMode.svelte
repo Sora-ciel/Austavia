@@ -10,6 +10,7 @@
     rememberedNote,
     withRememberedNote
   } from '../utils/lastNote.js';
+  import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { usesPortraitBackground, noteImageFilterCss } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
@@ -451,10 +452,12 @@
       <TipTapEditor
         content={noteContent}
         historyKey={noteBlock.id}
+        initialScrollTop={recallScroll(fileKey, noteBlock.id)}
         placeholder="Write your note here..."
         on:change={(e) => {
           updateBlock(noteBlock.id, { content: e.detail }, { pushToHistory: false, changedKeys: ['content'] });
         }}
+        on:scroll={(e) => rememberScroll(fileKey, noteBlock.id, e.detail)}
         on:focus={() => ensureFocus(noteBlock.id)}
       />
     {/key}

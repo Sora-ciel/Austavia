@@ -13,6 +13,7 @@
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
   import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../utils/scrollOwnership.js';
+  import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
 
 
   export let mode;
@@ -686,7 +687,8 @@
             initialBgColor={block.bgColor}
             initialTextColor={block.textColor}
             initialContent={block.content}
-            initialScrollTop={block.scrollTop}
+            initialScrollTop={recallScroll(openFolder, block.id) || block.scrollTop || 0}
+            fileKey={openFolder}
             focused={block.id === focusedBlockId}
             canvasScale={scale}
             on:delete={deleteBlockHandler}

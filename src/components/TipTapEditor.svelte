@@ -645,10 +645,17 @@
     });
     lastPushedContent = content;
     initTextHistory(historyKey, content || '');
-    // Restore scroll after editor settles
-    if (initialScrollTop && wrapEl) {
-      requestAnimationFrame(() => { wrapEl.scrollTop = initialScrollTop; });
-    }
+    // Put the reader back where they were, once there is somewhere to put them.
+    //
+    // One frame is not enough and the failure is silent: the editor's content
+    // has not been laid out yet, so the scroller is still its empty height, and
+    // setting scrollTop to 900 on an element with nothing to scroll clamps it
+    // to 0 — which then looks exactly like "it forgot", and was why this
+    // appeared not to work at all.
+    //
+    // So it waits for the content to be tall enough, and gives up after about
+    // half a second rather than watching for ever.
+    putTheReaderBack(initialScrollTop);
 
     // The other thing that changes the room on a line is the line getting
     // wider or narrower — a block resized, a window resized, a panel opened.
@@ -666,7 +673,15 @@
 
   // Sync external content changes (e.g. switching notes)
   $: if (editor && content !== lastPushedContent) {
+    // Where the reader was, before setContent takes them to the top. A cloud
+    // download of a note that is already open goes through here, and losing
+    // somebody's place every time another device saved is the complaint this
+    // answers.
+    // Whichever is still owed: a position from before this component had
+    // anything to show, or wherever the reader actually was a moment ago.
+    const wasAt = pendingScroll || wrapEl?.scrollTop || 0;
     editor.commands.setContent(content || '', false);
+    putTheReaderBack(wasAt);
     lastPushedContent = content;
     // The change came from outside — a cloud download, or the workspace undo
     // restoring a snapshot — so the history is told about it rather than
@@ -680,8 +695,86 @@
     editor?.destroy();
   });
 
+  /**
+   * Puts the reader back where they were, once there is somewhere to put them.
+   *
+   * Two things make this harder than one line:
+   *
+   * - **The content is not there yet.** At mount the document has not been laid
+   *   out, so the scroller is still its empty height, and setting scrollTop to
+   *   900 on an element with nothing to scroll clamps it to 0. Silently. So it
+   *   waits for the room to exist, and gives up after about half a second
+   *   rather than watching for ever.
+   * - **Content arriving later wipes it.** `setContent` puts the scroller back
+   *   to the top, and that is exactly what a cloud download does to a note that
+   *   is already open. "When it syncs it shouldn't reset the scrolls that you
+   *   have" is this case, and the caller below re-arms with wherever the reader
+   *   was a moment earlier.
+   */
+  let pendingScroll = 0;
+  let pendingTries = 0;
+  let restoreScheduled = false;
+
+  function putTheReaderBack(target) {
+    const wanted = Number(target) || 0;
+    if (wanted <= 1 || !wrapEl) return;
+
+    // The target is kept rather than chased by a loop that can run out. A
+    // note's content is stored as a blob and arrives after the editor has
+    // mounted, so a fixed number of frames from mount expires while the
+    // scroller is still empty and the position is lost with no sign of it.
+    // Every call restarts the budget, so content arriving late extends the
+    // wait instead of ending it.
+    pendingScroll = wanted;
+    pendingTries = 40;
+    scheduleRestore();
+  }
+
+  /**
+   * A timer, deliberately, and not requestAnimationFrame.
+   *
+   * rAF does not run in a tab that is not being painted — backgrounded, behind
+   * another window, or restored into a tab the person has not looked at yet. A
+   * restore built on it simply never happens there, with nothing to show for
+   * it, and "it forgot where I was" is the same symptom as never having
+   * remembered. Timers are throttled in the background rather than stopped.
+   */
+  function scheduleRestore() {
+    if (restoreScheduled) return;
+    restoreScheduled = true;
+    setTimeout(attemptRestore, 50);
+  }
+
+  function attemptRestore() {
+    restoreScheduled = false;
+    if (!wrapEl || !pendingScroll) return;
+
+    if (wrapEl.scrollHeight - wrapEl.clientHeight >= pendingScroll) {
+      wrapEl.scrollTop = pendingScroll;
+      pendingScroll = 0;
+      return;
+    }
+
+    pendingTries -= 1;
+    if (pendingTries > 0) scheduleRestore();
+    else pendingScroll = 0;
+  }
+
   function onScroll() {
-    dispatch('scroll', wrapEl?.scrollTop ?? 0);
+    if (!wrapEl) return;
+    // Only from a scroller that has somewhere to scroll.
+    //
+    // A block that is being torn down, or whose content has just been replaced
+    // by a shorter document, reports a scroll to 0 on its way past. Whoever is
+    // listening cannot tell that from somebody deliberately going back to the
+    // top, and treating it as the latter is how a remembered position gets
+    // thrown away at exactly the moment it is needed — on a remount, which is
+    // what a cloud download causes.
+    //
+    // Whether there is anything to scroll is a fact about the element, so it is
+    // asked here rather than guessed at further up.
+    if (wrapEl.scrollHeight - wrapEl.clientHeight <= 1) return;
+    dispatch('scroll', wrapEl.scrollTop ?? 0);
   }
 </script>
 
