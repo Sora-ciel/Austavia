@@ -3422,6 +3422,40 @@
     event.preventDefault();
     const files = Array.from(event.dataTransfer?.files || []);
     const mediaFiles = files.filter(file => file.type?.startsWith('image/') || file.type?.startsWith('video/'));
+    if (!mediaFiles.length) return;
+
+    // Dropped onto writing, the picture goes *into* the writing.
+    //
+    // Asked for: the canvas already made a block from a dropped picture, and
+    // the same gesture was wanted in Single Note mode -- but there it should
+    // "add the images in the note and not as a image block like canvas". A note
+    // is one piece of writing; a block beside it would be a second thing rather
+    // than part of it.
+    //
+    // The editor has its own handler for this, which is the tidier path when
+    // the editor gets the event. This is here because it is the one that always
+    // runs: a listener on this element cannot be skipped by anything inside it,
+    // and the editor's version stops propagation when it takes a drop, so the
+    // two never both fire.
+    const writing = event.target?.closest?.('.ProseMirror');
+    if (writing?.editor) {
+      const at = writing.editor.view.posAtCoords({ left: event.clientX, top: event.clientY });
+      let insertAt = at?.pos ?? null;
+      for (const file of mediaFiles.filter(f => f.type?.startsWith('image/'))) {
+        try {
+          const src = await readFileAsDataUrl(file);
+          if (typeof src !== 'string') continue;
+          const chain = writing.editor.chain().focus();
+          if (typeof insertAt === 'number') chain.setTextSelection(insertAt);
+          chain.setImage({ src }).run();
+          insertAt = writing.editor.state.selection.to;
+        } catch (error) {
+          console.error('Failed to drop a picture into a note:', error);
+        }
+      }
+      return;
+    }
+
     for (const file of mediaFiles) {
       try {
         await addImageBlockFromFile(file);

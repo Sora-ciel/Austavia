@@ -99,6 +99,13 @@ In order, each landing and released on its own:
 
 ## 4. Loose ends
 
+- **The mouse pointer reappears while typing, in the desktop app.** It should
+  hide on the first keystroke and stay hidden until the mouse moves. The likely
+  cause is item 1: every keystroke in a note re-lays the whole document out, and
+  a layout under the pointer is enough for the browser to decide the pointer is
+  worth showing again. Untested, and worth re-checking after the editor's height
+  is restructured rather than chased on its own.
+
 - **Canvas pan and the column-list scroll are not remembered.** `scrollMemory.js`
   already has `modeSurfaceKey` for exactly this; only notes and text blocks are
   wired. ~30 minutes.

@@ -341,6 +341,55 @@
     return true;
   }
 
+  /**
+   * A picture dropped onto writing lands in the writing.
+   *
+   * Asked for: dragging pictures in already made image blocks on the canvas,
+   * and the same gesture was wanted in Single Note mode -- but there "it adds
+   * the images in the note and not as a image block like canvas". Which is the
+   * right distinction: a note is one piece of writing, and a block dropped
+   * beside it would be a second thing rather than part of it.
+   *
+   * So this takes the drop wherever there is an editor under the pointer, and
+   * the canvas keeps its own handler for everything else. Dropping on bare
+   * canvas still makes a block; dropping on a note puts the picture in it.
+   *
+   * Inserted where it was dropped rather than at the end, because that is the
+   * one thing the gesture says that a paste does not.
+   */
+  function handleImageDrop(view, event) {
+    const carried = event?.dataTransfer;
+    if (!hasImage(carried)) return false;
+
+    event.preventDefault();
+    // Stopped here so the canvas does not also take it and make a block of the
+    // same picture -- the handler on .modes is an ancestor of this one.
+    event.stopPropagation();
+
+    const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
+    const pictures = imagesFrom(carried);
+
+    (async () => {
+      let insertAt = at?.pos ?? null;
+      for (const picture of pictures) {
+        try {
+          const src = await readAsDataUrl(picture);
+          if (!src) continue;
+          const chain = editor.chain().focus();
+          if (typeof insertAt === 'number') chain.setTextSelection(insertAt);
+          chain.setImage({ src }).run();
+          // The next picture goes after the one just placed, so several
+          // dropped together keep the order they were dropped in.
+          insertAt = editor.state.selection.to;
+        } catch (error) {
+          console.error('Could not drop a picture:', error);
+        }
+      }
+    })();
+
+    return true;
+  }
+
   function readAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -621,6 +670,7 @@
         attributes: { class: 'tiptap-inner', spellcheck: 'false' },
         handleKeyDown: handleHistoryKeys,
         handlePaste: handleImagePaste,
+        handleDrop: handleImageDrop,
       },
       onUpdate({ editor: e }) {
         const value =
