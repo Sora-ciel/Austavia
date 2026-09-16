@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   SAVE_QUIET_MS,
   SAVE_MAX_WAIT_MS,
-  nextSaveDelay
+  nextSaveDelay,
+  saveVerdict
 } from '../src/utils/saveScheduling.js';
 
 const NOW = 1_000_000;
@@ -102,4 +103,33 @@ describe('nextSaveDelay', () => {
       'a ceiling below the quiet window would make every save a deadline save'
     );
   });
+});
+
+describe('a folder being replaced from the cloud is not written over by what was on screen a moment ago', () => {
+// The save-during-pull race, written in the words it was diagnosed in: a folder
+// being replaced from the cloud must not get written over by what was on screen
+// a moment ago.
+
+it('a save is dropped while a cloud copy is landing', () => {
+  assert.equal(saveVerdict({ applyingRemoteCopy: true }), 'discard');
+});
+
+it('it is dropped rather than held until after', () => {
+  // The whole point. Holding it puts the bug straight back: the held payload is
+  // the blocks as they were *before* the cloud copy landed, so running it
+  // afterwards writes exactly the stale content the wait was meant to prevent.
+  assert.notEqual(saveVerdict({ applyingRemoteCopy: true }), 'queue');
+  assert.notEqual(saveVerdict({ applyingRemoteCopy: true, saveInFlight: true }), 'queue');
+});
+
+it('a save waiting behind another save is still queued', () => {
+  // Different case, and it must not be swept up: that payload is newer than the
+  // one being written, not older.
+  assert.equal(saveVerdict({ saveInFlight: true }), 'queue');
+});
+
+it('an ordinary save writes', () => {
+  assert.equal(saveVerdict({}), 'write');
+  assert.equal(saveVerdict(), 'write');
+});
 });

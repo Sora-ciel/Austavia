@@ -76,7 +76,7 @@
   import { buildDiagnostics, formatDiagnostics } from './utils/diagnostics.js';
   // How long a typing save waits, and the ceiling that stops it waiting for
   // ever. See utils/saveScheduling.js.
-  import { nextSaveDelay } from './utils/saveScheduling.js';
+  import { nextSaveDelay, saveVerdict } from './utils/saveScheduling.js';
   // Turns an SDK failure into something a person can act on. See
   // utils/syncErrors.js.
   import { explainSyncFailure } from './utils/syncErrors.js';
@@ -2481,6 +2481,11 @@
   let cloudBootstrapComplete = false;
   let cloudSyncGateInProgress = false;
   let pullInFlight = false;
+  // Set while a copy from the cloud is being written and the workspace brought
+  // up to date with it. Anything captured before that finishes is stale -- see
+  // saveVerdict in utils/saveScheduling.js for what happens to a save that
+  // arrives in the middle, and why it is dropped rather than held.
+  let applyingRemoteCopy = false;
   // Held while the app checks the cloud on coming back, the same way it is held
   // at startup: readable, scrollable, not editable. Without it, the first thing
   // somebody does on returning to a phone is type into a copy that is about to
@@ -2701,10 +2706,21 @@
   }
 
   async function _runSave(payload) {
-    if (_saveInFlight) {
+    const verdict = saveVerdict({ applyingRemoteCopy, saveInFlight: _saveInFlight });
+
+    if (verdict === 'discard') {
+      // Not queued. This payload is the blocks as they were before the cloud
+      // copy landed; running it afterwards is exactly how a folder ends up
+      // reverted with a fresh timestamp on it.
+      logSync('skip', currentSaveName, 'a cloud copy is landing, so this save is stale');
+      return;
+    }
+
+    if (verdict === 'queue') {
       _pendingSave = payload; // queue behind in-flight save
       return;
     }
+
     _saveInFlight = true;
     try {
       const normalizedOrders = ensureModeOrders(payload.blocks, payload.orders);
@@ -4031,6 +4047,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           localModifiedAt,
           aheadByMs: remoteModifiedAt - localModifiedAt
         });
+        // From here until the workspace has been brought up to date, what is in
+        // memory is older than what is on disk. A save running in that gap
+        // writes the old blocks back with a new stamp, and old content wearing
+        // a new stamp wins everywhere.
+        applyingRemoteCopy = true;
+
         // Opened here, where it is genuinely needed: this is the copy about to
         // be replaced, and keeping it is the point.
         await keepReplacedCopy(
@@ -4067,12 +4089,24 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     lastRemoteSyncFingerprint = remoteFingerprint;
 
     if (downloadedAny) {
-      savedList = await listSavedBlocks();
-      // Only when the folder on screen is the one that actually changed.
-      if (openFileChanged) {
-        logSync('remount', currentSaveName, 'open folder changed underneath, redrawing');
-        await remountCurrentSaveIfLoaded();
+      try {
+        savedList = await listSavedBlocks();
+        // Only when the folder on screen is the one that actually changed.
+        if (openFileChanged) {
+          logSync('remount', currentSaveName, 'open folder changed underneath, redrawing');
+          await remountCurrentSaveIfLoaded();
+        }
+      } finally {
+        // A save queued before the copy landed is stale for the same reason a
+        // save arriving during it is, so it goes the same way rather than
+        // running the moment the gate opens.
+        if (_pendingSave) {
+          logSync('skip', currentSaveName, 'a cloud copy landed, so the queued save is stale');
+          _pendingSave = null;
+        }
+        applyingRemoteCopy = false;
       }
+
       if (options.showInfo) {
         await appAlert('Cloud download complete. Newer cloud updates were applied.');
       }

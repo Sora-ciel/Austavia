@@ -9,32 +9,7 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
-## 1. The save-during-pull race
-
-**About an hour. It is a data-loss bug, which is why it is first.**
-
-In `pullRemoteUpdatesIfNeeded`, `saveBlocks(fileName, remotePayload)` writes the
-downloaded copy to storage, and the remount that catches the in-memory `blocks`
-up is several `await`s later. Nothing gates `_runSave` in that window:
-`_saveInFlight` only stops two saves overlapping, `uploadInProgress` and
-`cloudBootstrapInProgress` gate the *pull* rather than the *save*, and
-`downloadInProgress` belongs to the manual download button.
-
-So a save firing mid-pull compares the old in-memory blocks against the newly
-written storage, correctly concludes they differ, and writes the old content
-back with a fresh `modifiedAt`. Old content, new stamp — which then wins
-everywhere.
-
-The fix is a flag around applying a pull, and one detail that matters or it
-comes straight back: **the blocked save must be discarded, not queued.**
-`_pendingSave` holds a payload captured before the pull landed; replaying it
-writes the stale blocks anyway. Once a pull has landed, a save captured before
-it is void by definition.
-
-Test it in the words of the request: *a folder being replaced from the cloud
-does not get written over by what was on screen a moment ago.*
-
-## 2. Typing in a long note
+## 1. Typing in a long note
 
 Two separate causes, measured on a note of 15,930 characters — the size of a
 real one. A keystroke costs about **7ms**, and it scales with the note: 0.4ms at
@@ -45,7 +20,7 @@ no layout — a keystroke costs **0.3ms**. The rest is the browser recalculating
 style and laying out the page, because every character typed at the end of a
 note re-lays the whole of it.
 
-### 2a. Let the editor be laid out on its own
+### 1a. Let the editor be laid out on its own
 
 `contain: layout` on `.tiptap-inner` takes a keystroke from 7.0ms to 3.0ms.
 **It also breaks scrolling**, and this was tried and reverted, so do not simply
@@ -67,7 +42,7 @@ scrolls it, which is the ordinary arrangement; containment is then safe and
 free. That is a layout change to the most-used component in the app, so check
 empty notes, the click-anywhere-to-focus area, and Simple Note's grid.
 
-### 2b. Coalesce the editor's update handler
+### 1b. Coalesce the editor's update handler
 
 Worth about 3ms of the 7: roughly 1.5ms serialising the document with
 `getHTML()` and 1.9ms in the Svelte cascade that follows `dispatch('change')`.
@@ -78,7 +53,7 @@ losing the last characters typed, so it must flush on blur, on destroy, and
 before any external content push — that is the part to get right rather than
 fast.
 
-## 3. Pictures stored by reference, not inside the text
+## 2. Pictures stored by reference, not inside the text
 
 **The largest item, and the one that has failed before.** See
 `project-content-architecture` in memory: this was attempted in versions 4 and 5
@@ -104,7 +79,7 @@ In order, each landing and released on its own:
 4. **Then** the screenshot feature, export and download, which by then all go
    through the same resolver.
 
-## 4. Waiting on a device, not on code
+## 3. Waiting on a device, not on code
 
 - **Image paste from the Android keyboard.** Shipped in 0.8.57
   (`ImagePasteWebView`), never confirmed. `commitContent` cannot be exercised
@@ -122,7 +97,7 @@ In order, each landing and released on its own:
   still the neutral 100 in `typeScale.js`, waiting for somebody to drag the
   slider and say.
 
-## 5. Loose ends
+## 4. Loose ends
 
 - **Canvas pan and the column-list scroll are not remembered.** `scrollMemory.js`
   already has `modeSurfaceKey` for exactly this; only notes and text blocks are
@@ -137,7 +112,7 @@ In order, each landing and released on its own:
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
 
-## 6. Not code
+## 5. Not code
 
 - **Cloud Functions are undeployed.** Blocked on Secret Manager and
   `ARIAL_SMTP_PASS`, which only the account owner can set. See
