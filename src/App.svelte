@@ -113,8 +113,8 @@
     DEFAULT_SCALES,
     readScales,
     withScale,
-    scaleFor,
-    cssScale
+    cssScaleFor,
+    scalesToStore
   } from './utils/typeScale.js';
   import {
     startBackgroundAudio,
@@ -763,7 +763,10 @@
   function persistTypeScales(scales) {
     if (typeof localStorage === 'undefined') return;
     try {
-      localStorage.setItem(TYPE_SCALE_STORAGE_KEY, JSON.stringify(scales));
+      // Through the module, which stamps what the numbers mean. Without that a
+      // pair written now is indistinguishable from one written before the base
+      // existed, and would be rebased a second time on the next read.
+      localStorage.setItem(TYPE_SCALE_STORAGE_KEY, JSON.stringify(scalesToStore(scales)));
     } catch {
       /* ignore persistence failures */
     }
@@ -774,8 +777,11 @@
   // it as `font-size: calc(100% * var(--type-scale))`.
   function applyTypeScale() {
     if (typeof document === 'undefined' || typeof window === 'undefined') return;
-    const percent = scaleFor({ width: window.innerWidth, scales: typeScales });
-    document.documentElement.style.setProperty('--type-scale', String(cssScale(percent)));
+    // The base for the width on screen, times where the slider sits. app.css
+    // carries the base on its own for the first paint; this replaces it with
+    // the real product as soon as there is one.
+    const multiplier = cssScaleFor({ width: window.innerWidth, scales: typeScales });
+    document.documentElement.style.setProperty('--type-scale', String(multiplier));
   }
 
   function handleTypeScaleChange(event) {

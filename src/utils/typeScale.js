@@ -78,19 +78,62 @@ export const MAX_SCALE = 160;
 export const STORAGE_KEY = 'typeScale';
 
 /**
- * Where each of the two starts.
+ * The size each kind of screen actually reads at, folded into the base.
  *
- * 109 on a computer is not a guess: it is the number that came back from
- * building the slider and living with it -- "I have seen that 109% on PC so
- * let's make this the new PC default". Finding it was the reason the setting
- * was asked for, and this line is the setting paying for itself.
+ * Neither number is a guess. Both came back from building the slider and living
+ * with it -- 109 on a computer first ("I have seen that 109% on PC so let's
+ * make this the new PC default"), then 97 on a phone once there had been long
+ * enough on one to say. Finding them was the whole reason the setting was
+ * asked for, and these two lines are it paying for itself twice.
  *
- * A phone stays at 100 until the same thing happens for a phone.
+ * They are the **base** rather than the default position of the slider, which
+ * is the change asked for afterwards: "make those text the base, then reset the
+ * ranges to 100%, so that the text really is those defaults and now the range
+ * at 100% looks like the real normal range."
+ *
+ * The difference is what the slider means. It used to read 109 when nothing had
+ * been touched, so the neutral mark and the default sat in different places and
+ * the travel either side of normal was lopsided. Now the base carries the
+ * chosen size and the slider is a multiplier on top of it, so 100 means "the
+ * size this app is meant to be read at" on both kinds of screen, and 120 means
+ * the same amount bigger on either.
+ */
+export const BASE_SCALES = Object.freeze({
+  desktop: 109,
+  mobile: 97
+});
+
+/**
+ * Where the slider starts: the neutral, on both.
+ *
+ * It is 100 rather than a number per device precisely because the numbers moved
+ * into BASE_SCALES above.
  */
 export const DEFAULT_SCALES = Object.freeze({
+  desktop: DEFAULT_SCALE,
+  mobile: DEFAULT_SCALE
+});
+
+/**
+ * What the slider used to start at, needed only to read what was stored before.
+ *
+ * Until this change the stored number was an absolute percentage of the
+ * browser's own size, so 109 meant 109%. Now it is a multiplier on the base, so
+ * 109 would mean 109% of 109%. The same digits, a different meaning, which is
+ * the one kind of change a stored value cannot survive on its own.
+ */
+const PREVIOUS_DEFAULTS = Object.freeze({
   desktop: 109,
   mobile: 100
 });
+
+/**
+ * Bumped when the stored numbers change meaning, so old ones can be recognised.
+ *
+ * A stored pair without this is from before the base existed and is read as
+ * absolute percentages -- see rebaseStoredScales.
+ */
+export const SCHEME_VERSION = 2;
 
 /** The two it can be. */
 export const DEVICES = Object.freeze(['desktop', 'mobile']);
@@ -151,6 +194,64 @@ export function cssScale(percent) {
   return Math.round((clampScale(percent) / 100) * 1000) / 1000;
 }
 
+/** The base this screen's writing is sized from, before the slider touches it. */
+export function baseFor({ width } = {}) {
+  return BASE_SCALES[deviceFor({ width })];
+}
+
+/**
+ * The one number the stylesheet gets: the base for this screen, multiplied by
+ * where the slider is.
+ *
+ * The slider is clamped and the result is **not**, which is the point of doing
+ * it here rather than by handing `cssScale` a product. 160 on a computer means
+ * 160% of the base, or 174% outright; clamping that back to 160 would quietly
+ * shorten the top of the travel on exactly the screen with the most room.
+ */
+export function cssScaleFor({ width, scales } = {}) {
+  const device = deviceFor({ width });
+  const slider = clampScale(normaliseScales(scales)[device], DEFAULT_SCALES[device]);
+  return Math.round((BASE_SCALES[device] / 100) * (slider / 100) * 1000) / 1000;
+}
+
+/**
+ * A pair stored before the base existed, read as what it meant at the time.
+ *
+ * Two different things have to happen, and telling them apart is the whole job:
+ *
+ * - **Somebody sitting on the old default meant "the default"**, so they get
+ *   the new one. That is what makes a phone actually arrive at 97 rather than
+ *   keeping 100 for ever, which is the change that was asked for.
+ * - **Somebody who had moved the slider meant that size**, so the size is kept
+ *   and the number is converted. 130 on a computer was 130% outright; against a
+ *   base of 109 the same size is a slider at 119.
+ *
+ * Getting this backwards either way is silently wrong: everybody's writing
+ * jumps 9% on a release that was supposed to change nothing for them, or
+ * nobody ever receives the new phone size.
+ */
+export function rebaseStoredScales(stored) {
+  const source = stored && typeof stored === 'object' ? stored : {};
+  const pair = {};
+  for (const device of DEVICES) {
+    const before = source[device];
+    const wasDefault =
+      before == null || clampScale(before, PREVIOUS_DEFAULTS[device]) === PREVIOUS_DEFAULTS[device];
+    pair[device] = wasDefault
+      ? DEFAULT_SCALES[device]
+      : clampScale(
+          Math.round((clampScale(before, PREVIOUS_DEFAULTS[device]) / BASE_SCALES[device]) * 100),
+          DEFAULT_SCALES[device]
+        );
+  }
+  return pair;
+}
+
+/** The pair as it should be written down, carrying what its numbers mean. */
+export function scalesToStore(scales) {
+  return { ...normaliseScales(scales), v: SCHEME_VERSION };
+}
+
 /** A pair, from anything: a stored object, a half-written one, or nothing. */
 export function normaliseScales(scales) {
   const source = scales && typeof scales === 'object' ? scales : {};
@@ -170,7 +271,12 @@ export function normaliseScales(scales) {
 export function readScales(raw) {
   if (typeof raw !== 'string' || !raw) return { ...DEFAULT_SCALES };
   try {
-    return normaliseScales(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_SCALES };
+    // Written before the numbers changed meaning, so it says percentages of the
+    // browser's own size rather than multiples of the base.
+    if (parsed.v !== SCHEME_VERSION) return rebaseStoredScales(parsed);
+    return normaliseScales(parsed);
   } catch {
     return { ...DEFAULT_SCALES };
   }

@@ -89,9 +89,10 @@
   <div class="tab-section">
     <h4>🔠 Text size</h4>
     <p class="advanced-note">
-      The size of the writing, in every mode at once. Which of the two is in use
-      follows the width of the window, so narrowing this one shows you the
-      phone's.
+      The size of the writing, in every mode at once. 100% is the size each kind
+      of screen is meant to be read at, so it is the same starting point on
+      both. Which of the two is in use follows the width of the window, so
+      narrowing this one shows you the phone's.
     </p>
 
     <label class="scale-row" class:live={liveDevice === 'desktop'}>

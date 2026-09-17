@@ -47,8 +47,17 @@
 
      100% rather than 16px on purpose: it is the size the browser was already
      going to use, so somebody who has turned their own text size up keeps it
-     and this multiplies what they chose instead of overruling it. */
-  --type-scale: 1;
+     and this multiplies what they chose instead of overruling it.
+
+     The number here is the *base* -- the size the app is meant to be read at,
+     1.09 on a computer and 0.97 on a phone, which are BASE_SCALES in
+     typeScale.js. The slider is a multiplier on top, and App.svelte writes the
+     product of the two onto this element, where it wins over both rules below.
+
+     Written here as well as there so the very first paint is already the right
+     size. With a bare 1 the app came up at neutral and jumped once the script
+     ran, which is a flash of the wrong size on every single load. */
+  --type-scale: 1.09;
   font-size: calc(100% * var(--type-scale));
   /* Asked for: "make the regular less bold". 300 rather than 400, which is
      what widens the gap to bold without touching bold again.
@@ -70,6 +79,19 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* The phone's base, at the same 1024px the rest of the app changes layout at.
+   See MOBILE_BREAKPOINT in src/utils/typeScale.js -- if that moves, this moves
+   with it, because the rule is "the size that belongs to the layout on screen".
+
+   Only the first paint depends on this: App.svelte writes the real number onto
+   the element as an inline style, which beats any rule here, and re-writes it
+   whenever the window changes width. */
+@media (max-width: 1024px) {
+  :root {
+    --type-scale: 0.97;
+  }
 }
 
 /* Disable selection everywhere */
