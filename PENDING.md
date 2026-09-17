@@ -24,6 +24,7 @@ list below with what was observed.
 | next | The **wallpaper** holding still in Single Note and Playlist while the phone keyboard opens *and closes* — the closing is the half a browser cannot show. |
 | next | **Moving a block on the canvas** no longer making the text inside jump. |
 | next | **One click** on an unfocused text block leaving the caret where you clicked. |
+| next | **Shuffle's back button** retracing what you heard. The path is kept for the session only — a restart starts a fresh one, which is a deliberate limit rather than an oversight. |
 
 Two standing checks worth doing at the same time:
 

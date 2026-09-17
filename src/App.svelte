@@ -85,6 +85,7 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
+  import { stepShuffle, rememberPlayed, EMPTY as EMPTY_SHUFFLE } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping } from './utils/wallpaperViewport.js';
   import {
     startupGate,
@@ -1429,6 +1430,10 @@
   let audioEl;
   let nowPlayingId = null;
   let musicQueue = [];
+  // The order shuffle actually played things in, so that back goes back rather
+  // than picking again. See utils/shuffleHistory.js.
+  let shufflePlayed = EMPTY_SHUFFLE.played;
+  let shufflePosition = EMPTY_SHUFFLE.position;
   let isPlaying = false;
   let nowPlayingUrl = '';
   let playerExpanded = false;
@@ -1507,7 +1512,7 @@
     if (cover) nowPlayingCoverUrl = URL.createObjectURL(cover);
   }
 
-  async function playMusicTrack(trackId, queue = []) {
+  async function playMusicTrack(trackId, queue = [], { remember = true } = {}) {
     const blob = await loadMusicTrack(trackId);
     if (!blob) {
       await appAlert("That track's audio isn't on this device yet. Import it from a music export.");
@@ -1519,6 +1524,15 @@
     musicPosition = 0;
     musicDuration = 0;
     if (queue.length) musicQueue = queue;
+
+    // Chosen rather than stepped to: a new branch, so whatever shuffle had
+    // ahead of it is dropped. Stepping passes remember: false and moves the
+    // position itself, since walking a path must not rewrite it.
+    if (remember) {
+      const path = rememberPlayed({ played: shufflePlayed, position: shufflePosition, trackId });
+      shufflePlayed = path.played;
+      shufflePosition = path.position;
+    }
     showCoverFor(trackId);
     await tick();
     if (audioEl) {
@@ -1560,11 +1574,23 @@
   function stepMusic(offset) {
     if (!musicQueue.length || !nowPlayingId) return;
 
-    // Shuffle picks anything but the current track, so a two-track queue still
-    // alternates instead of repeating the same one.
+    // Shuffle walks the order it actually played things in. Forward at the end
+    // of that order picks something new, which is what shuffle is for; forward
+    // in the middle of it -- because back was pressed -- re-walks what was
+    // heard. Back used to pick at random too, which meant the one thing back is
+    // for was the one thing it could not do.
     if (musicShuffle && musicQueue.length > 1) {
-      const others = musicQueue.filter(id => id !== nowPlayingId);
-      playMusicTrack(others[Math.floor(Math.random() * others.length)]);
+      const stepped = stepShuffle({
+        played: shufflePlayed,
+        position: shufflePosition,
+        queue: musicQueue,
+        currentId: nowPlayingId,
+        delta: offset
+      });
+      if (!stepped.trackId) return;
+      shufflePlayed = stepped.played;
+      shufflePosition = stepped.position;
+      playMusicTrack(stepped.trackId, [], { remember: false });
       return;
     }
 
