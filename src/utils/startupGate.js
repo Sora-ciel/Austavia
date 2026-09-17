@@ -107,3 +107,37 @@ function release(reason) {
 export function releasedWithoutSyncing(reason) {
   return reason === 'the cloud did not answer in time' || reason === 'this device is offline';
 }
+
+/**
+ * Whether coming back to the window is worth checking the cloud over.
+ *
+ * ## What went wrong
+ *
+ * The check that runs on returning to the app was bound to `focus` as well as
+ * `visibilitychange`, because on Android a WebView can be back in front of
+ * somebody before `visibilitychange` fires.
+ *
+ * `focus` is broader than that. A native file dialog takes focus from the
+ * window and gives it back when it closes — so choosing a picture to add ran
+ * the check, the workspace went read-only for the fraction of a second it took,
+ * and the picture being inserted right then was refused. It only happened while
+ * signed in with auto sync on, because that is the only time the check runs at
+ * all, and it left nothing in the log because nothing had gone wrong as far as
+ * the check was concerned.
+ *
+ * ## The distinction
+ *
+ * Coming back from *away* is worth a check. Coming back from a dialog that was
+ * on top of a page which never stopped being visible is not — nothing can have
+ * changed underneath in that moment that was not already going to be picked up.
+ *
+ * So focus only counts when the page had actually been hidden since the last
+ * check. `visibilitychange` is what sets that, and it is exactly the event a
+ * file dialog does not fire.
+ */
+export function shouldCheckOnReturn({ trigger = 'focus', wasHidden = false } = {}) {
+  // The page itself saying it is visible again is first-hand and always counts.
+  if (trigger === 'visibilitychange') return true;
+  // Everything else is a hint, and only worth acting on if the app was away.
+  return Boolean(wasHidden);
+}

@@ -85,7 +85,12 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
-  import { startupGate, releasedWithoutSyncing, GATE_TIMEOUT_MS } from './utils/startupGate.js';
+  import {
+    startupGate,
+    releasedWithoutSyncing,
+    shouldCheckOnReturn,
+    GATE_TIMEOUT_MS
+  } from './utils/startupGate.js';
   import { owesUpload, shouldTakeCloudCopy, receivedFromCloud } from './utils/syncOwing.js';
   import {
     worthKeeping as folderSnapshotWorthKeeping,
@@ -4222,6 +4227,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   // dead subscription, and the moment someone is most likely to be looking for
   // the note they wrote on the other device. Re-attach the listener and ask
   // once, rather than waiting up to another thirty seconds.
+  // Whether the app has actually been away since the last check. A file dialog
+  // takes the window's focus and gives it back without the page ever being
+  // hidden, which is the difference between "I came back" and "a dialog closed".
+  let awaySinceLastCheck = false;
+
   function handleVisibilityForSync() {
     // Leaving is the last safe moment to write. A typing save can now sit for
     // up to SAVE_MAX_WAIT_MS, and on a phone "hidden" is very often the last
@@ -4229,11 +4239,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // change has to go to disk here rather than wait out a timer that may never
     // fire.
     if (document.visibilityState !== 'visible') {
+      awaySinceLastCheck = true;
       flushPendingSave();
       return;
     }
 
-    checkCloudOnResume();
+    checkCloudOnResume({ trigger: 'visibilitychange' });
   }
 
   /**
@@ -4250,9 +4261,21 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    * that a device which is up to date does no folder reads at all -- for most
    * resumes this is a flicker or nothing.
    */
-  async function checkCloudOnResume() {
+  function onWindowReturned(event) {
+    checkCloudOnResume({ trigger: event?.type || 'focus' });
+  }
+
+  async function checkCloudOnResume({ trigger = 'focus' } = {}) {
+    // Not every return of focus is a return to the app. Choosing a picture
+    // opens a native dialog, which takes focus and hands it back -- and running
+    // the check there put the workspace into its read-only moment exactly as
+    // the picture was being inserted, so the picture was refused. It only
+    // happened while signed in, because that is the only time this runs.
+    if (!shouldCheckOnReturn({ trigger, wasHidden: awaySinceLastCheck })) return;
     if (!autoSyncEnabled || !firebaseReady || !authUser) return;
     if (resumeCheckInProgress) return;
+
+    awaySinceLastCheck = false;
 
     resumeCheckInProgress = true;
     // The same escape as the startup gate, for the same reason: a check that
@@ -5005,8 +5028,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // fires, which is the gap between coming back and the check starting.
     // focus and pageshow arrive on paths visibilitychange misses, and the check
     // itself refuses to run twice, so asking three times costs nothing.
-    window.addEventListener('focus', checkCloudOnResume);
-    window.addEventListener('pageshow', checkCloudOnResume);
+    // Both are hints rather than proof, and only act when the app was away --
+    // see shouldCheckOnReturn.
+    window.addEventListener('focus', onWindowReturned);
+    window.addEventListener('pageshow', onWindowReturned);
     // Closing the tab or window is the other last-safe-moment.
     window.addEventListener('pagehide', flushPendingSave);
 
@@ -5033,8 +5058,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     stopStorageUsageListener?.();
     stopRemoteIndexWatch();
     document.removeEventListener('visibilitychange', handleVisibilityForSync);
-    window.removeEventListener('focus', checkCloudOnResume);
-    window.removeEventListener('pageshow', checkCloudOnResume);
+    window.removeEventListener('focus', onWindowReturned);
+    window.removeEventListener('pageshow', onWindowReturned);
     window.removeEventListener('pagehide', flushPendingSave);
     if (autoSyncUploadIntervalId !== null) {
       window.clearInterval(autoSyncUploadIntervalId);

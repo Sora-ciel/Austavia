@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { startupGate, releasedWithoutSyncing, GATE_TIMEOUT_MS } from '../src/utils/startupGate.js';
+import {
+  startupGate,
+  releasedWithoutSyncing,
+  shouldCheckOnReturn,
+  GATE_TIMEOUT_MS
+} from '../src/utils/startupGate.js';
 
 // Named after the request: "there's a moment between the opening of the app,
 // the mounting of the mode, and the pop-up that stops editing to sync. In that
@@ -108,4 +113,36 @@ test('the banner has something to say at every stage', () => {
     const { reason } = startupGate(state);
     assert.ok(reason && reason.length > 3, `no reason given for ${JSON.stringify(state)}`);
   }
+});
+
+// Named after the report: "when I try to add an image it says checking
+// something for a fraction of a second and apparently it shows nothing on the
+// diagnostic" — and, earlier, "when I'm not connected I can add those images
+// but when I'm connected I can't".
+//
+// A file dialog takes focus from the window and gives it back. That looked like
+// coming back to the app, so the check ran, the workspace went read-only for
+// the moment it took, and the picture being added right then was refused.
+
+test('choosing a file does not count as coming back to the app', () => {
+  // The window is focused again, but it was never hidden — a dialog sat on top
+  // of a page that stayed visible the whole time.
+  assert.equal(shouldCheckOnReturn({ trigger: 'focus', wasHidden: false }), false);
+});
+
+test('coming back from actually being away does count', () => {
+  assert.equal(shouldCheckOnReturn({ trigger: 'focus', wasHidden: true }), true);
+});
+
+test('the page saying it is visible again always counts', () => {
+  // First-hand, and the reason focus is listened to at all is that this one is
+  // late on Android rather than wrong.
+  assert.equal(shouldCheckOnReturn({ trigger: 'visibilitychange', wasHidden: false }), true);
+  assert.equal(shouldCheckOnReturn({ trigger: 'visibilitychange', wasHidden: true }), true);
+});
+
+test('an unknown trigger is treated as a hint, not as proof', () => {
+  assert.equal(shouldCheckOnReturn({ trigger: 'pageshow', wasHidden: false }), false);
+  assert.equal(shouldCheckOnReturn({ trigger: 'pageshow', wasHidden: true }), true);
+  assert.equal(shouldCheckOnReturn(), false);
 });
