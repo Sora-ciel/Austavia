@@ -22,8 +22,9 @@
    *   ensureFocus()       ask the parent to focus this block
    *   size, position      the live values, for a body that must lay itself out
    */
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
+  import { shouldPlaceCaret, pointIsInside } from '../utils/blockFocusClick.js';
   import {
     MIN_WIDTH,
     MIN_HEIGHT,
@@ -82,6 +83,9 @@
 
     dispatch('update', detail);
   }
+
+  /** The block's own element, for finding the writing slotted inside it. */
+  let rootEl;
 
   function ensureFocus() {
     if (!focused) dispatch('focusToggle', { id });
@@ -179,10 +183,47 @@
     dispatch('delete', { id });
   }
 
+  /**
+   * Focusing a block also puts the caret where the click landed.
+   *
+   * An unfocused block's writing is untouchable on purpose -- see the note on
+   * `.note:not(.focused) .tiptap-wrap` below -- so the click that focuses it
+   * cannot also reach the writing, and the caret used to wait for a second
+   * click. The rule stays; this finishes the job the browser would have done
+   * if the writing had been reachable.
+   *
+   * Reached through the DOM rather than through a prop because the writing
+   * belongs to whatever was slotted in here, and the shell is the only thing
+   * that knows a click happened on a block that was not focused yet.
+   */
+  function placeCaretWhereClicked(clientX, clientY) {
+    const editorEl = rootEl?.querySelector('.ProseMirror');
+    const editor = editorEl?.editor;
+    if (!editor) return;
+
+    if (!pointIsInside({ x: clientX, y: clientY }, editorEl.getBoundingClientRect())) return;
+
+    const at = editor.view.posAtCoords({ left: clientX, top: clientY });
+    const chain = editor.chain().focus();
+    if (typeof at?.pos === 'number') chain.setTextSelection(at.pos);
+    chain.run();
+  }
+
   function handleClick(event) {
     if (suppressClick) return;
     if (event.defaultPrevented) return;
+
+    const wasFocused = focused;
     ensureFocus();
+
+    // `dragged` is not passed: a click that follows a drag has already been
+    // turned away by the suppressClick check above, and passing a value that is
+    // always false here would read as though this handled the case.
+    if (!shouldPlaceCaret({ wasFocused, insideWriting: true })) return;
+    // After the focus has been applied, because until then the writing is still
+    // untouchable and asking it where a point falls is asking about a box that
+    // is about to change.
+    tick().then(() => placeCaretWhereClicked(event.clientX, event.clientY));
   }
 
   function handleKeydown(event) {
@@ -197,6 +238,7 @@
 <div
   class="note {className}"
   class:focused
+  bind:this={rootEl}
   data-block-id={id}
   style="left:{position.x}px; top:{position.y}px; width:{size.width}px; height:{size.height}px; --bg: {bgColor}; --text: color-mix(in srgb, {textColor} var(--block-text-opacity, 100%), transparent);"
   role="button"
