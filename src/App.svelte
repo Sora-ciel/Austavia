@@ -834,8 +834,20 @@
       const snapshot = folderSnapshotOf(current, { takenAt: Date.now() });
       const kept = withFolderSnapshot(await listFolderSnapshots(fileName), snapshot);
       await putFolderSnapshots(fileName, kept);
-      logSync('snapshot', fileName, 'kept the copy this replaced', {
+      // Both sides, not just the one being kept.
+      //
+      // "I added a picture and it vanished" looks like nothing in a log that
+      // only says a copy was kept. It is obvious the moment the line says a
+      // folder of three blocks was replaced by one of two -- and losing blocks
+      // to a copy from elsewhere is loud enough to be worth an error rather
+      // than a note, even when it is the correct thing to have done.
+      const incomingBlocks = Array.isArray(incoming?.blocks) ? incoming.blocks.length : 0;
+      const lostBlocks = snapshot.blockCount > incomingBlocks;
+      logSync(lostBlocks ? 'error' : 'snapshot', fileName, lostBlocks
+        ? 'the copy that arrived has fewer blocks than the one it replaced'
+        : 'kept the copy this replaced', {
         blocks: snapshot.blockCount,
+        becomes: incomingBlocks,
         characters: snapshot.characterCount,
         nowKeeping: kept.length
       });
@@ -4059,9 +4071,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       const hasUnsentWork = owesUpload({ lastSent, localUpdatedAt: localMeta?.updatedAt });
 
       if (localMeta && hasUnsentWork && remoteModifiedAt > localModifiedAt) {
+        // localUpdatedAt as well as localModifiedAt: the refusal is decided by
+        // comparing updatedAt against lastSent, and the log was printing
+        // modifiedAt -- so a report of this could show two numbers that look
+        // like they should match while the ones that actually disagreed stayed
+        // invisible. A log that names the wrong field is worse than no log.
         logSync('skip', fileName, 'cloud copy is newer, but local changes are still unsent', {
           remoteModifiedAt,
           localModifiedAt,
+          localUpdatedAt: Number(localMeta?.updatedAt || 0),
           lastSent
         });
         continue;
@@ -4109,7 +4127,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         //
         // Seen as nine consecutive refusals over a hundred seconds, all naming
         // the same pair of numbers, while the other device went on writing.
-        lastAutoSyncFingerprintByFile[fileName] = receivedFromCloud(remotePayload);
+        // Read back rather than taken from the payload.
+        //
+        // The first version of this recorded `remotePayload.updatedAt`, which
+        // is what *arrived* -- and the deadlock came back anyway, with the log
+        // showing a lastSent that was neither the old local stamp nor the new
+        // one. Storage puts its own rules over a payload on the way in, so the
+        // only number that is certainly right is the one that ended up there.
+        // Asking costs one read of a record already in memory.
+        lastAutoSyncFingerprintByFile[fileName] =
+          Number((await loadSaveMeta(fileName))?.updatedAt || receivedFromCloud(remotePayload));
         // Not recorded, on purpose: working it out means opening the folder,
         // and the only cost of leaving it unknown is that the next upload --
         // if there ever is one -- checks the attachments once.
@@ -4524,7 +4551,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           await saveBlocks(remoteName, remotePayload);
           rememberCloudSyncForFile(remoteName, Number(remotePayload?.lastSyncedAt || Date.now()));
           // As above: what was just fetched is not owed back.
-          lastAutoSyncFingerprintByFile[remoteName] = receivedFromCloud(remotePayload);
+          lastAutoSyncFingerprintByFile[remoteName] =
+            Number((await loadSaveMeta(remoteName))?.updatedAt || receivedFromCloud(remotePayload));
           delete lastAutoSyncAttachmentFingerprintByFile[remoteName];
         }
       }
