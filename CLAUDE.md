@@ -147,15 +147,28 @@ and they still did not match the mode they were sitting over.
 [`PENDING.md`](PENDING.md) is the list. It exists because the same list was
 reconstructed from memory twice and both times something fell off it.
 
-Add to it when something is found and not fixed, and say enough that it can be
-picked up cold: what the symptom was, what was measured, and what was already
-tried and rejected. An entry that only names a task is worth little — the entry
-for the editor's containment is worth having precisely because it records that
-the obvious fix breaks scrolling, so nobody spends the afternoon rediscovering
-that.
+It holds two things, and both belong there:
 
-Take from it when starting work, and delete the entry in the same commit as the
-fix.
+- **What is owed** — found and not fixed. Say enough that it can be picked up
+  cold: what the symptom was, what was measured, and what was already tried and
+  rejected. An entry that only names a task is worth little; the entry for the
+  editor's containment is worth having precisely because it records that the
+  obvious fix breaks scrolling, so nobody spends the afternoon rediscovering
+  that.
+- **What is next** — the things meant to be built, in the order they should
+  happen, with their dependencies. The staged plan for storing pictures by
+  reference is the shape to copy: four steps, each landing on its own, and the
+  note that the same change failed once before.
+
+Keep it current rather than reconstructing it. It exists because the list was
+rebuilt from memory twice in one day and both times something fell off; a plan
+agreed in conversation and not written down has the same half-life. So when a
+direction is settled, write it there before doing anything else with it, and
+when a fix lands, delete its entry in the same commit.
+
+**Section 0 is what a release leaves behind**: everything shipped that nobody
+has confirmed on a real device. Add to it at release time and cross items off as
+they are seen working — see `RELEASE.md`.
 
 ## Staging is for reproducing bugs, not only for rules and plans
 

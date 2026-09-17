@@ -181,6 +181,18 @@ using Austavia, not reading its source:
 
 ## Afterwards
 
+Update [`PENDING.md`](PENDING.md) as part of the release, not later:
+
+- Anything that went out and can only be judged on a real device goes into
+  section 0, with what to look for. Nobody remembers this a day later, and every
+  one of those has been mentioned once in a message and then lost.
+- Anything fixed has its entry deleted, if that did not already happen in the
+  commit that fixed it.
+- Anything learned on the way in — a thing tried and rejected, a measurement —
+  goes in beside the item it belongs to, so the next attempt starts from it
+  rather than from nothing.
+
+
 Send the APK and the installer to whoever is waiting on them, and say plainly
 what did **not** go out — an undeployed function or a known bug left in is
 worth a sentence, because silence reads as "everything shipped".
