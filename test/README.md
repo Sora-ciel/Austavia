@@ -27,6 +27,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/textHistory.js` | how typing is grouped into undo steps |
 | `src/utils/syncLog.js` | what sync decided, and what it thought had changed |
 | `src/utils/editorUpdates.js` | when the editor tells the app the writing changed |
+| `src/utils/playbackPosition.js` | what the phone's notification is told about the track |
 
 ## What is covered
 
@@ -89,6 +90,23 @@ import, and the code that acts on them stayed where it was:
   introduces and the one thing that must not happen, so blur, teardown, undo
   and an incoming copy all send first. Flushing when nothing was typed sends
   nothing, and nothing is sent after the editor is gone.
+
+**`playbackPosition.test.js`**
+
+- **A track playing normally is never reported again, however long it plays.**
+  Android is given a position and a speed and extrapolates the rest, so a
+  fresh report is only worth sending when the audio has diverged from what the
+  shade will have worked out. Comparing against the position last *sent*, rather
+  than against where it will have been carried to, sends an update every second
+  for ever on a track that is playing perfectly — the test walks ten minutes of
+  playback to say so.
+- A seek is reported, forwards or backwards, and so is a stall — where the
+  music stops advancing and no event fires at all. That last one is why this is
+  a recomputing pass and not only an event handler.
+- A duration that is `NaN` — which every track is until its metadata loads —
+  claims no length rather than sending nonsense to the shade.
+- A paused track reports a speed of zero, or the bar creeps forward over music
+  that is not playing and then jumps back.
 
 ## Adding to it
 

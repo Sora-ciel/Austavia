@@ -42,17 +42,28 @@ public class MediaNotificationService extends Service {
     public static final String ACTION_TOGGLE = "com.sora.austavia.TOGGLE";
     public static final String ACTION_NEXT = "com.sora.austavia.NEXT";
     public static final String ACTION_STOP = "com.sora.austavia.STOP";
+    /** Dragging the system player's progress bar. Carries a position, unlike the rest. */
+    public static final String ACTION_SEEK = "com.sora.austavia.SEEK";
 
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_ARTIST = "artist";
     public static final String EXTRA_ARTWORK = "artwork";
     public static final String EXTRA_PLAYING = "playing";
+    public static final String EXTRA_POSITION = "position";
+    public static final String EXTRA_DURATION = "duration";
+
+    /** "Nothing said about it this time", so an update can leave one alone. */
+    private static final long UNSET = -1L;
 
     /** Set by the plugin so button presses can be forwarded to the web layer. */
     public static ActionListener actionListener;
 
     public interface ActionListener {
-        void onAction(String action);
+        /**
+         * @param value a position in milliseconds for ACTION_SEEK, and 0 for
+         *              every other action, none of which carry one.
+         */
+        void onAction(String action, long value);
     }
 
     private MediaSessionCompat session;
@@ -60,6 +71,9 @@ public class MediaNotificationService extends Service {
     private String artist = "";
     private Bitmap artwork;
     private boolean playing;
+    /** Where the track is up to, and how long it is. Both in milliseconds. */
+    private long positionMs = 0L;
+    private long durationMs = 0L;
 
     @Override
     public void onCreate() {
@@ -82,6 +96,15 @@ public class MediaNotificationService extends Service {
 
             @Override
             public void onStop() { dispatch(ACTION_STOP); }
+
+            @Override
+            public void onSeekTo(long positionMs) {
+                // The web player owns the audio element, so it does the moving
+                // and tells us where it landed on the next update. Writing a
+                // position here as well would put the bar somewhere the music
+                // is not, for as long as it took the two to disagree.
+                dispatch(ACTION_SEEK, positionMs);
+            }
         });
         session.setActive(true);
     }
@@ -108,6 +131,15 @@ public class MediaNotificationService extends Service {
             title = valueOr(intent.getStringExtra(EXTRA_TITLE), title);
             artist = valueOr(intent.getStringExtra(EXTRA_ARTIST), artist);
             playing = intent.getBooleanExtra(EXTRA_PLAYING, playing);
+
+            // Left alone when the update did not mention them. A track whose
+            // metadata has not been read yet has no duration to send, and
+            // clearing the one already shown would make the bar flicker back to
+            // nothing every time the play button was pressed.
+            long sentPosition = intent.getLongExtra(EXTRA_POSITION, UNSET);
+            if (sentPosition >= 0) positionMs = sentPosition;
+            long sentDuration = intent.getLongExtra(EXTRA_DURATION, UNSET);
+            if (sentDuration >= 0) durationMs = sentDuration;
 
             String artworkData = intent.getStringExtra(EXTRA_ARTWORK);
             if (artworkData != null) {
@@ -142,8 +174,12 @@ public class MediaNotificationService extends Service {
     }
 
     private void dispatch(String action) {
+        dispatch(action, 0L);
+    }
+
+    private void dispatch(String action, long value) {
         ActionListener listener = actionListener;
-        if (listener != null) listener.onAction(action);
+        if (listener != null) listener.onAction(action, value);
     }
 
     private static String valueOr(String value, String fallback) {
@@ -172,6 +208,11 @@ public class MediaNotificationService extends Service {
         if (artwork != null) {
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artwork);
         }
+        // How long the track is. Without this the system player has a position
+        // but no length to draw it against, so there is still no bar.
+        if (durationMs > 0) {
+            metadata.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs);
+        }
         session.setMetadata(metadata.build());
 
         long actions = PlaybackStateCompat.ACTION_PLAY
@@ -179,14 +220,24 @@ public class MediaNotificationService extends Service {
             | PlaybackStateCompat.ACTION_PLAY_PAUSE
             | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
             | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-            | PlaybackStateCompat.ACTION_STOP;
+            | PlaybackStateCompat.ACTION_STOP
+            // Without this the bar is drawn but cannot be dragged.
+            | PlaybackStateCompat.ACTION_SEEK_TO;
 
         session.setPlaybackState(new PlaybackStateCompat.Builder()
             .setActions(actions)
             .setState(
                 playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED,
-                PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN,
-                1f
+                positionMs,
+                // The speed Android extrapolates at between updates, and the
+                // reason a position is not sent several times a second: the
+                // system works out where the track is from the position, this,
+                // and the moment the state was set.
+                //
+                // Zero while paused. At 1x it would keep moving the bar along a
+                // track that is not playing, and then jump it back the moment
+                // anything refreshed it.
+                playing ? 1f : 0f
             )
             .build());
     }
@@ -221,18 +272,29 @@ public class MediaNotificationService extends Service {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
+            // The app's own icons rather than android.R.drawable.ic_media_*,
+            // which are the stock system shapes and the reason the notification
+            // did not look like the player it belongs to. These are the same
+            // paths src/components/PlayerIcons.svelte draws, on the same 24x24
+            // grid — see the drawables for why they had to be redrawn as paths.
+            //
+            // The container itself is not ours to style: a MediaStyle
+            // notification is rendered by the system, and from Android 13 the
+            // media control in the shade is built from the session rather than
+            // from anything here. The icons, the artwork and the controls are
+            // the part that can be made to match.
             .addAction(
-                android.R.drawable.ic_media_previous,
+                R.drawable.ic_media_prev,
                 "Previous",
                 servicePendingIntent(ACTION_PREVIOUS, 1)
             )
             .addAction(
-                playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                playing ? R.drawable.ic_media_pause : R.drawable.ic_media_play,
                 playing ? "Pause" : "Play",
                 servicePendingIntent(ACTION_TOGGLE, 2)
             )
             .addAction(
-                android.R.drawable.ic_media_next,
+                R.drawable.ic_media_next,
                 "Next",
                 servicePendingIntent(ACTION_NEXT, 3)
             );

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Two rounded bars, matching PlayerIcons' pause.
+
+    The app draws these as <rect rx="1">, which a vector drawable has no element
+    for, so each is written out as the path a rounded rectangle actually is.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7,4h2a1,1 0 0 1 1,1v14a1,1 0 0 1 -1,1h-2a1,1 0 0 1 -1,-1v-14a1,1 0 0 1 1,-1z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M15,4h2a1,1 0 0 1 1,1v14a1,1 0 0 1 -1,1h-2a1,1 0 0 1 -1,-1v-14a1,1 0 0 1 1,-1z" />
+</vector>

@@ -121,6 +121,7 @@
     stopBackgroundAudio,
     setBackgroundAudioActions
   } from './utils/backgroundAudio.js';
+  import { worthReporting } from './utils/playbackPosition.js';
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
   const CUSTOM_THEMES_STORAGE_KEY = 'customThemes';
@@ -1735,17 +1736,64 @@
   // and pause along with the player.
   // Re-runs on the play state and on the artwork, so the notification's
   // button flips with the player and the cover appears as soon as it's read.
+  // The three it has to re-run on are named here rather than read inside the
+  // function, because Svelte works out what a reactive statement depends on
+  // from what the statement itself mentions — a dependency that only appears
+  // inside a called function is invisible to it, and the notification would
+  // then never hear about a pause or a cover that had just finished loading.
   $: if (nowPlayingTrack) {
-    startBackgroundAudio({
-      title: nowPlayingTrack.title || 'Untitled',
-      artist: [nowPlayingTrack.artist, nowPlayingTrack.album].filter(Boolean).join(' · '),
-      // The same data URL the lock screen gets: a blob: URL means nothing
-      // outside the page that created it.
-      artwork: mediaSessionCoverUrl,
-      isPlaying
-    });
+    tellTheNotification(nowPlayingTrack, isPlaying, mediaSessionCoverUrl);
   } else {
     stopBackgroundAudio();
+  }
+
+  // Where the notification was last told the track had reached, and when. Both
+  // are needed to work out what Android will have extrapolated to by now — see
+  // utils/playbackPosition.js.
+  let lastReportedPositionMs = null;
+  let lastReportedAt = 0;
+
+  function tellTheNotification(
+    track = nowPlayingTrack,
+    playing = isPlaying,
+    cover = mediaSessionCoverUrl
+  ) {
+    if (!track) return;
+    lastReportedPositionMs = Math.round((Number(audioEl?.currentTime) || 0) * 1000);
+    lastReportedAt = Date.now();
+    startBackgroundAudio({
+      title: track.title || 'Untitled',
+      artist: [track.artist, track.album].filter(Boolean).join(' · '),
+      // The same data URL the lock screen gets: a blob: URL means nothing
+      // outside the page that created it.
+      artwork: cover,
+      isPlaying: playing,
+      position: audioEl?.currentTime,
+      // NaN until the file's metadata has been read, which every track passes
+      // through. playbackPosition.js drops it rather than claiming a length.
+      duration: audioEl?.duration
+    });
+  }
+
+  /**
+   * Keeps the shade's progress bar honest without talking to it constantly.
+   *
+   * Android is given a position and a speed and works the rest out itself, so
+   * `timeupdate` has nothing to add while a track plays normally. This only
+   * speaks up when the audio has actually diverged from what the shade would
+   * have extrapolated — a seek, or a stall, which fires no event of its own.
+   */
+  function reportPositionIfItMoved() {
+    if (!nowPlayingTrack) return;
+    const positionMs = Math.round((Number(audioEl?.currentTime) || 0) * 1000);
+    const moved = worthReporting({
+      positionMs,
+      lastReportedMs: lastReportedPositionMs,
+      lastReportedAt,
+      now: Date.now(),
+      playing: isPlaying
+    });
+    if (moved) tellTheNotification();
   }
 
   // ── Resuming where you left off ───────────────────────────────────
@@ -5010,7 +5058,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       previous: () => stepMusic(-1),
       toggle: toggleMusic,
       next: () => stepMusic(1),
-      stop: stopMusic
+      stop: stopMusic,
+      // Dragging the progress bar in the shade or on the lock screen. The web
+      // player owns the audio element, so the move happens here and the shade
+      // is told where it landed on the update that follows.
+      seek: seconds => {
+        if (audioEl && Number.isFinite(seconds)) audioEl.currentTime = seconds;
+      }
     });
     loadLocalMusicLibrary();
     adjustCanvasPadding();
@@ -6105,10 +6159,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   on:ended={() => stepMusic(1)}
   on:play={() => (isPlaying = true)}
   on:pause={() => { isPlaying = false; rememberPlaybackPosition(); }}
-  on:loadedmetadata={() => { applyResumePosition(); syncMusicTime(); }}
-  on:durationchange={syncMusicTime}
-  on:seeked={syncMusicTime}
-  on:timeupdate={() => { syncMusicTime(); throttledRememberPosition(); }}
+  on:loadedmetadata={() => { applyResumePosition(); syncMusicTime(); tellTheNotification(); }}
+  on:durationchange={() => { syncMusicTime(); tellTheNotification(); }}
+  on:seeked={() => { syncMusicTime(); tellTheNotification(); }}
+  on:timeupdate={() => { syncMusicTime(); throttledRememberPosition(); reportPositionIfItMoved(); }}
   preload="metadata"
   hidden
 ></audio>

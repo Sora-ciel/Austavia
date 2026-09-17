@@ -30,9 +30,12 @@ public class MediaNotificationPlugin extends Plugin {
     public void load() {
         // Button presses arrive on the service and are forwarded to the web
         // layer, which is what actually controls playback.
-        MediaNotificationService.actionListener = action -> {
+        MediaNotificationService.actionListener = (action, value) -> {
             JSObject payload = new JSObject();
             payload.put("action", shortName(action));
+            // Only a seek carries one; everything else sends 0 and the web side
+            // ignores it.
+            payload.put("position", value);
             notifyListeners("action", payload);
         };
     }
@@ -42,6 +45,7 @@ public class MediaNotificationPlugin extends Plugin {
         if (MediaNotificationService.ACTION_TOGGLE.equals(action)) return "toggle";
         if (MediaNotificationService.ACTION_NEXT.equals(action)) return "next";
         if (MediaNotificationService.ACTION_STOP.equals(action)) return "stop";
+        if (MediaNotificationService.ACTION_SEEK.equals(action)) return "seek";
         return action;
     }
 
@@ -81,12 +85,31 @@ public class MediaNotificationPlugin extends Plugin {
             intent.putExtra(MediaNotificationService.EXTRA_ARTWORK, artwork);
         }
 
+        // Where the track is up to, so the system player can draw its progress
+        // bar. Left out rather than sent as zero when the web side does not know
+        // yet -- a track's duration is unreadable until its metadata has loaded,
+        // and sending nothing leaves the last good value in place instead of
+        // blanking the bar. See src/utils/playbackPosition.js.
+        putIfPresent(call, intent, "position", MediaNotificationService.EXTRA_POSITION);
+        putIfPresent(call, intent, "duration", MediaNotificationService.EXTRA_DURATION);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getContext().startForegroundService(intent);
         } else {
             getContext().startService(intent);
         }
         call.resolve();
+    }
+
+    /**
+     * Copies a millisecond value across only when the call actually carried
+     * one, so "not known yet" stays distinguishable from "the start of the
+     * track". The service treats a missing value as leave-it-alone.
+     */
+    private static void putIfPresent(PluginCall call, Intent intent, String key, String extra) {
+        Double value = call.getDouble(key);
+        if (value == null || value.isNaN() || value < 0) return;
+        intent.putExtra(extra, value.longValue());
     }
 
     /** Takes the notification down and lets the service stop. */

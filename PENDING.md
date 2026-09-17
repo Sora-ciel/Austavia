@@ -27,6 +27,7 @@ list below with what was observed.
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
 | 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
 | 0.8.641 | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
+| next | **The notification on the phone**: the transport buttons should be the app's own shapes rather than Android's, and the system player should now draw a **progress bar that can be dragged**. Worth checking on the lock screen as well as in the shade, and that the bar stops moving when the music is paused. None of it can be exercised from a browser. |
 | 0.8.641 | **The test-release path itself**, the first time it has been run: the live site should still report 0.8.64, the GitHub release should be badged *Pre-release* and not *Latest*, and the preview channel should report 0.8.641. All three were checked from here; what is unconfirmed is installing the APK over a full release and finding it behaves. |
 
 Two standing checks worth doing at the same time:
@@ -141,6 +142,26 @@ In order, each landing and released on its own:
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
+
+## 4a. The notification, as far as it can go
+
+The transport icons and the progress bar are done. What is **not** possible, so
+nobody spends an afternoon on it:
+
+- **The notification cannot be given a layout of ours.** A `MediaStyle`
+  notification is drawn by the system, and from Android 13 the media control in
+  the shade is built from the MediaSession rather than from anything the app
+  posts. `setCustomContentView` is ignored there.
+- **`setColor` does not stick either.** From Android 12 the colours are derived
+  from the album art, which means the artwork *is* the theming.
+- Dropping `MediaStyle` for custom `RemoteViews` would buy a layout and cost
+  the lock-screen player, the Quick Settings media card, and Bluetooth, car and
+  watch controls. Not worth it for a music app.
+
+Still open, and cheap if ever wanted: **shuffle and repeat buttons**. The
+wrinkle is that from Android 13 the system builds the buttons from the
+session's `PlaybackState` custom actions rather than from the notification's
+own actions, so it has to be done in both places to appear across versions.
 
 ## 4b. The test-release path, now that it exists
 

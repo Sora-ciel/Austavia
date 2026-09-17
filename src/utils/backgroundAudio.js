@@ -16,6 +16,8 @@
 // Only Android needs any of it. On the web and in the desktop shell the
 // browser keeps playing on its own, so everything here is a no-op there.
 
+import { positionReport, seekTarget } from './playbackPosition.js';
+
 let plugin = null;
 let pluginLoadFailed = false;
 let listenerAttached = false;
@@ -51,6 +53,8 @@ function attachActionListener(service) {
       else if (action === 'toggle') actionHandlers.toggle?.();
       else if (action === 'next') actionHandlers.next?.();
       else if (action === 'stop') actionHandlers.stop?.();
+      // The only one that carries anything: where on the bar it was dragged to.
+      else if (action === 'seek') actionHandlers.seek?.(seekTarget(event?.position));
     });
   } catch (error) {
     console.warn('Could not listen for notification controls:', error);
@@ -66,19 +70,33 @@ function attachActionListener(service) {
  * `artwork` is a data URL: the notification can't read a blob: URL, since
  * those only mean anything inside the page that made them.
  */
-export async function startBackgroundAudio({ title, artist, artwork, isPlaying = false } = {}) {
+export async function startBackgroundAudio({
+  title,
+  artist,
+  artwork,
+  isPlaying = false,
+  position,
+  duration
+} = {}) {
   if (!isNativeAndroid()) return;
   const service = getPlugin();
   if (!service) return;
 
   attachActionListener(service);
 
+  // Where the track is up to, so Android's own player can draw a progress bar
+  // and let it be dragged. Left out entirely when it is not known yet rather
+  // than sent as zero — see utils/playbackPosition.js.
+  const where = positionReport({ position, duration, playing: isPlaying });
+
   try {
     await service.show({
       title: title || 'Playing',
       artist: artist || '',
       artwork: artwork || '',
-      playing: isPlaying
+      playing: isPlaying,
+      ...(where ? { position: where.positionMs } : {}),
+      ...(where?.durationMs ? { duration: where.durationMs } : {})
     });
     shown = true;
   } catch (error) {

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The player's own play triangle, not Android's.
+
+    Taken straight from src/components/PlayerIcons.svelte, which draws on the
+    same 24x24 grid a vector drawable uses, so the shape in the notification is
+    the shape in the app rather than something that merely resembles it.
+
+    White because a notification action is a silhouette: the system tints it to
+    suit whatever the shade is wearing, and a colour set here would be thrown
+    away.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,4l14,8 -14,8z" />
+</vector>

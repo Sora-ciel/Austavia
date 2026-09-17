@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PlayerIcons' next: the triangle and its bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,4l11,8 -11,8z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M18,4h1a1,1 0 0 1 1,1v14a1,1 0 0 1 -1,1h-1a1,1 0 0 1 -1,-1v-14a1,1 0 0 1 1,-1z" />
+</vector>
