@@ -27,7 +27,7 @@ list below with what was observed.
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
 | 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
 | 0.8.641 | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
-| next | **The notification on the phone**: the transport buttons should be the app's own shapes rather than Android's, and the system player should now draw a **progress bar that can be dragged**. Worth checking on the lock screen as well as in the shade, and that the bar stops moving when the music is paused. None of it can be exercised from a browser. |
+| 0.8.642 | **The notification on the phone**: the transport buttons should be the app's own shapes rather than Android's, and the system player should now draw a **progress bar that can be dragged**. Worth checking on the lock screen as well as in the shade, and that the bar stops moving when the music is paused. None of it can be exercised from a browser. |
 | 0.8.641 | **The test-release path itself**, the first time it has been run: the live site should still report 0.8.64, the GitHub release should be badged *Pre-release* and not *Latest*, and the preview channel should report 0.8.641. All three were checked from here; what is unconfirmed is installing the APK over a full release and finding it behaves. |
 
 Two standing checks worth doing at the same time:
@@ -36,8 +36,11 @@ Two standing checks worth doing at the same time:
   `fetching: 0` on a device that is up to date. `fetching: 17` on a first launch
   after a fresh install is right; on every launch it would mean the stamps never
   match and the whole account is re-downloaded each time.
-- **A phone text size.** Computers settled at 109%; the phone is still on the
-  neutral 100, waiting for somebody to drag the slider and say.
+- **The text size rebase.** Both numbers are settled — 109 on a computer, 97 on
+  a phone — and they are the base now rather than the slider's starting point,
+  so both sliders read 100. The one to check is that a slider you had *already
+  moved* still gives the size it did: the stored number changed meaning and is
+  converted on read, not reset.
 
 ## 1. Typing in a long note
 
@@ -116,9 +119,9 @@ In order, each landing and released on its own:
   seeded five-minute audio, including playing from one playlist and then another
   and restarting. What a seeded library still cannot show is a real file
   finishing and autoplay stepping on in a long library.
-- **A text size for phones.** Computers settled at 109%; the phone number is
-  still the neutral 100 in `typeScale.js`, waiting for somebody to drag the
-  slider and say.
+- **The phone's media notification.** The transport icons and the progress bar
+  went out in 0.8.642 and none of it can be exercised from a browser: the shade,
+  the lock screen, and whether the bar can actually be dragged.
 
 ## 4. Loose ends
 
