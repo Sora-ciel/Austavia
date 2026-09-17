@@ -26,7 +26,8 @@ list below with what was observed.
 | next | **One click** on an unfocused text block leaving the caret where you clicked. |
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
 | 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
-| next | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
+| 0.8.641 | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
+| 0.8.641 | **The test-release path itself**, the first time it has been run: the live site should still report 0.8.64, the GitHub release should be badged *Pre-release* and not *Latest*, and the preview channel should report 0.8.641. All three were checked from here; what is unconfirmed is installing the APK over a full release and finding it behaves. |
 
 Two standing checks worth doing at the same time:
 
@@ -140,6 +141,19 @@ In order, each landing and released on its own:
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
+
+## 4b. The test-release path, now that it exists
+
+Shipped and working, but two things are worth deciding once rather than each
+time:
+
+- **The preview channel expires after 30 days** — the CLI's maximum. Deploying
+  to the same channel again resets it. Nothing warns when it lapses; the URL
+  simply stops working, which will look like a bug the first time.
+- **Test builds accumulate on the releases page.** They are badged and never
+  *Latest*, so they cost nothing but clutter. Worth deleting the ones between
+  two full releases when the later full release goes out, or leaving them as a
+  record — but pick one, rather than letting it be whatever happened.
 
 ## 5. Not code
 
