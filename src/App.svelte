@@ -85,7 +85,15 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
-  import { stepShuffle, rememberPlayed, EMPTY as EMPTY_SHUFFLE } from './utils/shuffleHistory.js';
+  import {
+    stepShuffle,
+    rememberPlayed,
+    prunePath,
+    readPath,
+    pathToStore,
+    STORAGE_KEY as SHUFFLE_PATH_KEY,
+    EMPTY as EMPTY_SHUFFLE
+  } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping } from './utils/wallpaperViewport.js';
   import {
     startupGate,
@@ -1431,9 +1439,54 @@
   let nowPlayingId = null;
   let musicQueue = [];
   // The order shuffle actually played things in, so that back goes back rather
-  // than picking again. See utils/shuffleHistory.js.
+  // than picking again. Kept on this device across restarts -- which songs this
+  // pair of ears has been through is the same kind of fact as which note was
+  // last open, and never worth syncing. See utils/shuffleHistory.js.
   let shufflePlayed = EMPTY_SHUFFLE.played;
   let shufflePosition = EMPTY_SHUFFLE.position;
+
+  function loadShufflePath() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const stored = readPath(localStorage.getItem(SHUFFLE_PATH_KEY));
+      shufflePlayed = stored.played;
+      shufflePosition = stored.position;
+    } catch {
+      // A browser with storage off simply starts a fresh path.
+    }
+  }
+
+  function persistShufflePath() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(SHUFFLE_PATH_KEY, pathToStore({
+        played: shufflePlayed,
+        position: shufflePosition
+      }));
+    } catch {
+      /* ignore persistence failures */
+    }
+  }
+
+  /**
+   * Drop anything the library no longer holds.
+   *
+   * Run once the library is here rather than at load, because until then there
+   * is nothing to check a song against. A path kept across a restart can name a
+   * track deleted since, and walking back onto one would stop with a message
+   * about audio that is not on this device.
+   */
+  let shufflePathPruned = false;
+  $: if (!shufflePathPruned && musicLibrary.tracks?.length && shufflePlayed.length) {
+    shufflePathPruned = true;
+    const known = new Set(musicLibrary.tracks.map(track => track.id));
+    const pruned = prunePath({ played: shufflePlayed, position: shufflePosition, known });
+    if (pruned.played.length !== shufflePlayed.length) {
+      shufflePlayed = pruned.played;
+      shufflePosition = pruned.position;
+      persistShufflePath();
+    }
+  }
   let isPlaying = false;
   let nowPlayingUrl = '';
   let playerExpanded = false;
@@ -1532,6 +1585,7 @@
       const path = rememberPlayed({ played: shufflePlayed, position: shufflePosition, trackId });
       shufflePlayed = path.played;
       shufflePosition = path.position;
+      persistShufflePath();
     }
     showCoverFor(trackId);
     await tick();
@@ -1590,6 +1644,7 @@
       if (!stepped.trackId) return;
       shufflePlayed = stepped.played;
       shufflePosition = stepped.position;
+      persistShufflePath();
       playMusicTrack(stepped.trackId, [], { remember: false });
       return;
     }
@@ -4961,6 +5016,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     adjustCanvasPadding();
 
     if (!firebaseReady) authStateResolved = true;
+    loadShufflePath();
     countTheWait();
     stopWallpaperWatch = watchWallpaperBox();
     window.__austaviaPasteImage = receivePictureFromKeyboard;

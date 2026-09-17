@@ -5,7 +5,11 @@ import {
   stepShuffle,
   rememberPlayed,
   canGoBack,
+  prunePath,
+  readPath,
+  pathToStore,
   MAX_REMEMBERED,
+  TRIM_BATCH,
   EMPTY
 } from '../src/utils/shuffleHistory.js';
 
@@ -104,14 +108,20 @@ test('pressing play on what is already playing does not lengthen the path', () =
 });
 
 test('the path is bounded, and it is the oldest that goes', () => {
+  // Never more than the ceiling, whatever happens on the way -- but not pinned
+  // to it either, because trimming now happens in batches rather than one song
+  // at a time, so the length sits somewhere between the batch and the ceiling.
   let state = { ...EMPTY };
   for (let i = 0; i < MAX_REMEMBERED + 25; i += 1) {
     state = rememberPlayed({ ...state, trackId: `track-${i}` });
+    assert.ok(
+      state.played.length <= MAX_REMEMBERED,
+      `path reached ${state.played.length} after ${i + 1} songs`
+    );
   }
-  assert.equal(state.played.length, MAX_REMEMBERED);
-  assert.equal(state.played.at(-1), `track-${MAX_REMEMBERED + 24}`);
-  assert.equal(state.position, MAX_REMEMBERED - 1);
-  assert.equal(state.played[0], 'track-25', 'the oldest were dropped');
+  assert.equal(state.played.at(-1), `track-${MAX_REMEMBERED + 24}`, 'the newest is kept');
+  assert.equal(state.position, state.played.length - 1, 'and that is where you are standing');
+  assert.equal(state.played[0], `track-${TRIM_BATCH}`, 'the oldest batch went');
 });
 
 test('an empty queue changes nothing rather than throwing', () => {
@@ -121,4 +131,83 @@ test('an empty queue changes nothing rather than throwing', () => {
   assert.deepEqual(stepped.played, ['a']);
   assert.equal(stepShuffle().trackId, null);
   assert.deepEqual(rememberPlayed().played, []);
+});
+
+// Asked for after the first version: "make it stay on restart bro, and make it
+// so that the max it remembers is 200 songs, and make it delete in batch 50 of
+// the oldest songs remembered. So basically 199 - 200 - 150 - 151."
+
+test('the path is full at 200 and drops fifty at once, not one at a time', () => {
+  let state = { ...EMPTY };
+  for (let i = 1; i <= 200; i += 1) state = rememberPlayed({ ...state, trackId: `s${i}` });
+  assert.equal(state.played.length, 200, 'full, and nothing dropped yet');
+  assert.equal(state.played[0], 's1');
+
+  // The one that tips it over.
+  state = rememberPlayed({ ...state, trackId: 's201' });
+  assert.equal(state.played.length, 151, '200 becomes 151, not 200');
+  assert.equal(state.played[0], 's51', 'and it is the oldest fifty that went');
+  assert.equal(state.played.at(-1), 's201');
+  assert.equal(state.position, 150);
+});
+
+test('the next forty-nine songs are a plain append, with no trimming', () => {
+  let state = { ...EMPTY };
+  for (let i = 1; i <= 201; i += 1) state = rememberPlayed({ ...state, trackId: `s${i}` });
+  assert.equal(state.played.length, 151);
+
+  for (let i = 202; i <= 250; i += 1) state = rememberPlayed({ ...state, trackId: `s${i}` });
+  assert.equal(state.played.length, 200, 'back to full, having dropped nothing on the way');
+  assert.equal(state.played[0], 's51');
+});
+
+test('a path written down comes back the same', () => {
+  let state = { ...EMPTY };
+  for (const id of ['a', 'b', 'c']) state = rememberPlayed({ ...state, trackId: id });
+  const back = readPath(pathToStore(state));
+  assert.deepEqual(back.played, ['a', 'b', 'c']);
+  assert.equal(back.position, 2);
+});
+
+test('a position that points outside the path is brought back inside it', () => {
+  // Worse than no position: back and forward would disagree about where they
+  // are standing.
+  assert.deepEqual(readPath('{"played":["a","b"],"position":9}'), { played: ['a', 'b'], position: 1 });
+  assert.deepEqual(readPath('{"played":["a","b"],"position":-5}'), { played: ['a', 'b'], position: -1 });
+});
+
+test('a stored path that cannot be read starts empty rather than throwing', () => {
+  assert.deepEqual(readPath('not json'), { played: [], position: -1 });
+  assert.deepEqual(readPath(''), { played: [], position: -1 });
+  assert.deepEqual(readPath(null), { played: [], position: -1 });
+  assert.deepEqual(readPath('{"played":"nope"}'), { played: [], position: -1 });
+  assert.deepEqual(readPath('{"played":[1,2,null,"a"]}'), { played: ['a'], position: 0 });
+});
+
+test('songs deleted since last time are taken out of the path', () => {
+  // A path kept across a restart can name a track that has been deleted, and
+  // walking back onto one would stop with a message about missing audio.
+  const pruned = prunePath({
+    played: ['a', 'gone', 'b', 'c'],
+    position: 3,
+    known: new Set(['a', 'b', 'c'])
+  });
+  assert.deepEqual(pruned.played, ['a', 'b', 'c']);
+  assert.equal(pruned.position, 2, 'still standing on c');
+});
+
+test('when the song you were on is the deleted one, you land behind it', () => {
+  const pruned = prunePath({
+    played: ['a', 'b', 'gone'],
+    position: 2,
+    known: new Set(['a', 'b'])
+  });
+  assert.deepEqual(pruned.played, ['a', 'b']);
+  assert.equal(pruned.position, 1);
+});
+
+test('pruning with nothing to prune against leaves the path alone', () => {
+  const path = { played: ['a', 'b'], position: 1 };
+  assert.deepEqual(prunePath(path), path);
+  assert.deepEqual(prunePath({ ...path, known: new Set(['a', 'b']) }), path);
 });
