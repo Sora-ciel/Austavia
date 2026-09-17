@@ -777,7 +777,22 @@
     // wait instead of ending it.
     pendingScroll = wanted;
     pendingTries = 40;
-    scheduleRestore();
+
+    // Straight away first, and only then on a timer.
+    //
+    // The content is already in the editor by the time this is called, so the
+    // room for it usually exists and the position can be put back before
+    // anything is painted. Going through the timer unconditionally cost 50ms
+    // every time -- invisible on a reload, and a visible jump on the canvas,
+    // where moving a block rebuilds it and every text block on screen restores
+    // itself at once. Reported as "after every move of a block the scroll jumps
+    // in text blocks".
+    //
+    // The timer stays for the case it was written for: a note whose writing is
+    // stored as a blob arrives after the editor has mounted, and there is no
+    // room to scroll into until it does.
+    attemptRestore();
+    if (pendingScroll) scheduleRestore();
   }
 
   /**
