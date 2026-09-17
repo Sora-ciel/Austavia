@@ -6,11 +6,53 @@ release entirely — the tag was pushed, the site went out, the installers were
 built and filed, and nothing on the releases page changed. Nobody watching the
 repository would have known either had happened.
 
+## Two kinds of release
+
+There is a **full release** and there is a **test release**, and the difference
+is not a label on the GitHub page — it is which of the steps below you run.
+
+| | Full release | Test release |
+| --- | --- | --- |
+| The live site | `firebase deploy --only hosting` | **not touched** |
+| The web app | — | an unlisted preview channel, 30 days |
+| The apps | built and attached | built and attached |
+| GitHub | a release | `gh release create --prerelease` |
+| Marked `Latest` | yes | **never** |
+
+The GitHub flag is the small half. **The live site is the half that reaches
+people**, and it does not care what the release was labelled, so a test release
+that runs `firebase deploy --only hosting` has shipped to everybody no matter
+what the page says. Skipping that one command is what makes a test release a
+test release.
+
+Nothing in the app polls GitHub for a new version — there is no updater in
+`src/`, `src-tauri/` or `tauri.conf.json` — so a prerelease cannot arrive on
+somebody's device on its own.
+
 ## The version
 
 **One step at a time, whatever the size of the release.** 0.8.50 → 0.8.51. The
 number says what came after what and nothing else; it is not a claim about how
 much changed. Do not open a new minor line without being asked.
+
+A test release takes **a further digit** rather than the next number, so the
+version says which kind it is:
+
+| | |
+| --- | --- |
+| 0.8.64 | a full release |
+| 0.8.641, 0.8.642, … | its test builds, in order |
+| 0.8.65 | the next full release |
+
+Asked for in as many words: a test build steps by `0.0.001` and a full release
+by `0.0.01`. Both are ordinary semver — the patch is just a larger number — and
+both fit the MSI's version fields, whose limits are 255 / 255 / 65535.
+
+**Going back is not free on Android.** `versionCode` only ever rises, so once a
+test build is on the phone, returning to the last full release means
+uninstalling first — and uninstalling takes the folders with it. Anything not
+synced to the cloud is gone. Either stay on test builds until the next full
+release, or make sure everything has synced before going back.
 
 Two files carry it, and both must agree:
 
@@ -84,6 +126,8 @@ git push origin v0.8.51
 
 ### 4. The site
 
+**Full release only.**
+
 ```bash
 firebase deploy --only hosting
 ```
@@ -91,6 +135,25 @@ firebase deploy --only hosting
 Then **open it and confirm it is the build you just made** — the diagnostics
 button reports the version, which is the quickest way to be sure the upload was
 not a no-op.
+
+#### 4b. A test release goes to a channel instead
+
+Never to `live`. A preview channel is a separate, unguessable URL on the same
+project, and production is untouched:
+
+```bash
+firebase hosting:channel:deploy testing --expires 30d
+```
+
+Thirty days is the maximum the CLI allows, and deploying to the same channel
+again resets the clock. The command prints the URL; it is not guessable and not
+listed anywhere, but it is not a secret either — treat it as unlisted rather
+than private.
+
+It adds the channel's domain to Firebase Auth's authorised domains by default,
+so **signing in works there**, which is the point: most of the faults worth
+chasing only exist with an account attached. Two tabs on it are two devices
+arguing — see the staging note in `CLAUDE.md`.
 
 ### Putting it back
 
@@ -157,6 +220,31 @@ gh release create v0.8.51 --verify-tag \
 Check afterwards that the newest release is the one marked `Latest`; a release
 created out of order is not, and `gh release edit <tag> --latest` fixes it.
 
+**A test release adds `--prerelease`**, and then the opposite check applies: it
+must *not* be `Latest`, and `/releases/latest` must still point at the last full
+release.
+
+```bash
+gh release create v0.8.641 --verify-tag --prerelease \
+  --title "v0.8.641 — <what is in it to try>" \
+  --notes-file <notes> \
+  release/Austavia_0.8.641.apk \
+  release/Austavia_0.8.641_x64-setup.exe \
+  release/Austavia_0.8.641_x64_en-US.msi
+```
+
+It still appears on the releases page, badged *Pre-release*. That is as hidden
+as a public repository gets while keeping a link that installs on a phone; a
+draft would be invisible but its downloads need a token, which is the one thing
+the link is for.
+
+If a test build turns out to be the one worth keeping, promote it rather than
+rebuilding it:
+
+```bash
+gh release edit v0.8.641 --prerelease=false --latest
+```
+
 **Never pass a placeholder title or notes meaning to edit them after.** A
 release is public and notified the moment it is created.
 
@@ -173,6 +261,11 @@ using Austavia, not reading its source:
   changes what people should expect, say that too.
 - Call out anything that touches saved data, even when the answer is "nothing
   changes". That is the question a reader has.
+- **A test release is written for the one person installing it**, so it says
+  what to try and what would count as it going wrong, rather than what was
+  added. Open it by saying it is a test build and that the live site is still
+  on the last full release — otherwise the first question is whether everybody
+  just got this.
 - End with the standing Android note:
 
   > **Android:** the build is unlisted, so Android will warn about installing
