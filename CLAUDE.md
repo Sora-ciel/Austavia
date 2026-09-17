@@ -157,6 +157,34 @@ that.
 Take from it when starting work, and delete the entry in the same commit as the
 fix.
 
+## Staging is for reproducing bugs, not only for rules and plans
+
+`npm run dev:staging` points the app at **`arial-staging`**, which is a separate
+Firebase project — a different database, a different bucket, a different set of
+folders. Not a namespace inside production: nothing done there can reach a real
+note. Confirm it before trusting a session with anything:
+
+```js
+(await import('/src/firebaseClient.js')).firebaseConfig.projectId  // 'arial-staging'
+```
+
+It was set up for the storage ceiling and the plan work, and that is a tenth of
+what it is good for. Most of the hardest bugs in this app only exist when signed
+in — the download that refuses to arrive, the folder that reverts, the picture
+that vanishes when an account is attached — and every one of them was chased
+through pasted logs because the only signed-out browser available could not
+reproduce any of it. A staging session signed into a real account reproduces all
+of them, and two tabs against it are two devices arguing, which is the shape of
+nearly every sync fault reported so far.
+
+So: reach for staging whenever a report involves an account, rather than
+reasoning from a log.
+
+**The sign-in is the user's to do, never yours.** Passwords and account
+credentials do not go through an assistant, whatever the convenience. Ask them
+to sign in once in the staging tab; the session then persists in that browser's
+storage and can be driven from then on.
+
 ## Releasing goes by the checklist, not by memory
 
 [`RELEASE.md`](RELEASE.md) has every step in order. Follow it whenever the ask

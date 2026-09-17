@@ -9,6 +9,31 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## 0. To check on a device after the next release
+
+Things that are built and shipped but that nobody has confirmed. Cross one off
+when it is seen working; if one turns out to be wrong, it goes back into the
+list below with what was observed.
+
+| Shipped | What to look for |
+| --- | --- |
+| 0.8.57 | Pasting a picture from the **Android keyboard's** own picker, not the clipboard. `commitContent` cannot be exercised from a browser. |
+| 0.8.59 | The **drag pointer** on the desktop: the no-drop cursor should no longer flash at the start of a drag. A browser ignores `dropEffect` outside a real drag. |
+| 0.8.60 | A **real track ending** and autoplay stepping on, in a full library. Seeded audio covered everything up to that. |
+| 0.8.62 | **Adding a picture while signed in.** This is the file-dialog fix; it is the one most likely to have been the whole complaint. |
+| next | The **wallpaper** holding still in Single Note and Playlist while the phone keyboard opens *and closes* — the closing is the half a browser cannot show. |
+| next | **Moving a block on the canvas** no longer making the text inside jump. |
+| next | **One click** on an unfocused text block leaving the caret where you clicked. |
+
+Two standing checks worth doing at the same time:
+
+- **`fetching: N` on the second launch.** The bootstrap line should read
+  `fetching: 0` on a device that is up to date. `fetching: 17` on a first launch
+  after a fresh install is right; on every launch it would mean the stamps never
+  match and the whole account is re-downloaded each time.
+- **A phone text size.** Computers settled at 109%; the phone is still on the
+  neutral 100, waiting for somebody to drag the slider and say.
+
 ## 1. Typing in a long note
 
 Two separate causes, measured on a note of 15,930 characters — the size of a
