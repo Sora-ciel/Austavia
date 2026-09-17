@@ -296,9 +296,25 @@
 
   /* Per-file background image sitting behind the text */
   /* Crops the oversized blurred layer back to the note's bounds. */
+  /* Anchored to the top and drawn at the height the window has when nothing is
+     being typed into -- not at the mode's own height.
+
+     The phone keyboard really does shrink the page, on purpose, so the controls
+     stay reachable and the caret stays on screen. A picture sized to cover a
+     box that just got shorter is re-fitted into it, and a centred picture
+     re-fitted shorter looks exactly like it jumped upwards. Holding the height
+     still leaves the picture where it was, with its bottom behind the keyboard,
+     which is what it looks like it should do.
+
+     Falls back to the old behaviour wherever the variable is not set. */
   .note-bg-clip {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--wallpaper-height, auto);
+    min-height: 100%;
     z-index: 0;
     overflow: hidden;
     pointer-events: none;

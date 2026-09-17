@@ -1320,9 +1320,17 @@
   /* The picture sits behind everything and takes no clicks. Clipped to the
      mode, because a blurred layer is drawn larger than its box on purpose —
      see modeBackground.js — and would otherwise spill over the toolbar. */
+  /* Same as Single Note's wallpaper, and for the same reason: the keyboard
+     shrinks the page, and a picture re-fitted into a shorter box looks like it
+     moved. See the note on .note-bg-clip in SingleNoteMode.svelte. */
   .pl-bg-holder {
     position: absolute;
-    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--wallpaper-height, auto);
+    min-height: 100%;
     overflow: hidden;
     pointer-events: none;
     z-index: 0;

@@ -85,6 +85,7 @@
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
+  import { steadyWallpaperHeight, isTyping } from './utils/wallpaperViewport.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -1063,6 +1064,53 @@
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type });
+  }
+
+  /**
+   * How tall a wallpaper should be drawn, which is not always how tall the
+   * window is.
+   *
+   * The Android keyboard genuinely shrinks the page -- deliberately, so the
+   * controls stay reachable and the caret stays on screen -- and a picture
+   * sized to cover a box that just got shorter is re-fitted into it, which
+   * looks exactly like the picture jumping upwards. So the modes draw their
+   * wallpaper at this height instead of at their own, and it holds still while
+   * something is being typed into. See utils/wallpaperViewport.js.
+   */
+  let wallpaperHeight = 0;
+  let wallpaperWidth = 0;
+
+  function measureWallpaperBox() {
+    if (typeof window === 'undefined') return;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const next = steadyWallpaperHeight({
+      previousHeight: wallpaperHeight,
+      previousWidth: wallpaperWidth,
+      width,
+      height,
+      typing: isTyping(document.activeElement)
+    });
+    wallpaperWidth = width;
+    if (next !== wallpaperHeight) wallpaperHeight = next;
+  }
+
+  // Watched the same way the text scale is, and for the same reason: the window
+  // changes without anybody asking it to. focusout is here because a keyboard
+  // closing is a focus leaving, and the height has to be taken again the moment
+  // holding it still stops being right.
+  function watchWallpaperBox() {
+    if (typeof window === 'undefined') return () => {};
+    const remeasure = () => measureWallpaperBox();
+    measureWallpaperBox();
+    window.addEventListener('resize', remeasure);
+    window.addEventListener('orientationchange', remeasure);
+    window.addEventListener('focusout', remeasure);
+    return () => {
+      window.removeEventListener('resize', remeasure);
+      window.removeEventListener('orientationchange', remeasure);
+      window.removeEventListener('focusout', remeasure);
+    };
   }
 
   function loadSyncedUid() {
@@ -2352,6 +2400,7 @@
   // has to tell those apart to know whether it is still worth waiting.
   let authStateResolved = false;
   let stopConnectionWatch = null;
+  let stopWallpaperWatch = null;
   // The account's stored-byte record, streamed from storage/{uid}. Null until
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
@@ -4887,6 +4936,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     if (!firebaseReady) authStateResolved = true;
     countTheWait();
+    stopWallpaperWatch = watchWallpaperBox();
     window.__austaviaPasteImage = receivePictureFromKeyboard;
 
     // The gate releases when the device is offline, so it has to hear about it
@@ -5051,6 +5101,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     observedControlsEl = null;
     stopAuthListener?.();
     stopConnectionWatch?.();
+    stopWallpaperWatch?.();
     if (window.__austaviaPasteImage === receivePictureFromKeyboard) {
       delete window.__austaviaPasteImage;
     }
@@ -5910,6 +5961,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
        stopped, in the capture phase before anything else sees them. -->
   <div
     class="modes"
+    style={wallpaperHeight ? `--wallpaper-height: ${wallpaperHeight}px;` : ''}
     class:sync-lock-active={workspaceHeld}
     role="region"
     aria-label="Workspace"
