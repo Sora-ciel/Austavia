@@ -25,7 +25,8 @@ list below with what was observed.
 | next | **Moving a block on the canvas** no longer making the text inside jump. |
 | next | **One click** on an unfocused text block leaving the caret where you clicked. |
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
-| next | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
+| 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
+| next | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
 
 Two standing checks worth doing at the same time:
 
@@ -46,6 +47,10 @@ real one. A keystroke costs about **7ms**, and it scales with the note: 0.4ms at
 no layout — a keystroke costs **0.3ms**. The rest is the browser recalculating
 style and laying out the page, because every character typed at the end of a
 note re-lays the whole of it.
+
+The second cause — our own ~3.4ms of serialising and dispatching, which used to
+run inside the key event — is **done**, in `utils/editorUpdates.js`. What is
+left here is the layout.
 
 ### 1a. Let the editor be laid out on its own
 
@@ -68,17 +73,6 @@ The real fix is to restructure so the editable sizes to its content and the wrap
 scrolls it, which is the ordinary arrangement; containment is then safe and
 free. That is a layout change to the most-used component in the app, so check
 empty notes, the click-anywhere-to-focus area, and Simple Note's grid.
-
-### 1b. Coalesce the editor's update handler
-
-Worth about 3ms of the 7: roughly 1.5ms serialising the document with
-`getHTML()` and 1.9ms in the Svelte cascade that follows `dispatch('change')`.
-Both run on every single keystroke.
-
-One serialise-and-dispatch per ~50ms instead of per character. The risk is
-losing the last characters typed, so it must flush on blur, on destroy, and
-before any external content push — that is the part to get right rather than
-fast.
 
 ## 2. Pictures stored by reference, not inside the text
 
@@ -131,7 +125,8 @@ In order, each landing and released on its own:
   cause is item 1: every keystroke in a note re-lays the whole document out, and
   a layout under the pointer is enough for the browser to decide the pointer is
   worth showing again. Untested, and worth re-checking after the editor's height
-  is restructured rather than chased on its own.
+  is restructured rather than chased on its own. Coalescing the update handler
+  did not touch the layout, so it will not have fixed this.
 
 - **Canvas pan and the column-list scroll are not remembered.** `scrollMemory.js`
   already has `modeSurfaceKey` for exactly this; only notes and text blocks are

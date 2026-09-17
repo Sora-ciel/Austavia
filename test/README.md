@@ -26,6 +26,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/syncRules.js` | what may be synced, and what counts as a change |
 | `src/utils/textHistory.js` | how typing is grouped into undo steps |
 | `src/utils/syncLog.js` | what sync decided, and what it thought had changed |
+| `src/utils/editorUpdates.js` | when the editor tells the app the writing changed |
 
 ## What is covered
 
@@ -72,6 +73,22 @@ import, and the code that acts on them stayed where it was:
 - History survives the editor being rebuilt, which happens on every block move
   and every mode switch.
 - Redo returns exactly what undo took away.
+
+**`editorUpdates.test.js`**
+
+- A burst of typing is serialised once rather than once per character. Reported
+  as "writing on the phone seems slow even without images"; the work used to run
+  inside the key event, ahead of the character being drawn.
+- What is sent is the writing as it ended up, not as it was when the first key
+  went down — which is why the editor is read at the end instead of a value
+  being kept per keystroke.
+- The window does not move while somebody keeps typing. A window that restarted
+  on every keystroke would never close during a paragraph, so the writing would
+  reach the save and the undo history only once they stopped.
+- **The last characters typed are never lost.** This is the risk the delay
+  introduces and the one thing that must not happen, so blur, teardown, undo
+  and an incoming copy all send first. Flushing when nothing was typed sends
+  nothing, and nothing is sent after the editor is gone.
 
 ## Adding to it
 

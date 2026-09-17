@@ -15,6 +15,7 @@
     redoText,
     syncTextHistory
   } from '../utils/textHistory.js';
+  import { createUpdateCoalescer } from '../utils/editorUpdates.js';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -40,6 +41,44 @@
   // Set while an undo or redo is being written into the editor, so the update
   // it causes isn't recorded as a fresh edit.
   let applyingHistory = false;
+
+  // Telling the rest of the app that the writing changed means serialising the
+  // whole document and then running the Svelte cascade, and it used to happen
+  // inside the key event, ahead of the character being drawn. This moves it off
+  // that path and, for anything faster than the window, does it once instead of
+  // once per character. utils/editorUpdates.js has the measurements and the
+  // reason a delay is what makes typing feel faster.
+  //
+  // Only typing ever waits. Everything that puts content into the editor
+  // programmatically sends on the line after, because the bookkeeping that
+  // follows those was written to run after the update they emit.
+  const updates = createUpdateCoalescer({ send: () => sendUpdate() });
+
+  /**
+   * Hands the writing to whoever is listening: the parent, and the undo history.
+   *
+   * Reads the document rather than being given a value, so a burst is
+   * serialised once at its end instead of once per keystroke. The caret is read
+   * at the same moment and for the same reason — the content and the position
+   * recorded beside it then come from one instant, rather than the position
+   * being up to a window older than the text it belongs to.
+   */
+  function sendUpdate() {
+    if (!editor || editor.isDestroyed) return;
+    const value =
+      emit === 'markdown'
+        ? (editor.storage?.markdown?.getMarkdown?.() ?? editor.getHTML())
+        : editor.getHTML();
+    // Tracked in the same format we emit, so the reactive push below can tell
+    // "the parent echoed our own value back" from a real change.
+    lastPushedContent = value;
+    if (!applyingHistory) recordText(historyKey, value, editor.state.selection.from);
+    dispatch('change', value);
+    // A separator's width is the room left on its line, and writing is what
+    // changes that room. Measuring it forces a layout, so it belongs off the
+    // key event alongside everything else here.
+    fitSeparators();
+  }
 
   // Where two versions of the text first differ. Undoing an insertion diverges
   // where the inserted text began; undoing a deletion, where the removed text
@@ -92,6 +131,13 @@
     applyingHistory = true;
     try {
       editor.commands.setContent(content || '', false);
+      // setContent emits an update of its own — the second argument has not
+      // suppressed one since TipTap 3, where it became an options object — and
+      // what follows was written to run after it. So it goes now rather than in
+      // fifty milliseconds, by which time applyingHistory would be false again
+      // and the restored text would be recorded as a fresh edit, throwing away
+      // everything ahead of it in the history.
+      updates.flush();
       // Put the caret back where it was when this state was recorded. Dropping
       // it at the end of the block instead is disorienting: you undo a word in
       // the middle of a paragraph and the cursor leaps to the bottom.
@@ -155,6 +201,10 @@
     // Handled here whether or not there is anything left to step through, so
     // the keystroke never falls through to the workspace's own undo.
     event.preventDefault();
+    // Whatever was typed in the last few milliseconds has to reach the history
+    // before it is stepped through, or Ctrl+Z walks back past characters it
+    // never heard about and they are gone, with no redo to bring them back.
+    updates.flush();
     applyHistory(isRedo ? redoText(historyKey) : undoText(historyKey));
     return true;
   }
@@ -672,24 +722,19 @@
         handlePaste: handleImagePaste,
         handleDrop: handleImageDrop,
       },
-      onUpdate({ editor: e }) {
-        const value =
-          emit === 'markdown'
-            ? (e.storage?.markdown?.getMarkdown?.() ?? e.getHTML())
-            : e.getHTML();
-        // Tracked in the same format we emit, so the reactive push below can
-        // tell "the parent echoed our own value back" from a real change.
-        lastPushedContent = value;
-        if (!applyingHistory) recordText(historyKey, value, e.state.selection.from);
-        dispatch('change', value);
-        // A separator's width is the room left on its line, and writing is what
-        // changes that room.
-        fitSeparators();
+      onUpdate() {
+        // Noted, and nothing more, so the keystroke can return and the browser
+        // can draw the character. The work is in sendUpdate above.
+        updates.noteChange();
       },
       onFocus({ event }) {
         dispatch('focus', event);
       },
       onBlur({ event }) {
+        // Clicking away is one of the moments the last characters typed would
+        // otherwise still be waiting, and whoever listens for a blur wants the
+        // writing as it now stands.
+        updates.flush();
         dispatch('blur', event);
       },
     });
@@ -722,7 +767,13 @@
   });
 
   // Sync external content changes (e.g. switching notes)
-  $: if (editor && content !== lastPushedContent) {
+  $: if (editor && content !== lastPushedContent) applyIncomingContent(content);
+
+  function applyIncomingContent(next) {
+    // Anything typed and not yet sent goes up first. setContent below replaces
+    // the whole document, so characters still waiting would be wiped out of the
+    // editor without ever having reached the save or the undo history.
+    updates.flush();
     // Where the reader was, before setContent takes them to the top. A cloud
     // download of a note that is already open goes through here, and losing
     // somebody's place every time another device saved is the complaint this
@@ -730,16 +781,26 @@
     // Whichever is still owed: a position from before this component had
     // anything to show, or wherever the reader actually was a moment ago.
     const wasAt = pendingScroll || wrapEl?.scrollTop || 0;
-    editor.commands.setContent(content || '', false);
+    editor.commands.setContent(next || '', false);
+    // Sent now rather than in fifty milliseconds, for the reason written up in
+    // applyHistory: the three lines below were written to run after the update
+    // setContent emits, and that ordering is what turns a note stored as legacy
+    // markdown into the HTML the app keeps now.
+    updates.flush();
     putTheReaderBack(wasAt);
-    lastPushedContent = content;
+    lastPushedContent = next;
     // The change came from outside — a cloud download, or the workspace undo
     // restoring a snapshot — so the history is told about it rather than
     // being left pointing at a version this block no longer has.
-    syncTextHistory(historyKey, content || '');
+    syncTextHistory(historyKey, next || '');
   }
 
   onDestroy(() => {
+    // Before the editor goes, or there is nothing left to serialise. Switching
+    // modes and moving a block on the canvas both come through here, and either
+    // one landing mid-word would have taken the word with it.
+    updates.flush();
+    updates.stop();
     separatorWatcher?.disconnect();
     window.removeEventListener('resize', fitSeparators);
     editor?.destroy();
