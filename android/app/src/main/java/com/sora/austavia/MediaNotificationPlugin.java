@@ -44,7 +44,7 @@ public class MediaNotificationPlugin extends Plugin {
         if (MediaNotificationService.ACTION_PREVIOUS.equals(action)) return "previous";
         if (MediaNotificationService.ACTION_TOGGLE.equals(action)) return "toggle";
         if (MediaNotificationService.ACTION_NEXT.equals(action)) return "next";
-        if (MediaNotificationService.ACTION_STOP.equals(action)) return "stop";
+        if (MediaNotificationService.ACTION_DISMISS.equals(action)) return "dismiss";
         if (MediaNotificationService.ACTION_SEEK.equals(action)) return "seek";
         return action;
     }

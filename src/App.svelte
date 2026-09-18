@@ -122,6 +122,8 @@
     setBackgroundAudioActions
   } from './utils/backgroundAudio.js';
   import { worthReporting } from './utils/playbackPosition.js';
+  import { shrinkCover } from './utils/coverArtwork.js';
+  import { shouldShowNotification, dismissalFor } from './utils/notificationPresence.js';
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
   const CUSTOM_THEMES_STORAGE_KEY = 'customThemes';
@@ -1683,22 +1685,19 @@
     }
 
     // The notification can't read a blob: URL from IndexedDB, so the cover is
-    // re-encoded as a data URL it can actually fetch.
+    // re-encoded as a data URL it can actually fetch -- and cut down on the way,
+    // because it travels to Android on an intent and a full-size embedded sleeve
+    // does not fit through Binder. See utils/coverArtwork.js.
     const artwork = [];
+    // Cleared first, and unconditionally. Left to the branch below, a track with
+    // no cover of its own kept the previous track's picture on the lock screen.
+    mediaSessionCoverUrl = '';
     try {
       const cover = await ensureMusicCover(track.id);
-      if (cover) {
-        if (mediaSessionCoverUrl) mediaSessionCoverUrl = '';
-        const dataUrl = await new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(cover);
-        });
-        if (dataUrl) {
-          mediaSessionCoverUrl = dataUrl;
-          artwork.push({ src: dataUrl, type: cover.type || 'image/jpeg', sizes: '512x512' });
-        }
+      const dataUrl = cover ? await shrinkCover(cover) : '';
+      if (dataUrl) {
+        mediaSessionCoverUrl = dataUrl;
+        artwork.push({ src: dataUrl, type: 'image/jpeg', sizes: '512x512' });
       }
     } catch { /* artwork is optional */ }
 
@@ -1716,7 +1715,11 @@
     const handlers = {
       play: () => { if (!isPlaying) toggleMusic(); },
       pause: () => { if (isPlaying) toggleMusic(); },
-      stop: stopMusic,
+      // Same as the notification being swiped away: stop playing, keep the
+      // track. The player's own Stop button is the deliberate "I am done with
+      // this", and it still clears; a stop from the operating system is not
+      // that, and clearing on it was the complaint.
+      stop: () => putTheNotificationAway(),
       previoustrack: () => stepMusic(-1),
       nexttrack: () => stepMusic(1),
       seekto: details => {
@@ -1742,12 +1745,39 @@
   // and pause along with the player.
   // Re-runs on the play state and on the artwork, so the notification's
   // button flips with the player and the cover appears as soon as it's read.
-  // The three it has to re-run on are named here rather than read inside the
-  // function, because Svelte works out what a reactive statement depends on
-  // from what the statement itself mentions — a dependency that only appears
-  // inside a called function is invisible to it, and the notification would
-  // then never hear about a pause or a cover that had just finished loading.
-  $: if (nowPlayingTrack) {
+  /** The track whose notification was swiped away — see utils/notificationPresence.js. */
+  let dismissedNotificationFor = null;
+
+  /**
+   * Swiped away, or stopped from a car, a headset or the lock screen.
+   *
+   * Asked for: "when swiping the music out it removes the music it was on in
+   * app -- it shouldn't remove, just stop in app." So playback stops and the
+   * track stays exactly where it was, ready to press play on.
+   *
+   * The dismissal is remembered against this track because pausing is itself a
+   * change the notification watches, so without it the swipe would put the
+   * notification straight back up and undo itself. Pressing play or moving to
+   * another track ends it without anything having to clear a flag.
+   */
+  function putTheNotificationAway() {
+    dismissedNotificationFor = dismissalFor(nowPlayingTrack?.id ?? null);
+    audioEl?.pause();
+  }
+
+  // The dependencies are named here rather than read inside the function,
+  // because Svelte works out what a reactive statement depends on from what the
+  // statement itself mentions — one that only appears inside a called function
+  // is invisible to it, and the notification would then never hear about a
+  // pause or a cover that had just finished loading.
+  $: notificationWanted = shouldShowNotification({
+    hasTrack: Boolean(nowPlayingTrack),
+    playing: isPlaying,
+    trackId: nowPlayingTrack?.id ?? null,
+    dismissedFor: dismissedNotificationFor
+  });
+
+  $: if (notificationWanted) {
     tellTheNotification(nowPlayingTrack, isPlaying, mediaSessionCoverUrl);
   } else {
     stopBackgroundAudio();
@@ -5064,7 +5094,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       previous: () => stepMusic(-1),
       toggle: toggleMusic,
       next: () => stepMusic(1),
-      stop: stopMusic,
+      // Swiping the notification away, which is the only thing that reaches
+      // this. It means "put this away", not "throw away what I was listening
+      // to" — so the track stays loaded and only playback stops. The dismissal
+      // is remembered against this track so that pausing, which is a change the
+      // notification watches, does not put it straight back up.
+      dismiss: putTheNotificationAway,
       // Dragging the progress bar in the shade or on the lock screen. The web
       // player owns the audio element, so the move happens here and the shade
       // is told where it landed on the update that follows.

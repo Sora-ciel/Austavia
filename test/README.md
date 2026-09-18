@@ -28,6 +28,8 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/syncLog.js` | what sync decided, and what it thought had changed |
 | `src/utils/editorUpdates.js` | when the editor tells the app the writing changed |
 | `src/utils/playbackPosition.js` | what the phone's notification is told about the track |
+| `src/utils/coverArtwork.js` | how big a cover may be before it cannot be sent |
+| `src/utils/notificationPresence.js` | whether the playback notification should be on screen |
 
 ## What is covered
 
@@ -107,6 +109,31 @@ import, and the code that acts on them stayed where it was:
   claims no length rather than sending nonsense to the shade.
 - A paused track reports a speed of zero, or the bar creeps forward over music
   that is not playing and then jumps back.
+
+**`coverArtwork.test.js`**
+
+- A cover is cut to 512 on its long edge, keeping its shape, and never enlarged.
+  Not a tidy-up: the cover reaches Android as a string on an intent, everything
+  on an intent goes through Binder, and Binder's buffer is about a megabyte for
+  the whole process. A measured 1400px sleeve is **2.58 million characters** as a
+  data URL, so it was silently dropped every time — which is why there was no
+  artwork for the system to use as the notification's background.
+- The ceiling is deliberately far below the real one, because the budget is
+  shared with everything else in flight and that cannot be asked about from here.
+
+**`notificationPresence.test.js`**
+
+- Swiping the notification away leaves the track loaded and only stops playback.
+  It used to fire the same stop as the player's own Stop button, which clears the
+  track, the object URL and the resume position — so a gesture meaning "put this
+  away" threw away what you were listening to.
+- **The swipe does not undo itself.** The notification is shown from a reactive
+  statement that re-runs when the play state changes, so pausing — which is what
+  the swipe now does — would put it straight back up.
+- The dismissal is recorded against the track it was made on, so pressing play or
+  changing track ends it with nothing having to clear a flag. A flag that
+  something must remember to clear is the kind that goes stale and leaves the
+  notification gone for the rest of the session.
 
 ## Adding to it
 

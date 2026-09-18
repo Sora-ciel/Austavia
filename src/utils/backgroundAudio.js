@@ -52,7 +52,9 @@ function attachActionListener(service) {
       if (action === 'previous') actionHandlers.previous?.();
       else if (action === 'toggle') actionHandlers.toggle?.();
       else if (action === 'next') actionHandlers.next?.();
-      else if (action === 'stop') actionHandlers.stop?.();
+      // Swiped away, or stopped from a car or headset. Not the same as the app
+      // asking for the notification to go, which never comes back through here.
+      else if (action === 'dismiss') actionHandlers.dismiss?.();
       // The only one that carries anything: where on the bar it was dragged to.
       else if (action === 'seek') actionHandlers.seek?.(seekTarget(event?.position));
     });

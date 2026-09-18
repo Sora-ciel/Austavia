@@ -41,7 +41,16 @@ public class MediaNotificationService extends Service {
     public static final String ACTION_PREVIOUS = "com.sora.austavia.PREVIOUS";
     public static final String ACTION_TOGGLE = "com.sora.austavia.TOGGLE";
     public static final String ACTION_NEXT = "com.sora.austavia.NEXT";
+    /** The app asking for the notification to go. Not passed back to the web layer. */
     public static final String ACTION_STOP = "com.sora.austavia.STOP";
+    /**
+     * The person swiping the notification away, or a stop from a car or headset.
+     *
+     * Kept apart from ACTION_STOP because they travel in opposite directions.
+     * ACTION_STOP is the web layer telling us to go, so passing it back would be
+     * the app answering itself; this one starts outside and has to be told.
+     */
+    public static final String ACTION_DISMISS = "com.sora.austavia.DISMISS";
     /** Dragging the system player's progress bar. Carries a position, unlike the rest. */
     public static final String ACTION_SEEK = "com.sora.austavia.SEEK";
 
@@ -95,7 +104,11 @@ public class MediaNotificationService extends Service {
             public void onSkipToNext() { dispatch(ACTION_NEXT); }
 
             @Override
-            public void onStop() { dispatch(ACTION_STOP); }
+            public void onStop() {
+                // A stop from a car, a headset or the lock screen. Same meaning
+                // as a swipe: stop playing, keep the track.
+                dispatch(ACTION_DISMISS);
+            }
 
             @Override
             public void onSeekTo(long positionMs) {
@@ -121,8 +134,18 @@ public class MediaNotificationService extends Service {
             return START_STICKY;
         }
 
+        if (ACTION_DISMISS.equals(action)) {
+            // Started outside the app, so the web layer has to be told: it
+            // stops playing and keeps the track.
+            dispatch(ACTION_DISMISS);
+            stopPlayback();
+            return START_NOT_STICKY;
+        }
+
         if (ACTION_STOP.equals(action)) {
-            dispatch(ACTION_STOP);
+            // The web layer asking. Telling it back would be the app answering
+            // itself, and with a dismissal now meaning "pause and remember", that
+            // round trip would re-arm the dismissal on every ordinary hide.
             stopPlayback();
             return START_NOT_STICKY;
         }
@@ -206,7 +229,13 @@ public class MediaNotificationService extends Service {
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist);
         if (artwork != null) {
+            // Both keys, because which one the system reads has moved between
+            // versions and the cost of setting the other is a reference. This is
+            // what makes the cover the background of the media card on Android
+            // 13, and what the whole notification is coloured from on 12 --
+            // "the cover as background" is supplied here rather than drawn.
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artwork);
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artwork);
         }
         // How long the track is. Without this the system player has a position
         // but no length to draw it against, so there is still no bar.
@@ -267,7 +296,10 @@ public class MediaNotificationService extends Service {
             .setContentText(artist)
             .setLargeIcon(artwork)
             .setContentIntent(openApp)
-            .setDeleteIntent(servicePendingIntent(ACTION_STOP, 4))
+            // Swiping it away means "put this away", not "throw away what I was
+            // listening to" -- so this is a dismissal, which stops playback and
+            // leaves the track loaded in the app.
+            .setDeleteIntent(servicePendingIntent(ACTION_DISMISS, 4))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
