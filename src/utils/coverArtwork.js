@@ -30,12 +30,39 @@
  * second notification in flight cannot push it over.
  */
 
-/** The long edge the cover is cut down to. */
-export const MAX_EDGE = 512;
+/**
+ * ## Quality: the picture is left alone unless it cannot be sent
+ *
+ * The first version of this shrank every cover to 512 and re-encoded it, which
+ * cost quality on covers that were never the problem — and the problem turned
+ * out to be somewhere else entirely, so every one of those was paid for
+ * nothing.
+ *
+ * So: a cover that already fits is handed over **exactly as it is**, bytes
+ * untouched, no re-encode and no loss. Only one that will not fit is reduced,
+ * and then by as little as gets it under the limit rather than straight to the
+ * smallest size. Most embedded art is 50–300KB and goes through as-is.
+ */
 
-/** What it is re-encoded as. JPEG, because a cover is a photograph. */
+/** What a reduced cover is re-encoded as. JPEG, because a cover is a photograph. */
 export const ENCODE_TYPE = 'image/jpeg';
-export const ENCODE_QUALITY = 0.85;
+
+/**
+ * Tried in order, and the first that fits wins.
+ *
+ * Only reached by a cover too big to send as it stands, so the question is not
+ * "how small" but "how little can be taken off". A 1400px sleeve usually lands
+ * on the first step and keeps far more detail than the flat 512 it used to get.
+ */
+export const REDUCTION_STEPS = Object.freeze([
+  { edge: 1024, quality: 0.92 },
+  { edge: 768, quality: 0.9 },
+  { edge: 512, quality: 0.85 },
+  { edge: 320, quality: 0.8 }
+]);
+
+/** The largest step, kept as a name for the tests and for targetSize's default. */
+export const MAX_EDGE = REDUCTION_STEPS[0].edge;
 
 /**
  * The most we will put on an intent, in characters of data URL.
@@ -77,38 +104,51 @@ export function fitsOnAnIntent(dataUrl) {
 }
 
 /**
- * The cover as a data URL small enough to send, or '' when there is none.
+ * The cover as a data URL the notification can be given, or '' when there is none.
  *
- * Browser-only — it needs a canvas — so it is guarded rather than assumed, and
- * the shape of the decision above is what the tests cover. A failure here is
- * never fatal: artwork is decoration, and a notification without it is still a
- * working notification.
+ * Untouched if it fits, reduced only as far as it has to be if it does not.
+ *
+ * Browser-only — reducing needs a canvas — but the untouched path does not, so
+ * a cover that already fits still gets through somewhere without one. A failure
+ * here is never fatal: artwork is decoration, and a notification without it is
+ * still a working notification.
  */
-export async function shrinkCover(blob) {
-  if (!blob || typeof document === 'undefined' || typeof createImageBitmap !== 'function') {
-    return '';
-  }
+export async function coverForNotification(blob) {
+  if (!blob) return '';
+
+  // As it is, if it will go. This is the ordinary case and it costs the picture
+  // nothing at all.
+  const original = await asDataUrl(blob);
+  if (fitsOnAnIntent(original)) return original;
+
+  if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') return '';
 
   let bitmap = null;
   try {
     bitmap = await createImageBitmap(blob);
-    const size = targetSize({ width: bitmap.width, height: bitmap.height });
-    if (!size) return '';
 
-    const canvas = document.createElement('canvas');
-    canvas.width = size.width;
-    canvas.height = size.height;
-    const context = canvas.getContext('2d');
-    if (!context) return '';
-    context.drawImage(bitmap, 0, 0, size.width, size.height);
+    let smallest = '';
+    for (const step of REDUCTION_STEPS) {
+      const size = targetSize({ width: bitmap.width, height: bitmap.height, max: step.edge });
+      if (!size) return '';
 
-    const shrunk = canvas.toDataURL(ENCODE_TYPE, ENCODE_QUALITY);
-    // Re-encoding can come out larger than the original for a small, already
-    // well-compressed cover, and there is no sense sending the worse of the two.
-    const original = size.resized ? '' : await asDataUrl(blob);
-    const best =
-      original && original.length < shrunk.length && fitsOnAnIntent(original) ? original : shrunk;
-    return fitsOnAnIntent(best) ? best : '';
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d');
+      if (!context) return '';
+      context.drawImage(bitmap, 0, 0, size.width, size.height);
+
+      const reduced = canvas.toDataURL(ENCODE_TYPE, step.quality);
+      // The first step that fits is the most detail this cover can be sent
+      // with, so stop rather than carrying on down the list.
+      if (fitsOnAnIntent(reduced)) return reduced;
+      smallest = reduced;
+    }
+
+    // Past the last step and still too big: a cover this stubborn is better
+    // left out than sent as something that will not arrive.
+    return fitsOnAnIntent(smallest) ? smallest : '';
   } catch {
     return '';
   } finally {

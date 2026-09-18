@@ -123,7 +123,7 @@
     notificationDiagnostics
   } from './utils/backgroundAudio.js';
   import { worthReporting } from './utils/playbackPosition.js';
-  import { shrinkCover } from './utils/coverArtwork.js';
+  import { coverForNotification } from './utils/coverArtwork.js';
   import { shouldShowNotification, dismissalFor } from './utils/notificationPresence.js';
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
@@ -1728,9 +1728,9 @@
       // Cut down on the way: it travels to Android on an intent, and a
       // full-size embedded sleeve does not fit through Binder. See
       // utils/coverArtwork.js.
-      const dataUrl = await shrinkCover(cover);
+      const dataUrl = await coverForNotification(cover);
       report.shrunkChars = dataUrl.length;
-      report.stage = dataUrl ? 'ready' : 'a cover was found but would not shrink';
+      report.stage = dataUrl ? 'ready' : 'a cover was found but was too big to send';
       coverReport = report;
 
       mediaSessionCoverUrl = dataUrl;
