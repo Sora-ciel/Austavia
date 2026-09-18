@@ -7,6 +7,8 @@
 // the cover image is handed back separately to be kept device-local, since
 // artwork routinely runs past 100KB and would blow up the sync payload.
 
+import { findMp4Cover } from './mp4Cover.js';
+
 const FALLBACK_TITLE_FROM_NAME = name => String(name || '').replace(/\.[^.]+$/, '');
 
 // Everything the parser can read tags out of. The browser's own MIME guess is
@@ -105,8 +107,15 @@ export async function readAudioTags(file) {
       : null;
 
     // Files that keep their artwork somewhere non-standard parse fine but
-    // report no picture; fall back to scanning the bytes for one.
-    const cover = pictureCover || (await findEmbeddedCoverInBytes(file));
+    // report no picture, so there are two fallbacks behind the parser, tried
+    // cheapest first.
+    //
+    // An MP4 whose `covr` atom declares the wrong type is the common case — the
+    // parser reads the picture as text and reports nothing — and reading the
+    // container properly costs about two percent of the file. Only when that
+    // finds nothing too is it worth searching the raw bytes.
+    const cover =
+      pictureCover || (await findMp4Cover(file)) || (await findEmbeddedCoverInBytes(file));
 
     return {
       tags: {
@@ -129,7 +138,7 @@ export async function readAudioTags(file) {
     // failed to read; they look identical otherwise.
     console.warn('Could not read tags from audio file:', error);
     // The container may be unreadable while the artwork inside it is fine.
-    const scanned = await findEmbeddedCoverInBytes(file);
+    const scanned = (await findMp4Cover(file)) || (await findEmbeddedCoverInBytes(file));
     return { tags: fallback, cover: scanned, parsed: false, error };
   }
 }
@@ -148,11 +157,19 @@ export function formatDuration(seconds) {
 // guess at which non-standard atom was used, this scans the raw bytes for an
 // embedded JPEG or PNG and pulls out the largest valid one.
 //
-// It only runs when the parser found no picture, and only over the ends of the
-// file, so it costs nothing for the overwhelming majority of tracks.
+// It only runs when the parser found no picture *and* reading the MP4 container
+// properly found none either, so it costs nothing for the overwhelming majority
+// of tracks — including the mistyped `covr` atoms that mp4Cover.js now handles,
+// which used to be what this was reaching for.
 
-const SCAN_HEAD_BYTES = 3 * 1024 * 1024;
-const SCAN_TAIL_BYTES = 1 * 1024 * 1024;
+// Small enough to read in one piece, which is most music. Splitting a file into
+// a head and a tail leaves a gap in the middle, and a gap is where things hide:
+// the example .m4a is 3.16MB with its artwork 99.1% of the way in, so it fell
+// past a 3MB head — while the tail read never ran, because that only happened
+// for files larger than head plus tail, which this was not. Scanned by neither.
+const SCAN_WHOLE_UNDER = 16 * 1024 * 1024;
+const SCAN_HEAD_BYTES = 4 * 1024 * 1024;
+const SCAN_TAIL_BYTES = 4 * 1024 * 1024;
 const MIN_IMAGE_BYTES = 2 * 1024;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 // Album art is never a 16px icon; this rejects UI sprites and stray thumbnails.
@@ -210,8 +227,12 @@ async function isUsableCover(blob) {
 export async function findEmbeddedCoverInBytes(file) {
   if (!file || typeof file.slice !== 'function') return null;
   try {
-    const chunks = [new Uint8Array(await file.slice(0, SCAN_HEAD_BYTES).arrayBuffer())];
-    if (file.size > SCAN_HEAD_BYTES + SCAN_TAIL_BYTES) {
+    const chunks = [];
+    if (file.size <= SCAN_WHOLE_UNDER) {
+      // One piece, so there is nowhere for artwork to fall between two reads.
+      chunks.push(new Uint8Array(await file.arrayBuffer()));
+    } else {
+      chunks.push(new Uint8Array(await file.slice(0, SCAN_HEAD_BYTES).arrayBuffer()));
       chunks.push(new Uint8Array(await file.slice(file.size - SCAN_TAIL_BYTES).arrayBuffer()));
     }
 

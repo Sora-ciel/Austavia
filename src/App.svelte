@@ -1566,13 +1566,41 @@
     persistMusicShuffle(musicShuffle);
   }
 
+  /** Which cover lookup is the current one, so a slow older one cannot win. */
+  let coverRequest = 0;
+
+  /**
+   * The player's artwork, changed in one go rather than in two.
+   *
+   * Asked for: "there's a transition when changing covers, that transition is
+   * long as fuck — I'd prefer if when I press to change it took more time to
+   * load, but when it does everything changes in a short time."
+   *
+   * It was not a transition. The old art was cleared *before* the lookup, and
+   * the lookup is the slow part — for a track with no stored cover it opens the
+   * audio file and parses it. So the player went blank, sat there for as long
+   * as that took, and then the new picture appeared: read from the outside as
+   * one long dissolve.
+   *
+   * Now the old art stays until the new one is ready and they swap together. It
+   * takes no less time; it just stops showing the middle of it.
+   *
+   * The counter is what makes that safe. Holding the old picture means a lookup
+   * can still be running when the next track is picked, and without it a slow
+   * one landing late would paint the wrong cover over the right one — which is
+   * a worse fault than the one being fixed, and the sort that only shows up
+   * when somebody skips quickly through an album.
+   */
   async function showCoverFor(trackId) {
-    if (nowPlayingCoverUrl) {
-      URL.revokeObjectURL(nowPlayingCoverUrl);
-      nowPlayingCoverUrl = '';
-    }
+    const mine = ++coverRequest;
     const cover = await ensureMusicCover(trackId);
-    if (cover) nowPlayingCoverUrl = URL.createObjectURL(cover);
+    if (mine !== coverRequest) return;
+
+    const previous = nowPlayingCoverUrl;
+    nowPlayingCoverUrl = cover ? URL.createObjectURL(cover) : '';
+    // After the swap, never before: revoking first would blank the player for
+    // exactly the moment this is meant to remove.
+    if (previous) URL.revokeObjectURL(previous);
   }
 
   async function playMusicTrack(trackId, queue = [], { remember = true } = {}) {

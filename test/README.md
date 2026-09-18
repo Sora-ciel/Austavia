@@ -30,6 +30,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/playbackPosition.js` | what the phone's notification is told about the track |
 | `src/utils/coverArtwork.js` | how big a cover may be before it cannot be sent |
 | `src/utils/notificationPresence.js` | whether the playback notification should be on screen |
+| `src/utils/mp4Cover.js` | where the artwork is inside an .m4a, and whether it is artwork |
 
 ## What is covered
 
@@ -134,6 +135,26 @@ import, and the code that acts on them stayed where it was:
   changing track ends it with nothing having to clear a flag. A flag that
   something must remember to clear is the kind that goes stale and leaves the
   notification gone for the rest of the session.
+
+**`mp4Cover.test.js`**
+
+- **A cover declared as text is still read as a picture.** An iTunes `covr` atom
+  says what it holds, and plenty of encoders say 1 (UTF-8 text) over bytes that
+  begin `ff d8 ff`. A parser that believes the file reports no picture, which is
+  right behaviour on a wrong file and is why those tracks had no artwork. The
+  first bytes are believed instead of the declaration.
+- **An atom name beginning with © does not stop the walk.** This cost a build.
+  iTunes names most metadata atoms `©nam`, `©ART`, `©alb`, and one of them is the
+  *first* child of `ilst` — so a walk that only accepts printable ASCII rejects it
+  and stops before reaching the artwork beside it.
+- `meta` is a full atom, with four bytes of version and flags between its header
+  and its children; descending without stepping over those lands mid-length and
+  the walk falls apart.
+- Only the metadata is read, not the audio: the top level is stepped through by
+  length, so `mdat` is skipped rather than scanned. Measured at 2% of the example
+  file, and 46ms against 305ms for the byte scan it replaces.
+- Junk, a non-MP4 file, a file with no cover, and a `covr` atom genuinely holding
+  text all come back empty rather than confidently wrong.
 
 ## Adding to it
 
