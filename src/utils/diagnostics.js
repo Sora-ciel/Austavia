@@ -258,16 +258,50 @@ export function describeNotification(notification) {
   );
   if (native.artworkError) lines.push(`  artwork error: ${native.artworkError}`);
 
-  lines.push(`  → ${artworkVerdict(sent, native)}`);
+  for (const line of describeCover(notification.cover)) lines.push(line);
+  lines.push(`  → ${artworkVerdict(sent, native, notification.cover)}`);
   return lines;
 }
 
+/**
+ * How far the cover got before it became whatever the notification was given.
+ *
+ * Added because "the app sent no artwork" was true and still did not say why —
+ * found, not found, found and unshrinkable, or never looked for at all are four
+ * different faults, and the first report could not tell them apart.
+ */
+export function describeCover(cover) {
+  if (!cover) return [];
+  const bits = [`  cover: ${cover.stage || 'unknown'}`];
+  if (cover.coverBytes !== undefined) bits.push(`    found ${cover.coverBytes} bytes`);
+  if (cover.shrunkChars !== undefined) bits.push(`    shrank to ${cover.shrunkChars} chars`);
+  if (cover.mediaSessionApi !== undefined) {
+    bits.push(`    browser Media Session API: ${cover.mediaSessionApi ? 'present' : 'ABSENT'}`);
+  }
+  return bits;
+}
+
 /** Which of the three faults this is, said plainly rather than implied. */
-export function artworkVerdict(sent, native) {
+export function artworkVerdict(sent, native, cover = null) {
   if (!native.notificationsAllowed) {
     return 'notifications are blocked for the app, so nothing will show whatever else is right';
   }
   if (!sent || sent.artworkChars === 0) {
+    // Say which of the ways it came to nothing, rather than listing them. The
+    // first version of this report named all four and left the reading to
+    // whoever pasted it, which is how a diagnostic becomes another guess.
+    if (cover?.stage === 'ready') {
+      return 'the cover was ready but the notification was sent without it — they are getting out of step';
+    }
+    if (cover?.coverBytes === 0) {
+      return `no cover was found for this track (${cover.trackId ?? 'unknown'}) — the fault is in finding it, not in sending it`;
+    }
+    if (cover?.shrunkChars === 0) {
+      return 'a cover was found but would not shrink into something sendable';
+    }
+    if (cover?.stage) {
+      return `the cover never got made: ${cover.stage}`;
+    }
     return 'the app sent no artwork — the cover was never found or never shrunk, so the fault is on the web side';
   }
   if (native.artworkChars < 0) {

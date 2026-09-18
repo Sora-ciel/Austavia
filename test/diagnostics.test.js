@@ -255,7 +255,7 @@ test('a block with nothing painted over it raises nothing', () => {
 // which one rather than leaving it to be read out of a row of numbers -- the
 // numbers were there the last two times and were read wrongly, by me.
 
-import { describeNotification, artworkVerdict } from '../src/utils/diagnostics.js';
+import { describeNotification, artworkVerdict, describeCover } from '../src/utils/diagnostics.js';
 
 const sentWithArt = { at: 0, artworkChars: 46735, playing: true, durationMs: 208000, error: null };
 const nativeOk = {
@@ -313,4 +313,46 @@ test('the report does not pretend on a platform that has no notification', () =>
 test('a missing plugin is named rather than read as a missing cover', () => {
   const lines = describeNotification({ platform: 'android', plugin: 'missing', sent: null }).join('\n');
   assert.match(lines, /not registered/);
+});
+
+// The second round of this report. "The app sent no artwork" was true and still
+// did not say why -- never looked for, not found, found and unshrinkable, and
+// ready-but-not-sent are four different faults, and naming all four and leaving
+// the reading to whoever pasted it is how a diagnostic becomes another guess.
+
+test('it names the track when no cover could be found for it', () => {
+  const verdict = artworkVerdict({ artworkChars: 0 }, nativeOk, {
+    stage: 'no cover found in the file or the store', trackId: 'abc-123', coverBytes: 0
+  });
+  assert.match(verdict, /no cover was found/);
+  assert.match(verdict, /abc-123/, 'says which track, so it can be tried by hand');
+});
+
+test('it separates a cover that would not shrink from one that was never there', () => {
+  const verdict = artworkVerdict({ artworkChars: 0 }, nativeOk, {
+    stage: 'a cover was found but would not shrink', coverBytes: 51596, shrunkChars: 0
+  });
+  assert.match(verdict, /would not shrink/);
+  assert.doesNotMatch(verdict, /never found/);
+});
+
+test('a cover that was ready but not sent is called out as the two getting out of step', () => {
+  // The case that would mean the fault moved rather than went away.
+  const verdict = artworkVerdict({ artworkChars: 0 }, nativeOk, {
+    stage: 'ready', coverBytes: 51596, shrunkChars: 46735
+  });
+  assert.match(verdict, /out of step/);
+});
+
+test('it repeats whatever stage the cover actually stopped at', () => {
+  const verdict = artworkVerdict({ artworkChars: 0 }, nativeOk, { stage: 'threw: quota exceeded' });
+  assert.match(verdict, /threw: quota exceeded/);
+});
+
+test('the cover lines report whether the browser Media Session API is even there', () => {
+  // The condition that was silently deciding whether there was any artwork at
+  // all, because the cover was only ever made after a check for it.
+  const printed = describeCover({ stage: 'ready', coverBytes: 51596, shrunkChars: 46735, mediaSessionApi: false }).join('\n');
+  assert.match(printed, /Media Session API: ABSENT/);
+  assert.deepEqual(describeCover(null), []);
 });

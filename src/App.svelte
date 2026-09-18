@@ -1676,7 +1676,77 @@
   // real audio — which is what keeps it running once the screen goes off.
   let mediaSessionCoverUrl = '';
 
+  /** Why the cover is what it is, for the diagnostics report. */
+  let coverReport = { stage: 'nothing played yet' };
+
+  /**
+   * The cover for a track, ready to hand to anything that wants one.
+   *
+   * **This used to live inside updateMediaSession, behind its early return**,
+   * and that was the whole of the missing artwork on the phone. That function
+   * begins by checking for `navigator.mediaSession` and `MediaMetadata` — a
+   * browser API — and returns when either is absent. Android's notification is
+   * a native service that has nothing to do with that API, but the only place
+   * its picture was ever produced was after that check, so wherever the web
+   * Media Session is unavailable the notification got no artwork, for ever,
+   * while its title, buttons and progress bar all carried on working through
+   * the native path. Which is exactly what it looked like from the outside:
+   * everything working except the cover.
+   *
+   * So the cover is prepared on its own terms now, and the web Media Session is
+   * one of the things that consumes it rather than the thing that gates it.
+   */
+  async function prepareCover(track) {
+    // Cleared first, and unconditionally. Left to the branch below, a track
+    // with no cover of its own kept the previous track's picture.
+    mediaSessionCoverUrl = '';
+
+    if (!track) {
+      coverReport = { stage: 'nothing playing' };
+      return '';
+    }
+
+    const report = {
+      trackId: track.id,
+      // Recorded rather than assumed: this is the condition that was silently
+      // deciding whether there was any artwork at all.
+      mediaSessionApi:
+        typeof navigator !== 'undefined' &&
+        Boolean(navigator.mediaSession) &&
+        typeof MediaMetadata !== 'undefined'
+    };
+
+    try {
+      const cover = await ensureMusicCover(track.id);
+      report.coverBytes = cover?.size ?? 0;
+      if (!cover) {
+        report.stage = 'no cover found in the file or the store';
+        coverReport = report;
+        return '';
+      }
+
+      // Cut down on the way: it travels to Android on an intent, and a
+      // full-size embedded sleeve does not fit through Binder. See
+      // utils/coverArtwork.js.
+      const dataUrl = await shrinkCover(cover);
+      report.shrunkChars = dataUrl.length;
+      report.stage = dataUrl ? 'ready' : 'a cover was found but would not shrink';
+      coverReport = report;
+
+      mediaSessionCoverUrl = dataUrl;
+      return dataUrl;
+    } catch (error) {
+      report.stage = `threw: ${error?.message || error}`;
+      coverReport = report;
+      return '';
+    }
+  }
+
   async function updateMediaSession(track) {
+    // First, and outside everything below, because the notification's artwork
+    // is not the web Media Session's business.
+    const dataUrl = await prepareCover(track);
+
     const ms = navigator.mediaSession;
     if (!ms || typeof MediaMetadata === 'undefined') return;
     if (!track) {
@@ -1685,28 +1755,11 @@
       return;
     }
 
-    // The notification can't read a blob: URL from IndexedDB, so the cover is
-    // re-encoded as a data URL it can actually fetch -- and cut down on the way,
-    // because it travels to Android on an intent and a full-size embedded sleeve
-    // does not fit through Binder. See utils/coverArtwork.js.
-    const artwork = [];
-    // Cleared first, and unconditionally. Left to the branch below, a track with
-    // no cover of its own kept the previous track's picture on the lock screen.
-    mediaSessionCoverUrl = '';
-    try {
-      const cover = await ensureMusicCover(track.id);
-      const dataUrl = cover ? await shrinkCover(cover) : '';
-      if (dataUrl) {
-        mediaSessionCoverUrl = dataUrl;
-        artwork.push({ src: dataUrl, type: 'image/jpeg', sizes: '512x512' });
-      }
-    } catch { /* artwork is optional */ }
-
     ms.metadata = new MediaMetadata({
       title: track.title || 'Untitled',
       artist: track.artist || '',
       album: track.album || '',
-      artwork
+      artwork: dataUrl ? [{ src: dataUrl, type: 'image/jpeg', sizes: '512x512' }] : []
     });
   }
 
@@ -2006,7 +2059,7 @@
       // Both halves of the handover to the phone's notification. Asked for
       // after the cover still did not appear: "do you want to make a diagnostic
       // or something to be sure of why it doesn't work?"
-      notification: await notificationDiagnostics()
+      notification: { ...(await notificationDiagnostics()), cover: coverReport }
     }));
   }
   let lastPaintedTheme = null;
