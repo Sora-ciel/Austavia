@@ -198,10 +198,85 @@ export function buildDiagnostics(input = {}) {
     themes: summariseThemes(input.themes),
     samples: input.samples || [],
     sync: input.sync || {},
-    library: input.library || {}
+    library: input.library || {},
+    notification: input.notification || null
   };
   report.notes = flagSuspicions(report);
   return report;
+}
+
+/**
+ * The playback notification, as both halves of the handover.
+ *
+ * Written to answer one question that cannot be answered from outside the
+ * phone: when the cover does not appear, did it never cross, did it cross and
+ * fail to decode, or did it decode and get ignored? Those are three different
+ * faults that look identical from here, and the verdict at the end names which
+ * one rather than leaving it to be read out of numbers.
+ */
+export function describeNotification(notification) {
+  if (!notification) return [];
+
+  const lines = ['', 'playback notification'];
+  const sent = notification.sent;
+  const native = notification.native;
+
+  if (notification.platform !== 'android') {
+    lines.push(`  platform: ${notification.platform} — the notification is Android only`);
+    return lines;
+  }
+  if (notification.plugin === 'missing') {
+    lines.push('  the native plugin is not registered, so nothing can be shown at all');
+    return lines;
+  }
+
+  if (!sent) {
+    lines.push('  the app has not tried to show one yet — play something first');
+  } else {
+    lines.push(
+      `  last sent: ${new Date(sent.at).toLocaleTimeString()} · artwork ${sent.artworkChars} chars` +
+        ` · ${sent.playing ? 'playing' : 'paused'}` +
+        (sent.durationMs ? ` · ${Math.round(sent.durationMs / 1000)}s` : ' · no duration')
+    );
+    if (sent.error) lines.push(`  the send itself failed: ${sent.error}`);
+  }
+
+  if (!native) {
+    lines.push(`  the service could not be asked${notification.error ? `: ${notification.error}` : ''}`);
+    return lines;
+  }
+
+  lines.push(
+    `  service: ${native.serviceRunning ? 'running' : 'not running'}` +
+      ` · Android API ${native.sdk}` +
+      ` · ${native.updatesReceived} update(s) received` +
+      ` · notifications ${native.notificationsAllowed ? 'allowed' : 'BLOCKED'}`
+  );
+  lines.push(
+    `  artwork received: ${native.artworkChars < 0 ? 'none sent with the last update' : `${native.artworkChars} chars`}` +
+      ` · decoded ${native.artworkWidth}x${native.artworkHeight}`
+  );
+  if (native.artworkError) lines.push(`  artwork error: ${native.artworkError}`);
+
+  lines.push(`  → ${artworkVerdict(sent, native)}`);
+  return lines;
+}
+
+/** Which of the three faults this is, said plainly rather than implied. */
+export function artworkVerdict(sent, native) {
+  if (!native.notificationsAllowed) {
+    return 'notifications are blocked for the app, so nothing will show whatever else is right';
+  }
+  if (!sent || sent.artworkChars === 0) {
+    return 'the app sent no artwork — the cover was never found or never shrunk, so the fault is on the web side';
+  }
+  if (native.artworkChars < 0) {
+    return 'the app sent artwork but the service received none — it is being lost in the handover';
+  }
+  if (native.artworkWidth === 0 || native.artworkHeight === 0) {
+    return 'the artwork arrived but would not decode into a picture';
+  }
+  return `the artwork arrived and decoded at ${native.artworkWidth}x${native.artworkHeight} — it is in Android's hands, so what is left is how the system chooses to draw it`;
 }
 
 /** The snapshot as text, for pasting into a message. */
@@ -271,6 +346,8 @@ export function formatDiagnostics(report) {
       (report.sync.lastError ? ` · last error: ${report.sync.lastError}` : '')
   );
   lines.push(`music: ${report.library.tracks ?? 0} track(s), ${report.library.playlists ?? 0} playlist(s)`);
+
+  for (const line of describeNotification(report.notification)) lines.push(line);
 
   if (report.sync.log?.length) {
     lines.push('');

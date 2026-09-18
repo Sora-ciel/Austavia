@@ -21,7 +21,7 @@
   export let downloadInProgress = false;
   export let autoSyncEnabled = false;
   // Supplied by App, which is the only place that knows the whole picture.
-  export let collectDiagnostics = () => 'diagnostics unavailable';
+  export let collectDiagnostics = async () => 'diagnostics unavailable';
   export let blocksFollowTheme = false;
   export let blocksFollowThemeAll = false;
 
@@ -47,7 +47,7 @@
   // and the fact that mattered was usually the one nobody thought to mention.
   let diagnosticsCopied = false;
   async function copyDiagnostics() {
-    const text = collectDiagnostics();
+    const text = await collectDiagnostics();
     try {
       await navigator.clipboard.writeText(text);
       diagnosticsCopied = true;

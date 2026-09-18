@@ -119,7 +119,8 @@
   import {
     startBackgroundAudio,
     stopBackgroundAudio,
-    setBackgroundAudioActions
+    setBackgroundAudioActions,
+    notificationDiagnostics
   } from './utils/backgroundAudio.js';
   import { worthReporting } from './utils/playbackPosition.js';
   import { shrinkCover } from './utils/coverArtwork.js';
@@ -1962,7 +1963,7 @@
     });
   }
 
-  function collectDiagnostics() {
+  async function collectDiagnostics() {
     const platform = typeof window === 'undefined'
       ? 'unknown'
       : window.__TAURI_INTERNALS__ || window.__TAURI__
@@ -2001,7 +2002,11 @@
       library: {
         tracks: musicLibrary?.tracks?.length ?? 0,
         playlists: musicLibrary?.playlists?.length ?? 0
-      }
+      },
+      // Both halves of the handover to the phone's notification. Asked for
+      // after the cover still did not appear: "do you want to make a diagnostic
+      // or something to be sure of why it doesn't work?"
+      notification: await notificationDiagnostics()
     }));
   }
   let lastPaintedTheme = null;

@@ -243,3 +243,74 @@ test('a block with nothing painted over it raises nothing', () => {
   });
   assert.deepEqual(notes, []);
 });
+
+// ── The playback notification ────────────────────────────────────
+// Added after the cover still did not appear on the phone twice running, and
+// the offer was made plainly: "do you want to make a diagnostic or something to
+// be sure of why it doesn't work?"
+//
+// The cover crosses from the web layer into an Android service nobody can
+// watch. When it does not appear there are three faults that look identical
+// from outside the phone, and each wants a different fix. The verdict names
+// which one rather than leaving it to be read out of a row of numbers -- the
+// numbers were there the last two times and were read wrongly, by me.
+
+import { describeNotification, artworkVerdict } from '../src/utils/diagnostics.js';
+
+const sentWithArt = { at: 0, artworkChars: 46735, playing: true, durationMs: 208000, error: null };
+const nativeOk = {
+  sdk: 34, serviceRunning: true, updatesReceived: 3,
+  artworkChars: 46735, artworkWidth: 512, artworkHeight: 512,
+  artworkError: null, notificationsAllowed: true
+};
+
+test('it says when the app never sent a cover at all', () => {
+  const verdict = artworkVerdict({ ...sentWithArt, artworkChars: 0 }, nativeOk);
+  assert.match(verdict, /sent no artwork/);
+  assert.match(verdict, /web side/, 'and says which side to look at');
+});
+
+test('it says when the cover was sent but never arrived', () => {
+  // The handover itself losing it -- what a cover too big for Binder looks
+  // like, which is the fault that was found and fixed at 1400px.
+  const verdict = artworkVerdict(sentWithArt, { ...nativeOk, artworkChars: -1 });
+  assert.match(verdict, /received none/);
+  assert.match(verdict, /handover/);
+});
+
+test('it says when the cover arrived but would not decode', () => {
+  const verdict = artworkVerdict(sentWithArt, {
+    ...nativeOk, artworkWidth: 0, artworkHeight: 0
+  });
+  assert.match(verdict, /would not decode/);
+});
+
+test('it says when the cover is in Android hands, which is the answer that clears us', () => {
+  // The one that matters most: it means the app has done its part and what is
+  // left is how the system chooses to draw it -- a different conversation.
+  const verdict = artworkVerdict(sentWithArt, nativeOk);
+  assert.match(verdict, /arrived and decoded at 512x512/);
+});
+
+test('blocked notifications are said first, because nothing else matters then', () => {
+  // Everything downstream can be perfect and still show nothing, so this is
+  // checked before the rest rather than reported alongside it.
+  const verdict = artworkVerdict(sentWithArt, { ...nativeOk, notificationsAllowed: false });
+  assert.match(verdict, /blocked/);
+});
+
+test('the report says plainly when nothing has been played yet', () => {
+  const lines = describeNotification({ platform: 'android', sent: null, native: nativeOk }).join('\n');
+  assert.match(lines, /has not tried to show one yet/);
+});
+
+test('the report does not pretend on a platform that has no notification', () => {
+  const lines = describeNotification({ platform: 'web', sent: null }).join('\n');
+  assert.match(lines, /Android only/);
+  assert.deepEqual(describeNotification(null), [], 'and says nothing at all when there is nothing');
+});
+
+test('a missing plugin is named rather than read as a missing cover', () => {
+  const lines = describeNotification({ platform: 'android', plugin: 'missing', sent: null }).join('\n');
+  assert.match(lines, /not registered/);
+});

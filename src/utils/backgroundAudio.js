@@ -23,6 +23,8 @@ let pluginLoadFailed = false;
 let listenerAttached = false;
 let shown = false;
 let actionHandlers = {};
+/** The last thing handed to the notification, for the diagnostics report. */
+let lastSent = null;
 
 function isNativeAndroid() {
   const capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
@@ -92,6 +94,16 @@ export async function startBackgroundAudio({
   const where = positionReport({ position, duration, playing: isPlaying });
 
   try {
+    lastSent = {
+      at: Date.now(),
+      titleChars: (title || '').length,
+      artworkChars: (artwork || '').length,
+      playing: Boolean(isPlaying),
+      positionMs: where?.positionMs ?? null,
+      durationMs: where?.durationMs ?? null,
+      error: null
+    };
+
     await service.show({
       title: title || 'Playing',
       artist: artist || '',
@@ -102,7 +114,31 @@ export async function startBackgroundAudio({
     });
     shown = true;
   } catch (error) {
+    if (lastSent) lastSent.error = String(error?.message || error);
     console.warn('Could not show the playback notification:', error);
+  }
+}
+
+/**
+ * Both halves of the handover, for the diagnostics report.
+ *
+ * What the web layer sent, and what the service says it received. The point is
+ * the comparison: artwork counted here but not there never crossed, artwork
+ * counted on both sides but no bitmap would not decode, and a bitmap with a size
+ * means the picture is in Android's hands and the rest is the system's doing.
+ * Each is a different fault, and from the outside they look identical.
+ */
+export async function notificationDiagnostics() {
+  if (!isNativeAndroid()) return { platform: 'not android', sent: lastSent };
+  const service = getPlugin();
+  if (!service) return { platform: 'android', plugin: 'missing', sent: lastSent };
+
+  try {
+    const native = typeof service.status === 'function' ? await service.status() : null;
+    return { platform: 'android', sent: lastSent, native };
+  } catch (error) {
+    // An older build of the app with a newer web layer, most likely.
+    return { platform: 'android', sent: lastSent, native: null, error: String(error?.message || error) };
   }
 }
 

@@ -112,6 +112,36 @@ public class MediaNotificationPlugin extends Plugin {
         intent.putExtra(extra, value.longValue());
     }
 
+    /**
+     * What the notification service actually received and made of it.
+     *
+     * The cover crosses from the web layer into a service nobody can watch, and
+     * when it does not appear there is no way from the outside to tell the three
+     * cases apart: it was never sent, it arrived and would not decode, or it
+     * decoded and the system ignored it. Each wants a different fix, so this
+     * says which — and it reports rather than guesses, because every previous
+     * guess about this has been wrong.
+     */
+    @PluginMethod
+    public void status(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("sdk", Build.VERSION.SDK_INT);
+        out.put("serviceRunning", MediaNotificationService.serviceRunning);
+        out.put("updatesReceived", MediaNotificationService.updatesReceived);
+        // -1 means the last update carried no artwork extra at all, which is a
+        // different fault from one that arrived and failed.
+        out.put("artworkChars", MediaNotificationService.lastArtworkChars);
+        out.put("artworkWidth", MediaNotificationService.lastArtworkWidth);
+        out.put("artworkHeight", MediaNotificationService.lastArtworkHeight);
+        out.put("artworkError", MediaNotificationService.lastArtworkError);
+        out.put(
+            "notificationsAllowed",
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                || getPermissionState("notifications") == com.getcapacitor.PermissionState.GRANTED
+        );
+        call.resolve(out);
+    }
+
     /** Takes the notification down and lets the service stop. */
     @PluginMethod
     public void hide(PluginCall call) {

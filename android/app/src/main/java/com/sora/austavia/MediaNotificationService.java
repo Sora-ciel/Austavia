@@ -67,6 +67,20 @@ public class MediaNotificationService extends Service {
     /** Set by the plugin so button presses can be forwarded to the web layer. */
     public static ActionListener actionListener;
 
+    // ── What the last update actually did ────────────────────────────
+    // Read by the plugin's status() and printed in the app's diagnostics. The
+    // cover crosses from the web layer into a process nobody can watch, and
+    // when it does not appear there is no way from the outside to tell whether
+    // it was never sent, arrived and would not decode, or decoded and was
+    // ignored. These say which.
+    public static volatile boolean serviceRunning = false;
+    /** Characters of data URL received, or -1 when none was sent at all. */
+    public static volatile int lastArtworkChars = -1;
+    public static volatile int lastArtworkWidth = 0;
+    public static volatile int lastArtworkHeight = 0;
+    public static volatile String lastArtworkError = null;
+    public static volatile int updatesReceived = 0;
+
     public interface ActionListener {
         /**
          * @param value a position in milliseconds for ACTION_SEEK, and 0 for
@@ -87,6 +101,7 @@ public class MediaNotificationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        serviceRunning = true;
         createChannel();
 
         session = new MediaSessionCompat(this, "AustaviaPlayback");
@@ -164,9 +179,13 @@ public class MediaNotificationService extends Service {
             long sentDuration = intent.getLongExtra(EXTRA_DURATION, UNSET);
             if (sentDuration >= 0) durationMs = sentDuration;
 
+            updatesReceived += 1;
             String artworkData = intent.getStringExtra(EXTRA_ARTWORK);
+            lastArtworkChars = artworkData == null ? -1 : artworkData.length();
             if (artworkData != null) {
                 artwork = decodeArtwork(artworkData);
+                lastArtworkWidth = artwork == null ? 0 : artwork.getWidth();
+                lastArtworkHeight = artwork == null ? 0 : artwork.getHeight();
             }
         }
 
@@ -187,6 +206,7 @@ public class MediaNotificationService extends Service {
     }
 
     private void stopPlayback() {
+        serviceRunning = false;
         if (session != null) session.setActive(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(Service.STOP_FOREGROUND_REMOVE);
@@ -215,9 +235,17 @@ public class MediaNotificationService extends Service {
             int comma = dataUrl.indexOf(',');
             String base64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;
             byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
-            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            Bitmap decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            // Said out loud rather than swallowed. A null here looks exactly
+            // like artwork that was never sent, and the two have nothing to do
+            // with each other.
+            lastArtworkError = decoded == null
+                ? "decoded to null from " + bytes.length + " bytes"
+                : null;
+            return decoded;
         } catch (Exception error) {
             // Artwork is decoration; a bad image must not stop the notification.
+            lastArtworkError = error.getClass().getSimpleName() + ": " + error.getMessage();
             return null;
         }
     }
