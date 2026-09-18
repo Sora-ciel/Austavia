@@ -27,6 +27,8 @@ list below with what was observed.
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
 | 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
 | 0.8.641 | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
+| 0.8.643 | **The cover on the notification** — it was never arriving at all (2.5MB through a ~1MB buffer), so this is the first build where there is artwork for Android to colour the notification from and use as the media card's background. Also: a track with no art should no longer show the previous track's. |
+| 0.8.643 | **Swiping the notification away** — the track should still be loaded and paused in the app, not gone. Pressing play, or changing track, should bring the notification back. Worth trying a stop from a headset or car too, which now behaves the same. |
 | 0.8.642 | **The notification on the phone**: the transport buttons should be the app's own shapes rather than Android's, and the system player should now draw a **progress bar that can be dragged**. Worth checking on the lock screen as well as in the shade, and that the bar stops moving when the music is paused. None of it can be exercised from a browser. |
 | 0.8.641 | **The test-release path itself**, the first time it has been run: the live site should still report 0.8.64, the GitHub release should be badged *Pre-release* and not *Latest*, and the preview channel should report 0.8.641. All three were checked from here; what is unconfirmed is installing the APK over a full release and finding it behaves. |
 
@@ -119,9 +121,13 @@ In order, each landing and released on its own:
   seeded five-minute audio, including playing from one playlist and then another
   and restarting. What a seeded library still cannot show is a real file
   finishing and autoplay stepping on in a long library.
-- **The phone's media notification.** The transport icons and the progress bar
-  went out in 0.8.642 and none of it can be exercised from a browser: the shade,
-  the lock screen, and whether the bar can actually be dragged.
+- **The phone's media notification.** The transport icons and progress bar went
+  out in 0.8.642, the cover art and the swipe behaviour in 0.8.643, and none of
+  it can be exercised from a browser: the shade, the lock screen, whether the bar
+  can be dragged, and whether the artwork actually colours the card. The cover's
+  size was measured in a browser (a 1400px sleeve is 2.58M characters as a data
+  URL, against a Binder buffer of about 1MB) but that it now *arrives* has only
+  been reasoned about, not seen.
 
 ## 4. Loose ends
 
