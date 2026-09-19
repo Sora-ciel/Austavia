@@ -45,6 +45,28 @@ import java.io.InputStream;
  */
 public class ImagePasteWebView extends CapacitorWebView {
 
+    // ── What actually happened, link by link ────────────────────────
+    // Reported through DiagnosticsPlugin and printed in the app's diagnostics.
+    // The picture crosses four boundaries between the keyboard and the note --
+    // the keyboard asking us what we accept, the keyboard handing one over,
+    // reading it out of a temporary URI, and getting it into the page -- and
+    // from outside all four failures look like "nothing happened". These say
+    // which one it was.
+
+    /** The constructor ran, so the layout override really is in effect. */
+    public static volatile boolean installed = false;
+    /** How many times the keyboard has asked us to set up input. Zero is a finding. */
+    public static volatile int inputConnectionsCreated = 0;
+    /** Whether we got as far as declaring what we accept. */
+    public static volatile boolean mimeTypesDeclared = false;
+    /** How many times the keyboard has actually offered us content. */
+    public static volatile int contentOffers = 0;
+    public static volatile String lastOffer = "nothing offered yet";
+    public static volatile int lastPictureBytes = -1;
+    public static volatile int lastDataUrlChars = -1;
+    public static volatile int deliveriesToPage = 0;
+    public static volatile String lastError = null;
+
     /** Anything that is a picture. The page decides what it can actually draw. */
     private static final String[] ACCEPTED = new String[] { "image/*" };
 
@@ -53,15 +75,24 @@ public class ImagePasteWebView extends CapacitorWebView {
 
     public ImagePasteWebView(Context context, AttributeSet attrs) {
         super(context, attrs);
+        installed = true;
         ViewCompat.setOnReceiveContentListener(this, ACCEPTED, this::onReceiveContent);
     }
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        inputConnectionsCreated += 1;
         InputConnection connection = super.onCreateInputConnection(outAttrs);
-        if (connection == null) return null;
+        if (connection == null) {
+            // Worth recording rather than returning quietly: with no connection
+            // there is nothing to declare anything on, and the keyboard is
+            // never told we take pictures.
+            lastError = "super.onCreateInputConnection returned null";
+            return null;
+        }
 
         EditorInfoCompat.setContentMimeTypes(outAttrs, ACCEPTED);
+        mimeTypesDeclared = true;
         return InputConnectionCompat.createWrapper(this, connection, outAttrs);
     }
 
@@ -81,17 +112,28 @@ public class ImagePasteWebView extends CapacitorWebView {
      * than the case is worth.
      */
     private ContentInfoCompat onReceiveContent(View view, ContentInfoCompat payload) {
+        contentOffers += 1;
+
         ClipData clip = payload.getClip();
-        if (clip == null || clip.getItemCount() == 0) return payload;
+        if (clip == null || clip.getItemCount() == 0) {
+            lastOffer = "an offer with nothing in it";
+            return payload;
+        }
 
         for (int i = 0; i < clip.getItemCount(); i += 1) {
-            if (clip.getItemAt(i).getUri() == null) return payload;
+            if (clip.getItemAt(i).getUri() == null) {
+                lastOffer = "offered " + clip.getItemCount() + " item(s), not all of them files";
+                return payload;
+            }
         }
 
         boolean tookSomething = false;
         for (int i = 0; i < clip.getItemCount(); i += 1) {
             if (sendToPage(clip.getItemAt(i).getUri())) tookSomething = true;
         }
+        lastOffer = tookSomething
+            ? "took " + clip.getItemCount() + " item(s)"
+            : "offered " + clip.getItemCount() + " item(s) but could read none";
 
         // Anything it could not read — not a picture, too big, unreadable — is
         // handed back rather than swallowed.
@@ -108,12 +150,22 @@ public class ImagePasteWebView extends CapacitorWebView {
      */
     private boolean sendToPage(Uri uri) {
         String type = getContext().getContentResolver().getType(uri);
-        if (type == null || !type.startsWith("image/")) return false;
+        if (type == null || !type.startsWith("image/")) {
+            lastError = "offered something that is not a picture: " + type;
+            return false;
+        }
 
         byte[] bytes = readAll(uri);
-        if (bytes == null) return false;
+        if (bytes == null) {
+            // readAll already said why.
+            lastPictureBytes = -1;
+            return false;
+        }
+        lastPictureBytes = bytes.length;
 
         final String dataUrl = "data:" + type + ";base64," + Base64.encodeToString(bytes, Base64.NO_WRAP);
+        lastDataUrlChars = dataUrl.length();
+        deliveriesToPage += 1;
         post(() -> evaluateJavascript(
             "window.__austaviaPasteImage && window.__austaviaPasteImage('" + dataUrl + "')",
             null
@@ -133,11 +185,15 @@ public class ImagePasteWebView extends CapacitorWebView {
                 total += read;
                 // Stopped rather than truncated: half a picture is not a
                 // picture, and pretending otherwise puts a broken one in a note.
-                if (total > MAX_BYTES) return null;
+                if (total > MAX_BYTES) {
+                    lastError = "picture larger than the " + (MAX_BYTES / (1024 * 1024)) + "MB limit";
+                    return null;
+                }
                 out.write(buffer, 0, read);
             }
             return out.toByteArray();
         } catch (Exception error) {
+            lastError = "could not read the picture: " + error.getClass().getSimpleName();
             return null;
         }
     }

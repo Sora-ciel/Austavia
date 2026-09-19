@@ -23,6 +23,8 @@
  * browser. The measuring and the copying happen at the call site.
  */
 
+import { describePicturePaste } from './picturePasteReport.js';
+
 /** The value a header background holds when it is meant to follow its block. */
 export const FOLLOWS_BLOCK = 'var(--bg)';
 
@@ -199,7 +201,8 @@ export function buildDiagnostics(input = {}) {
     samples: input.samples || [],
     sync: input.sync || {},
     library: input.library || {},
-    notification: input.notification || null
+    notification: input.notification || null,
+    picturePaste: input.picturePaste || null
   };
   report.notes = flagSuspicions(report);
   return report;
@@ -382,6 +385,7 @@ export function formatDiagnostics(report) {
   lines.push(`music: ${report.library.tracks ?? 0} track(s), ${report.library.playlists ?? 0} playlist(s)`);
 
   for (const line of describeNotification(report.notification)) lines.push(line);
+  for (const line of describePicturePaste(report.picturePaste?.native, report.picturePaste?.page)) lines.push(line);
 
   if (report.sync.log?.length) {
     lines.push('');

@@ -14,6 +14,7 @@ public class MainActivity extends BridgeActivity {
         // Registered before the bridge starts so the web layer can call it
         // as soon as it loads.
         registerPlugin(MediaNotificationPlugin.class);
+        registerPlugin(DiagnosticsPlugin.class);
         super.onCreate(savedInstanceState);
         keepTheWebViewAboveTheKeyboard();
     }

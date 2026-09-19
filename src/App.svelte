@@ -125,6 +125,7 @@
   import { worthReporting } from './utils/playbackPosition.js';
   import { coverForNotification } from './utils/coverArtwork.js';
   import { shouldShowNotification, dismissalFor } from './utils/notificationPresence.js';
+  import { notePictureArrived, NOTHING_YET } from './utils/picturePasteReport.js';
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
   const CUSTOM_THEMES_STORAGE_KEY = 'customThemes';
@@ -1033,7 +1034,21 @@
    * call. Returns a string rather than throwing, so the Android side can say
    * whether it worked without parsing an exception.
    */
+  /** What the page has heard from the keyboard, for the diagnostics report. */
+  let keyboardPictures = NOTHING_YET;
+
   function receivePictureFromKeyboard(dataUrl) {
+    // Recorded whatever happens next, because "the page never heard" and "the
+    // page heard and refused it" are different faults that look the same.
+    const outcome = takePictureFromKeyboard(dataUrl);
+    keyboardPictures = notePictureArrived(keyboardPictures, {
+      outcome,
+      chars: typeof dataUrl === 'string' ? dataUrl.length : 0
+    });
+    return outcome;
+  }
+
+  function takePictureFromKeyboard(dataUrl) {
     try {
       if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return 'not a picture';
 
@@ -2044,6 +2059,17 @@
     });
   }
 
+  /** What the native side saw of the keyboard's pictures, or null off Android. */
+  async function nativePicturePasteStatus() {
+    try {
+      const plugin = window.Capacitor?.Plugins?.Diagnostics;
+      if (!plugin?.picturePaste) return null;
+      return await plugin.picturePaste();
+    } catch {
+      return null;
+    }
+  }
+
   async function collectDiagnostics() {
     const platform = typeof window === 'undefined'
       ? 'unknown'
@@ -2087,7 +2113,8 @@
       // Both halves of the handover to the phone's notification. Asked for
       // after the cover still did not appear: "do you want to make a diagnostic
       // or something to be sure of why it doesn't work?"
-      notification: { ...(await notificationDiagnostics()), cover: coverReport }
+      notification: { ...(await notificationDiagnostics()), cover: coverReport },
+      picturePaste: { native: await nativePicturePasteStatus(), page: keyboardPictures }
     }));
   }
   let lastPaintedTheme = null;
