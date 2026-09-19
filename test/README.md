@@ -114,12 +114,15 @@ import, and the code that acts on them stayed where it was:
 
 **`coverArtwork.test.js`**
 
-- A cover is cut to 512 on its long edge, keeping its shape, and never enlarged.
-  Not a tidy-up: the cover reaches Android as a string on an intent, everything
-  on an intent goes through Binder, and Binder's buffer is about a megabyte for
-  the whole process. A measured 1400px sleeve is **2.58 million characters** as a
-  data URL, so it was silently dropped every time — which is why there was no
-  artwork for the system to use as the notification's background.
+- **A cover that already fits is not touched at all** — no re-encode, no loss —
+  and only one too big to send is reduced, by as little as gets it under the
+  limit. Not a tidy-up: the cover reaches Android as a string on an intent,
+  everything on an intent goes through Binder, and Binder's buffer is about a
+  megabyte for the whole process. A measured 1400px sleeve is **2.58 million
+  characters** as a data URL and cannot cross at all.
+- Reducing everything was the first version, and it cost quality on covers that
+  were never the problem — the artwork was not being made at all, for a reason
+  that had nothing to do with size.
 - The ceiling is deliberately far below the real one, because the budget is
   shared with everything else in flight and that cannot be asked about from here.
 
