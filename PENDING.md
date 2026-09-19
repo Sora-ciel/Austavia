@@ -27,6 +27,7 @@ list below with what was observed.
 | 0.8.63 | **Shuffle's back button** retracing what you heard. |
 | 0.8.64 | **Shuffle's path surviving a restart** — close the app mid-listen, reopen, and back should still walk what you heard before. |
 | 0.8.641 | **Typing on the phone**, which is where the complaint came from. Also worth a look: undo straight after a word, clicking away mid-word, and switching modes mid-word — those are the three moments the last characters typed could go missing, and each is now flushed on purpose. |
+| 0.8.648 | **The Picture button in Single Note** — clipboard first, file picker when the clipboard has nothing. Worth trying in the app *and* on austavia.com in Chrome, since those failed for different reasons and only one of them was ours. |
 | 0.8.647 | **Covers on .m4a files** that had none before, and **changing tracks without the player going blank** — including skipping quickly, where the artwork must never land on the wrong track. |
 | 0.8.646 | **The cover at full quality.** Confirmed working in 0.8.645 — the cause was that the cover was only ever produced behind a check for the browser Media Session API, which the phone's webview does not provide, so the native notification never got one. Now it is also sent untouched unless too big to cross, so what is left to look at is whether it is sharp rather than whether it is there. |
 | 0.8.643 | **Swiping the notification away** — the track should still be loaded and paused in the app, not gone. Pressing play, or changing track, should bring the notification back. Worth trying a stop from a headset or car too, which now behaves the same. |
@@ -113,6 +114,14 @@ In order, each landing and released on its own:
 - **Image paste from the Android keyboard.** Shipped in 0.8.57
   (`ImagePasteWebView`), never confirmed. `commitContent` cannot be exercised
   from a browser.
+
+  Still unconfirmed, but no longer blocking anybody: 0.8.648 adds a Picture
+  button that does not go through the keyboard at all. Worth knowing if this is
+  ever picked up again — the declaration and the receiver both look right, and
+  the editor lookup in `receivePictureFromKeyboard` is *not* broken, which was
+  checked: TipTap does set `.editor` on the ProseMirror node. On the website
+  this can never work, because there the declaration is Chrome's to make and
+  Chrome refuses.
 - **The desktop drag cursor.** `dragDropEnabled: false` fixed the drag in
   0.8.58; `dropEffect` in 0.8.59 was meant to remove the remaining flash of the
   no-drop pointer. A browser ignores `dropEffect` outside a real drag, so this
