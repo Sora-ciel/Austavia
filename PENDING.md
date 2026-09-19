@@ -17,7 +17,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
-| 0.8.57 | Pasting a picture from the **Android keyboard's** own picker, not the clipboard. `commitContent` cannot be exercised from a browser. |
+| 0.8.650 | Pasting a picture from the **Android keyboard's** own picker. Broken since a Capacitor upgrade renamed the layout our WebView override was aimed at, so the app was not using its own WebView at all and nothing was ever declared. Fixed and now guarded by `test/capacitorLayout.test.js`. |
 | 0.8.59 | The **drag pointer** on the desktop: the no-drop cursor should no longer flash at the start of a drag. A browser ignores `dropEffect` outside a real drag. |
 | 0.8.60 | A **real track ending** and autoplay stepping on, in a full library. Seeded audio covered everything up to that. |
 | 0.8.62 | **Adding a picture while signed in.** This is the file-dialog fix; it is the one most likely to have been the whole complaint. |
@@ -111,17 +111,24 @@ In order, each landing and released on its own:
 
 ## 3. Waiting on a device, not on code
 
-- **Image paste from the Android keyboard.** Shipped in 0.8.57
-  (`ImagePasteWebView`), never confirmed. `commitContent` cannot be exercised
-  from a browser.
+- **Image paste from the Android keyboard.** The cause is known now and fixed
+  in 0.8.650: Capacitor renamed the layout `BridgeActivity` inflates, from
+  `bridge_layout_main` to `capacitor_bridge_layout_main`, while still shipping
+  the old name — so the override kept merging cleanly against a file nothing
+  reads and the app silently went back to Capacitor's plain WebView.
 
-  Still unconfirmed, but no longer blocking anybody: 0.8.648 adds a Picture
-  button that does not go through the keyboard at all. Worth knowing if this is
-  ever picked up again — the declaration and the receiver both look right, and
-  the editor lookup in `receivePictureFromKeyboard` is *not* broken, which was
-  checked: TipTap does set `.editor` on the ProseMirror node. On the website
-  this can never work, because there the declaration is Chrome's to make and
-  Chrome refuses.
+  **The lesson is the silence, not the rename.** There was no symptom except the
+  feature being gone: the build passed, the resource merge passed, and checking
+  the old file by hand looked like a pass because our class was in it. It took a
+  diagnostic to say "our WebView: NOT IN USE". `test/capacitorLayout.test.js`
+  now reads Capacitor's source for the name it really inflates and fails if we
+  are not overriding it, so the next upgrade is loud.
+
+  Two things checked along the way and found sound, so they are not re-checked:
+  the editor lookup in `receivePictureFromKeyboard` works (TipTap does set
+  `.editor` on the ProseMirror node), and on the website none of this can ever
+  work, because there the declaration is Chrome's to make and Chrome refuses.
+  The Picture button from 0.8.648 covers both.
 - **The desktop drag cursor.** `dragDropEnabled: false` fixed the drag in
   0.8.58; `dropEffect` in 0.8.59 was meant to remove the remaining flash of the
   no-drop pointer. A browser ignores `dropEffect` outside a real drag, so this
