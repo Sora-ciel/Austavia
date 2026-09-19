@@ -1,18 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
 <!--
-  Capacitor's own bridge_layout_main.xml, with one line changed: the WebView is
-  com.sora.austavia.ImagePasteWebView rather than com.getcapacitor.CapacitorWebView.
+  ** This is NOT the file that matters. See capacitor_bridge_layout_main.xml. **
 
-  Android resource merging lets an app's layout override a library's of the same
-  name, and this is the only way to get a WebView subclass into a Capacitor
-  activity — the bridge inflates this file by name and finds the view by id.
+  Capacitor still ships a layout by this name, but it stopped inflating it:
+  BridgeActivity calls setContentView(R.layout.capacitor_bridge_layout_main).
+  So this override merges cleanly, builds cleanly, and does nothing at all.
 
-  ImagePasteWebView extends CapacitorWebView, so everything Capacitor does here
-  still happens. It adds one thing: declaring that the app accepts pictures, so
-  the keyboard stops saying it does not.
-
-  Worth knowing if Capacitor is upgraded: if the library's version of this file
-  gains anything, this copy has to gain it too, because this one wins.
+  It is kept only because Capacitor still ships the name, so overriding it costs
+  nothing and covers any path that might still reach for it. It is left here
+  with this comment rather than deleted because its silence is the trap: when
+  the keyboard stopped being told the app accepts pictures, checking this file
+  showed our WebView named in the merged resources and looked like a pass. It
+  was the wrong file. test/capacitorLayout.test.js now reads Capacitor's source
+  and fails if the name it really inflates is not one we override.
 -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
