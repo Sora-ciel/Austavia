@@ -11,6 +11,11 @@
     withRememberedNote
   } from '../utils/lastNote.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
+  import {
+    canReadClipboard,
+    pictureAmong,
+    pictureAction
+  } from '../utils/clipboardPicture.js';
   import { usesPortraitBackground, noteImageFilterCss } from '../utils/modeBackground.js';
 
   const MOBILE_BREAKPOINT = 1024;
@@ -22,6 +27,63 @@
   /** The open file's name, used only to remember which note was last read. */
   export let fileKey = '';
   export let singleNoteSettings = {};
+
+  // ── Putting a picture in, without the keyboard ───────────────────
+  let noteEditor;
+  let pictureInput;
+
+  /** A blob as something the editor can hold. */
+  function asDataUrl(blob) {
+    return new Promise((resolve) => {
+      try {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      } catch {
+        resolve('');
+      }
+    });
+  }
+
+  /**
+   * The clipboard first, the file picker if it will not oblige.
+   *
+   * Falling through rather than reporting a failure is deliberate: the button
+   * means "put a picture here", and an old browser, a refused permission and a
+   * clipboard holding only text all deserve the same answer. See
+   * utils/clipboardPicture.js.
+   */
+  async function addPicture() {
+    const clipboard = typeof navigator === 'undefined' ? null : navigator.clipboard;
+    const canRead = canReadClipboard(clipboard);
+
+    let src = '';
+    let failed = false;
+    if (canRead) {
+      try {
+        const found = pictureAmong(await clipboard.read());
+        if (found) src = await asDataUrl(await found.item.getType(found.type));
+      } catch {
+        // Refused, unsupported, or nothing readable. All the same from here.
+        failed = true;
+      }
+    }
+
+    if (pictureAction({ canRead, found: Boolean(src), failed }) === 'insert') {
+      if (noteEditor?.insertPicture(src)) return;
+    }
+    pictureInput?.click();
+  }
+
+  async function pictureChosen(event) {
+    const file = event.currentTarget?.files?.[0];
+    // Cleared so that choosing the same file twice in a row still counts.
+    if (event.currentTarget) event.currentTarget.value = '';
+    if (!file || !String(file.type || '').startsWith('image/')) return;
+    const src = await asDataUrl(file);
+    if (src) noteEditor?.insertPicture(src);
+  }
 
   const dispatch = createEventDispatcher();
 
@@ -374,6 +436,34 @@
     border-radius: 0;
   }
 
+  /* Takes the note's own colours rather than picking any, which is the rule in
+     CLAUDE.md: the writing's colour for the mark, and a tint of it for the
+     surface, so it sits right on every theme without being told about any. */
+  .note-picture {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    /* Comfortably past the 44px a thumb wants, since a phone is where this
+       matters and there is nothing else to press. */
+    min-height: 34px;
+  }
+
+  .note-picture:hover {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  .note-picture-input {
+    display: none;
+  }
+
   :global(.single-note .tiptap-wrap) {
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
     color: var(--active-note-text, var(--mode-text-color, #ffffff));
@@ -475,9 +565,36 @@
         <span>Words: {wordCount}</span>
         <span>Characters: {characterCount}</span>
       </div>
+      <!--
+        The only way to put a picture in a note on a phone.
+
+        Dragging one in needs a mouse, and the keyboard's own clipboard refuses:
+        it does not paste a picture, it offers one, and the app has to have said
+        it accepts them. In the Android app that is ours to declare and we do —
+        but on the website it is Chrome's to declare, and Chrome says no. So
+        this asks the clipboard directly, and falls back to choosing a file,
+        neither of which goes through the keyboard at all.
+      -->
+      <button class="note-picture" on:click={addPicture} title="Put a picture in this note">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="8.5" cy="10.5" r="1.5" fill="currentColor" stroke="none" />
+          <path d="M21 16l-5-5L6 19" />
+        </svg>
+        Picture
+      </button>
+      <input
+        class="note-picture-input"
+        type="file"
+        accept="image/*"
+        bind:this={pictureInput}
+        on:change={pictureChosen}
+      />
     </div>
     {#key noteBlock.id}
       <TipTapEditor
+        bind:this={noteEditor}
         content={noteContent}
         historyKey={noteBlock.id}
         initialScrollTop={recallScroll(fileKey, noteBlock.id)}

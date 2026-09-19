@@ -189,6 +189,21 @@
     return true;
   }
 
+  /**
+   * Put a picture in, from somewhere that is not a paste or a drop.
+   *
+   * Exported rather than reached for through the DOM because the caller is a
+   * button, and pressing a button moves the focus onto it — so anything that
+   * worked out where to insert from `document.activeElement` would already be
+   * looking at the wrong thing by the time it ran.
+   */
+  export function insertPicture(src) {
+    if (!editor || editor.isDestroyed) return false;
+    if (typeof src !== 'string' || !src.startsWith('data:image/')) return false;
+    editor.chain().focus().setImage({ src }).run();
+    return true;
+  }
+
   function handleHistoryKeys(view, event) {
     const mod = event.ctrlKey || event.metaKey;
     if (!mod) return false;

@@ -31,6 +31,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/coverArtwork.js` | how big a cover may be before it cannot be sent |
 | `src/utils/notificationPresence.js` | whether the playback notification should be on screen |
 | `src/utils/mp4Cover.js` | where the artwork is inside an .m4a, and whether it is artwork |
+| `src/utils/clipboardPicture.js` | which thing on the clipboard is a picture, and what to do without one |
 
 ## What is covered
 
@@ -155,6 +156,21 @@ import, and the code that acts on them stayed where it was:
   file, and 46ms against 305ms for the byte scan it replaces.
 - Junk, a non-MP4 file, a file with no cover, and a `covr` atom genuinely holding
   text all come back empty rather than confidently wrong.
+
+**`clipboardPicture.test.js`**
+
+- A screenshot is preferred over a photograph, and either over a GIF, because a
+  screenshot is most of what gets pasted into a note.
+- **Every way the clipboard can decline ends at the file picker** — an old
+  browser, a refused permission, a clipboard holding only text. The button means
+  "put a picture here", and all of those deserve the same answer rather than an
+  error. Only a picture actually found goes straight in.
+- Reported as "I can't paste images in Single Note on mobile — and even on the
+  site on Chrome". A keyboard does not paste a picture, it offers one through
+  `commitContent`, and the app must have declared it accepts them. In the Android
+  app that declaration is ours and `ImagePasteWebView` makes it; on the website
+  it is Chrome's, and Chrome refuses. Nothing here can change Chrome's mind, so
+  this is the route that never asks the keyboard.
 
 ## Adding to it
 
