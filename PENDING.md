@@ -17,6 +17,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| 0.8.652 | **Holding a habit to delete it** — and scrolling a list of habits without the menu appearing, which is the case it is most likely to get wrong. Also **the note's footer** going while the keyboard is up and coming back after, with the picture behind holding still. |
 | 0.8.651 | **Habit Tracker on a phone**: a habit two lines tall, the last seven days on one row. Also worth checking **after 8pm** that the last square is really today — the date used to be worked out in UTC, so from early evening the tracker thought it was tomorrow and ticks landed a day late. Old evening ticks will be sitting one square too far right. |
 | 0.8.650 | Pasting a picture from the **Android keyboard's** own picker. Broken since a Capacitor upgrade renamed the layout our WebView override was aimed at, so the app was not using its own WebView at all and nothing was ever declared. Fixed and now guarded by `test/capacitorLayout.test.js`. |
 | 0.8.59 | The **drag pointer** on the desktop: the no-drop cursor should no longer flash at the start of a drag. A browser ignores `dropEffect` outside a real drag. |
