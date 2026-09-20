@@ -94,7 +94,7 @@
     STORAGE_KEY as SHUFFLE_PATH_KEY,
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
-  import { steadyWallpaperHeight, isTyping } from './utils/wallpaperViewport.js';
+  import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -1113,6 +1113,15 @@
    */
   let wallpaperHeight = 0;
   let wallpaperWidth = 0;
+  /**
+   * Whether the on-screen keyboard is covering the bottom of the screen.
+   *
+   * Read from the same measurement the wallpaper is held by, because it is the
+   * same event seen from two sides: the picture wants to keep its height, and
+   * anything sitting at the bottom of a note wants to get out of the way. See
+   * utils/wallpaperViewport.js.
+   */
+  let keyboardOpen = false;
 
   function measureWallpaperBox() {
     if (typeof window === 'undefined') return;
@@ -1127,6 +1136,13 @@
     });
     wallpaperWidth = width;
     if (next !== wallpaperHeight) wallpaperHeight = next;
+    // Against the height being held rather than the one just measured: that is
+    // the height before the keyboard arrived, which is what it is hiding.
+    keyboardOpen = keyboardIsUp({
+      heldHeight: wallpaperHeight,
+      height,
+      typing: isTyping(document.activeElement)
+    });
   }
 
   // Watched the same way the text scale is, and for the same reason: the window
@@ -6278,6 +6294,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       blocks={modeOrderedBlocks}
       {simpleNoteColumnCount}
       {singleNoteSettings}
+      {keyboardOpen}
       {taskAddDirection}
       {musicLibrary}
       {nowPlayingId}

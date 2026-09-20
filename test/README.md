@@ -33,6 +33,8 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/mp4Cover.js` | where the artwork is inside an .m4a, and whether it is artwork |
 | `src/utils/clipboardPicture.js` | which thing on the clipboard is a picture, and what to do without one |
 | `src/utils/habitDays.js` | which days a habit shows, and what day it is where you are |
+| `src/utils/longPress.js` | whether a finger held down is a hold, a tap, or a scroll |
+| `src/utils/wallpaperViewport.js` | how tall the wallpaper is, and whether the keyboard is up |
 
 ## What is covered
 
@@ -191,6 +193,25 @@ import, and the code that acts on them stayed where it was:
   `typeScale.js` carries a scar from.
 - Months, years and leap days are crossed without skipping or repeating one, and
   the date is stepped by whole days so the clocks changing cannot eat one.
+
+**`longPress.test.js`**
+
+- Holding still for half a second opens the menu, and a quick tap does not.
+- **A finger that moves is scrolling**, and a list of habits is something people
+  scroll — without this the menu opens in the middle of a flick, which is worse
+  than having no menu. A few pixels of wander still counts as held, because a
+  press that demands perfect stillness reads as broken rather than strict.
+- **The tap that ends a long press does not also count.** A hold on a habit ends
+  with a finger lifting off a day square, and that square would otherwise be
+  marked done by the same gesture that opened the menu.
+
+**`wallpaperViewport.test.js`** (the keyboard half)
+
+- A keyboard taking three hundred pixels is a keyboard; an address bar
+  collapsing, at fifty or sixty, is not; and a window genuinely dragged smaller
+  is not, because nothing is being typed into then. The same two facts the
+  wallpaper's height already works from, asked a different question — not "what
+  height should the picture be" but "should this get out of the way".
 
 ## Adding to it
 

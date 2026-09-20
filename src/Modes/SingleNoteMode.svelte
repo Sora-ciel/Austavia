@@ -27,6 +27,20 @@
   /** The open file's name, used only to remember which note was last read. */
   export let fileKey = '';
   export let singleNoteSettings = {};
+  /**
+   * The on-screen keyboard is up.
+   *
+   * Asked for: "when the keyboard shows itself you should remove the footer,
+   * because it stays and takes proportionally more space." Which it does — the
+   * screen loses three hundred pixels to the keyboard and the footer goes on
+   * claiming the same slice of what is left, so a bar worth a sliver of a full
+   * screen becomes a noticeable band of a short one.
+   *
+   * Only hidden, never unmounted with the note: the wallpaper and the editor
+   * are untouched, so the picture behind stays exactly where it was and the
+   * footer comes back the moment the keyboard goes.
+   */
+  export let keyboardOpen = false;
 
   // ── Putting a picture in, without the keyboard ───────────────────
   let noteEditor;
@@ -496,6 +510,18 @@
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
   }
 
+  /* Out of the way while the keyboard is up.
+   *
+   * `display: none` rather than a height of zero or a transform, because the
+   * point is the space: the screen has just lost three hundred pixels and the
+   * footer should stop occupying any of what is left. It is the only thing
+   * removed — the wallpaper keeps the height it was already holding and the
+   * editor is untouched, so the picture behind does not move while this
+   * happens, and the footer is back the moment the keyboard goes. */
+  .note-footer.keyboard-open {
+    display: none;
+  }
+
   .note-footer button {
     background: transparent;
     border: none;
@@ -607,7 +633,7 @@
       />
     {/key}
 
-    <div class="note-footer">
+    <div class="note-footer" class:keyboard-open={keyboardOpen}>
       <button on:click={() => deleteBlock(noteBlock.id)} aria-label="Delete note">
         ×
       </button>

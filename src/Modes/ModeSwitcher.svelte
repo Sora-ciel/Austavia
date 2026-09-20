@@ -23,6 +23,8 @@
   export let modeLabels = {};
   export let simpleNoteColumnCount = 2;
   export let singleNoteSettings = {};
+  /** The on-screen keyboard is up, so anything at the bottom should stand aside. */
+  export let keyboardOpen = false;
   // Canvas mode's wallpaper. Same shape as singleNoteSettings; see
   // utils/modeBackground.js.
   export let canvasBackgroundSettings = {};
@@ -149,6 +151,7 @@
       bind:canvasRef
       {canvasColors}
       {singleNoteSettings}
+      {keyboardOpen}
       fileKey={openFolder}
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}

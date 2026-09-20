@@ -64,3 +64,43 @@ test('nothing focused, or something that takes no keyboard, does not count', () 
   assert.equal(isTyping(null), false);
   assert.equal(isTyping(), false);
 });
+
+// ── Whether the keyboard is up ───────────────────────────────────
+// Asked for on Single Note: "when the keyboard shows itself you should remove
+// the footer, because it stays and takes proportionally more space -- and make
+// sure the background still shows while it happens, and show it back when the
+// keyboard removes itself."
+//
+// The same two facts steadyWallpaperHeight already works from, asked a
+// different question: not "what height should the picture be" but "should this
+// get out of the way".
+
+import { keyboardIsUp, KEYBOARD_MIN_BITE } from '../src/utils/wallpaperViewport.js';
+
+test('a keyboard taking three hundred pixels is a keyboard', () => {
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 480, typing: true }), true);
+});
+
+test('with nothing being typed into, a smaller window is just a smaller window', () => {
+  // The distinction the wallpaper already relies on. Dragging a window edge
+  // shorter must not take the footer away.
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 480, typing: false }), false);
+});
+
+test('an address bar collapsing is not a keyboard', () => {
+  // Fifty or sixty pixels, and it happens on every scroll.
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 744, typing: true }), false);
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 800 - KEYBOARD_MIN_BITE, typing: true }), false, 'the line itself');
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 800 - KEYBOARD_MIN_BITE - 1, typing: true }), true);
+});
+
+test('a window that has not shrunk has no keyboard over it', () => {
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 800, typing: true }), false);
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 900, typing: true }), false, 'taller, so it closed');
+});
+
+test('nothing measured yet is not a keyboard', () => {
+  assert.equal(keyboardIsUp({ heldHeight: 0, height: 480, typing: true }), false);
+  assert.equal(keyboardIsUp({ heldHeight: 800, height: 0, typing: true }), false);
+  assert.equal(keyboardIsUp(), false);
+});

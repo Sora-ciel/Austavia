@@ -76,3 +76,37 @@ export function isTyping(element) {
   if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
   return Boolean(element.isContentEditable);
 }
+
+/**
+ * How much shorter the window has to get before it counts as a keyboard.
+ *
+ * A browser's address bar collapsing takes fifty or sixty pixels, and a
+ * rounding difference takes one; a phone keyboard takes two or three hundred.
+ * The gap between those is wide, so the line can sit comfortably in the middle
+ * rather than being tuned.
+ */
+export const KEYBOARD_MIN_BITE = 120;
+
+/**
+ * Whether the on-screen keyboard is up.
+ *
+ * The same two facts `steadyWallpaperHeight` already works from, asked a
+ * different question. That function wants to know what height to *draw* at;
+ * this wants to know whether to get out of the way — the footer of a note is
+ * worth its space normally and is worth none of it when the screen has just
+ * lost three hundred pixels to a keyboard.
+ *
+ * `heldHeight` is the height being held for the wallpaper, which is the last
+ * one measured before the keyboard arrived. A window genuinely made smaller
+ * does not count, because nothing is being typed into then.
+ */
+export function keyboardIsUp({ heldHeight = 0, height = 0, typing = false } = {}) {
+  if (!typing) return false;
+
+  const held = Number(heldHeight);
+  const now = Number(height);
+  if (!Number.isFinite(held) || !Number.isFinite(now)) return false;
+  if (held <= 0 || now <= 0) return false;
+
+  return held - now > KEYBOARD_MIN_BITE;
+}

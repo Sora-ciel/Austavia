@@ -5,6 +5,8 @@
   // light text and could put it on a light background.
   import { getReadableTextColor } from "../utils/readableColor.js";
   import { recentDays, daysToShow } from "../utils/habitDays.js";
+  import { createLongPress } from "../utils/longPress.js";
+  import { onDestroy } from "svelte";
 
   export let modeLabels = {};
   export let activeMode = "default";
@@ -90,8 +92,56 @@
   };
 
   const deleteHabit = habitId => {
+    menuFor = null;
     saveHabits(habits.filter(habit => habit.id !== habitId));
   };
+
+  // ── Holding a habit down ─────────────────────────────────────────
+  // Asked for: "on mobile the thing to close the habit should probably be a
+  // pop-up, like after a long press on the line of our habit — so that you can
+  // remove the delete button that shows itself at all time." Which is the right
+  // trade on a phone: the delete was holding a permanent slot in a row one line
+  // tall, for something wanted about once in the life of a habit.
+  //
+  // The deciding is in utils/longPress.js, including the two parts that are not
+  // a timer: a finger that moves is scrolling, and the tap that ends a long
+  // press must not also mark a day.
+  let menuFor = null;
+  let pressedId = null;
+  let swallowNextClick = false;
+
+  const press = createLongPress({
+    onLongPress: () => { menuFor = pressedId; }
+  });
+
+  const pointFrom = event => ({ x: event.clientX ?? 0, y: event.clientY ?? 0 });
+
+  function holdStart(habitId, event) {
+    // Only a finger. A mouse has the Delete button beside it, and holding a
+    // mouse button down is not how anybody asks for a menu.
+    if (event.pointerType === "mouse") return;
+    pressedId = habitId;
+    press.start(pointFrom(event));
+  }
+
+  function holdMove(event) {
+    press.move(pointFrom(event));
+  }
+
+  function holdEnd() {
+    swallowNextClick = press.finish();
+  }
+
+  /** The click that follows a long press, eaten before it marks a day. */
+  function guardClick(event) {
+    if (!swallowNextClick) return false;
+    swallowNextClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+
+  onDestroy(() => press.cancel());
 
   const toggleDay = (habitId, dayKey) => {
     const updated = habits.map(habit => {
@@ -418,6 +468,62 @@
     cursor: pointer;
   }
 
+  /* The menu a long press opens. Anchored to its own row rather than floating
+     in the middle of the screen, so it is obvious which habit is about to go. */
+  .habit-row {
+    position: relative;
+  }
+
+  .habit-row.menu-open {
+    /* Says which row the menu belongs to while the backdrop dims everything. */
+    border-color: color-mix(in srgb, var(--mode-text-color, #ffffff) 45%, transparent);
+  }
+
+  .habit-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000000) 45%, transparent);
+  }
+
+  .habit-menu {
+    position: absolute;
+    right: 8px;
+    top: calc(100% - 4px);
+    z-index: 11;
+    min-width: 168px;
+    padding: 6px;
+    border-radius: var(--block-control-radius, 10px);
+    border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 25%, transparent));
+    /* Opaque, because it sits over the row it belongs to. */
+    background: var(--canvas-inner-bg, #000000);
+    box-shadow: var(--block-shadow, 0 6px 20px rgba(0, 0, 0, 0.45));
+  }
+
+  .habit-menu-name {
+    padding: 4px 8px 6px;
+    font-size: 0.75rem;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .habit-menu-delete {
+    width: 100%;
+    /* A thumb-sized target: this one is worth being easy to hit deliberately
+       and hard to hit by accident, which is why it is behind a hold. */
+    min-height: 40px;
+    padding: 0 10px;
+    text-align: left;
+    border-radius: var(--block-control-radius, 8px);
+    border: none;
+    background: color-mix(in srgb, var(--mode-text-color, #ffffff) 10%, transparent);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
   .empty-state {
     opacity: 0.7;
     padding: 16px;
@@ -449,7 +555,16 @@
   {:else}
     <div class="habit-grid">
       {#each habits as habit}
-        <div class="habit-row">
+        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <div
+          class="habit-row"
+          class:menu-open={menuFor === habit.id}
+          on:pointerdown={event => holdStart(habit.id, event)}
+          on:pointermove={holdMove}
+          on:pointerup={holdEnd}
+          on:pointercancel={() => press.cancel()}
+          on:contextmenu={event => { if (compact) event.preventDefault(); }}
+        >
           <div class="habit-name" title={habit.name}>
             <strong>{habit.name}</strong>
             <span>Tap a day to mark ✓ or ✕.</span>
@@ -461,7 +576,7 @@
                 class:is-today={day.isToday}
                 title={day.full}
                 aria-label={day.full}
-                on:click={() => toggleDay(habit.id, day.key)}
+                on:click={event => { if (!guardClick(event)) toggleDay(habit.id, day.key); }}
               >
                 <span class="calendar-header">{day.label}</span>
                 <span>{day.number}</span>
@@ -475,9 +590,33 @@
               </button>
             {/each}
           </div>
-          <div class="habit-actions">
-            <button on:click={() => deleteHabit(habit.id)} title="Delete habit" aria-label="Delete habit">{compact ? "×" : "Delete"}</button>
-          </div>
+          {#if !compact}
+            <div class="habit-actions">
+              <button on:click={() => deleteHabit(habit.id)}>Delete</button>
+            </div>
+          {/if}
+
+          {#if menuFor === habit.id}
+            <!-- A backdrop rather than a document listener: it dismisses on the
+                 first touch anywhere, it cannot be left behind if this row is
+                 removed, and it stops that touch reaching whatever was under
+                 it — which would otherwise be a day square. -->
+            <!-- svelte-ignore a11y-click-events-have-key-events -->
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div class="habit-menu-backdrop" on:pointerdown|stopPropagation={() => (menuFor = null)}></div>
+            <div class="habit-menu" role="menu">
+              <div class="habit-menu-name">{habit.name}</div>
+              <button
+                type="button"
+                role="menuitem"
+                class="habit-menu-delete"
+                on:pointerdown|stopPropagation
+                on:click|stopPropagation={() => deleteHabit(habit.id)}
+              >
+                Delete habit
+              </button>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
