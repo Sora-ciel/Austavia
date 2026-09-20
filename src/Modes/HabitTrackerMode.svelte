@@ -4,13 +4,13 @@
   // not understand 4- or 8-digit hex, so a theme using either fell through to
   // light text and could put it on a light background.
   import { getReadableTextColor } from "../utils/readableColor.js";
+  import { recentDays, daysToShow } from "../utils/habitDays.js";
 
   export let modeLabels = {};
   export let activeMode = "default";
   export let canvasColors = {};
 
   const STORAGE_KEY = "habitTrackerData";
-  const DAYS_VISIBLE = 14;
 
   let habits = [];
   let newHabitName = "";
@@ -42,32 +42,36 @@
   // dark blue every time.
   $: canvasCssVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor};`;
 
-  const formatDateKey = date =>
-    date.toISOString().slice(0, 10);
+  // One letter on a phone, three on a computer. A whole "Wed" inside a square
+  // narrow enough for seven of them is unreadable anyway, and the column is
+  // named by the number under it.
+  const formatDayLabel = (date, narrow) =>
+    date.toLocaleDateString(undefined, { weekday: narrow ? "narrow" : "short" });
 
-  const formatDayLabel = date =>
-    date.toLocaleDateString(undefined, {
-      weekday: "short"
-    });
+  // Just the number on a phone. "Sep 20" does not fit and does not need to:
+  // the window is the last week, so nobody is wondering which month it is.
+  const formatDayNumber = (date, narrow) =>
+    narrow
+      ? String(date.getDate())
+      : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-  const formatDayNumber = date =>
-    date.toLocaleDateString(undefined, {
-      month: "short",
+  // How many days are on screen follows the width of the window, the same way
+  // the rest of the app decides which layout it is in. The window itself lives
+  // in utils/habitDays.js: it ends today and runs backwards, where it used to
+  // start today and run forwards into days that had not happened yet.
+  let viewportWidth = typeof window === "undefined" ? 1440 : window.innerWidth;
+  $: compact = viewportWidth <= 1024;
+  $: days = recentDays({ today, count: daysToShow({ width: viewportWidth }) }).map(day => ({
+    key: day.key,
+    isToday: day.isToday,
+    label: formatDayLabel(day.date, compact),
+    number: formatDayNumber(day.date, compact),
+    full: day.date.toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
       day: "numeric"
-    });
-
-  const buildDays = () =>
-    Array.from({ length: DAYS_VISIBLE }, (_, index) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() + index);
-      return {
-        key: formatDateKey(date),
-        label: formatDayLabel(date),
-        number: formatDayNumber(date)
-      };
-    });
-
-  let days = buildDays();
+    })
+  }));
 
   const saveHabits = updatedHabits => {
     habits = updatedHabits;
@@ -115,7 +119,17 @@
         habits = [];
       }
     }
-    days = buildDays();
+    // Which days are on screen follows the window, and the window changes
+    // without anybody touching the tracker: rotated, resized, or shrunk by a
+    // keyboard sliding up.
+    const noteWidth = () => { viewportWidth = window.innerWidth; };
+    noteWidth();
+    window.addEventListener("resize", noteWidth);
+    window.addEventListener("orientationchange", noteWidth);
+    return () => {
+      window.removeEventListener("resize", noteWidth);
+      window.removeEventListener("orientationchange", noteWidth);
+    };
   });
 </script>
 
@@ -179,18 +193,18 @@
 
   .habit-grid {
     display: grid;
-    gap: 16px;
+    gap: 12px;
   }
 
   .habit-row {
     border-radius: var(--block-border-radius, 16px);
-    padding: 16px;
+    padding: 12px 14px;
     border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 12%, transparent));
     background: var(--block-header-bg, color-mix(in srgb, var(--mode-text-color, #ffffff) 6%, transparent));
     box-shadow: var(--block-shadow, none);
     display: grid;
-    grid-template-columns: minmax(160px, 220px) 1fr auto;
-    gap: 16px;
+    grid-template-columns: minmax(140px, 200px) 1fr auto;
+    gap: 12px;
     align-items: center;
   }
 
@@ -206,8 +220,11 @@
 
   .calendar {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-    gap: 8px;
+    /* 56 rather than 70: a fortnight of 70px squares does not fit beside the
+       name on a normal window, so the row wrapped onto a second line of
+       squares and one habit came out 264px tall. */
+    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    gap: 6px;
   }
 
   .calendar-header {
@@ -218,7 +235,7 @@
 
   .day-button {
     border-radius: var(--block-control-radius, 10px);
-    padding: 8px 6px;
+    padding: 6px 4px;
     border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 15%, transparent));
     background: var(--block-media-button-bg, color-mix(in srgb, var(--mode-text-color, #ffffff) 7%, transparent));
     color: inherit;
@@ -246,6 +263,152 @@
     font-weight: 600;
   }
 
+  /* ── A phone ────────────────────────────────────────────────────
+     Asked for: "one habit just takes around the height of two lines, and the
+     days to press are small enough to see the last 7 days -- right now it's
+     not workable."
+
+     It was not workable because the row was laid out as three columns, the
+     first of them 160px wide at minimum, on a screen 390px across. The days
+     were then asked for 70px each and there are seven of them, so they wrapped
+     into four or five rows, and one habit filled most of the screen.
+
+     So on a phone the row is two lines: the name on the first, the week on the
+     second. Seven days share the full width instead of queueing for what is
+     left of it, and each square carries its letter and its number and nothing
+     else -- the tick is the square's own colour, which it already was. */
+  @media (max-width: 1024px) {
+    .habit-tracker {
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .habit-header h2 {
+      font-size: 1.25rem;
+    }
+
+    /* The standing instruction is the same for every habit and is only worth
+       one sentence at the top; repeating it under each one was a whole line
+       per habit. */
+    .habit-name span {
+      display: none;
+    }
+
+    .habit-grid {
+      gap: 8px;
+    }
+
+    /* The box and its button on one line. Wrapped, they cost about seventy
+       pixels of a screen the habits themselves are meant to be filling. */
+    .habit-form {
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+
+    .habit-form input {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 8px 10px;
+    }
+
+    .habit-form button {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      white-space: nowrap;
+    }
+
+    .habit-row {
+      /* Everything on one line. Stacking the week under the name was the first
+         try and measured 89px — nearly four lines — because the Delete button
+         made the name's line 32px tall on its own. Side by side, the tallest
+         thing in the row is a day square and the row is the height of one. */
+      grid-template-columns: minmax(48px, 72px) minmax(0, 1fr) auto;
+      grid-template-areas: "name calendar actions";
+      gap: 6px;
+      padding: 5px 6px;
+      align-items: center;
+    }
+
+    .habit-name { grid-area: name; }
+    .habit-actions { grid-area: actions; }
+    .calendar { grid-area: calendar; }
+
+    .habit-name strong {
+      font-size: 0.85rem;
+      line-height: 1.2;
+      /* A long habit name shortens rather than pushing the week off the edge. */
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .calendar {
+      /* Seven equal columns, never wrapping. auto-fit with a minimum is what
+         made them wrap -- it hands out as many columns as fit and pushes the
+         rest onto another line, which is the opposite of what a week wants. */
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 3px;
+    }
+
+    .day-button {
+      padding: 3px 0;
+      gap: 0;
+      min-width: 0;
+      line-height: 1.15;
+    }
+
+    .calendar-header {
+      font-size: 0.62rem;
+      opacity: 0.7;
+    }
+
+    /* The status glyph is dropped: with the square already coloured for done
+       and outlined for missed, it was a third line saying what the colour
+       said, and the third line is most of the height. */
+    .day-status {
+      display: none;
+    }
+
+    .day-button span:not(.calendar-header) {
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    /* Dropping the glyph left "missed" with nothing to read it by: it inherits
+       a colour meant for an outline, which on a dark theme came out as an empty
+       black square — emptier-looking than a day nobody has touched, which is
+       the opposite of what it means. So at this size it says so with its own
+       border and a struck-through number, neither of which costs any height. */
+    .day-button.missed {
+      border-color: color-mix(in srgb, var(--mode-text-color, #ffffff) 55%, transparent);
+      color: inherit;
+      opacity: 0.8;
+    }
+
+    .day-button.missed span:not(.calendar-header) {
+      text-decoration: line-through;
+    }
+
+    /* Today is worth finding at a glance, now that it is the last square
+       rather than the first. */
+    .day-button.is-today {
+      border-color: var(--block-focus-outline, color-mix(in srgb, var(--mode-text-color, #ffffff) 55%, transparent));
+    }
+
+    /* A cross rather than the word, because the word is wider than the name
+       column it would be taking the space from. */
+    .habit-actions button {
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      font-size: 0.95rem;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+    }
+  }
+
   .habit-actions button {
     border-radius: var(--block-control-radius, 10px);
     padding: 8px 12px;
@@ -268,7 +431,7 @@
 <section class="habit-tracker" style={canvasCssVars}>
   <div class="habit-header">
     <h2>{modeLabels?.[activeMode] ?? "Habit Tracker"}</h2>
-    <p>Create a habit, then check or cross each day starting from today.</p>
+    <p>Tap a day to mark it ✓, again for ✕, again to clear. Today is the last square.</p>
   </div>
 
   <div class="habit-form">
@@ -287,7 +450,7 @@
     <div class="habit-grid">
       {#each habits as habit}
         <div class="habit-row">
-          <div class="habit-name">
+          <div class="habit-name" title={habit.name}>
             <strong>{habit.name}</strong>
             <span>Tap a day to mark ✓ or ✕.</span>
           </div>
@@ -295,6 +458,9 @@
             {#each days as day}
               <button
                 class="day-button {habit.log?.[day.key] ?? 'none'}"
+                class:is-today={day.isToday}
+                title={day.full}
+                aria-label={day.full}
                 on:click={() => toggleDay(habit.id, day.key)}
               >
                 <span class="calendar-header">{day.label}</span>
@@ -310,7 +476,7 @@
             {/each}
           </div>
           <div class="habit-actions">
-            <button on:click={() => deleteHabit(habit.id)}>Delete</button>
+            <button on:click={() => deleteHabit(habit.id)} title="Delete habit" aria-label="Delete habit">{compact ? "×" : "Delete"}</button>
           </div>
         </div>
       {/each}

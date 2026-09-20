@@ -32,6 +32,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/notificationPresence.js` | whether the playback notification should be on screen |
 | `src/utils/mp4Cover.js` | where the artwork is inside an .m4a, and whether it is artwork |
 | `src/utils/clipboardPicture.js` | which thing on the clipboard is a picture, and what to do without one |
+| `src/utils/habitDays.js` | which days a habit shows, and what day it is where you are |
 
 ## What is covered
 
@@ -174,6 +175,22 @@ import, and the code that acts on them stayed where it was:
   app that declaration is ours and `ImagePasteWebView` makes it; on the website
   it is Chrome's, and Chrome refuses. Nothing here can change Chrome's mind, so
   this is the route that never asks the keyboard.
+
+**`habitDays.test.js`**
+
+- **The window ends today and runs backwards.** It used to run *forwards* —
+  today and the next thirteen days — so every square on screen was a day that
+  had not happened, and yesterday, the one most often needed because it was
+  forgotten, could not be reached at all.
+- **A day is the day you are living in.** The key came from
+  `toISOString().slice(0, 10)`, which is UTC: at 22:24 in New York that reads as
+  the *next* day, so a habit ticked after dinner was written against tomorrow —
+  every evening, silently, for anyone west of Greenwich.
+- `new Date(null)` is the first of January 1970, not an invalid date, so null is
+  filtered before coercing rather than after. The same trap `clampScale` in
+  `typeScale.js` carries a scar from.
+- Months, years and leap days are crossed without skipping or repeating one, and
+  the date is stepped by whole days so the clocks changing cannot eat one.
 
 ## Adding to it
 
