@@ -35,6 +35,8 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/habitDays.js` | which days a habit shows, and what day it is where you are |
 | `src/utils/longPress.js` | whether a finger held down is a hold, a tap, or a scroll |
 | `src/utils/wallpaperViewport.js` | how tall the wallpaper is, and whether the keyboard is up |
+| `src/utils/checkout.js` | whether to offer an upgrade, and what the checkout is told |
+| `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered
 
@@ -321,6 +323,16 @@ emulator has to load the module and start a runtime before the first event.
 
 Scheduled functions do not run here; the emulator skips them without a pubsub
 emulator, and they are covered directly in `test-rules/` instead.
+
+`polar-webhook.test.js` is in the same suite and there for the same reason. The
+payment endpoint is the one place where being wrong is invisible from our side
+— the card is charged, Polar is satisfied, the delivery is accepted, and the
+account stays on the free plan. Only the person who paid finds out. So it posts
+real signed deliveries at the real function: a subscription that must become a
+plan *and* a ceiling, a forgery that must change nothing, the same event twice,
+and a payment with no account attached, which must be kept for looking at
+rather than dropped. The emulator has no Secret Manager, so `scripts/emulator.mjs`
+supplies a fixed fake signing secret that is valid nowhere else.
 
 This suite has already paid for itself once. It caught `recordStorageDelta`
 bumping the byte count in one write and the limit and verdict in another,

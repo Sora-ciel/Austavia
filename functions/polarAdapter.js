@@ -149,21 +149,99 @@ function statusFromEvent(event = {}) {
  * somebody else. Metadata follows the checkout onto the subscription and its
  * orders, so it is read from several places depending on which event arrived.
  */
+// The keys a uid might arrive under, in the order they are trusted.
+//
+// `uid` is what a checkout created through the API carries, because we set it.
+// The other two are Polar's doing: a checkout *link* cannot take arbitrary
+// metadata in its URL — only `reference_id` and the utm parameters, which
+// Polar says it attaches to the session's metadata. Which spelling it uses
+// there is not documented, so both are read rather than guessed at.
+const UID_KEYS = ['uid', 'reference_id', 'referenceId'];
+
+// A uid becomes part of a database path, so its shape is checked before it is
+// used as one. `sync/{ns}/users/{uid}/plan` with a slash or a dot in `uid`
+// does not fail — it writes somewhere else entirely, which is the sort of bug
+// that only shows up as somebody else's account changing.
+//
+// What is checked is the characters, not the length. A Firebase uid is 28 of
+// [A-Za-z0-9], but a minimum here would be a guess at somebody else's format
+// that quietly refuses to take payments the day an id looks different — while
+// buying nothing, because it is `/`, `.`, `#`, `$`, `[` and `]` that move
+// around a path and all of them are already gone.
+function looksLikeUid(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}
+
 function uidFromEvent(event = {}) {
   const data = event.data || {};
 
-  const candidates = [
-    data.metadata && data.metadata.uid,
-    data.subscription && data.subscription.metadata && data.subscription.metadata.uid,
-    data.checkout && data.checkout.metadata && data.checkout.metadata.uid,
-    data.customer && data.customer.metadata && data.customer.metadata.uid
-  ];
+  // Depending on which event arrived, the metadata hangs off a different
+  // object: an order carries its subscription, a subscription carries its
+  // customer, and the checkout carries what started all of it.
+  const holders = [data, data.subscription, data.checkout, data.customer];
 
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  for (const holder of holders) {
+    if (!holder) continue;
+
+    // An external customer id is the cleanest of the lot when it is there:
+    // Polar keeps it on the Customer, so every later event carries it without
+    // metadata having to propagate anywhere.
+    if (looksLikeUid(holder.external_id)) return holder.external_id;
+    if (holder.customer && looksLikeUid(holder.customer.external_id)) {
+      return holder.customer.external_id;
+    }
+
+    const metadata = holder.metadata;
+    if (!metadata) continue;
+    for (const key of UID_KEYS) {
+      if (looksLikeUid(metadata[key])) return metadata[key];
+    }
   }
 
   return null;
+}
+
+/**
+ * What an unmatched delivery looked like, for working out where the uid went.
+ *
+ * Only shapes: the event's type and the key *names* it carried, never their
+ * values. The values are a stranger's email address, name and billing country,
+ * and none of that belongs in our database because a checkout failed to carry
+ * an id.
+ */
+function eventShape(event = {}) {
+  const data = event.data || {};
+  const shapeOf = value =>
+    value && typeof value === 'object' ? Object.keys(value).sort() : null;
+
+  return {
+    type: typeof event.type === 'string' ? event.type : null,
+    dataKeys: shapeOf(data) || [],
+    metadataKeys: shapeOf(data.metadata) || [],
+    subscriptionMetadataKeys: shapeOf(data.subscription && data.subscription.metadata) || [],
+    checkoutMetadataKeys: shapeOf(data.checkout && data.checkout.metadata) || [],
+    customerMetadataKeys: shapeOf(data.customer && data.customer.metadata) || [],
+    hasCustomerExternalId: Boolean(data.customer && data.customer.external_id)
+  };
+}
+
+/**
+ * When the event itself happened, as a timestamp.
+ *
+ * Not the delivery time. A retry is re-signed with the clock at the moment it
+ * is retried — that is what lets a signature stay inside a five-minute window
+ * on the fourth attempt an hour later — so the header says when it was *sent*,
+ * which for an event that failed twice is long after it happened. Ordering by
+ * that would let an old event that took three attempts land on top of a newer
+ * one that landed first time.
+ *
+ * The object's own `modified_at` is what actually changed and when.
+ */
+function eventAtFrom(event = {}, deliveredAt = 0) {
+  const data = event.data || {};
+  const raw = data.modified_at || data.created_at || null;
+  const parsed = raw ? Date.parse(raw) : NaN;
+  return Number.isFinite(parsed) ? parsed : Number(deliveredAt) || 0;
 }
 
 /** When the paid-for period runs out, as a timestamp. */
@@ -187,6 +265,9 @@ module.exports = {
   verifyWebhook,
   statusFromSubscription,
   statusFromEvent,
+  looksLikeUid,
   uidFromEvent,
+  eventShape,
+  eventAtFrom,
   periodEndsAt
 };

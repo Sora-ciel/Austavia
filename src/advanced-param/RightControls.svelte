@@ -28,6 +28,7 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import { subscribeSyncLog, clearSyncLog, formatSyncLog } from '../utils/syncLog.js';
   import { describeStorageUsage, storageMessageFor } from '../utils/storageUsage.js';
+  import { upgradeOffer } from '../utils/checkout.js';
 
   // Sync writes down what it decided; this is where you read it. There is no
   // console in the packaged app, and the questions that matter — what did it
@@ -504,6 +505,29 @@
     line-height: 1.35;
   }
 
+  /* Takes its colour from the block it sits in, which is the panel's text
+     colour until the state turns it amber or red — so the button goes loud at
+     exactly the moment the message does, without naming a colour of its own. */
+  .storage-upgrade {
+    align-self: flex-start;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 999px;
+    font-size: 0.74rem;
+    text-decoration: none;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  .storage-upgrade:hover {
+    background: color-mix(in srgb, currentColor 20%, transparent);
+  }
+
+  .storage-upgrade[data-tone='urgent'] {
+    border-color: currentColor;
+    font-weight: 600;
+  }
+
   .sync-log {
     margin-top: 6px;
     border: 1px solid var(--dlg-border, #444);
@@ -637,6 +661,7 @@
               {#if storageUsage}
                 {@const usage = describeStorageUsage(storageUsage)}
                 {@const message = storageMessageFor(storageUsage)}
+                {@const offer = upgradeOffer({ usage: storageUsage, uid: authUser?.uid })}
                 <div class="storage-usage" data-state={usage.state}>
                   <div class="storage-usage-head">
                     <span>Cloud storage</span>
@@ -658,6 +683,23 @@
 
                   {#if message}
                     <p class="storage-usage-message">{message}</p>
+                  {/if}
+
+                  <!-- Only ever shown once there is a product to sell and an
+                       account to attach it to; upgradeOffer decides both. The
+                       uid rides along in the URL, because the payment comes
+                       back as a webhook that has no other way to know whose
+                       account it belongs to. -->
+                  {#if offer.show}
+                    <a
+                      class="storage-upgrade"
+                      data-tone={offer.tone}
+                      href={offer.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {offer.tone === 'urgent' ? 'Get more space' : 'Upgrade storage'}
+                    </a>
                   {/if}
                 </div>
               {/if}

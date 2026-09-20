@@ -219,5 +219,62 @@ time:
   plausible paid feature: it turns every future bug of the "my folder reverted"
   class from lost into restore.
 - **Conflict copies** via version vectors, instead of silently picking a winner.
-- **Monetisation**: Paddle, the storage ceiling, the paywall, INPI classes 9
-  and 42.
+- **Monetisation**: the paywall's remaining half, then INPI classes 9 and 42.
+  See section 6.
+
+## 6. The paywall, and what is left of it
+
+Agreed build order was: storage accounting, analytics, theme sync, **the
+paywall**, Birthday Mode's unlock, then the theme gallery. The first four are
+now written and tested. **Everything that is left is outside this repo**, in a
+dashboard or behind a deploy — see [`POLAR.md`](POLAR.md), which is the running
+order for it.
+
+**The provider is Polar** (merchant of record, so EU digital VAT is theirs and
+not ours). The account is connected; no product exists in it yet.
+
+| | |
+| --- | --- |
+| Decide what a subscription means | `functions/entitlements.js` |
+| Decide what Polar's words mean | `functions/polarAdapter.js` |
+| Decide what a delivery changes | `functions/subscriptionRecord.js` |
+| Receive a webhook | `polarWebhook` in `index.js` |
+| Write the plan, the ceiling and the token claim | `functions/subscriptions.js` |
+| Sweep for plans that should have lapsed | `sweepExpiredPlans`, daily |
+| Send someone to a checkout carrying their uid | `src/utils/checkout.js` |
+| An upgrade button | `RightControls.svelte`, under the usage bar |
+
+**The uid has to survive the round trip**, and that is the one part with a real
+unknown left in it. Polar's checkout links do not take arbitrary metadata in
+the URL — only `reference_id` and the `utm_*` parameters, which it says are
+attached to the checkout session's metadata. Which key it lands under is not
+documented, so the webhook reads several and, when it finds none, records the
+event's *shape* (its key names and type, never its customer details) under
+`diagnostics/polar/unmatched`. One real sandbox checkout then answers it
+instead of a fourth guess — the lesson from the cover art.
+
+Still owed, in order:
+
+1. **A product and a price in Polar**, and the checkout link pasted into
+   `src/utils/checkout.js`. Nothing shows an upgrade button until it is there.
+2. **Deploying at all.** No function in this repo has ever been deployed —
+   see section 5 — so the webhook cannot be reached until that is unblocked.
+   `POLAR_WEBHOOK_SECRET` has to be set as well, and is declared, so it now
+   blocks a deploy the same way `ARIAL_SMTP_PASS` does.
+3. **A sandbox run**: `sandbox.polar.sh`, a test card, and the plan moving to
+   `pro` on a real delivery.
+4. **Cancelling, refunding and a failed payment**, each checked once in the
+   sandbox. The grace period and the lapse are the two nobody ever tests, and
+   both fail silently in the customer's favour.
+5. **Birthday Mode's unlock** rewired onto `plan`.
+
+Two things noticed while building it, neither blocking:
+
+- **The upgrade button opens an ordinary link.** That is right on the web and
+  in the Android app, where Capacitor hands an outside URL to the system
+  browser. What it does in the Tauri desktop build is unverified — it may
+  navigate the app window instead of opening a browser.
+- **The webhook's end-to-end test found the one bug unit tests could not**: the
+  delivery id becomes a database key, and a Realtime Database key cannot hold a
+  dot. It threw, so the endpoint answered 500 and the provider would have
+  retried for ever while nobody's plan changed. `eventKey` escapes it now.

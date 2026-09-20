@@ -13,6 +13,8 @@ const {
   verifyWebhook,
   statusFromEvent,
   uidFromEvent,
+  eventShape,
+  eventAtFrom,
   periodEndsAt
 } = polar;
 const { STATUS } = entitlements;
@@ -280,5 +282,104 @@ describe('a delivery end to end', () => {
       }),
       'free'
     );
+  });
+});
+
+// --- Finding the account a payment belongs to --------------------------
+//
+// The one genuinely unknown part of this integration. A checkout *link* cannot
+// carry arbitrary metadata in its URL: Polar takes `reference_id` and the utm
+// parameters and says it attaches them to the checkout session's metadata, but
+// not under which key. So several are read, and anything unattributable has
+// its shape recorded rather than being guessed at a fourth time.
+
+describe('uidFromEvent', () => {
+  it('reads a uid we put there ourselves', () => {
+    assert.equal(uidFromEvent({ data: { metadata: { uid: 'abc123XYZ' } } }), 'abc123XYZ');
+  });
+
+  it("reads a checkout link's reference_id, in either spelling", () => {
+    assert.equal(uidFromEvent({ data: { metadata: { reference_id: 'abc123XYZ' } } }), 'abc123XYZ');
+    assert.equal(uidFromEvent({ data: { metadata: { referenceId: 'abc123XYZ' } } }), 'abc123XYZ');
+  });
+
+  it('reads the external id Polar keeps on the customer', () => {
+    assert.equal(uidFromEvent({ data: { customer: { external_id: 'abc123XYZ' } } }), 'abc123XYZ');
+  });
+
+  it('looks on the subscription and the checkout as well as the order', () => {
+    assert.equal(
+      uidFromEvent({ data: { subscription: { metadata: { uid: 'fromSubscription1' } } } }),
+      'fromSubscription1'
+    );
+    assert.equal(
+      uidFromEvent({ data: { checkout: { metadata: { uid: 'fromCheckout123' } } } }),
+      'fromCheckout123'
+    );
+  });
+
+  // A uid becomes part of a database path. One with a slash in it does not
+  // fail -- it writes somewhere else entirely, which shows up as a stranger's
+  // account changing.
+  it('refuses anything that could move around a database path', () => {
+    assert.equal(uidFromEvent({ data: { metadata: { uid: '../../admins/me' } } }), null);
+    assert.equal(uidFromEvent({ data: { metadata: { uid: 'abc.def' } } }), null);
+    assert.equal(uidFromEvent({ data: { metadata: { uid: 'a#b$c' } } }), null);
+    assert.equal(uidFromEvent({ data: { metadata: { uid: 42 } } }), null);
+  });
+
+  it('says so plainly when there is nothing to go on', () => {
+    assert.equal(uidFromEvent({ data: {} }), null);
+    assert.equal(uidFromEvent({}), null);
+  });
+});
+
+describe('eventShape', () => {
+  it('records where the keys were, so one real delivery settles it', () => {
+    const shape = eventShape({
+      type: 'checkout.updated',
+      data: {
+        metadata: { reference_id: 'abc123XYZ', utm_source: 'app' },
+        customer: { external_id: 'abc123XYZ', email: 'someone@example.com' }
+      }
+    });
+
+    assert.equal(shape.type, 'checkout.updated');
+    assert.deepEqual(shape.metadataKeys, ['reference_id', 'utm_source']);
+    assert.equal(shape.hasCustomerExternalId, true);
+  });
+
+  // It is written to the database, and the values are a stranger's name,
+  // address and email. Only the shape is any of our business.
+  it('keeps no values at all', () => {
+    const shape = eventShape({
+      type: 'order.created',
+      data: { customer: { email: 'someone@example.com', name: 'A Person' } }
+    });
+
+    const printed = JSON.stringify(shape);
+    assert.ok(!printed.includes('someone@example.com'));
+    assert.ok(!printed.includes('A Person'));
+  });
+});
+
+describe('eventAtFrom', () => {
+  // A retry is re-signed with the clock at the moment it is retried, so the
+  // delivery time of an event that failed twice is long after it happened.
+  // Ordering by that lets an old event land on top of a newer one.
+  it('takes when the thing happened, not when it was delivered', () => {
+    const happened = Date.parse('2026-09-01T10:00:00Z');
+    const delivered = Date.parse('2026-09-01T11:30:00Z');
+
+    assert.equal(
+      eventAtFrom({ data: { modified_at: '2026-09-01T10:00:00Z' } }, delivered),
+      happened
+    );
+  });
+
+  it('falls back to the delivery time when the event does not say', () => {
+    const delivered = 1788400000000;
+    assert.equal(eventAtFrom({ data: {} }, delivered), delivered);
+    assert.equal(eventAtFrom({ data: { modified_at: 'not a date' } }, delivered), delivered);
   });
 });

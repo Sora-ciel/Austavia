@@ -111,6 +111,12 @@ whole codebase, targeted deploys included. Enable Secret Manager and set the
 secret, or comment out the three `exports.bandwidth*` lines in
 `functions/index.js`. See `functions/monitoring/README.md`.
 
+The payment webhook declares `POLAR_WEBHOOK_SECRET` and blocks a deploy the
+same way, for the same reason. Unlike the monitoring one it cannot be commented
+out and still work — an endpoint that cannot check a signature is an endpoint
+anybody can grant themselves a subscription through. Set it. See
+[`POLAR.md`](POLAR.md).
+
 ### 3. Commit and tag
 
 The commit is the version bump. The tag is annotated, so it carries a date and

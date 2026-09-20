@@ -1,5 +1,7 @@
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const { onObjectFinalized, onObjectDeleted } = require('firebase-functions/v2/storage');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
@@ -9,6 +11,8 @@ const { DAILY_BYTE_LIMIT } = require('./limits');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
 const { recordStorageDelta, reconcileStorageUsage } = require('./storageAccounting');
 const { recordActivity, rollUpStats } = require('./activityTracking');
+const { verifyWebhook, eventAtFrom } = require('./polarAdapter');
+const { applyPolarEvent, sweepExpiredPlans } = require('./subscriptions');
 
 initializeApp();
 
@@ -282,5 +286,102 @@ exports.publishSchemaVersionMeta = onSchedule(
       latest: LATEST_SCHEMA_VERSION,
       minSupported: MIN_SUPPORTED_SCHEMA_VERSION
     });
+  }
+);
+
+// --- The paywall -------------------------------------------------------
+//
+// Polar is the merchant of record, so what arrives here is a notification that
+// money moved, not a payment to take. Everything this decides is decided
+// elsewhere and tested without a runtime: polarAdapter.js reads Polar,
+// entitlements.js says what someone is owed, subscriptionRecord.js says what
+// to write down, subscriptions.js writes it. What is below is the door.
+//
+// Three things a payment endpoint has to get right, all of them here:
+//
+//   - **Verify before parsing.** The signature is over the bytes as received,
+//     so req.rawBody is the only acceptable input; JSON.parse's output
+//     re-serialised is a different string and would never match.
+//   - **Answer 2xx for anything a retry cannot fix.** A delivery we do not
+//     care about, or one we cannot attribute, is not a failure — returning 500
+//     to it buys an hour of retries and an alert mail about a webhook that is
+//     working exactly as intended.
+//   - **Answer non-2xx when we genuinely failed**, so it *is* retried. A
+//     database that was briefly unreachable must not swallow somebody's
+//     upgrade.
+const polarWebhookSecret = defineSecret('POLAR_WEBHOOK_SECRET');
+
+exports.polarWebhook = onRequest(
+  {
+    region: 'us-central1',
+    maxInstances: MAX_INSTANCES,
+    secrets: [polarWebhookSecret],
+    cors: false
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('POST only');
+      return;
+    }
+
+    const rawBody = req.rawBody ? req.rawBody.toString('utf8') : '';
+    const verdict = verifyWebhook({
+      secret: polarWebhookSecret.value(),
+      headers: req.headers,
+      rawBody
+    });
+
+    if (!verdict.ok) {
+      // 401 and nothing else. Saying which part was wrong tells whoever is
+      // probing whether they have the right secret, the right window or the
+      // right body, one guess at a time.
+      logger.warn('polar-webhook-rejected', { reason: verdict.reason });
+      res.status(401).send('unauthorized');
+      return;
+    }
+
+    let event;
+    try {
+      event = JSON.parse(rawBody);
+    } catch (error) {
+      logger.error('polar-webhook-unparseable', { id: verdict.id });
+      res.status(400).send('bad json');
+      return;
+    }
+
+    try {
+      const outcome = await applyPolarEvent({
+        event,
+        eventId: verdict.id,
+        eventAt: eventAtFrom(event, Date.now())
+      });
+      res.status(200).json(outcome);
+    } catch (error) {
+      // The one case that must be retried: we understood it and failed to
+      // carry it out.
+      // `message` is the logger's own field -- passing one in the payload
+      // overwrites the line with the stack of the log call itself, which is
+      // how the first failure here arrived with no cause attached.
+      logger.error('polar-webhook-failed', { id: verdict.id, cause: error.message, stack: error.stack });
+      res.status(500).send('retry');
+    }
+  }
+);
+
+// The pass that looks again — see the reconcile rule in CLAUDE.md, and the
+// long comment on sweepExpiredPlans.
+//
+// Daily rather than weekly, unlike the storage reconcile: what this corrects
+// is an account sitting on a plan it is no longer paying for, and a week of
+// that is a week of storage given away. It is also far cheaper — one read of a
+// node with a row per subscriber, against a full listing of the bucket.
+exports.sweepExpiredPlans = onSchedule(
+  {
+    schedule: 'every day 04:00',
+    region: 'us-central1',
+    maxInstances: SCHEDULED_MAX_INSTANCES
+  },
+  async () => {
+    await sweepExpiredPlans({});
   }
 );

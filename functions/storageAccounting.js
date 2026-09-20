@@ -102,6 +102,11 @@ async function recordStorageDelta(objectName, deltaBytes) {
 
     return {
       bytes: totalBytes,
+      // The plan travels with the ceiling it produced. The app subscribes to
+      // this node already, and without the name here it can only guess the
+      // plan from the size of the limit -- which means a price change silently
+      // turns a paying account back into one being offered an upgrade.
+      plan,
       limit: storableLimit(limit),
       full: isOverStorageLimit(totalBytes, plan),
       updatedAt: Date.now()
@@ -178,7 +183,7 @@ async function reconcileStorageUsage() {
     // write cannot be separated by an upload landing between them.
     const result = await db.ref(`storage/${uid}`).transaction(current => {
       if (isStaleScan(current, scanStartedAt)) return undefined; // abort
-      return { bytes, limit: storableLimit(limit), full: isFull, updatedAt: Date.now() };
+      return { bytes, plan, limit: storableLimit(limit), full: isFull, updatedAt: Date.now() };
     });
 
     if (!result.committed) {

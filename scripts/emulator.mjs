@@ -63,11 +63,24 @@ const command = [
   .map(quote)
   .join(' ');
 
+// The emulator has no Secret Manager, and a function that declares a secret it
+// cannot resolve refuses to serve at all — so the payment webhook would be
+// untestable locally, which is the one function most worth testing before it
+// is deployed. This is a fixed fake, valid only against the emulator; the real
+// one is set with `firebase functions:secrets:set POLAR_WEBHOOK_SECRET` and
+// never appears in the repo. Must match test-triggers/polar-webhook.test.js.
+const EMULATOR_WEBHOOK_SECRET = 'whsec_' + Buffer.from('emulator-only-not-a-secret').toString('base64');
+
 const child = spawn(command, {
   cwd: repoRoot,
   stdio: 'inherit',
   shell: true,
-  env: { ...process.env, TEMP: TEMP_DIR, TMP: TEMP_DIR }
+  env: {
+    ...process.env,
+    TEMP: TEMP_DIR,
+    TMP: TEMP_DIR,
+    POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET || EMULATOR_WEBHOOK_SECRET
+  }
 });
 
 child.on('exit', (code, signal) => {
