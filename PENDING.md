@@ -274,6 +274,14 @@ Two things noticed while building it, neither blocking:
   in the Android app, where Capacitor hands an outside URL to the system
   browser. What it does in the Tauri desktop build is unverified — it may
   navigate the app window instead of opening a browser.
+- **An event with no uid is recorded as unmatched even when we would have
+  ignored it anyway.** `applyPolarEvent` looks for the account before it asks
+  whether the event means anything, so a stray `order.created` that carries no
+  metadata lands in `diagnostics/polar/unmatched` beside the ones that matter.
+  Harmless, but it would make a diagnostic noisier than it should be. Checked
+  after the first sandbox purchase on 2026-09-21: the node does not exist at
+  all, so every delivery in a real checkout carried the metadata and there is
+  nothing to tighten yet.
 - **The webhook's end-to-end test found the one bug unit tests could not**: the
   delivery id becomes a database key, and a Realtime Database key cannot hold a
   dot. It threw, so the endpoint answered 500 and the provider would have

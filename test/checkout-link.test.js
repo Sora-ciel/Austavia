@@ -11,7 +11,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkoutUrlFor, upgradeOffer, isPaidPlan } from '../src/utils/checkout.js';
+import { checkoutUrlFor, upgradeOffer, isPaidPlan, POLAR_CHECKOUT_LINK } from '../src/utils/checkout.js';
 
 const LINK = 'https://buy.polar.sh/austavia-pro';
 const UID = 'kK2nQ7xyzAbCdEfGh1234567';
@@ -44,6 +44,29 @@ describe('checkoutUrlFor', () => {
   it('will not open a checkout over http', () => {
     assert.equal(checkoutUrlFor({ link: 'http://buy.polar.sh/x', uid: UID }), null);
     assert.equal(checkoutUrlFor({ link: 'not a url', uid: UID }), null);
+  });
+});
+
+// A sandbox checkout is indistinguishable from a real one until the money does
+// not arrive. Left in the committed default it would go out with the next
+// release and take nothing at all from everybody who pressed it, and the first
+// sign would be somebody asking where their subscription went.
+//
+// The sandbox link belongs in `.env.staging`, which is not committed. This is
+// what stops it drifting back.
+describe('the shipped checkout link', () => {
+  it('is never a sandbox one', () => {
+    assert.ok(
+      !/sandbox/i.test(POLAR_CHECKOUT_LINK),
+      `the committed checkout link points at a sandbox: ${POLAR_CHECKOUT_LINK}`
+    );
+  });
+
+  it('is https, or empty until there is a product', () => {
+    assert.ok(
+      POLAR_CHECKOUT_LINK === '' || POLAR_CHECKOUT_LINK.startsWith('https://'),
+      `the committed checkout link is not https: ${POLAR_CHECKOUT_LINK}`
+    );
   });
 });
 

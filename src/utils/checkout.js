@@ -27,12 +27,24 @@
  * The checkout link from the Polar dashboard — Products → the product →
  * Checkout Links.
  *
- * Use the **sandbox** link while testing (sandbox.polar.sh issues its own,
- * against test cards) and swap it for the live one when the sandbox run has
- * passed. Not a secret: it is a public URL that anyone can open, and it
- * carries no authority of its own.
+ * Same arrangement as `firebase.ts`, and for the same reason: the committed
+ * value is the **live** one, and an env file overrides it. `npm run dev:staging`
+ * reads `.env.staging`, which carries the sandbox link.
+ *
+ * That split is not tidiness. A sandbox checkout looks and behaves exactly like
+ * a real one right up until the money does not arrive, so a sandbox link left
+ * in the committed default would ship to the live site and take nothing from
+ * everybody who pressed it. `test/checkout-link.test.js` fails if one ever is.
+ *
+ * Not a secret either way: a checkout link is a public URL that anyone can
+ * open, and it carries no authority of its own.
  */
-export const POLAR_CHECKOUT_LINK = '';
+const env = (typeof import.meta !== 'undefined' && import.meta.env) || {};
+
+export const POLAR_CHECKOUT_LINK =
+  typeof env.VITE_POLAR_CHECKOUT_LINK === 'string' && env.VITE_POLAR_CHECKOUT_LINK.length > 0
+    ? env.VITE_POLAR_CHECKOUT_LINK
+    : '';
 
 /** Plans that are already paying, or already unlimited. Nothing to sell them. */
 const PAID_PLANS = ['pro', 'owner'];

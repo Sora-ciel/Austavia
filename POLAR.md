@@ -46,16 +46,27 @@ the reasoning is that 71 subscribers at $8 is a business one person can run and
 
 Then **Checkout Links → New Link** on that product, and copy the URL.
 
-## 3. Paste the link into the app
+## 3. Put the link where it belongs
 
-In [`src/utils/checkout.js`](src/utils/checkout.js):
+**The sandbox link goes in `.env.staging`**, which is not committed:
 
-```js
-export const POLAR_CHECKOUT_LINK = 'https://buy.polar.sh/...';
+```
+VITE_POLAR_CHECKOUT_LINK=https://sandbox-api.polar.sh/v1/checkout-links/.../redirect
 ```
 
-Until this is set, nothing shows an upgrade button — deliberately, so a
-half-finished paywall cannot offer a button that goes nowhere.
+**The live link is the committed default** in
+[`src/utils/checkout.js`](src/utils/checkout.js), the same arrangement
+`firebase.ts` uses for the project config.
+
+That split is not tidiness. A sandbox checkout behaves exactly like a real one
+right up to the point where the money does not arrive, so a sandbox link left
+in the committed default would ship to the live site and take nothing at all
+from everybody who pressed it — and the first sign would be someone asking
+where their subscription went. `test/checkout-link.test.js` fails the build if
+the committed link ever says `sandbox`.
+
+Until one of the two is set, nothing shows an upgrade button — deliberately, so
+a half-finished paywall cannot offer a button that goes nowhere.
 
 The app appends `?reference_id=<firebase uid>` to it. **That is the only thing
 tying a payment to an account**, since the email someone types at a checkout is
