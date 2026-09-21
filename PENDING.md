@@ -244,31 +244,45 @@ not ours). The account is connected; no product exists in it yet.
 | Send someone to a checkout carrying their uid | `src/utils/checkout.js` |
 | An upgrade button | `RightControls.svelte`, under the usage bar |
 
-**The uid has to survive the round trip**, and that is the one part with a real
-unknown left in it. Polar's checkout links do not take arbitrary metadata in
-the URL — only `reference_id` and the `utm_*` parameters, which it says are
-attached to the checkout session's metadata. Which key it lands under is not
-documented, so the webhook reads several and, when it finds none, records the
-event's *shape* (its key names and type, never its customer details) under
-`diagnostics/polar/unmatched`. One real sandbox checkout then answers it
-instead of a fourth guess — the lesson from the cover art.
+**The uid survives the round trip — confirmed 2026-09-21.** This was the one
+part with a real unknown in it: a checkout link cannot carry arbitrary metadata
+in its URL, only `reference_id`, and Polar does not document which key that
+lands under. It works, and `diagnostics/polar/unmatched` was never written at
+all, so every event in a real checkout carries it.
+
+**The whole path has now run against live Polar deliveries**, in the sandbox,
+against `arial-staging`:
+
+| Tried | Result |
+| --- | --- |
+| Buying it | `plan: "pro"` on the buyer's real uid, 5.3s after checkout, 10 GB ceiling applied with it |
+| Cancelling | `status: "canceled"`, `plan` still `"pro"`, the October period intact |
+| Refunding | `plan: "free"` and the 100 MB ceiling back, 0.5s after the refund |
 
 Still owed, in order:
 
-1. **A product and a price in Polar**, and the checkout link pasted into
-   `src/utils/checkout.js`. Nothing shows an upgrade button until it is there.
-2. **Deploying at all.** No function in this repo has ever been deployed —
-   see section 5 — so the webhook cannot be reached until that is unblocked.
-   `POLAR_WEBHOOK_SECRET` has to be set as well, and is declared, so it now
-   blocks a deploy the same way `ARIAL_SMTP_PASS` does.
-3. **A sandbox run**: `sandbox.polar.sh`, a test card, and the plan moving to
-   `pro` on a real delivery.
-4. **Cancelling, refunding and a failed payment**, each checked once in the
-   sandbox. The grace period and the lapse are the two nobody ever tests, and
-   both fail silently in the customer's favour.
-5. **Birthday Mode's unlock** rewired onto `plan`.
+1. **The lapse, and a failed payment.** What is left of the unhappy half is the
+   `past_due` grace window, which needs a card that fails, and
+   `sweepExpiredPlans` itself — the net under a `subscription.revoked` that
+   never arrives. Force-run the sweep from Cloud Scheduler rather than waiting
+   for a period to end.
 
-Two things noticed while building it, neither blocking:
+   Revoke was deliberately not tried by hand: it maps by event *name* rather
+   than by reading a payload, the emulator suite covers it end to end, and it
+   goes through the same `applyPlan` the refund just proved against live
+   deliveries.
+2. **Going live**: the same steps against the real dashboard — product,
+   checkout link (the committed one in `checkout.js`, not `.env.staging`), a
+   **new** signing secret, a new endpoint — plus deploying the functions to
+   production, which is still blocked by `ARIAL_SMTP_PASS`. See section 5 and
+   `POLAR.md`.
+3. **Birthday Mode's unlock** rewired onto `plan`.
+
+Done: the product and the checkout link, the first functions deploy this repo
+has ever had (to `arial-staging`), and a paid-for plan landing on a real
+account and being taken off it again.
+
+Three things noticed while building it, none blocking:
 
 - **The upgrade button opens an ordinary link.** That is right on the web and
   in the Android app, where Capacitor hands an outside URL to the system
