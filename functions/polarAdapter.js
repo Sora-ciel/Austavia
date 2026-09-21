@@ -226,6 +226,51 @@ function eventShape(event = {}) {
 }
 
 /**
+ * The subscription an event is about, when it names one.
+ *
+ * An order carries the subscription it paid for, which is what makes it
+ * possible to act on the subscription from a refund.
+ */
+function subscriptionIdFrom(event = {}) {
+  const data = event.data || {};
+  const candidates = [data.subscription_id, data.subscription && data.subscription.id];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Whether a refund took back the whole order, or only part of it.
+ *
+ * `order.refunded` fires for both -- Polar says so in as many words -- and the
+ * difference matters enormously, because the only reason to read this is to
+ * decide whether to end somebody's subscription. A goodwill refund of one
+ * month on a subscription that is carrying on must not cancel it.
+ *
+ * Returns `null` when it cannot be told, and the caller must then do nothing.
+ * The field names here are not in the published docs, so this reads the two
+ * that a real payload plausibly carries and refuses to guess past them. Failing
+ * to revoke leaves a subscription somebody has to end by hand; revoking by
+ * mistake cuts off a paying customer. Only one of those is recoverable in a
+ * click, which is the whole reason the uncertain case does nothing.
+ */
+function refundIsFull(event = {}) {
+  const data = event.data || {};
+
+  if (data.status === 'partially_refunded') return false;
+  if (data.status === 'refunded') return true;
+
+  const refunded = Number(data.refunded_amount);
+  const total = Number(data.total_amount ?? data.amount);
+  if (Number.isFinite(refunded) && Number.isFinite(total) && total > 0) {
+    return refunded >= total;
+  }
+
+  return null;
+}
+
+/**
  * When the event itself happened, as a timestamp.
  *
  * Not the delivery time. A retry is re-signed with the clock at the moment it
@@ -268,6 +313,8 @@ module.exports = {
   looksLikeUid,
   uidFromEvent,
   eventShape,
+  subscriptionIdFrom,
+  refundIsFull,
   eventAtFrom,
   periodEndsAt
 };

@@ -276,11 +276,16 @@ Still owed, in order:
    disagree, nothing notices. That is not hypothetical: refunding an order on
    2026-09-21 left Polar saying the subscription was active and us saying the
    account was free, and the only reason it surfaced is that Polar refused a
-   second checkout. A real reconcile would list subscriptions from Polar's API
+   second checkout.
+
+   The *cause* of that particular disagreement is fixed — a full refund now
+   revokes the subscription at Polar, see `revokeAfterRefund` — but the fix is
+   another event path, and an event path is only ever as right as the last
+   event it heard. A real reconcile would list subscriptions from Polar's API
    and recompute from that, the way `reconcileStorageUsage` lists the bucket
-   rather than trusting the running balance. It needs an API token as a second
-   secret, so it is a piece of work rather than a line — and it is the same
-   shape as every entry in CLAUDE.md's table.
+   rather than trusting the running balance. The token for it already exists
+   now (`POLAR_ACCESS_TOKEN`), so what is left is the listing, the paging and
+   deciding what to do with a subscription Polar knows about and we do not.
 3. **Going live**: the same steps against the real dashboard — product,
    checkout link (the committed one in `checkout.js`, not `.env.staging`), a
    **new** signing secret, a new endpoint — plus deploying the functions to

@@ -72,16 +72,30 @@ The app appends `?reference_id=<firebase uid>` to it. **That is the only thing
 tying a payment to an account**, since the email someone types at a checkout is
 very often not the one on their Google account.
 
-## 4. Set the webhook secret
+## 4. Set the two secrets
 
-Polar shows a signing secret when the endpoint is created (step 6). Store it:
+**The signing secret**, which Polar shows when the endpoint is created
+(step 6). Without it the webhook cannot tell a real delivery from anybody's:
 
 ```bash
 firebase functions:secrets:set POLAR_WEBHOOK_SECRET
 ```
 
-Never in the repo, never in a source file, and a different one for sandbox and
-production.
+**An access token**, used for one thing only — ending a subscription after a
+full refund, because Polar does not do that itself. Create it in the Polar
+dashboard under **Settings → Developers**, and give it the
+`subscriptions:write` scope and nothing else: a token that can do more than its
+one job has a blast radius somebody else decided.
+
+```bash
+firebase functions:secrets:set POLAR_ACCESS_TOKEN
+```
+
+Neither goes in the repo or in a source file, and **sandbox and production get
+different ones**. Which Polar is reached is keyed on the Firebase project, not
+on a setting, so a staging deploy cannot revoke a real customer's
+subscription — but a production token sitting in staging would be a real
+token in a place that only ever needs a test one.
 
 ## 5. Deploy the functions
 
@@ -143,14 +157,22 @@ These are the ones that fail silently and always in the customer's favour, so
 they are worth ten minutes each, once:
 
 - **Cancel** it in Polar — the plan should stay `pro` until the period ends.
-- **Refund** the order — the plan should drop immediately.
+- **Refund** the order — the plan should drop immediately, **and the
+  subscription should end at Polar too**.
 
-  **When you refund, revoke as well.** Polar refunds the *order* and leaves the
+  That second half is ours to do. Polar refunds the *order* and leaves the
   subscription running: its own docs say you cannot end access by refunding a
-  subscription's order, only by cancelling it. So a refund on its own leaves
-  Polar saying "active" and Austavia saying "free" — which shows up as the
-  customer being unable to subscribe again, because Polar thinks they already
-  are. Found exactly that way on 2026-09-21.
+  subscription's order, only by cancelling it. Left alone that means Polar says
+  "active" while Austavia says "free", which surfaces as the customer being
+  unable to subscribe again on an account that is not subscribed — found
+  exactly that way on 2026-09-21. So a **full** refund now calls Polar and
+  revokes the subscription, which is what `POLAR_ACCESS_TOKEN` is for.
+
+  A **partial** refund deliberately does not. `order.refunded` fires for those
+  too, and a goodwill refund of one month must not end a subscription somebody
+  is still paying for. If the payload does not make it clear which kind it was,
+  nothing is revoked and the log says so — check `diagnostics/polar/revokeFailures`
+  and the function logs if a refund ever leaves a subscription alive.
 - **Revoke** one — the plan should drop at once, and `status` should read
   `none`. This is also what fires at the natural end of every cancelled
   subscription, so it is the common ending rather than the rare one.

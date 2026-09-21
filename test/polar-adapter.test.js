@@ -14,6 +14,8 @@ const {
   statusFromEvent,
   uidFromEvent,
   eventShape,
+  subscriptionIdFrom,
+  refundIsFull,
   eventAtFrom,
   periodEndsAt
 } = polar;
@@ -381,5 +383,49 @@ describe('eventAtFrom', () => {
     const delivered = 1788400000000;
     assert.equal(eventAtFrom({ data: {} }, delivered), delivered);
     assert.equal(eventAtFrom({ data: { modified_at: 'not a date' } }, delivered), delivered);
+  });
+});
+
+// --- Deciding whether a refund ends a subscription ---------------------
+//
+// Asked for on 2026-09-21, after a sandbox refund left Polar still thinking
+// the subscription was live: "a refund is generally also a revoke immediate of
+// the subscription, so it makes the most sense that a refund revokes
+// immediately, by default if not always."
+//
+// Acting on that means calling Polar and ending somebody's subscription, so
+// the reading of "was this the whole order" has to be right. `order.refunded`
+// fires for partial refunds too — Polar says so — and a goodwill refund of one
+// month must never cancel a subscription that is carrying on.
+
+describe('refundIsFull', () => {
+  it('knows a whole order was given back', () => {
+    assert.equal(refundIsFull({ data: { status: 'refunded' } }), true);
+    assert.equal(refundIsFull({ data: { refunded_amount: 800, total_amount: 800 } }), true);
+  });
+
+  it('knows part of one was', () => {
+    assert.equal(refundIsFull({ data: { status: 'partially_refunded' } }), false);
+    assert.equal(refundIsFull({ data: { refunded_amount: 200, total_amount: 800 } }), false);
+  });
+
+  // The uncertain case does nothing, and that direction is deliberate: failing
+  // to revoke leaves something to finish by hand, while revoking by mistake
+  // takes the product off somebody who is paying for it.
+  it('declines to answer when the payload does not say', () => {
+    assert.equal(refundIsFull({ data: {} }), null);
+    assert.equal(refundIsFull({ data: { refunded_amount: 'lots' } }), null);
+    assert.equal(refundIsFull({}), null);
+  });
+});
+
+describe('subscriptionIdFrom', () => {
+  it('finds the subscription an order paid for', () => {
+    assert.equal(subscriptionIdFrom({ data: { subscription_id: 'sub_1' } }), 'sub_1');
+    assert.equal(subscriptionIdFrom({ data: { subscription: { id: 'sub_2' } } }), 'sub_2');
+  });
+
+  it('says nothing for an order that has none', () => {
+    assert.equal(subscriptionIdFrom({ data: {} }), null);
   });
 });

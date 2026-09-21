@@ -79,7 +79,12 @@ const child = spawn(command, {
     ...process.env,
     TEMP: TEMP_DIR,
     TMP: TEMP_DIR,
-    POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET || EMULATOR_WEBHOOK_SECRET
+    POLAR_WEBHOOK_SECRET: process.env.POLAR_WEBHOOK_SECRET || EMULATOR_WEBHOOK_SECRET,
+    // Deliberately not a working token. The webhook can now call Polar to end
+    // a subscription after a full refund, and an emulator run must never reach
+    // a real payment provider -- with no usable token that call is skipped and
+    // says so in the log.
+    POLAR_ACCESS_TOKEN: process.env.POLAR_ACCESS_TOKEN || ''
   }
 });
 

@@ -13,6 +13,7 @@ const { recordStorageDelta, reconcileStorageUsage } = require('./storageAccounti
 const { recordActivity, rollUpStats } = require('./activityTracking');
 const { verifyWebhook, eventAtFrom } = require('./polarAdapter');
 const { applyPolarEvent, sweepExpiredPlans } = require('./subscriptions');
+const { apiBaseFor } = require('./polarApi');
 
 initializeApp();
 
@@ -311,11 +312,19 @@ exports.publishSchemaVersionMeta = onSchedule(
 //     upgrade.
 const polarWebhookSecret = defineSecret('POLAR_WEBHOOK_SECRET');
 
+// Used only to end a subscription after a full refund — see revokeAfterRefund.
+// It needs the `subscriptions:write` scope and nothing else; a token that can
+// do more than the one job it is here for is a token whose blast radius is
+// somebody else's decision. Sandbox and production have separate tokens, and
+// which Polar is reached is keyed on the Firebase project rather than on a
+// setting, so a staging deploy cannot revoke a real customer's subscription.
+const polarAccessToken = defineSecret('POLAR_ACCESS_TOKEN');
+
 exports.polarWebhook = onRequest(
   {
     region: 'us-central1',
     maxInstances: MAX_INSTANCES,
-    secrets: [polarWebhookSecret],
+    secrets: [polarWebhookSecret, polarAccessToken],
     cors: false
   },
   async (req, res) => {
@@ -353,7 +362,11 @@ exports.polarWebhook = onRequest(
       const outcome = await applyPolarEvent({
         event,
         eventId: verdict.id,
-        eventAt: eventAtFrom(event, Date.now())
+        eventAt: eventAtFrom(event, Date.now()),
+        polar: {
+          token: polarAccessToken.value(),
+          baseUrl: apiBaseFor(process.env.GCLOUD_PROJECT, PRODUCTION_PROJECT_ID)
+        }
       });
       res.status(200).json(outcome);
     } catch (error) {

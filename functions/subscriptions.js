@@ -21,11 +21,13 @@ const { SYNC_NAMESPACE } = require('./syncNamespace');
 const { storageLimitFor, isOverStorageLimit, storableLimit } = require('./limits');
 const { syncStorageFullClaim } = require('./storageAccounting');
 const { expiredPlanFor } = require('./entitlements');
-const { uidFromEvent, eventShape } = require('./polarAdapter');
+const { uidFromEvent, eventShape, refundIsFull, subscriptionIdFrom } = require('./polarAdapter');
+const { revokeSubscription } = require('./polarApi');
 const { recordAfterEvent, eventKey } = require('./subscriptionRecord');
 
 const SUBSCRIPTIONS = 'subscriptions';
 const UNMATCHED = 'diagnostics/polar/unmatched';
+const REVOKE_FAILURES = 'diagnostics/polar/revokeFailures';
 
 // Unmatched deliveries are kept for looking at, not for ever.
 const UNMATCHED_KEPT = 20;
@@ -92,13 +94,85 @@ async function recordUnmatched(db, eventId, event) {
 }
 
 /**
+ * End the subscription at Polar, after a refund that took back the whole order.
+ *
+ * Polar refunds the order and leaves the subscription running — its own docs
+ * say you cannot end access by refunding, only by cancelling — so without this
+ * a refunded customer stays subscribed there while being on the free plan
+ * here. What they see is Polar refusing to let them subscribe again, on an
+ * account that is not subscribed. That is how it was found.
+ *
+ * Three rules, all of them deliberate:
+ *
+ * - **Only a full refund.** `order.refunded` fires for partial ones too, and a
+ *   goodwill refund of one month must not end a subscription that is carrying
+ *   on.
+ * - **Never on a maybe.** `refundIsFull` returns null when it cannot tell, and
+ *   null does nothing. Failing to revoke leaves something to finish by hand;
+ *   revoking by mistake takes the product off somebody who is paying for it.
+ * - **Never fails the webhook.** Our own side is already correct by the time
+ *   this runs. A provider that is down must not make us answer 500 to a
+ *   delivery we have finished with — the retry would be recognised as a
+ *   duplicate and skipped anyway, so it would buy nothing and lose the record.
+ *
+ * The revoke sends `subscription.revoked` back to us, which lands on an
+ * account already free and changes nothing. No loop.
+ */
+async function revokeAfterRefund({ db, event, uid, polar = {} }) {
+  const full = refundIsFull(event);
+  const subscriptionId = subscriptionIdFrom(event);
+
+  if (full !== true || !subscriptionId) {
+    logger.info('refund-not-revoked', { uid, subscriptionId, full });
+    return;
+  }
+
+  if (!polar.token) {
+    logger.warn('refund-revoke-no-token', { uid, subscriptionId });
+    return;
+  }
+
+  try {
+    const result = await revokeSubscription({
+      id: subscriptionId,
+      token: polar.token,
+      baseUrl: polar.baseUrl
+    });
+
+    if (result.ok) {
+      logger.info('refund-revoked', { uid, subscriptionId, alreadyDone: Boolean(result.alreadyDone) });
+      return;
+    }
+
+    // Kept where it can be looked at, because nothing else will ever notice:
+    // the sweep recomputes from our own record and never asks Polar.
+    logger.error('refund-revoke-failed', { uid, subscriptionId, ...result });
+    await db.ref(`${REVOKE_FAILURES}/${subscriptionId}`).set({
+      uid,
+      at: Date.now(),
+      reason: result.reason || 'unknown',
+      status: result.status || 0
+    });
+  } catch (error) {
+    logger.error('refund-revoke-threw', { uid, subscriptionId, message: error.message });
+  }
+}
+
+/**
  * Apply one verified Polar delivery.
  *
  * The record is updated inside a transaction so that recognising a redelivery
  * and writing the result cannot be separated: two copies of the same event
  * arriving together would otherwise both read "not seen yet" and both apply.
  */
-async function applyPolarEvent({ db = getDatabase(), event, eventId, eventAt, now = Date.now() }) {
+async function applyPolarEvent({
+  db = getDatabase(),
+  event,
+  eventId,
+  eventAt,
+  polar = {},
+  now = Date.now()
+} = {}) {
   const uid = uidFromEvent(event);
   if (!uid) {
     await recordUnmatched(db, eventId, event);
@@ -121,13 +195,18 @@ async function applyPolarEvent({ db = getDatabase(), event, eventId, eventAt, no
 
   const stored = await planRef(db, uid).get();
   const current = stored.val();
-  if (current === outcome.plan) {
-    logger.info('polar-event-applied-no-change', { uid, plan: outcome.plan });
-    return { ok: true, uid, plan: outcome.plan, changed: false };
+  const changed = current !== outcome.plan;
+
+  if (changed) await applyPlan(db, uid, outcome.plan);
+  else logger.info('polar-event-applied-no-change', { uid, plan: outcome.plan });
+
+  // After our own side is settled, never before. If this throws or the
+  // provider is unreachable, the account is still correct here.
+  if (event && event.type === 'order.refunded') {
+    await revokeAfterRefund({ db, event, uid, polar });
   }
 
-  await applyPlan(db, uid, outcome.plan);
-  return { ok: true, uid, plan: outcome.plan, changed: true };
+  return { ok: true, uid, plan: outcome.plan, changed };
 }
 
 /**
@@ -171,6 +250,8 @@ async function sweepExpiredPlans({ db = getDatabase(), now = Date.now() } = {}) 
 module.exports = {
   SUBSCRIPTIONS,
   UNMATCHED,
+  REVOKE_FAILURES,
+  revokeAfterRefund,
   applyPlan,
   recordUnmatched,
   applyPolarEvent,

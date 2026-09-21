@@ -176,6 +176,34 @@ describe('the payment webhook', () => {
     assert.equal(storage.limit, 100 * 1024 * 1024);
   });
 
+  // A refund now also ends the subscription at Polar, because refunding an
+  // order there leaves it running. That call cannot happen in an emulator —
+  // there is no token, deliberately, so nothing reaches a real payment
+  // provider from a test run.
+  //
+  // What this pins down is that the missing half is the *outbound* one: our own
+  // side still has to be completely correct, and the delivery still has to be
+  // accepted, because a 500 here would be retried and then recognised as a
+  // duplicate and skipped, losing the refund entirely.
+  it('handles a refund completely even when it cannot reach Polar', async () => {
+    await deliver(activeSubscription(BUYER));
+    await waitFor(() => planOf(BUYER), value => value === 'pro');
+
+    const { status } = await deliver({
+      type: 'order.refunded',
+      data: {
+        status: 'refunded',
+        subscription_id: 'sub_emulator_1',
+        modified_at: new Date().toISOString(),
+        metadata: { uid: BUYER }
+      }
+    });
+
+    assert.equal(status, 200, 'a refund we cannot revoke upstream is still a refund');
+    const plan = await waitFor(() => planOf(BUYER), value => value === 'free');
+    assert.equal(plan, 'free');
+  });
+
   // The one open question in this integration: which key a checkout link's
   // reference_id ends up under. A delivery we cannot attribute is answered 200
   // — retrying it would not help — and its *shape* is kept so one real
