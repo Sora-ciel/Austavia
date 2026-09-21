@@ -66,6 +66,12 @@ function resolvePlan({
     // Money returned means access returned, immediately and without grace.
     // Anything else is a free subscription for anyone willing to ask for a
     // refund.
+    //
+    // Deliberately stricter than the provider. Polar refunds the *order* and
+    // leaves the subscription running -- ending access there is a separate
+    // revoke -- so after a refund their side can still say "active" while this
+    // says "free". That disagreement is the right way round, and it is why
+    // POLAR.md says to revoke whenever you refund.
     case STATUS.REFUNDED:
       return fallback;
 

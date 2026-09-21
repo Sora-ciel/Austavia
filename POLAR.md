@@ -144,6 +144,16 @@ they are worth ten minutes each, once:
 
 - **Cancel** it in Polar — the plan should stay `pro` until the period ends.
 - **Refund** the order — the plan should drop immediately.
+
+  **When you refund, revoke as well.** Polar refunds the *order* and leaves the
+  subscription running: its own docs say you cannot end access by refunding a
+  subscription's order, only by cancelling it. So a refund on its own leaves
+  Polar saying "active" and Austavia saying "free" — which shows up as the
+  customer being unable to subscribe again, because Polar thinks they already
+  are. Found exactly that way on 2026-09-21.
+- **Revoke** one — the plan should drop at once, and `status` should read
+  `none`. This is also what fires at the natural end of every cancelled
+  subscription, so it is the common ending rather than the rare one.
 - **Let it lapse** — `sweepExpiredPlans` runs daily at 04:00 UTC and is what
   catches a `subscription.revoked` that never arrived. Force-run it from Cloud
   Scheduler rather than waiting a month.

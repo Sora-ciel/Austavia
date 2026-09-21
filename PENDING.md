@@ -271,12 +271,22 @@ Still owed, in order:
    than by reading a payload, the emulator suite covers it end to end, and it
    goes through the same `applyPlan` the refund just proved against live
    deliveries.
-2. **Going live**: the same steps against the real dashboard — product,
+2. **Nothing ever asks Polar what it thinks.** `sweepExpiredPlans` recomputes
+   absolutely, but it recomputes from *our own record* — so when the two sides
+   disagree, nothing notices. That is not hypothetical: refunding an order on
+   2026-09-21 left Polar saying the subscription was active and us saying the
+   account was free, and the only reason it surfaced is that Polar refused a
+   second checkout. A real reconcile would list subscriptions from Polar's API
+   and recompute from that, the way `reconcileStorageUsage` lists the bucket
+   rather than trusting the running balance. It needs an API token as a second
+   secret, so it is a piece of work rather than a line — and it is the same
+   shape as every entry in CLAUDE.md's table.
+3. **Going live**: the same steps against the real dashboard — product,
    checkout link (the committed one in `checkout.js`, not `.env.staging`), a
    **new** signing secret, a new endpoint — plus deploying the functions to
    production, which is still blocked by `ARIAL_SMTP_PASS`. See section 5 and
    `POLAR.md`.
-3. **Birthday Mode's unlock** rewired onto `plan`.
+4. **Birthday Mode's unlock** rewired onto `plan`.
 
 Done: the product and the checkout link, the first functions deploy this repo
 has ever had (to `arial-staging`), and a paid-for plan landing on a real

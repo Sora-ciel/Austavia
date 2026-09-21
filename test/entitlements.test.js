@@ -58,9 +58,22 @@ describe('resolvePlan', () => {
     );
   });
 
-  // Anything else is a free subscription for anyone willing to ask for a
-  // refund.
-  it('revokes a refund immediately, with no grace', () => {
+  // Asked for in as many words, on 2026-09-21, after watching it happen in the
+  // sandbox: "a refund shouldn't keep the plan on, a refund is generally also a
+  // revoke immediate of the subscription, so it makes the most sense that a
+  // refund revokes immediately, by default if not always."
+  //
+  // This is deliberately *stricter than Polar*, and that is the part worth not
+  // undoing later. Polar documents that refunding an order tied to a
+  // subscription returns the money and leaves the subscription running -- to
+  // end access you have to cancel or revoke it separately. So a refund alone
+  // leaves their side saying "active" and ours saying "free", which is the
+  // right way round: the alternative is a paid plan for anyone willing to ask
+  // for their money back.
+  //
+  // The operational half of that decision lives in POLAR.md: when you refund,
+  // revoke too, or the customer is still subscribed and will be billed again.
+  it('a refund ends the plan at once, even though Polar leaves the subscription running', () => {
     assert.equal(
       resolvePlan({
         status: STATUS.REFUNDED,
