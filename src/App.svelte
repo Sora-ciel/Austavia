@@ -95,6 +95,7 @@
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
+  import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -3461,6 +3462,8 @@
   // Rendered at twice the canvas's own pixel size, so a canvas the size of a
   // 1080p screen comes out at 2160p.
   let screenshotBusy = false;
+  let screenshotNote = '';
+  let screenshotNoteTimer;
 
   const SCREENSHOT_SCALE = 2;
   // Browsers refuse to allocate a canvas beyond roughly 16384px on a side, and
@@ -3524,9 +3527,14 @@
     };
   }
 
-  async function handleScreenshot() {
-    if (screenshotBusy) return;
-    screenshotBusy = true;
+  /**
+   * Draw the current view and give back a PNG.
+   *
+   * Split out from the button so that the clipboard can be asked for while the
+   * click is still warm — see screenshotDelivery.js. This half takes seconds;
+   * the permission does not last that long.
+   */
+  async function captureScreenshotBlob() {
     let restoreScrollers = () => {};
     try {
       // html2canvas-pro rather than html2canvas: the original stops at
@@ -3582,43 +3590,100 @@
 
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('The image came back empty.');
-
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-      const name = `${currentSaveName || 'austavia'}-${mode}-${stamp}.png`;
-
-      // Same reasoning as saving a picture from the lightbox: on a phone a
-      // download lands somewhere the gallery does not index, so the screenshot
-      // exists and is nowhere to be found. The system sheet offers Photos.
-      const file = new File([blob], name, { type: 'image/png' });
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file] });
-          return;
-        } catch (error) {
-          if (error?.name === 'AbortError') return; // dismissed on purpose
-          console.warn('Sharing the screenshot failed, saving it instead:', error);
-        }
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return blob;
     } catch (error) {
-      console.error('Screenshot failed', error);
       // Put the zoom back even if the capture threw part-way through,
       // otherwise the board would be left sitting at 1:1.
       const board = canvasRef?.querySelector?.('.canvas-inner');
       if (board && board.style.transform === 'none') board.style.transform = '';
-      await appAlert("Couldn't capture this view.");
+      throw error;
     } finally {
       // Panes are put back even if the capture threw part-way through,
       // otherwise the mode would be left with its scrollers hanging open.
       restoreScrollers();
+    }
+  }
+
+  /**
+   * Ask for the clipboard now, and hand it the picture when there is one.
+   *
+   * Called before anything is awaited, on purpose. A browser only allows a
+   * clipboard write while the click that caused it still counts, and the
+   * capture above takes longer than that on a big board — so the promise goes
+   * in and the browser waits for it.
+   *
+   * Never throws and never rejects: the download is what was asked for, and a
+   * clipboard that refuses must not cost somebody their screenshot.
+   */
+  function copyScreenshotToClipboard(capture) {
+    if (!canCopyImage()) return Promise.resolve(false);
+
+    try {
+      return navigator.clipboard
+        .write([new ClipboardItem({ 'image/png': capture })])
+        .then(() => true)
+        .catch(error => {
+          console.warn('Copying the screenshot failed; it was still saved:', error);
+          return false;
+        });
+    } catch (error) {
+      console.warn('This browser would not take a picture for the clipboard:', error);
+      return Promise.resolve(false);
+    }
+  }
+
+  function saveScreenshot(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function noteScreenshot(message) {
+    screenshotNote = message;
+    clearTimeout(screenshotNoteTimer);
+    screenshotNoteTimer = setTimeout(() => { screenshotNote = ''; }, 2200);
+  }
+
+  /**
+   * The button.
+   *
+   * Deliberately not `async`: everything before `copyScreenshotToClipboard`
+   * has to run in the same turn as the click, or the clipboard is already
+   * closed by the time we ask.
+   *
+   * It used to offer the system share sheet on a phone *instead* of
+   * downloading, because a download there lands in a folder the gallery does
+   * not index. That was asked for, and it is being replaced on purpose rather
+   * than tidied away: "make it so that it downloads the image like a normal
+   * download and also puts it in the clipboard, for both PC and phones."
+   * Both, everywhere, and no sheet to dismiss first.
+   */
+  function handleScreenshot() {
+    if (screenshotBusy) return;
+    screenshotBusy = true;
+    screenshotNote = '';
+
+    const capture = captureScreenshotBlob();
+    const copying = copyScreenshotToClipboard(capture);
+
+    deliverScreenshot(capture, copying);
+  }
+
+  async function deliverScreenshot(capture, copying) {
+    try {
+      const blob = await capture;
+      saveScreenshot(blob, screenshotFileName({ saveName: currentSaveName, mode }));
+      noteScreenshot(deliveryMessage({ copied: await copying, downloaded: true }));
+    } catch (error) {
+      console.error('Screenshot failed', error);
+      await copying.catch(() => {});
+      await appAlert("Couldn't capture this view.");
+    } finally {
       screenshotBusy = false;
     }
   }
@@ -5405,6 +5470,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     window.removeEventListener("pagehide", rememberPlaybackPosition);
     controlsResizeObserver?.disconnect();
     observedControlsEl = null;
+    clearTimeout(screenshotNoteTimer);
     stopAuthListener?.();
     stopConnectionWatch?.();
     stopWallpaperWatch?.();
@@ -5526,6 +5592,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   transition: filter 0.15s ease;
 }
 .screenshot-btn:hover:not(:disabled) { filter: brightness(1.18); }
+
+/* Wide enough for the words while it is saying them, and back to an icon
+   afterwards. Colours stay the button's own -- see the theme rule in
+   CLAUDE.md. */
+.screenshot-btn.has-note { width: auto; padding-inline: 10px; }
+.screenshot-note { font-size: 0.72rem; white-space: nowrap; }
 .screenshot-btn:disabled { opacity: 0.6; cursor: default; }
 
 /* Matches the height of the toolbar buttons beside it rather than sitting
@@ -6195,13 +6267,18 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {/if}
     {/if}
 
+    <!-- The outcome is said on the button itself rather than in a dialog:
+         this is pressed often, and a box to dismiss every time would be worse
+         than saying nothing. It is also announced, so it is not only a colour
+         change for somebody who cannot see it. -->
     <button
       class="screenshot-btn"
+      class:has-note={screenshotNote !== ''}
       on:click={handleScreenshot}
       disabled={screenshotBusy}
-      title="Screenshot this view (PNG)"
+      title="Screenshot this view — saves a PNG and copies it"
       aria-label="Screenshot this view"
-    >{#if screenshotBusy}…{:else}<ControlIcon name="camera" size={17} />{/if}</button>
+    >{#if screenshotBusy}…{:else if screenshotNote}<span class="screenshot-note" role="status">{screenshotNote}</span>{:else}<ControlIcon name="camera" size={17} />{/if}</button>
 
     {#if showRightControls}
     <div class="right-controls">

@@ -36,6 +36,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/longPress.js` | whether a finger held down is a hold, a tap, or a scroll |
 | `src/utils/wallpaperViewport.js` | how tall the wallpaper is, and whether the keyboard is up |
 | `src/utils/checkout.js` | whether to offer an upgrade, and what the checkout is told |
+| `src/utils/screenshotDelivery.js` | what a screenshot is called, and whether it can be copied |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered

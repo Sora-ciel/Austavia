@@ -23,6 +23,7 @@ list below with what was observed.
 | 0.8.59 | The **drag pointer** on the desktop: the no-drop cursor should no longer flash at the start of a drag. A browser ignores `dropEffect` outside a real drag. |
 | 0.8.60 | A **real track ending** and autoplay stepping on, in a full library. Seeded audio covered everything up to that. |
 | 0.8.62 | **Adding a picture while signed in.** This is the file-dialog fix; it is the one most likely to have been the whole complaint. |
+| next | **The screenshot button on a phone.** It now saves a PNG *and* copies it, on every platform, where before a phone got the system share sheet instead of a download. Two things to look at: that the file actually arrives (it lands in Downloads now, not the gallery — that was the share sheet's whole reason for existing, and it was replaced on purpose), and that pasting it into another app gives the picture. Worth trying in the app *and* on austavia.com, since the clipboard half is the browser's to allow. |
 | next | The **wallpaper** holding still in Single Note and Playlist while the phone keyboard opens *and closes* — the closing is the half a browser cannot show. |
 | next | **Moving a block on the canvas** no longer making the text inside jump. |
 | next | **One click** on an unfocused text block leaving the caret where you clicked. |
