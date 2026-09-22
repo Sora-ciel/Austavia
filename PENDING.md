@@ -292,7 +292,17 @@ Still owed, in order:
    **new** signing secret, a new endpoint — plus deploying the functions to
    production, which is still blocked by `ARIAL_SMTP_PASS`. See section 5 and
    `POLAR.md`.
-4. **Birthday Mode's unlock** rewired onto `plan`.
+4. **The portal's org slug.** `.env.staging` carries a *guessed*
+   `VITE_POLAR_PORTAL_LINK` — `sandbox.polar.sh/austavia/portal`. It will 404
+   until it is replaced with the real sandbox organisation slug, and the live
+   one still has to be written into `checkout.js` before any real sale.
+5. **Birthday Mode's unlock** rewired onto `plan`.
+
+What the subscriber sees is now built and unverified rather than missing: a
+plan panel above the storage bar showing what they are on, when it renews, that
+a payment failed and by when, and a Manage subscription link into Polar's
+portal. Only the words and the states are tested — the panel itself needs a
+signed-in staging session to look at, because it lives behind `authUser`.
 
 Done: the product and the checkout link, the first functions deploy this repo
 has ever had (to `arial-staging`), and a paid-for plan landing on a real
