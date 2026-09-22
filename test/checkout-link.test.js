@@ -11,7 +11,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkoutUrlFor, upgradeOffer, isPaidPlan, POLAR_CHECKOUT_LINK } from '../src/utils/checkout.js';
+import {
+  checkoutUrlFor,
+  upgradeOffer,
+  isPaidPlan,
+  portalUrlFor,
+  POLAR_CHECKOUT_LINK,
+  POLAR_PORTAL_LINK
+} from '../src/utils/checkout.js';
 
 const LINK = 'https://buy.polar.sh/austavia-pro';
 const UID = 'kK2nQ7xyzAbCdEfGh1234567';
@@ -123,5 +130,42 @@ describe('isPaidPlan', () => {
     assert.equal(isPaidPlan('free'), false);
     assert.equal(isPaidPlan('legacy'), false);
     assert.equal(isPaidPlan(undefined), false);
+  });
+});
+
+// Where a subscriber goes to change their card, take an invoice, or leave.
+//
+// Leaving has to be possible without emailing a person: that is a support
+// queue at best, and in the EU an easy way out is not optional.
+describe('portalUrlFor', () => {
+  const PORTAL = 'https://polar.sh/austavia/portal';
+
+  it('opens the portal as it is', () => {
+    assert.equal(portalUrlFor({ link: PORTAL }), PORTAL + '');
+  });
+
+  // Deliberately unlike the checkout, which carries the uid. The customer
+  // proves who they are to Polar with a code sent to the address they paid
+  // with, so this link says nothing about who clicked it — and a forwarded one
+  // shows the recipient nothing.
+  it('carries no account id at all', () => {
+    const url = new URL(portalUrlFor({ link: PORTAL }));
+    assert.equal(url.search, '');
+  });
+
+  it('shows no button until a portal is configured', () => {
+    assert.equal(portalUrlFor({ link: '' }), null);
+    assert.equal(portalUrlFor({ link: '   ' }), null);
+  });
+
+  it('will not open a billing page over http', () => {
+    assert.equal(portalUrlFor({ link: 'http://polar.sh/austavia/portal' }), null);
+    assert.equal(portalUrlFor({ link: 'nonsense' }), null);
+  });
+
+  // Same hazard as the checkout link: a sandbox portal shipped to the live
+  // site sends paying customers somewhere their subscription does not exist.
+  it('never ships pointing at a sandbox', () => {
+    assert.ok(!/sandbox/i.test(POLAR_PORTAL_LINK), POLAR_PORTAL_LINK);
   });
 });

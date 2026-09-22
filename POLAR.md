@@ -20,8 +20,9 @@ than yours. That is the whole reason it is there instead of Stripe.
 | `functions/subscriptions.js` | Writes the plan, the ceiling, and the token claim |
 | `polarWebhook` in `functions/index.js` | The endpoint — **needs a deploy and a secret** |
 | `sweepExpiredPlans` | Looks again daily, for the webhook that never arrives |
-| `src/utils/checkout.js` | Builds the checkout URL — **needs a link pasted in** |
-| The Upgrade button | Appears on its own once that link is there |
+| `src/utils/checkout.js` | Builds the checkout and portal URLs — **needs links pasted in** |
+| `src/utils/subscriptionStatus.js` | What the subscriber is told: renewal, cancellation, a failed card |
+| The plan panel | In the right-hand Settings panel, above the storage bar |
 
 All of it is exercised by `npm test`, and the endpoint itself end-to-end by
 `npm run test:triggers` — real signed deliveries against the real function in
@@ -57,6 +58,12 @@ VITE_POLAR_CHECKOUT_LINK=https://sandbox-api.polar.sh/v1/checkout-links/.../redi
 **The live link is the committed default** in
 [`src/utils/checkout.js`](src/utils/checkout.js), the same arrangement
 `firebase.ts` uses for the project config.
+
+**The customer portal goes in beside it**, as `VITE_POLAR_PORTAL_LINK`. It is
+`polar.sh/<your-org-slug>/portal`, and it is where a subscriber changes their
+card, takes an invoice or cancels. Without it there is no way out of a
+subscription except emailing you, which is a support queue and, in the EU, not
+allowed.
 
 That split is not tidiness. A sandbox checkout behaves exactly like a real one
 right up to the point where the money does not arrive, so a sandbox link left

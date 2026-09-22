@@ -580,6 +580,44 @@ export function subscribeStorageUsage(callback) {
   };
 }
 
+// Watches this account's subscription record.
+//
+// Separate from the storage record on purpose. `storage/{uid}` answers "how
+// much room is left", which changes on every upload; this answers "what did
+// they buy and what is happening to it", which changes a handful of times in
+// a subscription's life. They are written by different code paths and read for
+// different reasons, and joining them would mean a photo upload rewriting
+// somebody's billing state.
+//
+// Owner-readable only, and never client-writable -- database.rules.json grants
+// subscriptions/{uid} to that uid for reading and to nobody at all for writing,
+// because a plan that the client could set is not a paywall.
+export function subscribeSubscription(callback) {
+  let detach = () => {};
+  let cancelled = false;
+
+  getFirebaseContext()
+    .then(ctx => {
+      if (cancelled || !ctx) return;
+      const user = ctx.auth.currentUser;
+      if (!user) return;
+
+      const subscriptionRef = ctx.dbApi.ref(ctx.db, `subscriptions/${user.uid}`);
+      const unsubscribe = ctx.dbApi.onValue(
+        subscriptionRef,
+        snapshot => callback(snapshot.exists() ? snapshot.val() : null),
+        error => console.warn('Subscription subscription failed:', error)
+      );
+      detach = unsubscribe;
+    })
+    .catch(error => console.warn('Subscription subscription failed:', error));
+
+  return () => {
+    cancelled = true;
+    detach();
+  };
+}
+
 // Removes the uploads left behind by blocks that no longer exist.
 //
 // Deleting an image block never removed its upload: attachments were only

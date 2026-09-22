@@ -37,6 +37,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/wallpaperViewport.js` | how tall the wallpaper is, and whether the keyboard is up |
 | `src/utils/checkout.js` | whether to offer an upgrade, and what the checkout is told |
 | `src/utils/screenshotDelivery.js` | what a screenshot is called, and whether it can be copied |
+| `src/utils/subscriptionStatus.js` | what a subscriber is told about their own plan |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered

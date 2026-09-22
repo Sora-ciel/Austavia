@@ -37,7 +37,8 @@
     saveRemoteTheme,
     deleteRemoteTheme,
     sweepOrphanBlockAttachments,
-    subscribeStorageUsage
+    subscribeStorageUsage,
+    subscribeSubscription
   } from './firebaseClient.js';
   import { reconcileThemes } from './utils/themeSync.js';
   import {
@@ -2699,6 +2700,7 @@
   // The account's stored-byte record, streamed from storage/{uid}. Null until
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
+  let subscriptionRecord = null;
   // When each lock last got somewhere, so one that stopped moving can be let
   // go of. The flags below are cleared in a `finally`, which covers finishing
   // and covers failing — but not an await that never settles, and that is the
@@ -5256,6 +5258,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   // Torn down and re-attached on every auth change, so one account's figures
   // can never be left on screen for the next person to sign in.
   let stopStorageUsageListener = null;
+  let stopSubscriptionListener = null;
 
   onMount(async () => {
     Pc = window.innerWidth > MOBILE_BREAKPOINT;
@@ -5334,9 +5337,19 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         stopStorageUsageListener = null;
         storageUsage = null;
 
+        // Dropped on sign-out as well as picked up on sign-in. A subscription
+        // left on screen after somebody signs out would be showing one
+        // person's billing to the next one at the same computer.
+        stopSubscriptionListener?.();
+        stopSubscriptionListener = null;
+        subscriptionRecord = null;
+
         if (user) {
           stopStorageUsageListener = subscribeStorageUsage(usage => {
             storageUsage = usage;
+          });
+          stopSubscriptionListener = subscribeSubscription(record => {
+            subscriptionRecord = record;
           });
         }
       });
@@ -5479,6 +5492,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }
     if (gateTimer) clearInterval(gateTimer);
     stopStorageUsageListener?.();
+    stopSubscriptionListener?.();
     stopRemoteIndexWatch();
     document.removeEventListener('visibilitychange', handleVisibilityForSync);
     window.removeEventListener('focus', onWindowReturned);
@@ -6293,6 +6307,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         on:forgetSnapshot={handleForgetSnapshot}
         {savedList}
         {storageUsage}
+        {subscriptionRecord}
         {load}
         {deleteSave}
         {createNewFile}

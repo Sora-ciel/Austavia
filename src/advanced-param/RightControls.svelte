@@ -9,6 +9,9 @@
   // The server's stored-byte record for this account: { bytes, limit, full }.
   // Null when signed out, or before the first snapshot arrives.
   export let storageUsage = null;
+  // What the account bought and what is happening to it: status, period end,
+  // grace. Written by the server only -- see subscribeSubscription.
+  export let subscriptionRecord = null;
   export let load;
   export let deleteSave;
   export let createNewFile;
@@ -28,7 +31,8 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import { subscribeSyncLog, clearSyncLog, formatSyncLog } from '../utils/syncLog.js';
   import { describeStorageUsage, storageMessageFor } from '../utils/storageUsage.js';
-  import { upgradeOffer } from '../utils/checkout.js';
+  import { upgradeOffer, portalUrlFor } from '../utils/checkout.js';
+  import { subscriptionView } from '../utils/subscriptionStatus.js';
 
   // Sync writes down what it decided; this is where you read it. There is no
   // console in the packaged app, and the questions that matter — what did it
@@ -505,9 +509,55 @@
     line-height: 1.35;
   }
 
-  /* Takes its colour from the block it sits in, which is the panel's text
-     colour until the state turns it amber or red — so the button goes loud at
-     exactly the moment the message does, without naming a colour of its own. */
+  /* The plan, above the storage figure. Same box treatment as the storage
+     block so the two read as one section, and every colour comes from the
+     panel rather than from here — see the theme rule in CLAUDE.md. */
+  .plan-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--panel-border, #444);
+    border-radius: 8px;
+  }
+
+  .plan-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    opacity: 0.85;
+  }
+
+  .plan-name { font-weight: 600; }
+
+  .plan-detail {
+    margin: 0;
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  /* A card that failed is the one state with a deadline attached, so it is the
+     one that is allowed to shout. Cancelled is not a problem, only a fact, and
+     it stays the panel's own colour. */
+  .plan-box[data-tone='attention'] { color: #ff6b6b; }
+
+  .plan-action {
+    align-self: flex-start;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+    border-radius: 999px;
+    font-size: 0.74rem;
+    text-decoration: none;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  .plan-action:hover { background: color-mix(in srgb, currentColor 20%, transparent); }
+
+  /* Kept for the storage block's own future use. */
   .storage-upgrade {
     align-self: flex-start;
     padding: 0.3rem 0.6rem;
@@ -658,10 +708,43 @@
               <button class="create-theme-btn" type="button" on:click={signOut}>🚪 Sign Out</button>
               <p class="empty-state">Signed in as {authUser.displayName || authUser.email || authUser.uid}</p>
 
+              <!-- The plan comes before the storage bar on purpose: what you
+                   are on, then how much of it is left. Shown even before any
+                   storage record exists, because a brand new account has no
+                   such record and would otherwise be offered nothing at all. -->
+              {@const plan = subscriptionView({
+                plan: storageUsage?.plan,
+                status: subscriptionRecord?.status,
+                periodEndsAt: subscriptionRecord?.periodEndsAt,
+                gracePeriodEndsAt: subscriptionRecord?.gracePeriodEndsAt
+              })}
+              {@const offer = upgradeOffer({ usage: storageUsage, uid: authUser?.uid })}
+              {@const portal = portalUrlFor()}
+              <div class="plan-box" data-tone={plan.tone}>
+                <div class="plan-head">
+                  <span>Plan</span>
+                  <span class="plan-name">{plan.label}</span>
+                </div>
+                <p class="plan-detail">{plan.detail}</p>
+
+                {#if plan.action === 'upgrade' && offer.show}
+                  <a class="plan-action" href={offer.url} target="_blank" rel="noopener noreferrer">
+                    Upgrade to Pro
+                  </a>
+                {:else if plan.action === 'manage' && portal}
+                  <!-- Cancelling, changing a card and taking an invoice all
+                       live behind this one link, at Polar. Anything less and
+                       leaving means emailing a person, which is both a support
+                       queue and, in the EU, not allowed. -->
+                  <a class="plan-action" href={portal} target="_blank" rel="noopener noreferrer">
+                    Manage subscription
+                  </a>
+                {/if}
+              </div>
+
               {#if storageUsage}
                 {@const usage = describeStorageUsage(storageUsage)}
                 {@const message = storageMessageFor(storageUsage)}
-                {@const offer = upgradeOffer({ usage: storageUsage, uid: authUser?.uid })}
                 <div class="storage-usage" data-state={usage.state}>
                   <div class="storage-usage-head">
                     <span>Cloud storage</span>
@@ -683,23 +766,6 @@
 
                   {#if message}
                     <p class="storage-usage-message">{message}</p>
-                  {/if}
-
-                  <!-- Only ever shown once there is a product to sell and an
-                       account to attach it to; upgradeOffer decides both. The
-                       uid rides along in the URL, because the payment comes
-                       back as a webhook that has no other way to know whose
-                       account it belongs to. -->
-                  {#if offer.show}
-                    <a
-                      class="storage-upgrade"
-                      data-tone={offer.tone}
-                      href={offer.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {offer.tone === 'urgent' ? 'Get more space' : 'Upgrade storage'}
-                    </a>
                   {/if}
                 </div>
               {/if}

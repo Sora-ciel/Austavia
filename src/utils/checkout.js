@@ -46,6 +46,42 @@ export const POLAR_CHECKOUT_LINK =
     ? env.VITE_POLAR_CHECKOUT_LINK
     : '';
 
+/**
+ * Polar's customer portal for this organisation — `polar.sh/<org>/portal`.
+ *
+ * Where somebody goes to see their subscription, change their card, take an
+ * invoice, or cancel. It carries no account id: the customer proves who they
+ * are to Polar with a one-time code sent to the email they paid with, which is
+ * the right way round — the alternative is a link that would show one person's
+ * billing to whoever it was forwarded to.
+ *
+ * Same split as the checkout link: the committed value is live, `.env.staging`
+ * holds the sandbox one.
+ */
+export const POLAR_PORTAL_LINK =
+  typeof env.VITE_POLAR_PORTAL_LINK === 'string' && env.VITE_POLAR_PORTAL_LINK.length > 0
+    ? env.VITE_POLAR_PORTAL_LINK
+    : '';
+
+/**
+ * The portal URL, or null when there is nothing to open.
+ *
+ * Nothing is appended. Unlike the checkout, which has to carry the uid, this
+ * link is the same for everybody and deliberately says nothing about who is
+ * clicking it.
+ */
+export function portalUrlFor({ link = POLAR_PORTAL_LINK } = {}) {
+  if (typeof link !== 'string' || link.trim() === '') return null;
+
+  try {
+    const url = new URL(link.trim());
+    if (url.protocol !== 'https:') return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** Plans that are already paying, or already unlimited. Nothing to sell them. */
 const PAID_PLANS = ['pro', 'owner'];
 
