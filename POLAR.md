@@ -197,15 +197,30 @@ does not change.
 
 ## Two things that are not about code
 
-**Your country on the Polar account is a tax declaration, not a form field.**
-Polar pays out through a KYC check against identity documents, and the country
-on the account has to be the one you actually live in and file in — a mismatch
-surfaces at the first payout, which is the worst possible moment to find it. If
-where you live is a French overseas territory, the honest answer there is that
-territory, even where it is "treated like France" for most purposes: some of
-them are outside the EU VAT area entirely, and that changes what Polar collects
-on your behalf. Worth five minutes with their support before the first real
-sale rather than after it.
+**Guadeloupe, and what Polar said about it** (their support, 2026-09-23).
+France is the right account country: Guadeloupe is a French department, with a
+French passport and a FR IBAN behind it. Three things were asked before the
+first real sale, and two of them are now closed:
+
+- **VAT on Polar's fees to you: none.** "Out of scope, no VAT, no reverse
+  charge. Polar is a US entity, and since we have no VAT system to account for
+  it under, nothing appears on our invoice to you regardless of your location
+  inside or outside the EU VAT area." So the overseas-department question does
+  not reach their invoice at all.
+- **The reverse invoice with no VAT number: leave it empty.** The field is
+  optional, and under *franchise en base* there is no number to put in it. It
+  still stands as an income document.
+- **Stripe KYC with a 971 postcode: no promise either way.** "It depends on
+  actual Stripe verification history rather than anything in our docs or from
+  our end" — which means Polar does not gate on it and Stripe decides. So do
+  the verification **early**, before anybody is waiting on a payout, because
+  that is the only way to find out and the cheapest moment to hit a snag.
+
+What their answer does *not* cover is your own side of a purchase from a
+non-EU supplier — whether anything has to be self-assessed on a French return,
+and how that works from a department outside the EU VAT area. Polar is not in a
+position to answer that and did not try. It is a question for a local
+accountant, and it is the classic one to miss under *franchise en base*.
 
 **The trademark filing is still open.** INPI classes 9 and 42 for Austavia —
 unrelated to any of the above, but it is the other thing standing between this
