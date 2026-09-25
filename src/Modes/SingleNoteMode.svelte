@@ -423,6 +423,15 @@
   .single-note > .note-meta,
   .single-note > .note-footer { flex: 0 0 auto; }
 
+  /* Three pixels above and below the writing, asked for in as many words:
+     "make it small, maybe 2 or 3 pix of space above and below the text but not
+     more" -- because on a phone this row was taking about as much height as the
+     controls bar to say two short numbers, and every pixel of it comes off the
+     note.
+
+     The padding was never the whole of it. The row was 50px and the text in it
+     is 20px: what set the height was the Picture button beside it, so that is
+     trimmed to match rather than left to hold the row open on its own. */
   .note-meta {
     display: flex;
     flex-wrap: wrap;
@@ -430,7 +439,7 @@
     align-items: center;
     justify-content: space-between;
     width: 100%;
-    padding: 8px 12px;
+    padding: 3px 12px;
     box-sizing: border-box;
     background: var(--active-note-bg);
     color: var(--active-note-text, inherit);
@@ -457,7 +466,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 10px;
+    padding: 3px 10px;
     border-radius: 8px;
     border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
     background: color-mix(in srgb, currentColor 10%, transparent);
@@ -465,9 +474,11 @@
     font: inherit;
     font-size: 0.85rem;
     cursor: pointer;
-    /* Comfortably past the 44px a thumb wants, since a phone is where this
-       matters and there is nothing else to press. */
-    min-height: 34px;
+    /* This is the number that decides the row's height, not the padding around
+       the words beside it. Kept as large as the row allows: it is still the
+       only way to put a picture in a note on a phone, so it has to stay
+       findable by a thumb, and below about this it stops being. */
+    min-height: 28px;
   }
 
   .note-picture:hover {
