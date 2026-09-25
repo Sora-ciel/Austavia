@@ -9,11 +9,24 @@
  * ## Why it was not arriving
  *
  * The notification is started with `startForegroundService(intent)`, and the
- * cover travels as a string extra on that intent. Everything on an intent goes
- * through Binder, whose transaction buffer is about a megabyte for the whole
- * process — not per call — and embedded album art is routinely 500KB to 1.5MB
- * before base64 makes it a third larger again. Over the limit the write does
- * not fail loudly in a way the app can see; the artwork simply never turns up.
+ * cover used to travel as a string extra on that intent. Everything on an
+ * intent goes through Binder, whose transaction buffer is about a megabyte for
+ * the whole process — not per call — and embedded album art is routinely 500KB
+ * to 1.5MB before base64 makes it a third larger again. Over the limit the
+ * write does not fail loudly in a way the app can see; the artwork simply never
+ * turns up.
+ *
+ * **That constraint has since moved.** On 2026-09-25 a track with a 197KB PNG
+ * cover — 262,000 characters of data URL, about half a megabyte once parcelled
+ * as UTF-16 — froze the whole notification rather than just losing its picture,
+ * because the title, the play state and the position all rode on the same
+ * intent. The cover is now decoded in the plugin and handed to the service in
+ * memory (they are the same process), so the intent carries an integer instead.
+ * See `EXTRA_ARTWORK_ID` in `MediaNotificationService.java`.
+ *
+ * The limit below therefore no longer guards Binder. What it still bounds is
+ * the size of a string held in the WebView and decoded on the bridge thread,
+ * which is a reason to keep it but a reason to keep it generous.
  *
  * Nothing was resizing it. A cover is stored exactly as it was embedded in the
  * file, which for a well-tagged album is often 1400×1400.

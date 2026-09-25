@@ -18,6 +18,8 @@ import android.util.Base64;
 
 import androidx.core.app.NotificationCompat;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Foreground service holding a media session and the notification that goes
  * with it.
@@ -57,12 +59,60 @@ public class MediaNotificationService extends Service {
     public static final String EXTRA_TITLE = "title";
     public static final String EXTRA_ARTIST = "artist";
     public static final String EXTRA_ARTWORK = "artwork";
+    /**
+     * The cover, handed over in memory instead of on the intent.
+     *
+     * An intent goes to the system server and back, through Binder, whose
+     * transaction buffer is about a megabyte for the *whole process*. Album art
+     * is routinely 200KB, and a Java String is parcelled as UTF-16 -- so a
+     * 197KB PNG became a 262,000 character data URL and about half a megabyte
+     * on one intent. Over the line, startForegroundService throws, and because
+     * the title, the artist, the play state and the position all travelled on
+     * that same intent, *none* of it arrived: the notification kept the
+     * previous track's cover and the previous track's frozen progress bar.
+     * Found on one track that happened to have a PNG cover where the others
+     * had JPEGs a sixth of the size.
+     *
+     * The plugin and this service are the same process -- no `android:process`
+     * in the manifest -- so the bitmap never needs to be parcelled at all. The
+     * plugin decodes it, leaves it here, and the intent carries only this id.
+     */
+    public static final String EXTRA_ARTWORK_ID = "artworkId";
     public static final String EXTRA_PLAYING = "playing";
     public static final String EXTRA_POSITION = "position";
     public static final String EXTRA_DURATION = "duration";
 
     /** "Nothing said about it this time", so an update can leave one alone. */
     private static final long UNSET = -1L;
+
+    // Only ever one cover waiting: a new track replaces the old one, so an
+    // intent that never arrives cannot leave a bitmap behind for ever.
+    private static final AtomicInteger artworkIds = new AtomicInteger();
+    private static volatile int pendingArtworkId = 0;
+    private static volatile Bitmap pendingArtwork = null;
+
+    /** Leaves a decoded cover for the next update to pick up. */
+    public static int stashArtwork(Bitmap bitmap) {
+        int id = artworkIds.incrementAndGet();
+        pendingArtwork = bitmap;
+        pendingArtworkId = id;
+        return id;
+    }
+
+    /**
+     * Takes the cover left for this update, or null when it has been replaced.
+     *
+     * Null is the right answer for a superseded id: it means a newer track
+     * arrived while this intent was in flight, and drawing the older cover over
+     * the newer track would be worse than leaving the picture alone.
+     */
+    private static Bitmap takeArtwork(int id) {
+        if (id <= 0 || id != pendingArtworkId) return null;
+        Bitmap bitmap = pendingArtwork;
+        pendingArtwork = null;
+        pendingArtworkId = 0;
+        return bitmap;
+    }
 
     /** Set by the plugin so button presses can be forwarded to the web layer. */
     public static ActionListener actionListener;
@@ -80,6 +130,8 @@ public class MediaNotificationService extends Service {
     public static volatile int lastArtworkHeight = 0;
     public static volatile String lastArtworkError = null;
     public static volatile int updatesReceived = 0;
+    /** How the last cover reached the service: "memory", "dataUrl" or "none". */
+    public static volatile String lastArtworkVia = "none";
 
     public interface ActionListener {
         /**
@@ -180,12 +232,35 @@ public class MediaNotificationService extends Service {
             if (sentDuration >= 0) durationMs = sentDuration;
 
             updatesReceived += 1;
+
+            // In memory first. The data URL path is kept for a web layer older
+            // than this service -- the app updates in two pieces and they are
+            // not always the same age.
+            int artworkId = intent.getIntExtra(EXTRA_ARTWORK_ID, 0);
             String artworkData = intent.getStringExtra(EXTRA_ARTWORK);
-            lastArtworkChars = artworkData == null ? -1 : artworkData.length();
-            if (artworkData != null) {
+            Bitmap handed = takeArtwork(artworkId);
+
+            if (handed != null) {
+                artwork = handed;
+                lastArtworkVia = "memory";
+                lastArtworkChars = -1;
+                lastArtworkError = null;
+                lastArtworkWidth = artwork.getWidth();
+                lastArtworkHeight = artwork.getHeight();
+            } else if (artworkData != null) {
+                lastArtworkVia = "dataUrl";
+                lastArtworkChars = artworkData.length();
                 artwork = decodeArtwork(artworkData);
                 lastArtworkWidth = artwork == null ? 0 : artwork.getWidth();
                 lastArtworkHeight = artwork == null ? 0 : artwork.getHeight();
+            } else if (artworkId > 0) {
+                // An id that nothing answered to: a newer track overtook this
+                // update. The cover already on screen is the newer one's, so it
+                // is left alone rather than cleared.
+                lastArtworkVia = "superseded";
+            } else {
+                lastArtworkVia = "none";
+                lastArtworkChars = -1;
             }
         }
 
@@ -230,7 +305,7 @@ public class MediaNotificationService extends Service {
     }
 
     /** Artwork arrives as a data URL, which is how the web layer holds it. */
-    private Bitmap decodeArtwork(String dataUrl) {
+    static Bitmap decodeArtwork(String dataUrl) {
         try {
             int comma = dataUrl.indexOf(',');
             String base64 = comma >= 0 ? dataUrl.substring(comma + 1) : dataUrl;

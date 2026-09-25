@@ -2,6 +2,7 @@ package com.sora.austavia;
 
 import android.Manifest;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Build;
 
 import com.getcapacitor.JSObject;
@@ -25,6 +26,12 @@ import com.getcapacitor.annotation.PermissionCallback;
     }
 )
 public class MediaNotificationPlugin extends Plugin {
+
+    // The bridge's half of the story, for status(). What the service reports is
+    // the other half, and the interesting answers are always in the comparison.
+    private static volatile int lastArtworkChars = -1;
+    private static volatile boolean lastArtworkDecoded = false;
+    private static volatile String lastStartError = null;
 
     @Override
     public void load() {
@@ -80,9 +87,27 @@ public class MediaNotificationPlugin extends Plugin {
             .putExtra(MediaNotificationService.EXTRA_ARTIST, call.getString("artist", ""))
             .putExtra(MediaNotificationService.EXTRA_PLAYING, call.getBoolean("playing", false));
 
+        // Decoded here and handed over in memory, not written onto the intent.
+        // See EXTRA_ARTWORK_ID: an intent is parcelled through the system
+        // server, and a 197KB PNG cover became half a megabyte of UTF-16 on one
+        // -- which took the title, the play state and the position down with it
+        // when it failed, because all of them were riding on the same intent.
         String artwork = call.getString("artwork");
+        lastArtworkChars = artwork == null ? -1 : artwork.length();
+        lastArtworkDecoded = false;
+
         if (artwork != null && !artwork.isEmpty()) {
-            intent.putExtra(MediaNotificationService.EXTRA_ARTWORK, artwork);
+            Bitmap bitmap = MediaNotificationService.decodeArtwork(artwork);
+            if (bitmap != null) {
+                lastArtworkDecoded = true;
+                intent.putExtra(
+                    MediaNotificationService.EXTRA_ARTWORK_ID,
+                    MediaNotificationService.stashArtwork(bitmap)
+                );
+            }
+            // A cover that will not decode is simply not sent. The rest of the
+            // update still goes, because a broken picture must never cost
+            // somebody their play button.
         }
 
         // Where the track is up to, so the system player can draw its progress
@@ -93,12 +118,37 @@ public class MediaNotificationPlugin extends Plugin {
         putIfPresent(call, intent, "position", MediaNotificationService.EXTRA_POSITION);
         putIfPresent(call, intent, "duration", MediaNotificationService.EXTRA_DURATION);
 
+        // The artwork no longer travels on the intent, so this should not be
+        // able to fail on size any more. It is guarded anyway, and guarded in
+        // the order that matters: a second attempt without the cover, so the
+        // worst case is a stale picture over a working progress bar rather than
+        // a notification frozen on the previous track.
+        try {
+            fire(intent);
+            lastStartError = null;
+        } catch (Throwable error) {
+            lastStartError = error.getClass().getSimpleName() + ": " + error.getMessage();
+            intent.removeExtra(MediaNotificationService.EXTRA_ARTWORK_ID);
+            intent.removeExtra(MediaNotificationService.EXTRA_ARTWORK);
+            try {
+                fire(intent);
+            } catch (Throwable second) {
+                lastStartError += " | without artwork: "
+                    + second.getClass().getSimpleName() + ": " + second.getMessage();
+                call.reject("Could not start the media notification: " + lastStartError);
+                return;
+            }
+        }
+
+        call.resolve();
+    }
+
+    private void fire(Intent intent) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getContext().startForegroundService(intent);
         } else {
             getContext().startService(intent);
         }
-        call.resolve();
     }
 
     /**
@@ -134,6 +184,12 @@ public class MediaNotificationPlugin extends Plugin {
         out.put("artworkWidth", MediaNotificationService.lastArtworkWidth);
         out.put("artworkHeight", MediaNotificationService.lastArtworkHeight);
         out.put("artworkError", MediaNotificationService.lastArtworkError);
+        out.put("artworkVia", MediaNotificationService.lastArtworkVia);
+        // The bridge's own side of the handover, so a cover that never left the
+        // plugin is distinguishable from one the service never picked up.
+        out.put("sentArtworkChars", lastArtworkChars);
+        out.put("sentArtworkDecoded", lastArtworkDecoded);
+        out.put("startError", lastStartError);
         out.put(
             "notificationsAllowed",
             Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
