@@ -88,6 +88,26 @@ describe('revokeSubscription', () => {
     assert.match(result.detail, /exploded/);
   });
 
+  // A secret is pasted by a person, and a trailing newline is invisible in
+  // every tool that shows one. Polar rejects a token with one attached as
+  // with the same 401 as a token that is genuinely wrong, so the log could not
+  // tell them apart.
+  it('does not send whitespace along with the token', async () => {
+    const fetchImpl = fakeFetch(ok);
+    const withNewline = '  polar_oat_test' + String.fromCharCode(10);
+    await revokeSubscription({ id: 'sub_1', token: withNewline, fetchImpl });
+
+    assert.equal(fetchImpl.calls[0].options.headers.Authorization, 'Bearer polar_oat_test');
+  });
+
+  it('treats a token that is only whitespace as no token at all', async () => {
+    const fetchImpl = fakeFetch(ok);
+    const result = await revokeSubscription({ id: 'sub_1', token: '   ', fetchImpl });
+
+    assert.equal(result.reason, 'no-token');
+    assert.equal(fetchImpl.calls.length, 0);
+  });
+
   // Without a token this would send an unauthenticated DELETE to a payment
   // provider. It should not leave the building.
   it('does not call out at all without a token or an id', async () => {

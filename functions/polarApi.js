@@ -49,12 +49,18 @@ async function revokeSubscription({
   fetchImpl = globalThis.fetch
 } = {}) {
   if (!id) return { ok: false, reason: 'no-subscription-id' };
-  if (!token) return { ok: false, reason: 'no-token' };
+
+  // Trimmed, because a secret is typed or pasted by a person and a trailing
+  // newline is invisible in every tool that shows one. A trailing one is
+  // rejected as malformed, with the same 401 as a token that is genuinely
+  // wrong -- and the two would be indistinguishable from the log.
+  const bearer = String(token || '').trim();
+  if (!bearer) return { ok: false, reason: 'no-token' };
 
   const response = await fetchImpl(`${baseUrl}/v1/subscriptions/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${bearer}`,
       'Content-Type': 'application/json'
     }
   });
