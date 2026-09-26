@@ -19,7 +19,8 @@
     loadAllSaveMeta,
     listFolderSnapshots,
     putFolderSnapshots,
-    deleteFolderSnapshot
+    deleteFolderSnapshot,
+    describeLocalStorage
   } from './storage.js';
   import {
     isFirebaseConfigured,
@@ -2132,7 +2133,12 @@
       // after the cover still did not appear: "do you want to make a diagnostic
       // or something to be sure of why it doesn't work?"
       notification: { ...(await notificationDiagnostics()), cover: coverReport },
-      picturePaste: { native: await nativePicturePasteStatus(), page: keyboardPictures }
+      picturePaste: { native: await nativePicturePasteStatus(), page: keyboardPictures },
+      // What the local database actually holds. Added after a packaged desktop
+      // build lost every imported track while the notes and the sign-in
+      // survived -- a symptom with three quite different causes that look
+      // identical from outside. See describeLocalStore.
+      localStore: await describeLocalStorage()
     }));
   }
   let lastPaintedTheme = null;

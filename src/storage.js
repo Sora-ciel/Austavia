@@ -73,6 +73,77 @@ export async function getDB() {
   });
 }
 
+/**
+ * What the local database actually holds, for the diagnostics report.
+ *
+ * Written after a packaged desktop build came back with every imported track
+ * gone while the notes and the sign-in were still there — and there was no way
+ * to tell, from outside, which of three very different things had happened:
+ *
+ *  - the database would not open at all (an older build meeting a database a
+ *    newer one had already raised the version of), in which case *everything*
+ *    local was missing and the notes only looked fine because they had come
+ *    back down from the cloud;
+ *  - the library index was lost but the audio is still sitting in the store,
+ *    which is recoverable;
+ *  - the store really is empty, which is not.
+ *
+ * Each of those wants a different answer and from the outside they are
+ * identical. So this counts, and says which.
+ *
+ * Never throws: a diagnostic that fails to gather is a diagnostic nobody has.
+ */
+export async function describeLocalStorage() {
+  const report = {
+    name: DB_NAME,
+    expectedVersion: DB_VERSION,
+    versionOnDisk: null,
+    stores: [],
+    counts: {},
+    audioKeys: 0,
+    coverKeys: 0,
+    hasLibraryIndex: false,
+    error: null
+  };
+
+  // Read before opening. Opening would *create* the database, so a version
+  // read afterwards can never tell "there was nothing here" from "we just made
+  // it", and those are opposite answers.
+  try {
+    if (typeof indexedDB !== 'undefined' && typeof indexedDB.databases === 'function') {
+      const found = (await indexedDB.databases()).find(entry => entry.name === DB_NAME);
+      report.versionOnDisk = found ? found.version : 0;
+    }
+  } catch {
+    // Firefox has no databases(); not knowing is not a failure.
+  }
+
+  try {
+    const db = await getDB();
+    report.stores = Array.from(db.objectStoreNames);
+
+    for (const store of report.stores) {
+      report.counts[store] = await db.count(store);
+    }
+
+    if (report.stores.includes(MUSIC_STORE_NAME)) {
+      const keys = await db.getAllKeys(MUSIC_STORE_NAME);
+      for (const key of keys) {
+        const name = String(key);
+        if (name === MUSIC_LIBRARY_KEY) report.hasLibraryIndex = true;
+        else if (name.startsWith('cover:')) report.coverKeys += 1;
+        else report.audioKeys += 1;
+      }
+    }
+  } catch (error) {
+    // The whole point of the report. A VersionError here means the app is
+    // running with no local database at all.
+    report.error = `${error?.name || 'Error'}: ${error?.message || error}`;
+  }
+
+  return report;
+}
+
 function decodeBase64(base64) {
   if (typeof atob === 'function') {
     return atob(base64);

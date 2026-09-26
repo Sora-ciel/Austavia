@@ -113,6 +113,39 @@ In order, each landing and released on its own:
 4. **Then** the screenshot feature, export and download, which by then all go
    through the same resolver.
 
+## 2a. Music lost from a packaged desktop build
+
+Reported 2026-09-26 on 0.8.641: every imported track gone, while the notes and
+the sign-in were still there. Not reproduced, and not explained — what follows
+is what is *known*, so the next report is not started from nothing.
+
+**The notes surviving proves less than it looks.** Music and notes live in the
+same IndexedDB database, `codex-db` — the music in its own store beside the
+blocks. The sign-in does not: Firebase keeps that in a database of its own. So
+a wipe of `codex-db` takes the notes too, and they come straight back from the
+cloud on the next launch, while music is **never uploaded** and cannot. Losing
+everything local therefore looks exactly like losing only the music.
+
+That leaves three candidates, which nothing in the report could tell apart:
+
+1. The database would not open — most plausibly a `VersionError`, since the
+   version has been raised twice and an older build cannot open a database a
+   newer one has already upgraded. He runs several packaged builds.
+2. The library index went and the audio did not, which is recoverable.
+3. The store really is empty.
+
+`describeLocalStorage` in `storage.js` and `describeLocalStore` in
+`diagnostics.js` now answer exactly that, in the diagnostics: the version on
+disk against the one this build wants, a count per store, and audio keys
+counted separately from the index. A database that was not there at all reads
+as "was not there before this launch" rather than as version zero, because for
+this question that is the answer and not a detail.
+
+**If it turns out to be the VersionError**, the fix is not to bump anything: it
+is that `getDB()` should open with no version at all when the one on disk is
+higher, since every store it needs already exists there. Do not do that
+speculatively — wait for a report that says so.
+
 ## 3. Waiting on a device, not on code
 
 - **Image paste from the Android keyboard.** The cause is known now and fixed

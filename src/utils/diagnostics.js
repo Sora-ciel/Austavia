@@ -202,10 +202,82 @@ export function buildDiagnostics(input = {}) {
     sync: input.sync || {},
     library: input.library || {},
     notification: input.notification || null,
-    picturePaste: input.picturePaste || null
+    picturePaste: input.picturePaste || null,
+    localStore: input.localStore || null
   };
   report.notes = flagSuspicions(report);
   return report;
+}
+
+/**
+ * What is actually in the local database.
+ *
+ * Written after every imported track disappeared from a packaged desktop build
+ * while the notes and the sign-in stayed. That symptom has three quite
+ * different causes and they are indistinguishable from the outside:
+ *
+ *  - **The database would not open.** Then nothing local is readable, and the
+ *    notes only *look* fine because they came back down from the cloud. Music
+ *    is never uploaded, so it is the one thing that cannot come back — which
+ *    is why losing everything looks exactly like losing only the music.
+ *  - **The index went but the audio did not.** Recoverable: the tracks are
+ *    still in the store, just not listed.
+ *  - **The store is genuinely empty.** Not recoverable from here.
+ *
+ * So this says which, rather than leaving three possibilities and a shrug.
+ */
+export function describeLocalStore(store) {
+  if (!store) return [];
+
+  const lines = [''];
+
+  if (store.error) {
+    lines.push(`local store: ${store.name} — WOULD NOT OPEN`);
+    lines.push(`  ${store.error}`);
+    if (store.versionOnDisk && store.versionOnDisk > store.expectedVersion) {
+      // The one cause worth naming outright, because it is self-inflicted and
+      // invisible: a newer build raised the version, and this older one cannot
+      // open a database from the future.
+      lines.push(
+        `  on disk it is v${store.versionOnDisk} and this build asks for v${store.expectedVersion}` +
+          ' — a newer build of the app has run on this machine'
+      );
+    }
+    lines.push('  nothing local is readable; anything on screen came from the cloud');
+    return lines;
+  }
+
+  // Zero is not a version, it is an absence: the read happens before the open,
+  // so nothing on disk reads as 0 and a database that was already there reads
+  // as its own number. For the question this was written to answer -- "did
+  // something wipe it" -- that difference is the whole answer.
+  if (store.versionOnDisk === 0) {
+    lines.push(`local store: ${store.name} — was not there at all before this launch`);
+    lines.push(`  created fresh, at v${store.expectedVersion}. Anything it held before is gone.`);
+  } else {
+    const version = store.versionOnDisk === null ? '?' : store.versionOnDisk;
+    lines.push(`local store: ${store.name} v${version} (build expects v${store.expectedVersion})`);
+  }
+
+  const counts = store.counts || {};
+  const named = Object.keys(counts);
+  if (named.length) {
+    lines.push('  ' + named.map(name => `${name} ${counts[name]}`).join(' · '));
+  }
+
+  lines.push(
+    `  music: ${store.audioKeys} audio, ${store.coverKeys} cover(s), ` +
+      `${store.hasLibraryIndex ? 'index present' : 'NO index'}`
+  );
+
+  // The distinction that decides whether anything can be got back.
+  if (store.audioKeys > 0 && !store.hasLibraryIndex) {
+    lines.push('  the audio is still here and only the list of it is missing — recoverable');
+  } else if (store.audioKeys === 0 && store.hasLibraryIndex) {
+    lines.push('  the list is here and the audio is not — the files themselves are gone');
+  }
+
+  return lines;
 }
 
 /**
@@ -384,6 +456,7 @@ export function formatDiagnostics(report) {
   );
   lines.push(`music: ${report.library.tracks ?? 0} track(s), ${report.library.playlists ?? 0} playlist(s)`);
 
+  for (const line of describeLocalStore(report.localStore)) lines.push(line);
   for (const line of describeNotification(report.notification)) lines.push(line);
   for (const line of describePicturePaste(report.picturePaste?.native, report.picturePaste?.page)) lines.push(line);
 
