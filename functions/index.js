@@ -13,7 +13,7 @@ const { recordStorageDelta, reconcileStorageUsage } = require('./storageAccounti
 const { recordActivity, rollUpStats } = require('./activityTracking');
 const { verifyWebhook, eventAtFrom } = require('./polarAdapter');
 const { applyPolarEvent, sweepExpiredPlans } = require('./subscriptions');
-const { apiBaseFor } = require('./polarApi');
+const { apiBaseFor, runningProject } = require('./polarApi');
 
 initializeApp();
 
@@ -365,7 +365,7 @@ exports.polarWebhook = onRequest(
         eventAt: eventAtFrom(event, Date.now()),
         polar: {
           token: polarAccessToken.value(),
-          baseUrl: apiBaseFor(process.env.GCLOUD_PROJECT, PRODUCTION_PROJECT_ID)
+          baseUrl: apiBaseFor(runningProject(), PRODUCTION_PROJECT_ID)
         }
       });
       res.status(200).json(outcome);

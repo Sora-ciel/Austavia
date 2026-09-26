@@ -31,6 +31,24 @@ function apiBaseFor(projectId, productionProjectId) {
 }
 
 /**
+ * The project this code is *running* in.
+ *
+ * `GCLOUD_PROJECT` is what the Firebase CLI sets while it analyses the source,
+ * which is why the monitoring gate in index.js keys on it. At runtime in a
+ * second-generation function that is not the same environment, and the name
+ * there is `GOOGLE_CLOUD_PROJECT`.
+ *
+ * Reading only the first would have been invisible on staging, which is not
+ * production either way -- and wrong in exactly one place: the live project,
+ * where an unset variable reads as "not production" and sends a live token to
+ * the sandbox API. Every refund would then fail to revoke, with the same 401
+ * as a bad token and no way to tell them apart.
+ */
+function runningProject(env = process.env) {
+  return env.GCLOUD_PROJECT || env.GOOGLE_CLOUD_PROJECT || '';
+}
+
+/**
  * Revoke a subscription — Polar's word for ending it right now.
  *
  * `DELETE /v1/subscriptions/{id}`, which sets the status to canceled, stamps
@@ -70,6 +88,9 @@ async function revokeSubscription({
   }
 
   if (!response.ok) {
+    // Which Polar was called goes in the failure, because a token being
+    // refused and a token being offered to the wrong environment produce the
+    // same 401 and the log could not otherwise tell them apart.
     // The body can carry a reason worth reading, and it is Polar's own text
     // about a subscription id — no customer details in it.
     let detail = '';
@@ -78,7 +99,7 @@ async function revokeSubscription({
     } catch {
       detail = '';
     }
-    return { ok: false, reason: 'http-error', status: response.status, detail };
+    return { ok: false, reason: 'http-error', status: response.status, detail, baseUrl };
   }
 
   return { ok: true, status: response.status };
@@ -88,5 +109,6 @@ module.exports = {
   PRODUCTION_BASE,
   SANDBOX_BASE,
   apiBaseFor,
+  runningProject,
   revokeSubscription
 };

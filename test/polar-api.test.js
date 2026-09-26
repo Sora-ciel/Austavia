@@ -11,7 +11,13 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { apiBaseFor, revokeSubscription, PRODUCTION_BASE, SANDBOX_BASE } = require('../functions/polarApi.js');
+const {
+  apiBaseFor,
+  runningProject,
+  revokeSubscription,
+  PRODUCTION_BASE,
+  SANDBOX_BASE
+} = require('../functions/polarApi.js');
 
 const PRODUCTION = 'arial-473c1';
 
@@ -42,6 +48,32 @@ describe('apiBaseFor', () => {
     assert.equal(apiBaseFor('demo-arial', PRODUCTION), SANDBOX_BASE);
     assert.equal(apiBaseFor(undefined, PRODUCTION), SANDBOX_BASE);
     assert.equal(apiBaseFor('', PRODUCTION), SANDBOX_BASE);
+  });
+});
+
+// Which project the code is *running* in, which is not the same question the
+// Firebase CLI answers while it reads the source.
+describe('runningProject', () => {
+  it('reads the name a second-generation function is given at runtime', () => {
+    assert.equal(runningProject({ GOOGLE_CLOUD_PROJECT: 'arial-473c1' }), 'arial-473c1');
+  });
+
+  it('still reads the one the CLI sets while analysing the source', () => {
+    assert.equal(runningProject({ GCLOUD_PROJECT: 'arial-staging' }), 'arial-staging');
+  });
+
+  // The failure this was written for. Reading only GCLOUD_PROJECT is invisible
+  // on staging -- which is not production either way -- and wrong in exactly
+  // one place: on the live project an unset variable reads as "not
+  // production", so a live token is offered to the sandbox API and every
+  // refund fails to revoke with the same 401 as a bad token.
+  it('does not let the live project read as something else', () => {
+    const live = runningProject({ GOOGLE_CLOUD_PROJECT: 'arial-473c1' });
+    assert.equal(apiBaseFor(live, 'arial-473c1'), PRODUCTION_BASE);
+  });
+
+  it('says nothing rather than guessing when neither is set', () => {
+    assert.equal(runningProject({}), '');
   });
 });
 
@@ -86,6 +118,9 @@ describe('revokeSubscription', () => {
     assert.equal(result.ok, false);
     assert.equal(result.status, 500);
     assert.match(result.detail, /exploded/);
+    // A token being refused and a token being offered to the wrong Polar give
+    // the same 401, so the failure has to say which one was called.
+    assert.equal(result.baseUrl, PRODUCTION_BASE);
   });
 
   // A secret is pasted by a person, and a trailing newline is invisible in
