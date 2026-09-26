@@ -44,7 +44,7 @@ function planRef(db, uid) {
  * are both derived from them, so recomputing both from the new plan is
  * correct at any moment and safe to repeat.
  */
-async function applyPlan(db, uid, plan) {
+async function applyPlan(db, uid, plan, via = 'unknown') {
   await planRef(db, uid).set(plan);
 
   const snap = await db.ref(`storage/${uid}`).get();
@@ -64,7 +64,11 @@ async function applyPlan(db, uid, plan) {
   // of these that hands out storage nobody paid for.
   await syncStorageFullClaim(uid, full);
 
-  logger.info('plan-applied', { uid, plan, bytes, full });
+  // `via` is the event that caused it, or 'sweep'. Without it a log full of
+  // plan-applied lines cannot say whether a refund was ever processed -- which
+  // is exactly the question a log gets read for, and it could not answer it
+  // once already.
+  logger.info('plan-applied', { uid, plan, bytes, full, via });
 }
 
 /**
@@ -197,8 +201,9 @@ async function applyPolarEvent({
   const current = stored.val();
   const changed = current !== outcome.plan;
 
-  if (changed) await applyPlan(db, uid, outcome.plan);
-  else logger.info('polar-event-applied-no-change', { uid, plan: outcome.plan });
+  const type = (event && event.type) || 'unknown';
+  if (changed) await applyPlan(db, uid, outcome.plan, type);
+  else logger.info('polar-event-applied-no-change', { uid, plan: outcome.plan, type });
 
   // After our own side is settled, never before. If this throws or the
   // provider is unreachable, the account is still correct here.
@@ -238,7 +243,7 @@ async function sweepExpiredPlans({ db = getDatabase(), now = Date.now() } = {}) 
     if (!next) continue;
 
     await db.ref(`${SUBSCRIPTIONS}/${uid}`).update({ plan: next, updatedAt: now });
-    await applyPlan(db, uid, next);
+    await applyPlan(db, uid, next, 'sweep');
     corrected += 1;
     logger.info('plan-lapsed', { uid, from: record.plan, to: next });
   }
