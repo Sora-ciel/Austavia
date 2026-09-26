@@ -365,7 +365,12 @@ Still owed, in order:
    `VITE_POLAR_PORTAL_LINK` — `sandbox.polar.sh/austavia/portal`. It will 404
    until it is replaced with the real sandbox organisation slug, and the live
    one still has to be written into `checkout.js` before any real sale.
-5. **Birthday Mode's unlock** rewired onto `plan`.
+5. **Delete the sandbox access token when the sandbox run is finished.** It
+   was pasted into a chat on 2026-09-26, which is fine for a token scoped to a
+   sandbox organisation holding nothing but test data — and is exactly why it
+   should not outlive the testing. The production one never gets handled that
+   way: set with `functions:secrets:set`, read by nothing but the function.
+6. **Birthday Mode's unlock** rewired onto `plan`.
 
 What the subscriber sees is now built and unverified rather than missing: a
 plan panel above the storage bar showing what they are on, when it renews, that
