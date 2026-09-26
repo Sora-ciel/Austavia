@@ -429,3 +429,66 @@ describe('subscriptionIdFrom', () => {
     assert.equal(subscriptionIdFrom({ data: {} }), null);
   });
 });
+
+// --- When access actually ends ----------------------------------------
+//
+// Caught in a real staging log on 2026-09-26. A revoke had just worked, and
+// one second later the account went back to `pro` for twenty seconds before a
+// later delivery corrected it.
+//
+// The shapes below are copied from Polar's own listing for that account.
+
+describe('periodEndsAt', () => {
+  const REVOKED_AT = Date.parse('2026-09-26T22:13:12Z');
+  const PERIOD_END = Date.parse('2026-10-26T21:49:04Z');
+
+  it('reads the paid-for period of a healthy subscription', () => {
+    assert.equal(
+      periodEndsAt({ data: { status: 'active', ends_at: null, current_period_end: '2026-10-26T21:49:04Z' } }),
+      PERIOD_END
+    );
+  });
+
+  // The one that bit. A revoked subscription reports `canceled` with a period
+  // end still a month away, because access was taken away *inside* the period
+  // it was paid for. Reading only the period end says "keeps it until
+  // October", and resolvePlan then leaves them on the paid plan.
+  it('takes a revoke at the moment it happened, not the end of the paid month', () => {
+    const revoked = {
+      data: {
+        status: 'canceled',
+        canceled_at: '2026-09-26T22:13:12Z',
+        ends_at: '2026-09-26T22:13:12Z',
+        ended_at: '2026-09-26T22:13:12Z',
+        current_period_end: '2026-10-26T21:49:04Z'
+      }
+    };
+
+    assert.equal(periodEndsAt(revoked), REVOKED_AT);
+    assert.ok(periodEndsAt(revoked) < PERIOD_END, 'access ended before the period did');
+  });
+
+  // Cancel-at-period-end must still keep what was paid for, which is the same
+  // field saying something different.
+  it('keeps a cancelled subscription to the end of what was paid for', () => {
+    assert.equal(
+      periodEndsAt({
+        data: { status: 'active', cancel_at_period_end: true, ends_at: '2026-10-26T21:49:04Z', current_period_end: '2026-10-26T21:49:04Z' }
+      }),
+      PERIOD_END
+    );
+  });
+
+  it('finds it on a nested subscription, as an order event carries it', () => {
+    assert.equal(
+      periodEndsAt({ data: { subscription: { current_period_end: '2026-10-26T21:49:04Z' } } }),
+      PERIOD_END
+    );
+  });
+
+  it('says nothing rather than a wrong date', () => {
+    assert.equal(periodEndsAt({ data: {} }), 0);
+    assert.equal(periodEndsAt({ data: { current_period_end: 'soon' } }), 0);
+    assert.equal(periodEndsAt({}), 0);
+  });
+});

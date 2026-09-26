@@ -329,6 +329,24 @@ against `arial-staging`:
 | Cancelling | `status: "canceled"`, `plan` still `"pro"`, the October period intact |
 | Refunding | `plan: "free"` and the 100 MB ceiling back, 0.5s after the refund |
 
+**The refund now revokes at Polar — confirmed 2026-09-26.**
+`refund-revoked`, `alreadyDone: false`, under two seconds after the refund.
+The whole chain works: money back, plan to free, ceiling to 100 MB, and the
+subscription ended at Polar so the customer can subscribe again.
+
+It took six attempts, and none of them were the code. The value in
+`POLAR_ACCESS_TOKEN` was the *webhook signing secret* — a `whsec_` where a
+`polar_oat_` belonged, which a Bearer header rejects as malformed with the
+same 401 as a wrong token. What found it was taking our function out of the
+picture: curl with the real token returned 200 from the sandbox while the
+stored secret returned 401 from the same endpoint, which is not a fact any
+amount of reading the log could have produced.
+
+Two things worth keeping from it. Setting the secret interactively mangled the
+value four times on that machine — the first attempt stored it *twice* — so it
+is set from a file now. And Polar's own 200 proved the scopes and the
+environment were fine, which had been the leading theory twice.
+
 Still owed, in order:
 
 1. **The lapse, and a failed payment.** What is left of the unhappy half is the

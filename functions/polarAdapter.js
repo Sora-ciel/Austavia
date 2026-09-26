@@ -292,9 +292,30 @@ function eventAtFrom(event = {}, deliveredAt = 0) {
 /** When the paid-for period runs out, as a timestamp. */
 function periodEndsAt(event = {}) {
   const data = event.data || {};
+  const subscription = data.subscription || {};
+
+  // `ends_at` first, and it is the whole point of this function reading two
+  // fields instead of one.
+  //
+  // A revoked subscription comes back with `status: "canceled"` and a
+  // `current_period_end` still a month away, because the period it was paid
+  // for has not run out -- access was taken away inside it. Reading only the
+  // period end therefore says "cancelled, keeps it until October", which is
+  // how a revoke put an account back on the paid plan for twenty seconds on
+  // 2026-09-26, until the `subscription.revoked` event happened to arrive and
+  // correct it. Had that one delivery gone missing, the account would have
+  // kept the plan for a month and nothing would ever have looked again --
+  // `expiredPlanFor` recomputes from the record, and the record would have
+  // said the same wrong thing.
+  //
+  // `ends_at` is when access ends in both cases: the period end for a
+  // cancel-at-period-end, and the moment of the revoke for a revoke. On a
+  // healthy subscription it is null and the period end is right.
   const raw =
-    data.current_period_end
-    || (data.subscription && data.subscription.current_period_end)
+    data.ends_at
+    || subscription.ends_at
+    || data.current_period_end
+    || subscription.current_period_end
     || null;
 
   if (!raw) return 0;
