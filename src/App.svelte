@@ -5915,8 +5915,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   /* Wide enough for the readout at its widest, which is "100". It used to be
      26px, which fits "7" and not "100" — and a flex item's min-width is auto,
      so the label quietly grew to fit its content instead of clipping it. The
-     slider is a fixed 14px and never moved; what widened as the volume went up
-     was the number underneath it. */
+     slider is a fixed, narrow track and never moved; what widened as the
+     volume went up was the number underneath it. */
   width: 36px;
   color: var(--dlg-btn-text, var(--dlg-text, #fff));
   cursor: pointer;
