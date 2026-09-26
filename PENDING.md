@@ -159,8 +159,17 @@ apart:
 2. The library index went and the audio did not, which is recoverable.
 3. The store really is empty.
 
+There is now a **launch journal** as well — `utils/storageJournal.js`. Every
+launch writes down the version and how much was in each store, and the
+diagnostics lead with anything that dropped, naming the window and the builds
+either side of it. It lives in `localStorage`, not in the database it watches,
+because a journal kept there would be wiped by the event it exists to record.
+A journal that comes back *empty* is therefore a finding of its own: not
+"nothing recorded yet" but "this profile has never run the app before", which
+is the swapped-data-folder case above.
+
 `describeLocalStorage` in `storage.js` and `describeLocalStore` in
-`diagnostics.js` now answer exactly that, in the diagnostics: the version on
+`diagnostics.js` answer the rest, in the same report: the version on
 disk against the one this build wants, a count per store, and audio keys
 counted separately from the index. A database that was not there at all reads
 as "was not there before this launch" rather than as version zero, because for

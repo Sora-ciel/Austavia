@@ -98,6 +98,7 @@
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
+  import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -2138,7 +2139,10 @@
       // build lost every imported track while the notes and the sign-in
       // survived -- a symptom with three quite different causes that look
       // identical from outside. See describeLocalStore.
-      localStore: await describeLocalStorage()
+      localStore: await describeLocalStorage(),
+      // And what it held at the launches before this one, which is the only
+      // thing that can say *when* something went and which build was running.
+      journal: storageJournal
     }));
   }
   let lastPaintedTheme = null;
@@ -5266,8 +5270,35 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   let stopStorageUsageListener = null;
   let stopSubscriptionListener = null;
 
+  // Kept in localStorage rather than in the database it watches, because a
+  // journal of what the database held would be wiped by the very event it
+  // exists to record. See utils/storageJournal.js.
+  let storageJournal = [];
+
+  async function recordLaunch() {
+    try {
+      const store = await describeLocalStorage();
+      const stored = JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]');
+      storageJournal = appendLaunch(
+        stored,
+        journalEntry({
+          version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev',
+          store
+        })
+      );
+      localStorage.setItem(JOURNAL_KEY, JSON.stringify(storageJournal));
+    } catch (error) {
+      // A diagnostic must never be a dependency: storage off, quota full, or a
+      // journal somebody has edited by hand all mean no history, not no app.
+      console.warn('Could not record this launch:', error);
+    }
+  }
+
   onMount(async () => {
     Pc = window.innerWidth > MOBILE_BREAKPOINT;
+    // Not awaited. It is a note to a future reader and must never sit between
+    // the app starting and the person seeing their notes.
+    recordLaunch();
     window.addEventListener("resize", handleWindowResize);
     window.addEventListener("keydown", handleUndoRedoShortcut);
     window.addEventListener("keydown", handleFullscreenShortcut);

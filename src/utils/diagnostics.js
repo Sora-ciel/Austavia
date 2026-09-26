@@ -179,6 +179,8 @@ export function summariseThemes(themes = []) {
   }));
 }
 /** The snapshot, assembled from what the app knows about itself. */
+import { describeJournal } from './storageJournal.js';
+
 export function buildDiagnostics(input = {}) {
   const report = {
     generatedAt: new Date(input.now || Date.now()).toISOString(),
@@ -203,7 +205,8 @@ export function buildDiagnostics(input = {}) {
     library: input.library || {},
     notification: input.notification || null,
     picturePaste: input.picturePaste || null,
-    localStore: input.localStore || null
+    localStore: input.localStore || null,
+    journal: input.journal || null
   };
   report.notes = flagSuspicions(report);
   return report;
@@ -457,6 +460,7 @@ export function formatDiagnostics(report) {
   lines.push(`music: ${report.library.tracks ?? 0} track(s), ${report.library.playlists ?? 0} playlist(s)`);
 
   for (const line of describeLocalStore(report.localStore)) lines.push(line);
+  if (report.journal) for (const line of describeJournal(report.journal)) lines.push(line);
   for (const line of describeNotification(report.notification)) lines.push(line);
   for (const line of describePicturePaste(report.picturePaste?.native, report.picturePaste?.page)) lines.push(line);
 
