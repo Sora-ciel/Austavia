@@ -6,15 +6,25 @@
   import { getReadableTextColor } from "../utils/readableColor.js";
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createLongPress } from "../utils/longPress.js";
-  import { onDestroy } from "svelte";
+  import { onDestroy, createEventDispatcher } from "svelte";
+  import { habitsEqual } from "../utils/habitStore.js";
 
   export let modeLabels = {};
   export let activeMode = "default";
   export let canvasColors = {};
+  /**
+   * The open folder's habits.
+   *
+   * They used to be a single list in localStorage: the same habits in every
+   * folder, on one device only, so a tick on the phone never reached the
+   * computer. They now belong to the folder and travel with it -- see
+   * utils/habitStore.js. This mode owns none of it; it asks for a change and
+   * the folder decides, which is how every other mode's settings work.
+   */
+  export let habits = [];
 
-  const STORAGE_KEY = "habitTrackerData";
+  const dispatch = createEventDispatcher();
 
-  let habits = [];
   let newHabitName = "";
 
   const today = new Date();
@@ -76,8 +86,12 @@
   }));
 
   const saveHabits = updatedHabits => {
-    habits = updatedHabits;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+    // Guarded, because this is now a folder write and a folder write is a
+    // sync. Saving a list identical to the one already there stamps a new
+    // modifiedAt, which two devices then hand back and forth for as long as
+    // both are open -- the fault syncRules.js carries a scar from.
+    if (habitsEqual(habits, updatedHabits)) return;
+    dispatch('modeSettingChange', { habit: { habits: updatedHabits } });
   };
 
   const addHabit = () => {
@@ -158,17 +172,9 @@
   };
 
   onMount(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          habits = parsed;
-        }
-      } catch {
-        habits = [];
-      }
-    }
+    // Nothing is loaded here any more. The habits arrive as a prop from the
+    // folder, so opening a folder on any device shows the same list.
+    //
     // Which days are on screen follows the window, and the window changes
     // without anybody touching the tracker: rotated, resized, or shrunk by a
     // keyboard sliding up.

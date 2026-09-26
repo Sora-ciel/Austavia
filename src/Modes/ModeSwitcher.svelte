@@ -13,6 +13,9 @@
   // home zoom; nothing else needs it.
   export let openFolder = '';
   export let blocks;
+  // The folder's habits. Kept in modeSettings and synced with the folder, the
+  // same way the column count is -- see utils/habitStore.js.
+  export let habits = [];
   export let canvasRef;
   export let onTouchStart;
   export let onTouchMove;
@@ -112,7 +115,13 @@
     />
 
   {:else if mode === 'habit'}
-    <HabitTrackerMode {modeLabels} activeMode={mode} {canvasColors} />
+    <HabitTrackerMode
+      {modeLabels}
+      activeMode={mode}
+      {canvasColors}
+      {habits}
+      on:modeSettingChange
+    />
   {:else if mode === 'task'}
     <TaskMode
       {blocks}

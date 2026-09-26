@@ -99,6 +99,7 @@
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
+  import { normalizeHabits, habitsEqual, habitsToAdopt } from './utils/habitStore.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -468,6 +469,10 @@
     // Track metadata and playlists sync with the folder; the audio itself
     // stays on each device (see storage.js) and moves via export/import.
     playlist: { tracks: [], playlists: [] },
+    // Asked for on 2026-09-26: one habit list per folder, shared between
+    // devices. It lives here rather than behind its own sync because here it
+    // already is one -- see utils/habitStore.js.
+    habit: { habits: [] },
     // Both wallpapers use the same shape, defined once in
     // utils/modeBackground.js. Single Note had one first; Canvas mode now has
     // the same one rather than a second implementation that drifts from it.
@@ -502,6 +507,11 @@
         tracks: Array.isArray(settings?.playlist?.tracks) ? settings.playlist.tracks : [],
         playlists: Array.isArray(settings?.playlist?.playlists) ? settings.playlist.playlists : []
       },
+      // Normalised on the way in as well as out, so a folder written by an
+      // older build, a newer one, or by hand is the same shape by the time
+      // anything reads it -- and so that a round trip through the cloud is
+      // byte-identical and does not read as an edit.
+      habit: { habits: normalizeHabits(settings?.habit?.habits) },
       // Both wallpapers go through one normaliser, so the awkward parts — the
       // pre-0.8.35 opacity stored as a 0-1 fraction, all the clamping — are
       // written once and cannot disagree between the two modes.
@@ -1470,6 +1480,47 @@
     await saveMusicLibrary(musicLibrary);
     // Cleared from the folder so it stops being uploaded from here on.
     await handleModeSettingChange({ detail: { playlist: { tracks: [], playlists: [] } } });
+  }
+
+  // The tracker used to keep one list in localStorage, shared by every folder
+  // and stuck on one device. This moves it into the folder that is open the
+  // first time a build with syncing habits runs, and only if that folder has
+  // none -- a folder with habits has either been used here already or has come
+  // down from another device, and either way the leftover is the older story.
+  //
+  // The old key is left where it is and a flag is written beside it. Deleting
+  // somebody's only copy of months of ticking, to save a few hundred bytes, is
+  // not a trade worth making.
+  const HABITS_KEY = 'habitTrackerData';
+  const HABITS_ADOPTED_KEY = 'habitTrackerData:adopted';
+  let habitsAdoptionChecked = false;
+
+  async function adoptDeviceHabits() {
+    habitsAdoptionChecked = true;
+    try {
+      if (typeof localStorage === 'undefined') return;
+      if (localStorage.getItem(HABITS_ADOPTED_KEY) === 'yes') return;
+
+      const stored = JSON.parse(localStorage.getItem(HABITS_KEY) || '[]');
+      const adopt = habitsToAdopt({ inFolder: modeSettings?.habit?.habits, onDevice: stored });
+      if (!adopt) {
+        // Nothing to move. Still marked, so every later folder is left alone
+        // rather than being given a copy of the same list.
+        if (Array.isArray(stored) && stored.length === 0) {
+          localStorage.setItem(HABITS_ADOPTED_KEY, 'yes');
+        }
+        return;
+      }
+
+      localStorage.setItem(HABITS_ADOPTED_KEY, 'yes');
+      await handleModeSettingChange({ detail: { habit: { habits: adopt } } });
+    } catch (error) {
+      console.warn('Could not move the habits on this device into the folder:', error);
+    }
+  }
+
+  $: if (!habitsAdoptionChecked && currentSaveName && modeSettings?.habit) {
+    adoptDeviceHabits();
   }
 
   $: if (musicLibraryLoaded && !musicLibraryMigrated && modeSettings?.playlist) {
@@ -2671,6 +2722,7 @@
     };
   }
   $: taskAddDirection = modeSettings.task.addDirection;
+  $: habits = modeSettings.habit.habits;
   $: activeModeDefinition = getModeDefinition(mode);
   $: showRightControls = activeModeDefinition?.showRightControls !== false;
   let blocks = [];
@@ -5140,6 +5192,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       patch = { ...patch, playlist: { ...patch.playlist, ...detail.playlist } };
     }
 
+    if (detail.habit && typeof detail.habit === 'object') {
+      patch = { ...patch, habit: { ...patch.habit, ...detail.habit } };
+    }
+
     const nextModeSettings = normalizeModeSettings(patch);
     modeSettings = nextModeSettings;
     await persistAutosave(blocks, modeOrders, nextModeSettings, { immediate: true });
@@ -6425,6 +6481,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {singleNoteSettings}
       {keyboardOpen}
       {taskAddDirection}
+      {habits}
       {musicLibrary}
       {nowPlayingId}
       {isPlaying}
