@@ -206,10 +206,49 @@ export function buildDiagnostics(input = {}) {
     notification: input.notification || null,
     picturePaste: input.picturePaste || null,
     localStore: input.localStore || null,
-    journal: input.journal || null
+    journal: input.journal || null,
+    fonts: input.fonts || null
   };
   report.notes = flagSuspicions(report);
   return report;
+}
+
+/**
+ * Whether the app's own typeface is actually being used.
+ *
+ * Written after "bold is not working in Single Note -- it removes the
+ * asterisks, so it does try". The mark was being applied correctly; the
+ * question was whether it *looked* like anything.
+ *
+ * And that hangs entirely on Inter loading. The stroke that used to be drawn
+ * under bold was removed when Inter arrived, because Inter carries 100 to 900
+ * and the weight became the font's own -- 300 for the writing against 800 for
+ * bold, which is 2.2x the ink. Fall back to a system sans and there are two
+ * faces, not nine: the pair collapses to 400 against 700, a third of the
+ * difference, and bold reads as barely bold.
+ *
+ * Nothing about that failure is visible. The text is still there, still in a
+ * sans, still readable. So it gets a line.
+ */
+export function describeFonts(fonts) {
+  if (!fonts) return [];
+
+  if (fonts.supported === false) {
+    return ['', 'fonts: this browser will not say which are loaded'];
+  }
+
+  const both = fonts.regular && fonts.bold;
+  const lines = [
+    '',
+    `fonts: Inter 300 ${fonts.regular ? 'yes' : 'NO'} · Inter 800 ${fonts.bold ? 'yes' : 'NO'}`
+  ];
+
+  if (!both) {
+    lines.push('  the app is drawing in a fallback face, so bold has only the two');
+    lines.push('  weights a system sans ships -- it will look weak whatever is marked');
+  }
+
+  return lines;
 }
 
 /**
@@ -461,6 +500,7 @@ export function formatDiagnostics(report) {
 
   for (const line of describeLocalStore(report.localStore)) lines.push(line);
   if (report.journal) for (const line of describeJournal(report.journal)) lines.push(line);
+  for (const line of describeFonts(report.fonts)) lines.push(line);
   for (const line of describeNotification(report.notification)) lines.push(line);
   for (const line of describePicturePaste(report.picturePaste?.native, report.picturePaste?.page)) lines.push(line);
 

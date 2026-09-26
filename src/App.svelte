@@ -2141,6 +2141,19 @@
     }
   }
 
+  function readFontState() {
+    try {
+      if (typeof document === 'undefined' || !document.fonts) return { supported: false };
+      return {
+        supported: true,
+        regular: document.fonts.check('300 16px Inter'),
+        bold: document.fonts.check('800 16px Inter')
+      };
+    } catch {
+      return { supported: false };
+    }
+  }
+
   async function collectDiagnostics() {
     const platform = typeof window === 'undefined'
       ? 'unknown'
@@ -2193,7 +2206,11 @@
       localStore: await describeLocalStorage(),
       // And what it held at the launches before this one, which is the only
       // thing that can say *when* something went and which build was running.
-      journal: storageJournal
+      journal: storageJournal,
+      // Whether the app's own typeface is in use. Bold is nothing but a weight
+      // now -- 300 against 800 -- so a build where Inter did not load draws it
+      // in a face with two weights and bold stops looking bold, silently.
+      fonts: readFontState()
     }));
   }
   let lastPaintedTheme = null;
