@@ -37,6 +37,10 @@
     <rect x="4" y="4" width="3" height="16" rx="1" fill="currentColor" stroke="none" />
   {:else if name === 'stop'}
     <rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor" stroke="none" />
+  {:else if name === 'chevron'}
+    <!-- Points down when the panel is open, up when it is shut; the button
+         rotates it rather than swapping the drawing. -->
+    <path d="M6 15l6-6 6 6" />
   {:else if name === 'shuffle'}
     <path d="M16 4l4 4-4 4" />
     <path d="M16 12l4 4-4 4" />

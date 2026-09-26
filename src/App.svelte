@@ -5746,6 +5746,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 .mini-btn:hover { background: color-mix(in srgb, var(--controls-button-text, var(--controls-text, #fff)) 16%, transparent); }
 
+/* One drawing, turned over, so open and shut are the same shape rather than
+   two icons that have to be kept looking like each other. */
+.mini-expand { transform: rotate(180deg); transition: transform 0.18s ease; }
+.mini-expand.open { transform: rotate(0deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-expand { transition: none; }
+}
+
 .mini-cover {
   width: 20px;
   height: 20px;
@@ -6236,9 +6245,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->
     {#if nowPlayingTrack}
-      <!-- The whole strip opens the bigger controls; only the transport
-           buttons keep their own click. The cover art is already the strip's
-           background, so no thumbnail competes with the title for room. -->
+      <!-- Asked for on 2026-09-26: "when we click on the music player anywhere
+           other than the places where there's already buttons it will put you
+           in the playlist mode."
+
+           So the strip itself is now a way back to the music, and every
+           control on it keeps its own click through stopPropagation. The
+           bigger controls used to open by pressing the strip, which is what
+           this replaces -- so they get a button of their own at the end
+           rather than quietly becoming unreachable. The cover art is already
+           the strip's background, so no thumbnail competes with the title. -->
       <div
         class="mini-player"
         class:open={playerExpanded}
@@ -6246,14 +6262,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         bind:this={playerToggleRef}
         role="button"
         tabindex="0"
-        aria-expanded={playerExpanded}
-        aria-label="Show music controls"
-        title={playerExpanded ? 'Hide music controls' : 'Show music controls'}
-        on:click={() => (playerExpanded = !playerExpanded)}
+        aria-label="Open Playlist"
+        title="Open Playlist"
+        on:click={() => setMode('playlist')}
         on:keydown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            playerExpanded = !playerExpanded;
+            setMode('playlist');
           }
         }}
       >
@@ -6285,6 +6300,18 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           {/if}
           <ScrollingText text={nowPlayingTrack.title || 'Untitled'} always={!Pc} />
         </div>
+
+        <!-- What pressing the strip used to do. It is last so the title keeps
+             the room it had, and it stops the click so the strip underneath
+             does not also change mode. -->
+        <button
+          class="mini-btn mini-expand"
+          class:open={playerExpanded}
+          on:click|stopPropagation={() => (playerExpanded = !playerExpanded)}
+          aria-expanded={playerExpanded}
+          aria-label={playerExpanded ? 'Hide music controls' : 'Show music controls'}
+          title={playerExpanded ? 'Hide music controls' : 'Show music controls'}
+        ><PlayerIcon name="chevron" size={14} /></button>
       </div>
 
       {#if playerExpanded}
