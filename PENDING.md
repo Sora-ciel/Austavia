@@ -347,6 +347,15 @@ value four times on that machine — the first attempt stored it *twice* — so 
 is set from a file now. And Polar's own 200 proved the scopes and the
 environment were fine, which had been the leading theory twice.
 
+**And the bounce is gone — confirmed 2026-09-26, 22:37.** The first working
+revoke exposed a second fault: one second later a `subscription.updated`
+carrying `status: canceled` and a period end a month away put the account back
+on `pro`, and only a later `subscription.revoked` corrected it. Reading
+`ends_at` first fixed it, and the deployed run proves it: after the refund,
+`subscription.updated`, `subscription.canceled` and `subscription.revoked` all
+arrived and every one of them read as no change. Nothing now depends on that
+last delivery arriving.
+
 Still owed, in order:
 
 1. **The lapse, and a failed payment.** What is left of the unhappy half is the
