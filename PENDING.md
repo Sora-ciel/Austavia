@@ -126,7 +126,32 @@ a wipe of `codex-db` takes the notes too, and they come straight back from the
 cloud on the next launch, while music is **never uploaded** and cannot. Losing
 everything local therefore looks exactly like losing only the music.
 
-That leaves three candidates, which nothing in the report could tell apart:
+**And there is a fourth, which is ours and is confirmed to exist.** The Tauri
+identifier changed from `com.sora.codex` to `com.sora.austavia` on 2026-09-03
+(`88a2a4d`). WebView2 keys its data folder on that identifier, so builds from
+either side of that commit do not share storage at all — different folder,
+different IndexedDB, different everything. Both folders are on this machine
+right now:
+
+```
+56 MB  %LOCALAPPDATA%\com.sora.codex
+88 MB  %LOCALAPPDATA%\com.sora.austavia
+```
+
+Running an exe from the wrong side of that rename shows an empty library, notes
+that come straight back from the cloud, and — once signed in again — a session
+that looks entirely normal. Which is the reported symptom exactly.
+
+It was known that changing the identifier makes the next build install as a
+separate app; what was not written down is that it also leaves the old app's
+data behind in a folder nothing will ever look in again.
+
+(On this machine neither folder holds a library worth recovering: about 5MB of
+IndexedDB blobs each. If the affected machine is a different one, look there
+before concluding anything.)
+
+That leaves three more candidates, which nothing in the report could tell
+apart:
 
 1. The database would not open — most plausibly a `VersionError`, since the
    version has been raised twice and an older build cannot open a database a
