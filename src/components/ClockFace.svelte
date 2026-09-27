@@ -69,7 +69,12 @@
 <!-- A timer role, not a live region: a live region would read the time out
      every minute to somebody using a screen reader, which is not what a clock
      on a page is for. The label is there when they go and look. -->
-<div class="clock-face" role="timer" aria-label="{parts.time}{parts.period ? ` ${parts.period}` : ''}, {day}">
+<div
+  class="clock-face"
+  class:dated={showDate}
+  class:with-seconds={!!parts.seconds}
+  class:with-period={!!parts.period}
+  role="timer" aria-label="{parts.time}{parts.period ? ` ${parts.period}` : ''}, {day}">
   <div class="clock-time">
     <span class="clock-hm">{parts.time}</span>{#if parts.seconds}<span class="clock-s">:{parts.seconds}</span>{/if}{#if parts.period}<span class="clock-period">{parts.period}</span>{/if}
   </div>
@@ -79,17 +84,21 @@
 </div>
 
 <style>
-  /* Everything is sized from the block rather than fixed, so a clock dragged
-     twice as large reads twice as large instead of floating small in a big
-     box.
+  /* Everything is sized from the face's own box rather than fixed, so a clock
+     dragged twice as large reads twice as large instead of floating small in
+     a big box.
 
-     Sized from the *tighter* of the two sides. Width alone was the first
-     version, and in a wide Simple Note column it made the numerals taller
-     than the box: the top of the digits was cut off and the date pushed out
-     of sight entirely. `cqmin` is a hundredth of whichever side is shorter,
-     and the `cqi` cap beside it keeps a long "12:04:15 PM" inside a narrow
-     block too. Both need the face to have a real height, which is why the
-     container is `size` rather than `inline-size`. */
+     The time is set as one size on `.clock-time`, and the seconds and AM/PM
+     are fractions of it, so the three always keep their proportions. That
+     size is the smaller of two limits:
+
+       height  most of the box, less the date's share when the date shows;
+       width   a share of the box's width, narrower when seconds or AM/PM
+               make the line longer -- width alone was the first version, and
+               in a wide Simple Note column it cut the top off the digits.
+
+     `cqh` and `cqi` are hundredths of the face's height and width, which is
+     why the container is `size` rather than `inline-size`. */
   .clock-face {
     container-type: size;
     width: 100%;
@@ -98,7 +107,7 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.2em;
+    gap: 0.25em;
     /* The block's own writing colour, and nothing picked here -- the theme
        rule in CLAUDE.md. */
     color: inherit;
@@ -108,33 +117,41 @@
   }
 
   .clock-time {
+    --by-height: 84cqh;
+    --by-width: 30cqi;
     display: flex;
     align-items: baseline;
-    line-height: 1;
+    font-size: min(var(--by-height), var(--by-width));
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 0.9;
     white-space: nowrap;
   }
 
-  .clock-hm {
-    font-size: min(44cqmin, 24cqi);
-    font-weight: 300;
-    letter-spacing: -0.02em;
-  }
+  .dated .clock-time { --by-height: 70cqh; }
+  .with-seconds .clock-time { --by-width: 25cqi; }
+  .with-period .clock-time { --by-width: 25cqi; }
+  .with-seconds.with-period .clock-time { --by-width: 21cqi; }
 
   /* Smaller and quieter: seconds are movement, not the reading. */
   .clock-s {
-    font-size: min(18cqmin, 10cqi);
+    font-size: 0.42em;
     opacity: 0.6;
   }
 
   .clock-period {
-    font-size: min(12cqmin, 6cqi);
+    font-size: 0.3em;
+    font-weight: 600;
     margin-left: 0.3em;
     opacity: 0.75;
   }
 
+  /* Never below a size that can be read, even when that means the time
+     gives up a little of the height to it. */
   .clock-date {
-    font-size: min(12cqmin, 6.5cqi);
-    opacity: 0.7;
+    font-size: clamp(0.62rem, 13cqh, 7cqi);
+    font-weight: 600;
+    opacity: 0.72;
     white-space: nowrap;
   }
 </style>

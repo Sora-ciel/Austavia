@@ -989,14 +989,15 @@ input[type="text"] {
   padding: 0 8px 8px;
 }
 
-/* Tall enough to read at a glance in a grid of notes, and no taller: a clock
-   that takes a note's worth of height is a clock in the way. */
+/* Tall enough for the corners to have their own bands and the figure
+   between them to still read from across a room, and no taller: a clock that
+   takes a note's worth of height is a clock in the way. */
 .clock-content {
   width: 100%;
-  height: 120px;
+  height: 160px;
   display: flex;
   box-sizing: border-box;
-  padding: 0 8px 8px;
+  padding: 0 4px 4px;
 }
 
 /* The player draws its own rows and needs a height to scroll them in; without

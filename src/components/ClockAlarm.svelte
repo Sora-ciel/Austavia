@@ -202,105 +202,159 @@
   }
 </script>
 
+<!-- A grid, not a pile of absolutes: a thin band at the top for two corners,
+     one at the bottom for the third, and everything else is the stage. The
+     stage is what the numerals are sized from, so they fill it and can never
+     run under a corner -- the corners are not on top of it, they are beside
+     it. -->
 <div class="clock-alarm" class:ringing={status.state === 'ringing'}>
-  {#if page === 'alarm'}
-    <div class="alarm-page" data-focus-guard>
-      <input
-        class="alarm-time"
-        type="time"
-        value={normalTime}
-        aria-label="Alarm time"
-        on:change={onTimeChange}
-      />
-      <div class="alarm-row">
-        <button
-          class="alarm-switch"
-          class:on={alarmEnabled && normalTime}
-          role="switch"
-          aria-checked={alarmEnabled && !!normalTime}
-          aria-label="Alarm on"
-          disabled={!normalTime}
-          on:click={toggleEnabled}
-        ><span class="knob"></span></button>
-        <span class="alarm-status">{status.text}</span>
+  <!-- Each corner holds its own page's news, and the time while its own page
+       is open. Top left is the stopwatch. -->
+  <button
+    class="corner corner-tl"
+    class:active={watchCorner.kind === 'stopwatch'}
+    data-focus-guard
+    title={page === 'stopwatch' ? 'Back to the clock' : 'Stopwatch'}
+    aria-label={page === 'stopwatch' ? `Back to the clock, ${watchCorner.text}` : watchCorner.text ? `Stopwatch, ${watchCorner.text}` : 'Stopwatch'}
+    on:mousedown|stopPropagation
+    on:pointerdown|stopPropagation
+    on:touchstart|stopPropagation
+    on:click|stopPropagation={() => showPage(page === 'stopwatch' ? 'clock' : 'stopwatch')}
+  >
+    {#if watchCorner.kind === 'time'}
+      <span>{watchCorner.text}</span>
+    {:else}
+      <svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="13.5" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M12 13.5V10M10 3h4M12 3v3.5M18 7.5l1.5-1.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      {#if watchCorner.kind === 'stopwatch'}<span>{watchCorner.text}</span>{/if}
+    {/if}
+  </button>
+
+  <!-- Top right is the alarm. -->
+  <button
+    class="corner corner-tr"
+    class:active={corner.kind === 'alarm' || status.state === 'ringing' || status.state === 'snoozed'}
+    data-focus-guard
+    title={page === 'alarm' ? 'Back to the clock' : 'Alarm'}
+    aria-label={page === 'alarm' ? `Back to the clock, ${corner.text}` : corner.text ? `Alarm, ${corner.text}` : 'Alarm'}
+    on:mousedown|stopPropagation
+    on:pointerdown|stopPropagation
+    on:touchstart|stopPropagation
+    on:click|stopPropagation={() => showPage(page === 'alarm' ? 'clock' : 'alarm')}
+  >
+    {#if corner.kind === 'time'}
+      <span>{corner.text}</span>
+    {:else}
+      <svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 15v1.5h15V15L18 12.5V9a6 6 0 0 0-6-6Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      {#if corner.kind === 'alarm'}<span>{corner.text}</span>{/if}
+    {/if}
+  </button>
+
+  <div class="stage">
+    {#if page === 'alarm'}
+      <div class="page" data-focus-guard>
+        <input
+          class="hero hero-alarm"
+          type="time"
+          value={normalTime}
+          aria-label="Alarm time"
+          on:change={onTimeChange}
+        />
+        <!-- One row whatever the state, so a small block has room for it:
+             the switch while it is set, the answers while it rings. -->
+        <div class="controls">
+          {#if status.state === 'ringing'}
+            <button class="action" on:click={snooze}>Snooze</button>
+            <button class="action primary" on:click={stop}>Stop</button>
+          {:else if status.state === 'snoozed'}
+            <span class="status">{status.text}</span>
+            <button class="action" on:click={stop}>Stop</button>
+          {:else}
+            <button
+              class="switch"
+              class:on={alarmEnabled && normalTime}
+              role="switch"
+              aria-checked={alarmEnabled && !!normalTime}
+              aria-label="Alarm on"
+              disabled={!normalTime}
+              on:click={toggleEnabled}
+            ><span class="knob"></span></button>
+            <span class="status">{status.text}</span>
+          {/if}
+        </div>
       </div>
-      {#if status.state === 'ringing'}
-        <div class="alarm-row">
-          <button class="alarm-action" on:click={snooze}>Snooze</button>
-          <button class="alarm-action primary" on:click={stop}>Stop</button>
+    {:else if page === 'stopwatch'}
+      <div class="page" data-focus-guard>
+        <div class="hero hero-stopwatch" role="timer" aria-label="Stopwatch">{stopwatchReading(counted)}</div>
+        <div class="controls">
+          {#if watchRunning}
+            <button class="action" on:click={() => changeWatch(lapped)}>Lap</button>
+            <button class="action primary" on:click={() => changeWatch(paused)}>Pause</button>
+          {:else if counted > 0}
+            <button class="action" on:click={() => changeWatch(reset)}>Reset</button>
+            <button class="action primary" on:click={() => changeWatch(started)}>Resume</button>
+          {:else}
+            <button class="action primary" on:click={() => changeWatch(started)}>Start</button>
+          {/if}
         </div>
-      {:else if status.state === 'snoozed'}
-        <div class="alarm-row">
-          <button class="alarm-action" on:click={stop}>Stop</button>
-        </div>
-      {/if}
-    </div>
-  {:else if page === 'stopwatch'}
-    <div class="alarm-page" data-focus-guard>
-      <div class="watch-reading" role="timer" aria-label="Stopwatch">{stopwatchReading(counted)}</div>
-      <div class="alarm-row">
-        {#if watchRunning}
-          <button class="alarm-action" on:click={() => changeWatch(lapped)}>Lap</button>
-          <button class="alarm-action primary" on:click={() => changeWatch(paused)}>Pause</button>
-        {:else if counted > 0}
-          <button class="alarm-action" on:click={() => changeWatch(reset)}>Reset</button>
-          <button class="alarm-action primary" on:click={() => changeWatch(started)}>Resume</button>
+        {#each laps as lap (lap.number)}
+          <div class="lap">
+            <span>Lap {lap.number}</span>
+            <span>{stopwatchReading(lap.split)}</span>
+          </div>
+        {/each}
+      </div>
+    {:else if page === 'timer'}
+      <div class="page" class:rung={timerPhase === 'ringing'} data-focus-guard>
+        {#if timerPhase === 'idle'}
+          <!-- The reading is where its length is typed: "5" is five minutes,
+               "1:30" a minute and a half. Keyed on the length so a change from
+               elsewhere redraws it rather than leaving the old text in place. -->
+          {#key countdown.duration}
+            <input
+              class="hero hero-timer timer-input"
+              type="text"
+              inputmode="numeric"
+              value={timerReading(countdown.duration)}
+              aria-label="Timer length"
+              on:change={onDurationChange}
+              on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            />
+          {/key}
         {:else}
-          <button class="alarm-action primary" on:click={() => changeWatch(started)}>Start</button>
+          <div class="hero hero-timer" role="timer" aria-label="Timer">{timerReading(left)}</div>
         {/if}
-      </div>
-      {#each laps as lap (lap.number)}
-        <div class="watch-lap">
-          <span>Lap {lap.number}</span>
-          <span>{stopwatchReading(lap.split)}</span>
+        <div class="controls">
+          {#if timerPhase === 'running'}
+            <button class="action" on:click={() => changeTimer(resetTimer)}>Reset</button>
+            <button class="action primary" on:click={() => changeTimer(pauseTimer)}>Pause</button>
+          {:else if timerPhase === 'paused'}
+            <button class="action" on:click={() => changeTimer(resetTimer)}>Reset</button>
+            <button class="action primary" on:click={() => changeTimer(startTimer)}>Resume</button>
+          {:else if timerPhase === 'ringing'}
+            <button class="action" on:click={() => changeTimer(oneMoreMinute)}>+1 min</button>
+            <button class="action primary" on:click={() => changeTimer(resetTimer)}>Stop</button>
+          {:else if timerPhase === 'done'}
+            <span class="status">Done</span>
+            <button class="action primary" on:click={() => changeTimer(resetTimer)}>Reset</button>
+          {:else}
+            <button class="action primary" on:click={() => changeTimer(startTimer)}>Start</button>
+          {/if}
         </div>
-      {/each}
-    </div>
-  {:else if page === 'timer'}
-    <div class="alarm-page" class:timer-rung={timerPhase === 'ringing'} data-focus-guard>
-      {#if timerPhase === 'idle'}
-        <!-- The reading is where its length is typed: "5" is five minutes,
-             "1:30" a minute and a half. Keyed on the length so a change from
-             elsewhere redraws it rather than leaving the old text in place. -->
-        {#key countdown.duration}
-          <input
-            class="watch-reading timer-input"
-            type="text"
-            inputmode="numeric"
-            value={timerReading(countdown.duration)}
-            aria-label="Timer length"
-            on:change={onDurationChange}
-            on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-          />
-        {/key}
-      {:else}
-        <div class="watch-reading" role="timer" aria-label="Timer">{timerReading(left)}</div>
-      {/if}
-      <div class="alarm-row">
-        {#if timerPhase === 'running'}
-          <button class="alarm-action" on:click={() => changeTimer(resetTimer)}>Reset</button>
-          <button class="alarm-action primary" on:click={() => changeTimer(pauseTimer)}>Pause</button>
-        {:else if timerPhase === 'paused'}
-          <button class="alarm-action" on:click={() => changeTimer(resetTimer)}>Reset</button>
-          <button class="alarm-action primary" on:click={() => changeTimer(startTimer)}>Resume</button>
-        {:else if timerPhase === 'ringing'}
-          <button class="alarm-action" on:click={() => changeTimer(oneMoreMinute)}>+1 min</button>
-          <button class="alarm-action primary" on:click={() => changeTimer(resetTimer)}>Stop</button>
-        {:else if timerPhase === 'done'}
-          <span class="alarm-status">Done</span>
-          <button class="alarm-action primary" on:click={() => changeTimer(resetTimer)}>Reset</button>
-        {:else}
-          <button class="alarm-action primary" on:click={() => changeTimer(startTimer)}>Start</button>
-        {/if}
       </div>
-    </div>
-  {:else}
-    <ClockFace {hour12} {showSeconds} {showDate} />
-  {/if}
+    {:else}
+      <ClockFace {hour12} {showSeconds} {showDate} />
+    {/if}
+  </div>
 
   <!-- Bottom left is the timer. -->
   <button
-    class="clock-corner bottom-left"
+    class="corner corner-bl"
     class:active={countdownCorner.kind === 'timer'}
     class:rung={countdownCorner.ringing}
     data-focus-guard
@@ -314,154 +368,166 @@
     {#if countdownCorner.kind === 'time'}
       <span>{countdownCorner.text}</span>
     {:else}
-      <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       {#if countdownCorner.kind === 'timer'}<span>{countdownCorner.text}</span>{/if}
-    {/if}
-  </button>
-
-  <!-- Each corner holds its own page's news, and the time while its own page
-       is open. Top left is the stopwatch. -->
-  <button
-    class="clock-corner left"
-    class:active={watchCorner.kind === 'stopwatch'}
-    data-focus-guard
-    title={page === 'stopwatch' ? 'Back to the clock' : 'Stopwatch'}
-    aria-label={page === 'stopwatch' ? `Back to the clock, ${watchCorner.text}` : watchCorner.text ? `Stopwatch, ${watchCorner.text}` : 'Stopwatch'}
-    on:mousedown|stopPropagation
-    on:pointerdown|stopPropagation
-    on:touchstart|stopPropagation
-    on:click|stopPropagation={() => showPage(page === 'stopwatch' ? 'clock' : 'stopwatch')}
-  >
-    {#if watchCorner.kind === 'time'}
-      <span>{watchCorner.text}</span>
-    {:else}
-      <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="13.5" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
-        <path d="M12 13.5V10M10 3h4M12 3v3.5M18 7.5l1.5-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
-      {#if watchCorner.kind === 'stopwatch'}<span>{watchCorner.text}</span>{/if}
-    {/if}
-  </button>
-
-  <!-- Top right is the alarm. -->
-  <button
-    class="clock-corner right"
-    class:active={corner.kind === 'alarm' || status.state === 'ringing' || status.state === 'snoozed'}
-    data-focus-guard
-    title={page === 'alarm' ? 'Back to the clock' : 'Alarm'}
-    aria-label={page === 'alarm' ? `Back to the clock, ${corner.text}` : corner.text ? `Alarm, ${corner.text}` : 'Alarm'}
-    on:mousedown|stopPropagation
-    on:pointerdown|stopPropagation
-    on:touchstart|stopPropagation
-    on:click|stopPropagation={() => showPage(page === 'alarm' ? 'clock' : 'alarm')}
-  >
-    {#if corner.kind === 'time'}
-      <span>{corner.text}</span>
-    {:else}
-      <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3a6 6 0 0 0-6 6v3.5L4.5 15v1.5h15V15L18 12.5V9a6 6 0 0 0-6-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
-      {#if corner.kind === 'alarm'}<span>{corner.text}</span>{/if}
     {/if}
   </button>
 </div>
 
 <style>
+  /* ── Layout ──────────────────────────────────────────────────────────
+     Every colour here is the block's own writing colour, or that colour
+     mixed into transparency -- the theme rule in CLAUDE.md. The tints are
+     named once so the pages agree on them. */
   .clock-alarm {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    color: inherit;
-  }
+    --tint-faint: color-mix(in srgb, currentColor 10%, transparent);
+    --tint-soft: color-mix(in srgb, currentColor 18%, transparent);
+    --tint-strong: color-mix(in srgb, currentColor 34%, transparent);
 
-  /* Laid out below the corners rather than beside them. Centred in the whole
-     block, the figure shared a line with both corners and missed them by a
-     few pixels -- which a 12-hour time or an hour-long run would close. */
-  .alarm-page {
-    container-type: size;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "tl    tr"
+      "stage stage"
+      "bl    .";
     box-sizing: border-box;
     width: 100%;
     height: 100%;
-    padding-top: 20px;
+    padding: 2px 3px;
+    color: inherit;
+  }
+
+  .corner-tl { grid-area: tl; justify-self: start; }
+  .corner-tr { grid-area: tr; justify-self: end; }
+  .corner-bl { grid-area: bl; justify-self: start; }
+
+  /* What every size below is measured against: `cqh` and `cqi` are
+     hundredths of the stage's height and width. */
+  .stage {
+    grid-area: stage;
+    container-type: size;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .page {
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    overflow: hidden;
+    gap: min(5cqh, 8px);
   }
 
-  /* A small block keeps the last lap only, and a very small one none: a
-     figure and its buttons are the stopwatch, laps are extra. */
-  @container (max-height: 110px) {
-    .watch-lap + .watch-lap {
-      display: none;
-    }
-  }
-
-  @container (max-height: 80px) {
-    .watch-lap {
-      display: none;
-    }
-  }
-
-  /* The time is the page, so it is written as large as the clock's own. */
-  .alarm-time {
-    font: inherit;
-    font-size: min(30cqmin, 17cqi);
-    font-weight: 300;
+  /* ── The hero: the one big figure on each page ──────────────────────
+     Sized from whichever of the stage's sides runs out first, so it is as
+     large as the block allows without being cut. The width caps differ
+     because the figures differ in length. */
+  .hero {
+    font-family: inherit;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
-    line-height: 1;
+    letter-spacing: -0.02em;
+    line-height: 0.95;
+    white-space: nowrap;
     color: inherit;
+  }
+
+  .hero-alarm     { font-size: min(52cqh, 24cqi); }  /* 07:30    */
+  .hero-timer     { font-size: min(54cqh, 26cqi); }  /* 5:00     */
+  .hero-stopwatch { font-size: min(54cqh, 17cqi); }  /* 00:05.37 */
+
+  /* The inputs are the hero, dressed as the hero: a line underneath says
+     it can be changed, and nothing else does. */
+  input.hero {
     background: transparent;
     border: none;
-    border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    padding: 0 0.1em;
+    border-bottom: 2px solid var(--tint-soft);
+    border-radius: 0;
+    /* An input's own padding and line box made it half as tall again as
+       its writing, which pushed the page off the top of a small stage. */
+    box-sizing: content-box;
+    height: 1em;
+    padding: 0.04em 0.08em;
+    line-height: 1;
     text-align: center;
-    color-scheme: light dark;
     max-width: 100%;
+    color-scheme: light dark;
   }
 
-  .alarm-time:focus {
+  input.hero:focus {
     outline: none;
     border-bottom-color: currentColor;
   }
 
-  .alarm-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: min(10cqmin, 0.85rem);
+  /* As wide as what is typed, where the browser can do that, so the line
+     underneath is as long as the figure. Elsewhere, wide enough for
+     "1:02:03", the longest a timer reads. */
+  .timer-input {
+    width: 4.6em;
   }
 
-  .alarm-status {
+  @supports (field-sizing: content) {
+    .timer-input {
+      field-sizing: content;
+      width: auto;
+      min-width: 2em;
+    }
+  }
+
+  /* ── Controls ────────────────────────────────────────────────────── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(0.7rem, 12cqh, 1rem);
+    font-weight: 600;
+  }
+
+  .status {
     opacity: 0.75;
     white-space: nowrap;
   }
 
-  /* A switch drawn from the block's own writing colour: the groove is the text
-     colour at a fifth, the knob is the text colour -- the theme rule's pairing. */
-  .alarm-switch {
+  .action {
+    font: inherit;
+    color: inherit;
+    background: var(--tint-faint);
+    border: 1.5px solid var(--tint-strong);
+    border-radius: 999px;
+    padding: 0.15em 0.9em;
+    cursor: pointer;
+  }
+
+  .action.primary {
+    background: var(--tint-strong);
+    border-color: transparent;
+  }
+
+  /* A switch: the groove is the writing colour tinted, the knob is the
+     writing colour itself. */
+  .switch {
     position: relative;
+    flex: none;
     width: 34px;
     height: 18px;
     padding: 0;
     border: none;
     border-radius: 9px;
-    background: color-mix(in srgb, currentColor 20%, transparent);
+    background: var(--tint-soft);
     color: inherit;
     cursor: pointer;
-    flex: none;
   }
 
-  .alarm-switch.on {
-    background: color-mix(in srgb, currentColor 55%, transparent);
+  .switch.on {
+    background: color-mix(in srgb, currentColor 60%, transparent);
   }
 
-  .alarm-switch:disabled {
+  .switch:disabled {
     opacity: 0.4;
     cursor: default;
   }
@@ -477,118 +543,69 @@
     transition: transform 0.15s;
   }
 
-  .alarm-switch.on .knob {
+  .switch.on .knob {
     transform: translateX(16px);
   }
 
-  .alarm-action {
-    font: inherit;
-    color: inherit;
-    background: color-mix(in srgb, currentColor 12%, transparent);
-    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
-    border-radius: 999px;
-    padding: 3px 12px;
-    cursor: pointer;
-  }
-
-  .alarm-action.primary {
-    background: color-mix(in srgb, currentColor 28%, transparent);
-  }
-
-  /* The stopwatch figure, as large as the alarm's time and in the same
-     numerals as the clock, so the three pages read as one block. */
-  .watch-reading {
-    font-size: min(24cqmin, 13cqi);
-    font-weight: 300;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  .watch-lap {
+  .lap {
     display: flex;
     gap: 14px;
-    font-size: min(9cqmin, 0.78rem);
+    font-size: clamp(0.65rem, 9cqh, 0.8rem);
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
-    line-height: 1.1;
+    line-height: 1.15;
     opacity: 0.7;
   }
 
-  /* The corners: small, and quiet until they have something to say. */
-  .clock-corner {
-    position: absolute;
-    top: 4px;
+  /* Laps are extra: a short stage keeps the newest only, a very short one
+     none, so the figure and its buttons keep the room. */
+  @container (max-height: 120px) {
+    .lap + .lap { display: none; }
+  }
+
+  @container (max-height: 95px) {
+    .lap { display: none; }
+  }
+
+  /* ── Corners ─────────────────────────────────────────────────────────
+     Small, and quiet until they have something to say. */
+  .corner {
     display: inline-flex;
     align-items: center;
     gap: 3px;
-    padding: 2px 6px;
+    padding: 1px 5px;
     border: none;
     border-radius: 999px;
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1;
-    opacity: 0.55;
+    opacity: 0.6;
     cursor: pointer;
-    z-index: 1;
   }
 
-  .clock-corner.left {
-    left: 6px;
-  }
-
-  .clock-corner.right {
-    right: 6px;
-  }
-
-  .clock-corner.bottom-left {
-    top: auto;
-    bottom: 4px;
-    left: 6px;
-  }
-
-  /* The length is typed into the reading itself, so it looks like the
-     reading until it is being typed in. */
-  .timer-input {
-    font-family: inherit;
-    color: inherit;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
-    padding: 0 0.1em;
-    text-align: center;
-    width: 5.5em;
-    max-width: 100%;
-  }
-
-  .timer-input:focus {
-    outline: none;
-    border-bottom-color: currentColor;
-  }
-
-  .timer-rung .watch-reading,
-  .clock-corner.rung {
-    animation: ring-pulse 1s ease-in-out infinite;
-  }
-
-  .clock-corner:hover,
-  .clock-corner:focus-visible {
+  .corner:hover,
+  .corner:focus-visible {
     opacity: 1;
-    background: color-mix(in srgb, currentColor 12%, transparent);
+    background: var(--tint-faint);
   }
 
-  .clock-corner.active {
-    opacity: 0.9;
+  .corner.active {
+    opacity: 0.95;
   }
 
-  .bell {
-    width: 1.15em;
-    height: 1.15em;
+  .corner-icon {
+    width: 1.2em;
+    height: 1.2em;
   }
 
-  .ringing .clock-corner.right {
+  /* ── Ringing ─────────────────────────────────────────────────────── */
+  .ringing .corner-tr,
+  .corner.rung,
+  .page.rung .hero {
     animation: ring-pulse 1s ease-in-out infinite;
   }
 
