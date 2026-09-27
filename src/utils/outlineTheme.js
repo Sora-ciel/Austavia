@@ -25,6 +25,19 @@
  *
  * The canvas itself stays black: with no wallpaper it is what the outlines
  * are drawn on, and with one the wallpaper covers it.
+ *
+ * ## What is not see-through, and why
+ *
+ * Asked for the same day, once it had been tried: pop-ups -- dialogs, and the
+ * panels a toolbar button opens -- "should have a black background with a
+ * certain opacity, so it will always be easily readable above all images".
+ * Writing that floats over a wallpaper is only readable if something is
+ * between the two, and a panel is read, not looked through. So `popupBg` is
+ * black at 72%: dark enough for white writing over the brightest picture,
+ * light enough that the picture is still there behind it.
+ *
+ * Single Note's page is black for a related reason; that one is in
+ * modeSurface.js, because it is true of every theme and not only this one.
  */
 import { normalizeBlockTheme } from './themeDefaults.js';
 
@@ -71,11 +84,16 @@ export const OUTLINE_PRESET = {
     accentText: '#000000',
     mediaButtonBg: 'transparent',
     mediaButtonText: INK,
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.55)',
+    // Tight and dark enough to outline each letter, so white writing holds
+    // up over a white picture; the first version only softened the edges.
+    textShadow: '0 0 1px #000000, 0 0 3px #000000, 0 1px 6px rgba(0, 0, 0, 0.85)',
     bgOpacity: 0,
     headerOpacity: 0,
     textOpacity: 100
   }),
+  // What pop-ups sit on -- see above. A theme without one keeps its panels'
+  // own colour.
+  popupBg: 'rgba(0, 0, 0, 0.72)',
   previewBg: 'transparent',
   blockDefaults: { bgColor: '#000000', textColor: INK }
 };

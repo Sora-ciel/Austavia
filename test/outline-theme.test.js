@@ -44,6 +44,16 @@ describe('Outline makes everything invisible but the text, the shadows and the o
   });
 });
 
+// Asked for once it had been tried: pop-ups "should have a black background
+// with a certain opacity, so it will always be easily readable above all
+// images." Black, and neither solid nor see-through.
+it('puts pop-ups on black with some opacity, so they read over any wallpaper', () => {
+  const match = /^rgba\(0, 0, 0, ([\d.]+)\)$/.exec(OUTLINE_PRESET.popupBg);
+  assert.ok(match, `popupBg is ${OUTLINE_PRESET.popupBg}`);
+  const alpha = Number(match[1]);
+  assert.ok(alpha >= 0.6 && alpha < 1, `alpha ${alpha}`);
+});
+
 // A theme field every block reads has to exist on every theme, or the ones
 // that predate it would inherit whatever the page last set.
 it('gives every theme a text shadow, none unless it asks for one', () => {

@@ -284,7 +284,7 @@
     right: 0;
     bottom: 0;
     width: 260px;
-    background: var(--right-panel-bg, #222222);
+    background: var(--app-popup-bg, var(--right-panel-bg, #222222));
     border-left: 1px solid var(--right-border-color, #444444);
     z-index: 999;
     box-shadow: -2px 0 10px rgba(0,0,0,0.4);
@@ -331,7 +331,7 @@
     width: min(56vw, 240px);
     max-width: 92vw;
     max-height: calc(100dvh - var(--controls-height, 56px) - 16px);
-    background: var(--right-panel-bg, #222222);
+    background: var(--app-popup-bg, var(--right-panel-bg, #222222));
     border: 1px solid var(--right-border-color, #444444);
     border-radius: 12px;
     padding: 0;

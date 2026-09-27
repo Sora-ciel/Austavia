@@ -23,7 +23,7 @@
     sameNameClusters
   } from '../utils/duplicateTracks.js';
   import { tracksTheLibraryLacks, playableIds } from '../utils/nowPlaying.js';
-  import { surfaceBlock, surfaceColors } from '../utils/modeSurface.js';
+  import { surfaceBlock, surfaceColors, drawnSurface } from '../utils/modeSurface.js';
   import { isCompactToolbar, toolbarLayout } from '../utils/playlistToolbar.js';
   import ModeBackground from '../components/ModeBackground.svelte';
   import { backgroundImageFor, usesPortraitBackground } from '../utils/modeBackground.js';
@@ -67,7 +67,7 @@
   $: modeTextColor = surface.text;
   $: cssVars =
     `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg};` +
-    ` --pl-surface: ${surface.bg}; --mode-text-color: ${modeTextColor};`;
+    ` --pl-surface: ${drawnSurface(surface.bg, canvasTheme.innerBg)}; --mode-text-color: ${modeTextColor};`;
 
   // What a run has produced but not yet committed.
   //

@@ -474,7 +474,7 @@ onMount(() => {
     border-radius: 12px;
     /* The panel the compact menu uses, so the two are one thing wearing two
        shapes rather than two panels that have to be kept looking alike. */
-    background: var(--left-panel-bg, #111111f0);
+    background: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
     /* The Bg panel is anchored inside its own control and has to be able to
        reach past this box; clipping it would be a panel with no bottom. */
@@ -561,7 +561,7 @@ onMount(() => {
     top: calc(100% + 6px);
     left: 0;
     min-width: 200px;
-    background: var(--left-panel-bg, #111111);
+    background: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 6px;
@@ -595,7 +595,7 @@ onMount(() => {
     top: calc(100% + 6px);
     left: 0;
     min-width: 190px;
-    background: var(--left-panel-bg, #111111);
+    background: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 6px;
@@ -742,7 +742,7 @@ onMount(() => {
     top: calc(100% + 6px);
     z-index: 1002;
     width: 260px;
-    background: var(--left-panel-bg, #111111);
+    background: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 10px;
@@ -919,7 +919,7 @@ onMount(() => {
       flex-direction: column;
       align-items: stretch;
       gap: 3px;
-      background: var(--left-panel-bg, #111111f0);
+      background: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
       padding: 12px;
       border-radius: 12px;
       position: fixed;

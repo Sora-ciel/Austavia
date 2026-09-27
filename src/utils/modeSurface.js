@@ -68,3 +68,23 @@ export function surfaceColors(block, canvasColors = {}) {
   const text = block?.textColor || canvasColors?.textColor || getReadableTextColor(bg);
   return { bg, text };
 }
+
+/**
+ * The surface as drawn: the block's colour, faded by the theme's own surface
+ * dial toward the mode's background -- never toward see-through.
+ *
+ * A canvas block fades to transparent, because there is a canvas behind it.
+ * A full-screen mode has nothing behind it but the window, so fading it the
+ * same way showed whatever colour the block last held. Under Outline, whose
+ * dial is at zero, a note block still carrying a pale colour from an earlier
+ * theme came out as white writing on a white page -- reported 2026-09-27:
+ * "the background in Single Note mode should be black because it does white
+ * text on white background." Fading toward the mode's own background keeps
+ * it what the theme meant: on Outline, black.
+ *
+ * A CSS value rather than a colour, because the dial is a CSS variable set on
+ * the app; a theme that leaves it at 100% gets exactly the block's colour.
+ */
+export function drawnSurface(bg, modeBg) {
+  return `color-mix(in srgb, ${bg || '#000000'} var(--block-bg-opacity, 100%), ${modeBg || '#000000'})`;
+}

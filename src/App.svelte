@@ -104,6 +104,7 @@
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
+  import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, habitsToAdopt } from './utils/habitStore.js';
   import {
@@ -2629,7 +2630,10 @@
     `--app-border: color-mix(in srgb, ${appTextColor} 22%, transparent)`,
     `--app-muted: color-mix(in srgb, ${appTextColor} 60%, transparent)`,
     `--sb-track: transparent`,
-    `--sb-thumb: color-mix(in srgb, ${appTextColor} 40%, transparent)`
+    `--sb-thumb: color-mix(in srgb, ${appTextColor} 40%, transparent)`,
+    // What pop-ups sit on, for a theme that says: the panels a toolbar button
+    // opens read it before their own colour. See utils/outlineTheme.js.
+    ...(activeTheme?.popupBg ? [`--app-popup-bg: ${activeTheme.popupBg}`] : [])
   ].join('; ');
 
   function handleThemeSelect(event) {
@@ -2923,7 +2927,9 @@
   // theme vars — hand them the right-panel palette directly.
   $: rightTheme = controlColors.right || CONTROL_COLOR_DEFAULTS.right;
   $: overlayThemeStyle =
-    `--dlg-bg: ${rightTheme.panelBg}; --dlg-text: ${rightTheme.textColor};` +
+    // A theme's popupBg, when it has one, is what a dialog sits on -- see
+    // utils/outlineTheme.js. Otherwise the settings panel's own colour.
+    `--dlg-bg: ${activeTheme?.popupBg || rightTheme.panelBg}; --dlg-text: ${rightTheme.textColor};` +
     ` --dlg-border: ${rightTheme.borderColor}; --dlg-btn-bg: ${rightTheme.buttonBg};` +
     ` --dlg-btn-text: ${rightTheme.buttonText};`;
   // Modes used to derive their own readable text colour from the canvas
@@ -3702,8 +3708,20 @@
       const height = Math.max(target.scrollHeight, target.clientHeight, 1);
       const scale = fittingScale(width, height);
 
-      const canvas = await html2canvas(target, {
-        backgroundColor: canvasTheme?.innerBg || canvasTheme?.outerBg || '#000000',
+      // Canvas pins its wallpaper outside the board, so the board is captured
+      // with nothing behind it and the wallpaper painted in underneath -- see
+      // utils/screenshotWallpaper.js. Other modes draw theirs inside what is
+      // captured and need nothing extra.
+      const backdrop = canvasTheme?.innerBg || canvasTheme?.outerBg || '#000000';
+      const wallpaper = board && mode === 'default'
+        ? wallpaperPaint(canvasBackgroundSettings, {
+            isMobile: typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT,
+            scale
+          })
+        : null;
+
+      const drawn = await html2canvas(target, {
+        backgroundColor: wallpaper ? null : backdrop,
         scale,
         logging: false,
         useCORS: true,
@@ -3723,6 +3741,8 @@
       restoreScrollers();
       restoreScrollers = () => {};
 
+      const canvas = wallpaper ? await underlayWallpaper(drawn, wallpaper, backdrop) : drawn;
+
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('The image came back empty.');
       return blob;
@@ -3737,6 +3757,59 @@
       // otherwise the mode would be left with its scrollers hanging open.
       restoreScrollers();
     }
+  }
+
+  /**
+   * The captured board, with the wallpaper and the canvas colour under it.
+   *
+   * If the wallpaper will not load, the picture comes back on the plain
+   * colour: a screenshot without its wallpaper is still the screenshot that
+   * was asked for.
+   */
+  // Loaded by its load event and given up on after `ms`, rather than with
+  // image.decode(): decode waits for the page to be drawn, and in a tab that is
+  // not being drawn it never settled -- which left the screenshot button busy
+  // for good.
+  function loadImageWithin(src, ms) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      const timer = setTimeout(() => reject(new Error('The wallpaper took too long to load.')), ms);
+      image.onload = () => { clearTimeout(timer); resolve(image); };
+      image.onerror = () => { clearTimeout(timer); reject(new Error('The wallpaper would not load.')); };
+      image.src = src;
+    });
+  }
+
+  async function underlayWallpaper(drawn, paint, backdrop) {
+    const out = document.createElement('canvas');
+    out.width = drawn.width;
+    out.height = drawn.height;
+    const ctx = out.getContext('2d');
+
+    ctx.fillStyle = backdrop;
+    ctx.fillRect(0, 0, out.width, out.height);
+
+    try {
+      const image = await loadImageWithin(paint.image, 5000);
+      const rect = wallpaperRect({
+        imageWidth: image.naturalWidth,
+        imageHeight: image.naturalHeight,
+        width: out.width,
+        height: out.height,
+        size: paint.size,
+        bleed: paint.bleed
+      });
+      ctx.save();
+      ctx.globalAlpha = paint.alpha;
+      ctx.filter = paint.filter;
+      ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
+      ctx.restore();
+    } catch (error) {
+      console.warn('The wallpaper could not be drawn into the screenshot:', error);
+    }
+
+    ctx.drawImage(drawn, 0, 0);
+    return out;
   }
 
   /**

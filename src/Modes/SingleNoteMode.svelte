@@ -3,7 +3,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
-  import { surfaceColors } from '../utils/modeSurface.js';
+  import { surfaceColors, drawnSurface } from '../utils/modeSurface.js';
   import {
     STORAGE_KEY as LAST_NOTE_KEY,
     chooseOpenNote,
@@ -198,7 +198,9 @@
   // to look "like in Single Note mode", and two copies of a rule that is meant
   // to match are two things to keep matching.
   $: noteSurface = surfaceColors(noteBlock, canvasTheme);
-  $: activeNoteBg = noteSurface.bg;
+  // Faded by the theme's surface dial toward the mode's background -- see
+  // drawnSurface for why that and not toward see-through.
+  $: activeNoteBg = drawnSurface(noteSurface.bg, canvasTheme.innerBg);
   $: activeNoteText = noteSurface.text;
   // The scrollbar sits over the background image, so it tracks that image's
   // opacity — but never drops below 20%, or it would vanish entirely on a
@@ -336,6 +338,9 @@
     height: 100%;
     background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
     color: var(--mode-text-color, #ffffff);
+    /* The theme's shadow under writing, as a canvas block has it -- this mode
+       is the text block filling the window, counter and buttons included. */
+    text-shadow: var(--block-text-shadow, none);
     box-sizing: border-box;
     position: relative;
     /* Scrollbars here match the note surface they sit on, at the background's

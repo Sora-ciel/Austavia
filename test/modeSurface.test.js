@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { surfaceBlock, surfaceColors } from '../src/utils/modeSurface.js';
+import { surfaceBlock, surfaceColors, drawnSurface } from '../src/utils/modeSurface.js';
 
 // Named after the request: "like in Single Note mode, the Playlist mode should
 // have a particular background, so that the opacity changes don't go to black
@@ -61,4 +61,16 @@ test('with nothing at all it is still a colour, not undefined', () => {
   assert.ok(text);
   assert.equal(surfaceBlock(), null);
   assert.equal(surfaceBlock([{ type: 'music' }]), null, 'asked for no kind, it picks nothing');
+});
+
+// Reported 2026-09-27 under Outline: "the background in Single Note mode should
+// be black because it does white text on white background." A full-screen mode
+// fades toward its own background, not toward see-through, because there is
+// nothing behind it but the last colour the block held.
+test('a full-screen surface fades toward the mode background, by the theme dial', () => {
+  const drawn = drawnSurface('#fffaf2', '#000000');
+  assert.match(drawn, /var\(--block-bg-opacity, 100%\)/);
+  assert.match(drawn, /#fffaf2/);
+  assert.match(drawn, /, #000000\)$/);
+  assert.doesNotMatch(drawn, /transparent/);
 });
