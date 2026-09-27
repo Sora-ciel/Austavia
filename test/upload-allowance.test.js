@@ -18,7 +18,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { attachmentVerdict, roomLeft } from '../src/utils/uploadAllowance.js';
+import {
+  attachmentVerdict,
+  roomLeft,
+  freeSpaceBeforeSaving
+} from '../src/utils/uploadAllowance.js';
 
 const MB = 1024 * 1024;
 const tiny = { bytes: 900 * 1024, limit: MB }; // 124 KB left of a 1 MB plan
@@ -128,5 +132,42 @@ describe('attachmentVerdict', () => {
   it('copes with being asked about nothing', () => {
     assert.equal(attachmentVerdict().allow, true);
     assert.equal(attachmentVerdict({ bytes: 'lots', usage: tiny, signedIn: true, autoSync: true }).allow, true);
+  });
+});
+
+// --- Getting out of a full account ------------------------------------
+//
+// Reported on 2026-09-27: "even deleting an image would not actually delete
+// from the server -- we hit the limit and then we are stuck with too much even
+// after deleting."
+//
+// Two reasonable halves making a trap. A save uploads its attachments first
+// and writes the folder second, so a full account fails the whole save on the
+// first refused upload. And the sweep that removes deleted blocks' uploads
+// runs *after* a successful save. So the save that would record a deletion is
+// the save that cannot succeed, and nothing is ever freed.
+
+describe('freeSpaceBeforeSaving', () => {
+  it('sweeps first when the account is full and something was deleted', () => {
+    assert.equal(
+      freeSpaceBeforeSaving({ deletedBlocks: true, usage: { full: true } }),
+      true
+    );
+  });
+
+  // The ordinary path is left exactly as it was. Sweeping before a save that
+  // then fails would leave the cloud copy pointing at uploads that are gone,
+  // which is a worse trade everywhere it is not necessary.
+  it('leaves an account with room to sweep afterwards, as before', () => {
+    assert.equal(freeSpaceBeforeSaving({ deletedBlocks: true, usage: { full: false } }), false);
+  });
+
+  it('has nothing to free when nothing was deleted', () => {
+    assert.equal(freeSpaceBeforeSaving({ deletedBlocks: false, usage: { full: true } }), false);
+  });
+
+  it('does nothing without a balance to judge by', () => {
+    assert.equal(freeSpaceBeforeSaving({ deletedBlocks: true, usage: null }), false);
+    assert.equal(freeSpaceBeforeSaving(), false);
   });
 });

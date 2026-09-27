@@ -345,6 +345,17 @@ as one going into writing. The second measures the data URL rather than the
 file, because that is what a picture in writing actually costs — about a third
 more, which is what base64 does.
 
+**A full account can get out of being full.** Reported 2026-09-27: deleting a
+picture freed nothing and the account stayed stuck. Two reasonable halves made
+a trap — a save uploads its attachments before it writes the folder, so a full
+account fails the whole save on the first refused upload; and the sweep that
+removes deleted blocks' uploads runs *after* a successful save. So the save
+that would record a deletion was the save that could not succeed. When the
+account is full and something has been deleted, the sweep now goes first.
+Only when full: sweeping before a save that then fails would leave the cloud
+copy pointing at uploads that are gone, which is the worse trade everywhere it
+is not necessary.
+
 All of it can be exercised on staging without filling anything: put the
 staging account's `plan` on `tiny` (1 MB, which exists for this) and one
 photograph is enough.

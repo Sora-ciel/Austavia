@@ -84,7 +84,7 @@
   import { explainSyncFailure } from './utils/syncErrors.js';
   import { describeStorageUsage } from './utils/storageUsage.js';
   import { storageAnnouncement } from './utils/storageAlerts.js';
-  import { attachmentVerdict } from './utils/uploadAllowance.js';
+  import { attachmentVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
@@ -3012,6 +3012,13 @@
   }
 
   async function saveRemoteFileWithMemory(fileName, payload, options = {}) {
+    // On a full account the deletions go up before anything is uploaded --
+    // otherwise the save that would record them is the save that fails, and
+    // deleting can never make room. See freeSpaceBeforeSaving.
+    if (freeSpaceBeforeSaving({ deletedBlocks: blocksWereDeleted, usage: storageUsage })) {
+      await sweepDeletedBlockAttachments(fileName, payload);
+    }
+
     const result = await saveRemoteFile(fileName, payload, options);
     const syncedAt = Date.now();
     rememberCloudSyncForFile(fileName, syncedAt);

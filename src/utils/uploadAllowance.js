@@ -116,3 +116,26 @@ export function attachmentVerdict({
       + 'auto sync off nothing is uploaded, and it will not fit when it is on.'
   };
 }
+
+/**
+ * Whether room has to be made before a save is even attempted.
+ *
+ * A save uploads its attachments first and writes the folder second, so an
+ * account at its ceiling fails the whole save on the first refused upload --
+ * and the sweep that removes deleted blocks' uploads runs *after* a successful
+ * save. Both halves are reasonable alone and together they are a trap:
+ * deleting a picture to make room cannot make room, because the save that
+ * would record the deletion is the save that fails.
+ *
+ * So when an account is full and something has been deleted, the sweep goes
+ * first. Freeing space before trying to use it is the only order that can get
+ * out of a full account.
+ *
+ * Deliberately *only* when full. The ordinary path is left exactly as it was:
+ * sweeping before a save that then fails would leave the cloud copy pointing
+ * at uploads that are gone, and that is a worse trade than a late sweep
+ * everywhere it is not necessary.
+ */
+export function freeSpaceBeforeSaving({ deletedBlocks = false, usage = null } = {}) {
+  return Boolean(deletedBlocks) && Boolean(usage && usage.full);
+}
