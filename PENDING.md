@@ -254,6 +254,14 @@ speculatively — wait for a report that says so.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
+- **Wallpapers should reach behind the toolbar.** Asked for 2026-09-27 and
+  put off to a later session: with a see-through toolbar (Outline), the
+  wallpaper should show behind the controls rather than start just below
+  them. In Canvas it is `.canvas-bg-holder` in `CanvasMode.svelte`, pinned at
+  `top: var(--controls-height)`; Single Note (`.note-bg-clip`) and Playlist
+  (`ModeBackground`) sit inside their mode's box, which also starts below the
+  toolbar. Probably top: 0 plus letting the bar's own background stay clear
+  -- check that the toolbar's buttons still read over a bright picture.
 - **The alarm and the timer only ring while the app is open on their folder.** It is a
   timer in the page (`AlarmRinger.svelte`), so it cannot ring with the app
   closed, with a phone that has put the WebView to sleep, or for a clock in a
