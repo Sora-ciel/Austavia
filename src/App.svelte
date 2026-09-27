@@ -2649,6 +2649,7 @@
     music: ['position', 'size', 'bgColor', 'textColor', 'playlistId', 'trackUrl', 'title', 'content'],
     embed: ['position', 'size', 'bgColor', 'textColor', 'content'],
     task: ['tasks', 'title'],
+    clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };
 
@@ -3553,7 +3554,10 @@
       }
       type = "text";
     }
-    const blockW = 300, blockH = 200;
+    // A clock is read at a glance, so it starts the size of one rather than the
+    // size of a note.
+    const blockW = type === 'clock' ? 260 : 300;
+    const blockH = type === 'clock' ? 150 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
     const position = mode === 'default'
@@ -3565,6 +3569,9 @@
       content: "",
       src: "",
       ...(type === "task" ? { tasks: [], title: "Task List" } : {}),
+      // 24-hour by default: the owner is in France, and the setting is one
+      // click away for anyone who is not.
+      ...(type === "clock" ? { hour12: false, showSeconds: false, showDate: true } : {}),
       position,
       size: { width: blockW, height: blockH },
       ...newBlockColors,

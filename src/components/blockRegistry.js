@@ -3,7 +3,8 @@ export const BLOCK_DEFINITIONS = {
   image: { type: 'image', label: 'Image', icon: '+' },
   music: { type: 'music', label: 'Music', icon: '+' },
   embed: { type: 'embed', label: 'Embed', icon: '+' },
-  task: { type: 'task', label: 'Task List', icon: '+' }
+  task: { type: 'task', label: 'Task List', icon: '+' },
+  clock: { type: 'clock', label: 'Clock', icon: '+' }
 };
 
 export function getBlockDefinition(type) {

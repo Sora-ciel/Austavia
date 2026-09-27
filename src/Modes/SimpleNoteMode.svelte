@@ -18,6 +18,7 @@
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import MusicPlayer from '../components/MusicPlayer.svelte';
+  import ClockFace from '../components/ClockFace.svelte';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
 
@@ -988,6 +989,16 @@ input[type="text"] {
   padding: 0 8px 8px;
 }
 
+/* Tall enough to read at a glance in a grid of notes, and no taller: a clock
+   that takes a note's worth of height is a clock in the way. */
+.clock-content {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  box-sizing: border-box;
+  padding: 0 8px 8px;
+}
+
 /* The player draws its own rows and needs a height to scroll them in; without
    this it grows with the library instead. */
 .music-content {
@@ -1166,6 +1177,18 @@ input[type="text"] {
                   updateBlock(block.id, { playlistId: e.detail.playlistId }, { changedKeys: ['playlistId'] })}
                 on:play
                 on:toggle
+              />
+            </div>
+          {:else if block.type === 'clock'}
+            <!-- The same face the canvas uses, without the frame: Simple Note
+                 lays its blocks out itself, the way it does the music player.
+                 Settings are changed from the canvas, where the block has a
+                 header to hold them. -->
+            <div class="clock-content">
+              <ClockFace
+                hour12={block.hour12 === true}
+                showSeconds={block.showSeconds === true}
+                showDate={block.showDate !== false}
               />
             </div>
           {:else if block.type === 'embed'}

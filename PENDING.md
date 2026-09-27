@@ -17,6 +17,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **The clock block**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
 | 0.8.65 | **The plan panel, doing nothing.** The subscription groundwork ships with this release and is deliberately inert: no checkout link is committed, so no Upgrade button should appear anywhere, on any platform, signed in or out. If one does, something shipped that should not have. |
 | 0.8.65 | **The word count row** in Single Note, a third shorter, and the **mini player** opening Playlist when pressed anywhere that is not a button. |
 | 0.8.652 | **Holding a habit to delete it** — and scrolling a list of habits without the menu appearing, which is the case it is most likely to get wrong. Also **the note's footer** going while the keyboard is up and coming back after, with the picture behind holding still. |

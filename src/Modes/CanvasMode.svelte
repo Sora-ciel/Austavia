@@ -8,6 +8,7 @@
   import ImgBlock from '../components/ImgBlock.svelte';
   import Music from '../components/MusicBlock.svelte';
   import Embed from '../components/EmbedBlock.svelte';
+  import ClockBlock from '../components/ClockBlock.svelte';
   import TaskBlock from '../components/TaskBlock.svelte';
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
@@ -756,6 +757,22 @@
             initialTextColor={block.textColor}
             initialTasks={block.tasks}
             initialTitle={block.title}
+            focused={block.id === focusedBlockId}
+            canvasScale={scale}
+            on:delete={deleteBlockHandler}
+            on:update={updateBlockHandler}
+            on:focusToggle={focusToggleHandler}
+          />
+        {:else if block.type === 'clock'}
+          <ClockBlock
+            id={block.id}
+            initialPosition={block.position}
+            initialSize={block.size}
+            initialBgColor={block.bgColor}
+            initialTextColor={block.textColor}
+            initialHour12={block.hour12 === true}
+            initialShowSeconds={block.showSeconds === true}
+            initialShowDate={block.showDate !== false}
             focused={block.id === focusedBlockId}
             canvasScale={scale}
             on:delete={deleteBlockHandler}

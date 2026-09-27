@@ -7,13 +7,17 @@ export const MODE_DEFINITIONS = {
   default: {
     id: 'default',
     label: 'Canvas',
-    addBlockTypes: ['text', 'image', 'music', 'embed'],
+    // Clock asked for on 2026-09-27, for every mode except Task, Playlist and
+    // Birthday. It lands here and in Simple Note because those are the two that
+    // hold blocks; Single Note is one piece of writing and Habit Tracker is a
+    // list of habits, and neither has anywhere to put a block.
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock'],
     showRightControls: true
   },
   simple: {
     id: 'simple',
     label: 'Simple Note',
-    addBlockTypes: ['text', 'image', 'music', 'embed'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock'],
     showRightControls: true,
     settings: { simpleColumns: true }
   },
