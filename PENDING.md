@@ -19,6 +19,7 @@ list below with what was observed.
 | --- | --- |
 | next | **The clock & alarm block**, in Canvas and Simple Note: the corner flips between the clock and the alarm page, the page it was left on is still open after a reload (on that device only), and an alarm set a minute ahead rings — banner, beeps, and a buzz on a phone — in whatever mode is open. Snooze gives it five minutes; Stop keeps it quiet until tomorrow. Expect it *not* to ring with the app closed or a phone asleep: see 4. |
 | next | **The stopwatch**, from the clock block's top-left corner: Start, Lap, Pause, Resume, Reset; the corner shows the running figure from the other two pages. Start it on a phone, lock the screen for a minute, and it should read the right time on return -- it is worked out from when it started, not counted. It is per device, like the page. |
+| next | **The timer**, from the bottom-left corner: type `5` or `1:30` into the reading, Start, and it rings — banner, beeps, buzz — in whatever mode is open when it runs out, with +1 min and Stop. Start one on a phone and lock the screen past its end: it should be found run out and ring on return (within ten minutes), since it is kept as the moment it ends. Per device. The same limit as the alarm applies: nothing rings with the app closed. |
 | next | **The clock face**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
 | 0.8.65 | **The plan panel, doing nothing.** The subscription groundwork ships with this release and is deliberately inert: no checkout link is committed, so no Upgrade button should appear anywhere, on any platform, signed in or out. If one does, something shipped that should not have. |
 | 0.8.65 | **The word count row** in Single Note, a third shorter, and the **mini player** opening Playlist when pressed anywhere that is not a button. |
@@ -250,7 +251,7 @@ speculatively — wait for a report that says so.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
-- **The alarm only rings while the app is open on the alarm's folder.** It is a
+- **The alarm and the timer only ring while the app is open on their folder.** It is a
   timer in the page (`AlarmRinger.svelte`), so it cannot ring with the app
   closed, with a phone that has put the WebView to sleep, or for a clock in a
   folder that is not open. Answering is per device (`utils/alarm.js` says why),

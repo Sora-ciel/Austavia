@@ -1,7 +1,7 @@
 <script>
   /**
-   * The clock block's body: a clock page, an alarm page and a stopwatch page,
-   * with a corner for each of the other two.
+   * The clock block's body: a clock page, and an alarm, a stopwatch and a
+   * timer page, each with a corner of its own.
    *
    * Asked for on 2026-09-27 -- "a block that does both, and which one is open
    * is an on-device save. On the alarm page the clock still shows small in a
@@ -15,10 +15,13 @@
    * its own page shows the time and leads back to the clock. Its rules are in
    * utils/stopwatch.js.
    *
+   * Then the timer -- "on the bottom left corner probably" -- by the same rule,
+   * with its rules in utils/countdown.js.
+   *
    * Frameless, like ClockFace, so Canvas can wrap it in BlockShell and Simple
    * Note can lay it out itself. The alarm's time and switch are the block's and
    * are saved by whoever holds it, through the `alarm` event. The page, what
-   * was done about a ring, and the stopwatch are this device's --
+   * was done about a ring, the stopwatch and the timer are this device's --
    * clockDeviceStore.js.
    */
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
@@ -44,6 +47,19 @@
     msUntilStopwatchChange,
     stopwatchCorner
   } from '../utils/stopwatch.js';
+  import {
+    timerState,
+    timeLeft,
+    startTimer,
+    pauseTimer,
+    resetTimer,
+    setDuration,
+    oneMoreMinute,
+    parseDuration,
+    timerReading,
+    msUntilTimerChange,
+    timerCorner
+  } from '../utils/countdown.js';
   import { clockDevices, clockDevice, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
 
   export let blockId;
@@ -65,7 +81,7 @@
   $: page = device.page;
 
   let now = Date.now();
-  let timer = null;
+  let wake = null;
   let mounted = false;
 
   $: normalTime = normalizeAlarmTime(alarmTime);
@@ -79,10 +95,14 @@
   // The last two laps: a block is small, and a list long enough to scroll
   // would bring a scroll inside a block with it.
   $: laps = lapRows(watch).slice(0, 2);
+  $: countdown = device.timer;
+  $: timerPhase = timerState(countdown, now);
+  $: left = timeLeft(countdown, now);
+  $: countdownCorner = timerCorner({ page, timer: countdown, now, clockTime });
   $: status = alarmStatus({ now, time: normalTime, enabled: alarmEnabled, device, hour12 });
 
   function schedule() {
-    clearTimeout(timer);
+    clearTimeout(wake);
     now = Date.now();
     // The soonest of the corner clock's next minute, the alarm's next change
     // and the stopwatch's next figure -- often on its own page, once a second
@@ -90,17 +110,23 @@
     const waits = [
       msUntilNextTick({ now }),
       msUntilAlarmCheck({ now, alarms: [{ time: alarmTime, enabled: alarmEnabled, device }] }),
-      msUntilStopwatchChange(device.stopwatch, { now, fine: device.page === 'stopwatch' })
+      msUntilStopwatchChange(device.stopwatch, { now, fine: device.page === 'stopwatch' }),
+      msUntilTimerChange(device.timer, now)
     ].filter(wait => wait !== null);
     const wait = Math.min(...waits);
-    timer = setTimeout(schedule, wait);
+    wake = setTimeout(schedule, wait);
   }
 
   // Named only: the alarm, and what this device did about it. See ClockFace
-  // for why a reactive statement must not name the timer it sets.
+  // for why a reactive statement must not name the `wake` it sets.
   $: rescheduleFor(alarmTime, alarmEnabled, device);
   function rescheduleFor() {
-    if (mounted) schedule();
+    // Just after this update rather than inside it. schedule() sets `now`,
+    // and Svelte does not re-run statements above this one for a change made
+    // while it is running them -- so a Start pressed here was drawn against
+    // the time before it was pressed, a 2-second timer reading 0:03, until
+    // the next tick a second later.
+    if (mounted) Promise.resolve().then(() => { if (mounted) schedule(); });
   }
 
   function onVisible() {
@@ -114,7 +140,9 @@
   });
 
   onDestroy(() => {
-    clearTimeout(timer);
+    // Also stops a reschedule already queued from starting the timer again.
+    mounted = false;
+    clearTimeout(wake);
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', onVisible);
     }
@@ -141,6 +169,21 @@
   function toggleEnabled() {
     if (!normalTime) return;
     saveAlarm({ alarmEnabled: !alarmEnabled }, ['alarmEnabled']);
+  }
+
+  function changeTimer(change) {
+    beforeAct();
+    setClockDevice(blockId, { ...device, timer: change(device.timer, Date.now()) });
+  }
+
+  function onDurationChange(event) {
+    const ms = parseDuration(event.currentTarget.value);
+    if (ms) {
+      changeTimer((current, at) => setDuration(current, ms, at));
+    } else {
+      // Not a length: put back what it was rather than leave the typo showing.
+      event.currentTarget.value = timerReading(device.timer.duration);
+    }
   }
 
   function changeWatch(change) {
@@ -213,9 +256,70 @@
         </div>
       {/each}
     </div>
+  {:else if page === 'timer'}
+    <div class="alarm-page" class:timer-rung={timerPhase === 'ringing'} data-focus-guard>
+      {#if timerPhase === 'idle'}
+        <!-- The reading is where its length is typed: "5" is five minutes,
+             "1:30" a minute and a half. Keyed on the length so a change from
+             elsewhere redraws it rather than leaving the old text in place. -->
+        {#key countdown.duration}
+          <input
+            class="watch-reading timer-input"
+            type="text"
+            inputmode="numeric"
+            value={timerReading(countdown.duration)}
+            aria-label="Timer length"
+            on:change={onDurationChange}
+            on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+          />
+        {/key}
+      {:else}
+        <div class="watch-reading" role="timer" aria-label="Timer">{timerReading(left)}</div>
+      {/if}
+      <div class="alarm-row">
+        {#if timerPhase === 'running'}
+          <button class="alarm-action" on:click={() => changeTimer(resetTimer)}>Reset</button>
+          <button class="alarm-action primary" on:click={() => changeTimer(pauseTimer)}>Pause</button>
+        {:else if timerPhase === 'paused'}
+          <button class="alarm-action" on:click={() => changeTimer(resetTimer)}>Reset</button>
+          <button class="alarm-action primary" on:click={() => changeTimer(startTimer)}>Resume</button>
+        {:else if timerPhase === 'ringing'}
+          <button class="alarm-action" on:click={() => changeTimer(oneMoreMinute)}>+1 min</button>
+          <button class="alarm-action primary" on:click={() => changeTimer(resetTimer)}>Stop</button>
+        {:else if timerPhase === 'done'}
+          <span class="alarm-status">Done</span>
+          <button class="alarm-action primary" on:click={() => changeTimer(resetTimer)}>Reset</button>
+        {:else}
+          <button class="alarm-action primary" on:click={() => changeTimer(startTimer)}>Start</button>
+        {/if}
+      </div>
+    </div>
   {:else}
     <ClockFace {hour12} {showSeconds} {showDate} />
   {/if}
+
+  <!-- Bottom left is the timer. -->
+  <button
+    class="clock-corner bottom-left"
+    class:active={countdownCorner.kind === 'timer'}
+    class:rung={countdownCorner.ringing}
+    data-focus-guard
+    title={page === 'timer' ? 'Back to the clock' : 'Timer'}
+    aria-label={page === 'timer' ? `Back to the clock, ${countdownCorner.text}` : countdownCorner.text ? `Timer, ${countdownCorner.text}` : 'Timer'}
+    on:mousedown|stopPropagation
+    on:pointerdown|stopPropagation
+    on:touchstart|stopPropagation
+    on:click|stopPropagation={() => showPage(page === 'timer' ? 'clock' : 'timer')}
+  >
+    {#if countdownCorner.kind === 'time'}
+      <span>{countdownCorner.text}</span>
+    {:else}
+      <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      {#if countdownCorner.kind === 'timer'}<span>{countdownCorner.text}</span>{/if}
+    {/if}
+  </button>
 
   <!-- Each corner holds its own page's news, and the time while its own page
        is open. Top left is the stopwatch. -->
@@ -437,6 +541,36 @@
 
   .clock-corner.right {
     right: 6px;
+  }
+
+  .clock-corner.bottom-left {
+    top: auto;
+    bottom: 4px;
+    left: 6px;
+  }
+
+  /* The length is typed into the reading itself, so it looks like the
+     reading until it is being typed in. */
+  .timer-input {
+    font-family: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+    padding: 0 0.1em;
+    text-align: center;
+    width: 5.5em;
+    max-width: 100%;
+  }
+
+  .timer-input:focus {
+    outline: none;
+    border-bottom-color: currentColor;
+  }
+
+  .timer-rung .watch-reading,
+  .clock-corner.rung {
+    animation: ring-pulse 1s ease-in-out infinite;
   }
 
   .clock-corner:hover,

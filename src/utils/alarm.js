@@ -42,9 +42,10 @@
  */
 
 import { readStopwatch } from './stopwatch.js';
+import { readTimer } from './countdown.js';
 
 /** The pages a clock block has. Anything else read back is the clock. */
-export const CLOCK_PAGES = ['clock', 'alarm', 'stopwatch'];
+export const CLOCK_PAGES = ['clock', 'alarm', 'stopwatch', 'timer'];
 
 /** How long an unanswered alarm keeps ringing before it gives up. */
 export const RING_WINDOW_MS = 10 * 60 * 1000;
@@ -137,7 +138,9 @@ export function readClockDevice(raw) {
     snoozedUntil: number(value.snoozedUntil),
     snoozedFor: normalizeAlarmTime(value.snoozedFor),
     // This device's stopwatch -- utils/stopwatch.js.
-    stopwatch: readStopwatch(value.stopwatch)
+    stopwatch: readStopwatch(value.stopwatch),
+    // This device's timer -- utils/countdown.js.
+    timer: readTimer(value.timer)
   };
 }
 

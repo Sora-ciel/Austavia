@@ -46,6 +46,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/clockFace.js` | what a clock block says, and when it next changes |
 | `src/utils/alarm.js` | when a clock block's alarm rings, stops, and what its corner shows |
 | `src/utils/stopwatch.js` | what a clock block's stopwatch reads, and what its corner shows |
+| `src/utils/countdown.js` | when a clock block's timer runs out and rings, and what its corner shows |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered

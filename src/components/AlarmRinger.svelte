@@ -1,6 +1,7 @@
 <script>
   /**
-   * Rings the alarms of the open folder, whichever mode or page is showing.
+   * Rings the alarms and timers of the open folder, whichever mode or page is
+   * showing.
    *
    * Separate from the block, because a block is only drawn in the modes that
    * hold blocks: an alarm set in Canvas has to ring while the Playlist is open,
@@ -12,7 +13,11 @@
    * or while a phone has put it to sleep in the background, or for a folder
    * that is not open. That is a native alarm, and PENDING says so.
    *
-   * When is decided in utils/alarm.js; what was done about a ring is this
+   * A timer that runs out rings here too, for the same reason: it was started
+   * on the timer page, and nobody stays on the timer page.
+   *
+   * When is decided in utils/alarm.js and utils/countdown.js; what was done
+   * about a ring, and the timers themselves, are this
    * device's, in clockDeviceStore.js, shared with the block so answering in
    * either place answers both.
    */
@@ -25,6 +30,7 @@
     snoozed,
     alarmReading
   } from '../utils/alarm.js';
+  import { timerState, resetTimer, oneMoreMinute, msUntilTimerRingChange } from '../utils/countdown.js';
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
 
   export let blocks = [];
@@ -32,7 +38,7 @@
   export let themeStyle = '';
 
   let now = Date.now();
-  let timer = null;
+  let wake = null;
   let mounted = false;
 
   $: alarms = (Array.isArray(blocks) ? blocks : [])
@@ -47,18 +53,35 @@
 
   $: ringing = alarms.filter(alarm => isRinging({ now, ...alarm }));
 
+  // Every clock block's timer on this device, running or not -- a timer has
+  // no switch in the note to filter on.
+  $: timers = (Array.isArray(blocks) ? blocks : [])
+    .filter(block => block?.type === 'clock')
+    .map(block => ({ id: block.id, device: peekClockDevice(block.id, $clockDevices) }));
+
+  $: rungTimers = timers.filter(entry => timerState(entry.device.timer, now) === 'ringing');
+
   function schedule() {
-    clearTimeout(timer);
+    clearTimeout(wake);
     now = Date.now();
     // Capped at a minute inside msUntilAlarmCheck: every wake works it out
     // again from the time, so a timer the device held back cannot make it miss.
-    timer = setTimeout(schedule, msUntilAlarmCheck({ now, alarms }));
+    const waits = [
+      msUntilAlarmCheck({ now, alarms }),
+      ...timers.map(entry => msUntilTimerRingChange(entry.device.timer, now))
+    ].filter(wait => wait !== null);
+    wake = setTimeout(schedule, Math.min(...waits));
   }
 
-  // Named only: the alarms. See ClockFace for why not the timer.
-  $: rescheduleFor(alarms);
+  // Named only: the alarms and timers. See ClockFace for why not `wake`.
+  $: rescheduleFor(alarms, timers);
   function rescheduleFor() {
-    if (mounted) schedule();
+    // Just after this update rather than inside it. schedule() sets `now`,
+    // and Svelte does not re-run statements above this one for a change made
+    // while it is running them -- so a Start pressed here was drawn against
+    // the time before it was pressed, a 2-second timer reading 0:03, until
+    // the next tick a second later.
+    if (mounted) Promise.resolve().then(() => { if (mounted) schedule(); });
   }
 
   function onVisible() {
@@ -99,7 +122,7 @@
     }
   }
 
-  $: sounding = ringing.length > 0;
+  $: sounding = ringing.length > 0 || rungTimers.length > 0;
   $: soundFor(sounding);
   function soundFor(on) {
     if (on && !beeper) {
@@ -116,6 +139,10 @@
     setClockDevice(alarm.id, dismissed(alarm.device, Date.now()));
   }
 
+  function changeTimer(entry, change) {
+    setClockDevice(entry.id, { ...entry.device, timer: change(entry.device.timer, Date.now()) });
+  }
+
   function snooze(alarm) {
     setClockDevice(alarm.id, snoozed(alarm.device, alarm.time, Date.now()));
   }
@@ -127,7 +154,9 @@
   });
 
   onDestroy(() => {
-    clearTimeout(timer);
+    // Also stops a reschedule already queued from starting the timer again.
+    mounted = false;
+    clearTimeout(wake);
     soundFor(false);
     audio?.close?.();
     if (typeof document !== 'undefined') {
@@ -136,8 +165,8 @@
   });
 </script>
 
-{#if ringing.length}
-  <div class="alarm-banner" role="alertdialog" aria-label="Alarm ringing" style={themeStyle}>
+{#if ringing.length || rungTimers.length}
+  <div class="alarm-banner" role="alertdialog" aria-label={ringing.length ? "Alarm ringing" : "Timer finished"} style={themeStyle}>
     {#each ringing as alarm (alarm.id)}
       <div class="alarm-line">
         <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
@@ -147,6 +176,16 @@
         <span class="alarm-when">{alarmReading(alarm.time, alarm.hour12)}</span>
         <button class="alarm-btn" on:click={() => snooze(alarm)}>Snooze</button>
         <button class="alarm-btn primary" on:click={() => stop(alarm)}>Stop</button>
+      </div>
+    {/each}
+    {#each rungTimers as entry (entry.id)}
+      <div class="alarm-line">
+        <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="alarm-when">Time's up</span>
+        <button class="alarm-btn" on:click={() => changeTimer(entry, oneMoreMinute)}>+1 min</button>
+        <button class="alarm-btn primary" on:click={() => changeTimer(entry, resetTimer)}>Stop</button>
       </div>
     {/each}
   </div>
