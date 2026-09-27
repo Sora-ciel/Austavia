@@ -82,6 +82,8 @@
   // Turns an SDK failure into something a person can act on. See
   // utils/syncErrors.js.
   import { explainSyncFailure } from './utils/syncErrors.js';
+  import { describeStorageUsage } from './utils/storageUsage.js';
+  import { storageAnnouncement } from './utils/storageAlerts.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
@@ -2938,6 +2940,22 @@
   // running the packaged app can see it, which is how an account could stop
   // syncing without anything looking wrong.
   let syncFailureNotice = '';
+  // The worst storage state this account has been told about since it was last
+  // comfortable. Kept so a record that is rewritten on every upload does not
+  // put the same banner back every few seconds -- see utils/storageAlerts.js.
+  let announcedStorageState = '';
+
+  // Said when it changes, not when an upload is refused. The failure path in
+  // syncErrors.js is the same sentence arriving too late to act on: by then a
+  // picture has already not saved.
+  $: if (storageUsage) {
+    const verdict = storageAnnouncement({
+      state: describeStorageUsage(storageUsage).state,
+      announced: announcedStorageState
+    });
+    announcedStorageState = verdict.announced;
+    if (verdict.announce) syncFailureNotice = verdict.message;
+  }
   let cloudSyncMemoryByFile = loadCloudSyncMemory();
   let autoSyncEnabled = loadAutoSyncEnabled();
   let autoSyncUploadIntervalId = null;
