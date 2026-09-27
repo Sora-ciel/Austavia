@@ -331,20 +331,23 @@ number could not say which half had drifted. Per-folder sizes live in
 `noteSizes/{uid}/{fileId}`, written on every sync write and removed with the
 folder.
 
-One honest limit in the weekly reconcile: it re-adds the per-folder sizes
-rather than re-reading every payload, because re-reading would mean
-downloading every note in every account, pictures and all, once a week. A
-folder's size can therefore only be wrong if its own trigger was missed, and
-the next write of that folder corrects it. Re-measuring from the payloads is
-the stronger pass if it is ever wanted — the cost is the reason it is not
-there.
+The weekly reconcile corrects both halves properly, and without downloading
+every note in every account. Each recorded folder size carries that folder's
+own `updatedAt` beside it, and the index — tiny and fixed-shape — carries the
+same stamp. So the pass opens only folders never measured or measured before
+their last change, and removes sizes for folders that no longer exist. A
+folder nobody has touched since it was measured cannot have changed size, so
+skipping it is free rather than optimistic. `foldersNeedingMeasure` and
+`orphanSizes` decide that, and they are tested.
 
-**The client-side refusal still only guards image blocks.** A picture going
-into writing now *counts*, but nothing stops it at the moment it is added:
-that path has no size to check until the folder is serialised. Worth doing
-after item 2, where pictures stop living inside the writing at all. It can be exercised on staging without filling
-anything — put the staging account's `plan` on `tiny` (1 MB, which exists for
-this) and one photograph is enough.
+The client refuses a picture that will not fit **both** as an image block and
+as one going into writing. The second measures the data URL rather than the
+file, because that is what a picture in writing actually costs — about a third
+more, which is what base64 does.
+
+All of it can be exercised on staging without filling anything: put the
+staging account's `plan` on `tiny` (1 MB, which exists for this) and one
+photograph is enough.
 
 ## 5. Not code
 
