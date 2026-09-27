@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { OUTLINE_PRESET } from '../src/utils/outlineTheme.js';
+import { OUTLINE_PRESET, seeThroughPreset } from '../src/utils/outlineTheme.js';
 import { BLOCK_THEME_DEFAULTS } from '../src/utils/themeDefaults.js';
 
 const alphaOf = hex => (/^#[0-9a-f]{8}$/i.test(hex) ? parseInt(hex.slice(7), 16) : 255);
@@ -51,7 +51,35 @@ it('puts pop-ups on black with some opacity, so they read over any wallpaper', (
   const match = /^rgba\(0, 0, 0, ([\d.]+)\)$/.exec(OUTLINE_PRESET.popupBg);
   assert.ok(match, `popupBg is ${OUTLINE_PRESET.popupBg}`);
   const alpha = Number(match[1]);
-  assert.ok(alpha >= 0.6 && alpha < 1, `alpha ${alpha}`);
+  // "Around 78", once 72 had been seen.
+  assert.equal(alpha, 0.78);
+});
+
+// "When we do other themes that are as invisible as Outline, we'll take
+// Outline's opacity etc. as the default template for those."
+describe('Outline is the template for later see-through themes', () => {
+  const later = seeThroughPreset({ id: 'later', name: 'Later', ink: '#ffe066' });
+
+  it("starts from exactly Outline's opacities, shape and backings", () => {
+    for (const key of ['bgOpacity', 'headerOpacity', 'textOpacity', 'borderWidth', 'borderRadius']) {
+      assert.equal(later.blockTheme[key], OUTLINE_PRESET.blockTheme[key], key);
+    }
+    assert.equal(later.popupBg, OUTLINE_PRESET.popupBg);
+    assert.equal(alphaOf(later.controlColors.left.panelBg), 0);
+    assert.equal(alphaOf(later.controlColors.right.panelBg), 0);
+  });
+
+  it('takes its own colours for the writing and the edges', () => {
+    assert.equal(later.blockTheme.headerText, '#ffe066');
+    assert.equal(later.controlColors.left.textColor, '#ffe066');
+    assert.equal(later.blockTheme.borderColor, 'rgba(255, 224, 102, 0.7)');
+  });
+
+  it('lets a theme change anything it wants different', () => {
+    const rounder = seeThroughPreset({ id: 'r', name: 'R', blockTheme: { borderRadius: '20px' } });
+    assert.equal(rounder.blockTheme.borderRadius, '20px');
+    assert.equal(rounder.blockTheme.bgOpacity, 0);
+  });
 });
 
 // A theme field every block reads has to exist on every theme, or the ones

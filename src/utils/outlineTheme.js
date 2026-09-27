@@ -33,67 +33,99 @@
  * certain opacity, so it will always be easily readable above all images".
  * Writing that floats over a wallpaper is only readable if something is
  * between the two, and a panel is read, not looked through. So `popupBg` is
- * black at 72%: dark enough for white writing over the brightest picture,
- * light enough that the picture is still there behind it.
+ * black at 78% -- tried at 72% first, and asked to be "around 78" once seen:
+ * dark enough for white writing over the brightest picture, light enough
+ * that the picture is still there behind it.
  *
  * Single Note's page is black for a related reason; that one is in
  * modeSurface.js, because it is true of every theme and not only this one.
+ *
+ * ## The template for any see-through theme
+ *
+ * Said the same day: "when we do other themes that are as invisible as
+ * Outline, we'll take Outline's opacity etc. as the default template for
+ * those." So the see-through part is not written into Outline -- it is
+ * seeThroughPreset(), and Outline is its first use. A later theme in the same
+ * family calls it with its own name and colours and starts from exactly these
+ * opacities, shadows and backings; anything it wants different, it passes.
  */
 import { normalizeBlockTheme } from './themeDefaults.js';
 
 export const OUTLINE_THEME_ID = 'outline';
 
-const CLEAR = '#00000000';
-const INK = '#ffffff';
-const LINE = '#ffffffb3';
+/** How opaque the backing under a pop-up is -- see above. */
+export const POPUP_BACKING_OPACITY = 0.78;
 
-export const OUTLINE_PRESET = {
+/** An #rrggbb colour at an opacity, as rgba(). */
+function withAlpha(hex, alpha) {
+  const value = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''))?.[1] || '000000';
+  const [r, g, b] = [0, 2, 4].map(at => parseInt(value.slice(at, at + 2), 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * A see-through theme: every surface invisible, only writing, edges and
+ * shadows left -- Outline's settings, as the starting point for any theme in
+ * that family.
+ *
+ * `ink` is the writing and the edges; `backing` is what pop-ups and the
+ * canvas sit on, and should be the opposite of the ink so writing reads over
+ * any picture. `blockTheme` and `controlColors` are merged over the template
+ * for anything a particular theme wants different.
+ */
+export function seeThroughPreset({
+  id,
+  name,
+  description,
+  ink = '#ffffff',
+  backing = '#000000',
+  blockTheme = {},
+  controlColors = {}
+} = {}) {
+  const clear = '#00000000';
+  const line = `${ink}b3`;
+
+  return {
+    id,
+    name,
+    description,
+    controlColors: {
+      left: { panelBg: clear, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, inputBg: clear, ...controlColors.left },
+      right: { panelBg: clear, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, ...controlColors.right },
+      canvas: { outerBg: backing, ...controlColors.canvas }
+    },
+    blockTheme: normalizeBlockTheme({
+      borderColor: withAlpha(ink, 0.7),
+      borderWidth: '1.5px',
+      borderRadius: '12px',
+      shadow: `0 0 0 1px ${withAlpha(backing, 0.35)}, 0 12px 32px ${withAlpha(backing, 0.45)}`,
+      focusOutline: ink,
+      focusShadow: `0 0 0 2px ${withAlpha(ink, 0.45)}, 0 0 14px ${withAlpha(ink, 0.4)}`,
+      headerBg: 'transparent',
+      headerText: ink,
+      accentColor: ink,
+      accentText: backing,
+      mediaButtonBg: 'transparent',
+      mediaButtonText: ink,
+      // Tight and dark enough to outline each letter, so the writing holds up
+      // over a picture of its own colour; the first version only softened the
+      // edges.
+      textShadow: `0 0 1px ${backing}, 0 0 3px ${backing}, 0 1px 6px ${withAlpha(backing, 0.85)}`,
+      bgOpacity: 0,
+      headerOpacity: 0,
+      textOpacity: 100,
+      ...blockTheme
+    }),
+    // What pop-ups sit on -- see above. A theme without one keeps its panels'
+    // own colour.
+    popupBg: withAlpha(backing, POPUP_BACKING_OPACITY),
+    previewBg: 'transparent',
+    blockDefaults: { bgColor: backing, textColor: ink }
+  };
+}
+
+export const OUTLINE_PRESET = seeThroughPreset({
   id: OUTLINE_THEME_ID,
   name: 'Outline',
-  description: 'Only the writing, the edges and the shadows. Every surface is see-through, so a wallpaper shows through all of it.',
-  controlColors: {
-    left: {
-      panelBg: CLEAR,
-      textColor: INK,
-      buttonBg: CLEAR,
-      buttonText: INK,
-      borderColor: LINE,
-      inputBg: CLEAR
-    },
-    right: {
-      panelBg: CLEAR,
-      textColor: INK,
-      buttonBg: CLEAR,
-      buttonText: INK,
-      borderColor: LINE
-    },
-    canvas: {
-      outerBg: '#000000'
-    }
-  },
-  blockTheme: normalizeBlockTheme({
-    borderColor: 'rgba(255, 255, 255, 0.7)',
-    borderWidth: '1.5px',
-    borderRadius: '12px',
-    shadow: '0 0 0 1px rgba(0, 0, 0, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45)',
-    focusOutline: '#ffffff',
-    focusShadow: '0 0 0 2px rgba(255, 255, 255, 0.45), 0 0 14px rgba(255, 255, 255, 0.4)',
-    headerBg: 'transparent',
-    headerText: INK,
-    accentColor: INK,
-    accentText: '#000000',
-    mediaButtonBg: 'transparent',
-    mediaButtonText: INK,
-    // Tight and dark enough to outline each letter, so white writing holds
-    // up over a white picture; the first version only softened the edges.
-    textShadow: '0 0 1px #000000, 0 0 3px #000000, 0 1px 6px rgba(0, 0, 0, 0.85)',
-    bgOpacity: 0,
-    headerOpacity: 0,
-    textOpacity: 100
-  }),
-  // What pop-ups sit on -- see above. A theme without one keeps its panels'
-  // own colour.
-  popupBg: 'rgba(0, 0, 0, 0.72)',
-  previewBg: 'transparent',
-  blockDefaults: { bgColor: '#000000', textColor: INK }
-};
+  description: 'Only the writing, the edges and the shadows. Every surface is see-through, so a wallpaper shows through all of it.'
+});
