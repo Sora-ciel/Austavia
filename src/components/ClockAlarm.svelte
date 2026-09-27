@@ -1,7 +1,7 @@
 <script>
   /**
-   * The clock block's body: a clock page and an alarm page, and a corner that
-   * always holds the other one.
+   * The clock block's body: a clock page, an alarm page and a stopwatch page,
+   * with a corner for each of the other two.
    *
    * Asked for on 2026-09-27 -- "a block that does both, and which one is open
    * is an on-device save. On the alarm page the clock still shows small in a
@@ -9,10 +9,17 @@
    * active alarm shows in that same corner." The rules are in utils/alarm.js
    * and tested there in those words; this keeps a timer and draws.
    *
+   * The stopwatch followed the same day -- "a chronometer mode that will be on
+   * the other corner to click on" -- so the alarm has the top-right corner and
+   * the stopwatch the top-left. Each corner shows its own page's news, and on
+   * its own page shows the time and leads back to the clock. Its rules are in
+   * utils/stopwatch.js.
+   *
    * Frameless, like ClockFace, so Canvas can wrap it in BlockShell and Simple
    * Note can lay it out itself. The alarm's time and switch are the block's and
-   * are saved by whoever holds it, through the `alarm` event. The page, and
-   * what was done about a ring, are this device's -- clockDeviceStore.js.
+   * are saved by whoever holds it, through the `alarm` event. The page, what
+   * was done about a ring, and the stopwatch are this device's --
+   * clockDeviceStore.js.
    */
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import ClockFace from './ClockFace.svelte';
@@ -25,6 +32,18 @@
     dismissed,
     snoozed
   } from '../utils/alarm.js';
+  import {
+    elapsed,
+    isRunning,
+    started,
+    paused,
+    lapped,
+    reset,
+    lapRows,
+    stopwatchReading,
+    msUntilStopwatchChange,
+    stopwatchCorner
+  } from '../utils/stopwatch.js';
   import { clockDevices, clockDevice, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
 
   export let blockId;
@@ -51,24 +70,29 @@
 
   $: normalTime = normalizeAlarmTime(alarmTime);
   $: small = clockParts({ at: now, hour12 });
-  $: corner = cornerReading({
-    page,
-    time: normalTime,
-    enabled: alarmEnabled,
-    hour12,
-    clockTime: small.period ? `${small.time} ${small.period}` : small.time
-  });
+  $: clockTime = small.period ? `${small.time} ${small.period}` : small.time;
+  $: corner = cornerReading({ page, time: normalTime, enabled: alarmEnabled, hour12, clockTime });
+  $: watch = device.stopwatch;
+  $: watchCorner = stopwatchCorner({ page, stopwatch: watch, now, clockTime });
+  $: watchRunning = isRunning(watch);
+  $: counted = elapsed(watch, now);
+  // The last two laps: a block is small, and a list long enough to scroll
+  // would bring a scroll inside a block with it.
+  $: laps = lapRows(watch).slice(0, 2);
   $: status = alarmStatus({ now, time: normalTime, enabled: alarmEnabled, device, hour12 });
 
   function schedule() {
     clearTimeout(timer);
     now = Date.now();
-    // The sooner of the corner clock's next minute and the alarm's next
-    // change, so "Rings in 12 min" and the ringing state are both current.
-    const wait = Math.min(
+    // The soonest of the corner clock's next minute, the alarm's next change
+    // and the stopwatch's next figure -- often on its own page, once a second
+    // in its corner, never while it is stopped.
+    const waits = [
       msUntilNextTick({ now }),
-      msUntilAlarmCheck({ now, alarms: [{ time: alarmTime, enabled: alarmEnabled, device }] })
-    );
+      msUntilAlarmCheck({ now, alarms: [{ time: alarmTime, enabled: alarmEnabled, device }] }),
+      msUntilStopwatchChange(device.stopwatch, { now, fine: device.page === 'stopwatch' })
+    ].filter(wait => wait !== null);
+    const wait = Math.min(...waits);
     timer = setTimeout(schedule, wait);
   }
 
@@ -119,6 +143,11 @@
     saveAlarm({ alarmEnabled: !alarmEnabled }, ['alarmEnabled']);
   }
 
+  function changeWatch(change) {
+    beforeAct();
+    setClockDevice(blockId, { ...device, stopwatch: change(device.stopwatch, Date.now()) });
+  }
+
   function stop() {
     beforeAct();
     setClockDevice(blockId, dismissed(device));
@@ -163,14 +192,58 @@
         </div>
       {/if}
     </div>
+  {:else if page === 'stopwatch'}
+    <div class="alarm-page" data-focus-guard>
+      <div class="watch-reading" role="timer" aria-label="Stopwatch">{stopwatchReading(counted)}</div>
+      <div class="alarm-row">
+        {#if watchRunning}
+          <button class="alarm-action" on:click={() => changeWatch(lapped)}>Lap</button>
+          <button class="alarm-action primary" on:click={() => changeWatch(paused)}>Pause</button>
+        {:else if counted > 0}
+          <button class="alarm-action" on:click={() => changeWatch(reset)}>Reset</button>
+          <button class="alarm-action primary" on:click={() => changeWatch(started)}>Resume</button>
+        {:else}
+          <button class="alarm-action primary" on:click={() => changeWatch(started)}>Start</button>
+        {/if}
+      </div>
+      {#each laps as lap (lap.number)}
+        <div class="watch-lap">
+          <span>Lap {lap.number}</span>
+          <span>{stopwatchReading(lap.split)}</span>
+        </div>
+      {/each}
+    </div>
   {:else}
     <ClockFace {hour12} {showSeconds} {showDate} />
   {/if}
 
-  <!-- The corner always holds the other page: the time while the alarm is
-       open, the alarm (or the way to it) while the clock is. -->
+  <!-- Each corner holds its own page's news, and the time while its own page
+       is open. Top left is the stopwatch. -->
   <button
-    class="clock-corner"
+    class="clock-corner left"
+    class:active={watchCorner.kind === 'stopwatch'}
+    data-focus-guard
+    title={page === 'stopwatch' ? 'Back to the clock' : 'Stopwatch'}
+    aria-label={page === 'stopwatch' ? `Back to the clock, ${watchCorner.text}` : watchCorner.text ? `Stopwatch, ${watchCorner.text}` : 'Stopwatch'}
+    on:mousedown|stopPropagation
+    on:pointerdown|stopPropagation
+    on:touchstart|stopPropagation
+    on:click|stopPropagation={() => showPage(page === 'stopwatch' ? 'clock' : 'stopwatch')}
+  >
+    {#if watchCorner.kind === 'time'}
+      <span>{watchCorner.text}</span>
+    {:else}
+      <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="13.5" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M12 13.5V10M10 3h4M12 3v3.5M18 7.5l1.5-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      {#if watchCorner.kind === 'stopwatch'}<span>{watchCorner.text}</span>{/if}
+    {/if}
+  </button>
+
+  <!-- Top right is the alarm. -->
+  <button
+    class="clock-corner right"
     class:active={corner.kind === 'alarm' || status.state === 'ringing' || status.state === 'snoozed'}
     data-focus-guard
     title={page === 'alarm' ? 'Back to the clock' : 'Alarm'}
@@ -200,16 +273,35 @@
     color: inherit;
   }
 
+  /* Laid out below the corners rather than beside them. Centred in the whole
+     block, the figure shared a line with both corners and missed them by a
+     few pixels -- which a 12-hour time or an hour-long run would close. */
   .alarm-page {
     container-type: size;
+    box-sizing: border-box;
     width: 100%;
     height: 100%;
+    padding-top: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: min(5cqmin, 10px);
+    gap: 6px;
     overflow: hidden;
+  }
+
+  /* A small block keeps the last lap only, and a very small one none: a
+     figure and its buttons are the stopwatch, laps are extra. */
+  @container (max-height: 110px) {
+    .watch-lap + .watch-lap {
+      display: none;
+    }
+  }
+
+  @container (max-height: 80px) {
+    .watch-lap {
+      display: none;
+    }
   }
 
   /* The time is the page, so it is written as large as the clock's own. */
@@ -299,11 +391,29 @@
     background: color-mix(in srgb, currentColor 28%, transparent);
   }
 
-  /* Top right, small, and quiet until it has something to say. */
+  /* The stopwatch figure, as large as the alarm's time and in the same
+     numerals as the clock, so the three pages read as one block. */
+  .watch-reading {
+    font-size: min(24cqmin, 13cqi);
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .watch-lap {
+    display: flex;
+    gap: 14px;
+    font-size: min(9cqmin, 0.78rem);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    opacity: 0.7;
+  }
+
+  /* The corners: small, and quiet until they have something to say. */
   .clock-corner {
     position: absolute;
     top: 4px;
-    right: 6px;
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -321,6 +431,14 @@
     z-index: 1;
   }
 
+  .clock-corner.left {
+    left: 6px;
+  }
+
+  .clock-corner.right {
+    right: 6px;
+  }
+
   .clock-corner:hover,
   .clock-corner:focus-visible {
     opacity: 1;
@@ -336,7 +454,7 @@
     height: 1.15em;
   }
 
-  .ringing .clock-corner {
+  .ringing .clock-corner.right {
     animation: ring-pulse 1s ease-in-out infinite;
   }
 

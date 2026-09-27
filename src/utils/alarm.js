@@ -41,6 +41,11 @@
  * goes off two hours late is not an alarm, it is a noise.
  */
 
+import { readStopwatch } from './stopwatch.js';
+
+/** The pages a clock block has. Anything else read back is the clock. */
+export const CLOCK_PAGES = ['clock', 'alarm', 'stopwatch'];
+
 /** How long an unanswered alarm keeps ringing before it gives up. */
 export const RING_WINDOW_MS = 10 * 60 * 1000;
 
@@ -126,12 +131,13 @@ export function readClockDevice(raw) {
   const number = input => (Number.isFinite(Number(input)) && Number(input) > 0 ? Number(input) : 0);
 
   return {
-    // Anything but 'alarm' is the clock: a block opens on the clock unless
-    // this device was left on the alarm.
-    page: value.page === 'alarm' ? 'alarm' : 'clock',
+    // A block opens on the clock unless this device was left on another page.
+    page: CLOCK_PAGES.includes(value.page) ? value.page : 'clock',
     answeredAt: number(value.answeredAt),
     snoozedUntil: number(value.snoozedUntil),
-    snoozedFor: normalizeAlarmTime(value.snoozedFor)
+    snoozedFor: normalizeAlarmTime(value.snoozedFor),
+    // This device's stopwatch -- utils/stopwatch.js.
+    stopwatch: readStopwatch(value.stopwatch)
   };
 }
 
