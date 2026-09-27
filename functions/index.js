@@ -9,7 +9,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { LATEST_SCHEMA_VERSION, MIN_SUPPORTED_SCHEMA_VERSION, migrateFilePayload } = require('./migrations');
 const { DAILY_BYTE_LIMIT } = require('./limits');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
-const { recordStorageDelta, reconcileStorageUsage } = require('./storageAccounting');
+const { recordStorageDelta, recordNoteBytes, reconcileStorageUsage } = require('./storageAccounting');
 const { recordActivity, rollUpStats } = require('./activityTracking');
 const { verifyWebhook, eventAtFrom } = require('./polarAdapter');
 const { applyPolarEvent, sweepExpiredPlans } = require('./subscriptions');
@@ -55,7 +55,14 @@ exports.enforceSyncQuota = onValueWritten(
   async event => {
     const { ns, uid, fileId } = event.params;
     logger.info('enforceSyncQuota-start', { ns, uid, fileId, afterExists: event.data.after.exists() });
-    if (!event.data.after.exists()) return; // file deleted, nothing to charge
+
+    if (!event.data.after.exists()) {
+      // Nothing to charge for a delete -- but the folder's stored size goes
+      // with it, or an account would carry the weight of folders it no longer
+      // has and never get that room back.
+      await recordNoteBytes(getDatabase(), uid, fileId, 0);
+      return;
+    }
 
     // Stamped here rather than from its own trigger: this one already fires on
     // every sync write, and a save is the definition of active worth having.
@@ -72,6 +79,13 @@ exports.enforceSyncQuota = onValueWritten(
     logger.info('enforceSyncQuota-read', { fileExists: fileSnap.exists(), writtenBytes });
     if (writtenBytes === 0) return;
 
+    // Two different questions about the same bytes, and they are not the same
+    // limit. Bandwidth is what this account has *written today*, a cost guard
+    // that resets at midnight. The folder's size is what it is *keeping*, and
+    // that is what a plan is sold in -- see accountBytes.js. Counting only the
+    // first is how an account could hold a hundred megabytes of notes and read
+    // as empty.
+    await recordNoteBytes(db, uid, fileId, writtenBytes);
     await chargeBandwidth(db, ns, uid, writtenBytes);
   }
 );

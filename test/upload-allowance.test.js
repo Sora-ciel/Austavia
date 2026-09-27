@@ -32,6 +32,19 @@ describe('roomLeft', () => {
     assert.equal(roomLeft({ bytes: 5 * MB, limit: MB }), 0);
   });
 
+  // The record carries the folders as well as the attachments now, and `total`
+  // is what the ceiling compares against. Asked for on 2026-09-27: "I wanted
+  // the storage to count everything that is synced in an account folder."
+  it('counts the folders as well as the attachments', () => {
+    const usage = { bytes: 300 * 1024, noteBytes: 600 * 1024, total: 900 * 1024, limit: MB };
+    assert.equal(roomLeft(usage), MB - 900 * 1024);
+  });
+
+  // Every account that existed before the folders were counted.
+  it('reads an older record as what it says, not as nothing', () => {
+    assert.equal(roomLeft({ bytes: 900 * 1024, limit: MB }), MB - 900 * 1024);
+  });
+
   // Null is how the database stores "no ceiling", because Infinity is not JSON.
   it('is unlimited when there is no ceiling', () => {
     assert.equal(roomLeft({ bytes: 5 * MB, limit: null }), Number.POSITIVE_INFINITY);

@@ -316,12 +316,33 @@ rather than half a minute later — measured on staging at **thirty seconds**
 from adding a picture to the app knowing it was over, which is the floor for a
 ceiling enforced by counting what landed.
 
-**Only image blocks are guarded**, which is the path that reaches Cloud Storage
-and therefore the plan. A picture pasted *into writing* is a data URL inside
-the folder's payload: it never becomes a Storage object, so it is not what the
-storage ceiling counts, and blocking it against that number would be measuring
-against the wrong limit. What bounds those is item 2 and the daily bandwidth
-cap. It can be exercised on staging without filling
+**The balance counts everything the account keeps now**, not just its
+attachments. Asked for on 2026-09-27 — "I wanted the storage to count
+everything that is synced in an account folder" — and it was a fair complaint:
+the number was Cloud Storage objects alone, so an account could hold a hundred
+megabytes of notes, every picture pasted into writing included, and read as
+empty. "5 GB" meant 5 GB of attachments and an unspecified amount of
+everything else.
+
+`storage/{uid}` carries two components and their sum: `bytes` for Storage
+objects, `noteBytes` for the folders, `total` for the ceiling to compare
+against. They stay apart because different triggers maintain them and a single
+number could not say which half had drifted. Per-folder sizes live in
+`noteSizes/{uid}/{fileId}`, written on every sync write and removed with the
+folder.
+
+One honest limit in the weekly reconcile: it re-adds the per-folder sizes
+rather than re-reading every payload, because re-reading would mean
+downloading every note in every account, pictures and all, once a week. A
+folder's size can therefore only be wrong if its own trigger was missed, and
+the next write of that folder corrects it. Re-measuring from the payloads is
+the stronger pass if it is ever wanted — the cost is the reason it is not
+there.
+
+**The client-side refusal still only guards image blocks.** A picture going
+into writing now *counts*, but nothing stops it at the moment it is added:
+that path has no size to check until the folder is serialised. Worth doing
+after item 2, where pictures stop living inside the writing at all. It can be exercised on staging without filling
 anything — put the staging account's `plan` on `tiny` (1 MB, which exists for
 this) and one photograph is enough.
 

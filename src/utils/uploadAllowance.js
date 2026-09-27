@@ -49,11 +49,22 @@ function ceilingOf(usage) {
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
-/** What is left, never below zero. */
+/**
+ * What is left, never below zero.
+ *
+ * Measured against everything the account holds — `total` covers the folders
+ * as well as the attachments. An older record has only `bytes`, and reads as
+ * what it says rather than as nothing.
+ */
 export function roomLeft(usage) {
   const limit = ceilingOf(usage);
   if (!Number.isFinite(limit)) return Number.POSITIVE_INFINITY;
-  const used = Math.max(0, Number((usage && usage.bytes) || 0));
+
+  const total = Number(usage && usage.total);
+  const used = Number.isFinite(total) && total >= 0
+    ? total
+    : Math.max(0, Number((usage && usage.bytes) || 0));
+
   return Math.max(0, limit - used);
 }
 

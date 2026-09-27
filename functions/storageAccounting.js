@@ -8,6 +8,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
+const { componentsOf, withComponent, totalNoteBytes } = require('./accountBytes');
 const { DEFAULT_PLAN, storageLimitFor, isOverStorageLimit, storableLimit } = require('./limits');
 const {
   uidFromObjectName,
@@ -98,22 +99,26 @@ async function recordStorageDelta(objectName, deltaBytes) {
   // objects that predate this function, or a replayed event — would otherwise
   // drive the balance negative and hand the account free space.
   const result = await db.ref(`storage/${uid}`).transaction(current => {
-    const totalBytes = Math.max(0, Number((current && current.bytes) || 0) + deltaBytes);
+    const objectBytes = Math.max(0, Number((current && current.bytes) || 0) + deltaBytes);
+    // The other half is left exactly as it was -- this trigger knows about
+    // Cloud Storage and nothing else. withComponent adds them up so the two
+    // components and the total can never disagree.
+    const next = withComponent(current, 'bytes', objectBytes);
 
     return {
-      bytes: totalBytes,
+      ...next,
       // The plan travels with the ceiling it produced. The app subscribes to
       // this node already, and without the name here it can only guess the
       // plan from the size of the limit -- which means a price change silently
       // turns a paying account back into one being offered an upgrade.
       plan,
       limit: storableLimit(limit),
-      full: isOverStorageLimit(totalBytes, plan),
+      full: isOverStorageLimit(next.total, plan),
       updatedAt: Date.now()
     };
   });
 
-  const totalBytes = (result.snapshot.val() || {}).bytes || 0;
+  const totalBytes = componentsOf(result.snapshot.val()).total;
   const isFull = isOverStorageLimit(totalBytes, plan);
 
   if (isFull) {
@@ -177,13 +182,31 @@ async function reconcileStorageUsage() {
   for (const [uid, bytes] of Object.entries(finalTotals)) {
     const plan = await planFor(db, uid);
     const limit = storageLimitFor(plan);
-    const isFull = isOverStorageLimit(bytes, plan);
+
+    // The other half, re-added from what each folder was last measured at.
+    // Absolute with respect to those numbers rather than to the folders
+    // themselves: re-reading every payload would mean downloading every note
+    // in the account, pictures and all, once a week. A folder's recorded size
+    // can only be wrong if its own trigger was missed, and the next write of
+    // that folder corrects it.
+    const noteSizes = (await db.ref(`noteSizes/${uid}`).get()).val();
+    const noteBytes = totalNoteBytes(noteSizes);
+    const total = bytes + noteBytes;
+    const isFull = isOverStorageLimit(total, plan);
 
     // The staleness guard lives inside the transaction so the check and the
     // write cannot be separated by an upload landing between them.
     const result = await db.ref(`storage/${uid}`).transaction(current => {
       if (isStaleScan(current, scanStartedAt)) return undefined; // abort
-      return { bytes, plan, limit: storableLimit(limit), full: isFull, updatedAt: Date.now() };
+      return {
+        bytes,
+        noteBytes,
+        total,
+        plan,
+        limit: storableLimit(limit),
+        full: isFull,
+        updatedAt: Date.now()
+      };
     });
 
     if (!result.committed) {
@@ -204,9 +227,58 @@ async function reconcileStorageUsage() {
   });
 }
 
+/**
+ * What one folder weighs, and what that makes the account's notes weigh.
+ *
+ * Asked for on 2026-09-27: "I wanted the storage to count everything that is
+ * synced in an account folder." Until now the balance was Cloud Storage
+ * objects only, so an account could hold a hundred megabytes of notes -- and
+ * every picture pasted into writing, which lives as a data URL inside the
+ * folder's payload -- and still read as empty.
+ *
+ * Per folder rather than as a running total, for the reason every other
+ * balance here is: a size written down per folder can be re-added at any time
+ * and comes out the same, while a total nudged by deltas is wrong for ever
+ * after one missed trigger.
+ */
+async function recordNoteBytes(db, uid, fileId, bytes) {
+  if (!uid || !fileId) return;
+
+  const sizeRef = db.ref(`noteSizes/${uid}/${fileId}`);
+  if (bytes > 0) await sizeRef.set(bytes);
+  else await sizeRef.remove(); // the folder is gone; so is its size
+
+  const sizes = (await db.ref(`noteSizes/${uid}`).get()).val();
+  const noteBytes = totalNoteBytes(sizes);
+
+  const plan = await planFor(db, uid);
+  const limit = storageLimitFor(plan);
+
+  const result = await db.ref(`storage/${uid}`).transaction(current => {
+    // Leaves the Cloud Storage half alone, exactly as recordStorageDelta
+    // leaves this one alone.
+    const next = withComponent(current, 'noteBytes', noteBytes);
+
+    return {
+      ...next,
+      plan,
+      limit: storableLimit(limit),
+      full: isOverStorageLimit(next.total, plan),
+      updatedAt: Date.now()
+    };
+  });
+
+  const total = componentsOf(result.snapshot.val()).total;
+  const isFull = isOverStorageLimit(total, plan);
+
+  logger.info('note-bytes-recorded', { uid, fileId, bytes, noteBytes, total, full: isFull });
+  await syncStorageFullClaim(uid, isFull);
+}
+
 module.exports = {
   syncStorageFullClaim,
   planFor,
   recordStorageDelta,
+  recordNoteBytes,
   reconcileStorageUsage
 };

@@ -42,6 +42,23 @@ function limitOf(usage) {
 }
 
 /**
+ * Everything the account is holding, not just its attachments.
+ *
+ * The record carries two components now — `bytes` for Cloud Storage objects
+ * and `noteBytes` for the folders themselves, every picture pasted into
+ * writing included — and `total` is their sum. Asked for on 2026-09-27: "I
+ * wanted the storage to count everything that is synced in an account folder."
+ *
+ * A record written before that has `bytes` and no `total`, and must keep
+ * reading as what it says rather than as zero.
+ */
+function usedBytes(usage) {
+  const total = Number(usage && usage.total);
+  if (Number.isFinite(total) && total >= 0) return total;
+  return Math.max(0, Number((usage && usage.bytes) || 0));
+}
+
+/**
  * What to show for an account's storage.
  *
  * `state` is what the UI colours on, and it is deliberately three values and
@@ -49,7 +66,7 @@ function limitOf(usage) {
  * first a person hears of a limit is an upload that failed.
  */
 export function describeStorageUsage(usage) {
-  const bytes = Math.max(0, Number((usage && usage.bytes) || 0));
+  const bytes = usedBytes(usage);
   const limit = limitOf(usage);
 
   if (!Number.isFinite(limit)) {
