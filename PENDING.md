@@ -310,7 +310,18 @@ attaches to.
 
 The warning is already built and needs none of this: `storageAlerts.js` speaks
 when the account's own record crosses into nearly-full and full, in the same
-words the refusal will use. It can be exercised on staging without filling
+words the refusal will use. And `uploadAllowance.js` does the arithmetic on the
+way *in*, so a picture that will not fit is refused at the moment it is chosen
+rather than half a minute later — measured on staging at **thirty seconds**
+from adding a picture to the app knowing it was over, which is the floor for a
+ceiling enforced by counting what landed.
+
+**Only image blocks are guarded**, which is the path that reaches Cloud Storage
+and therefore the plan. A picture pasted *into writing* is a data URL inside
+the folder's payload: it never becomes a Storage object, so it is not what the
+storage ceiling counts, and blocking it against that number would be measuring
+against the wrong limit. What bounds those is item 2 and the daily bandwidth
+cap. It can be exercised on staging without filling
 anything — put the staging account's `plan` on `tiny` (1 MB, which exists for
 this) and one photograph is enough.
 

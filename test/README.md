@@ -40,6 +40,8 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/subscriptionStatus.js` | what a subscriber is told about their own plan |
 | `src/utils/storageJournal.js` | what each launch found, and where something went missing |
 | `src/utils/habitStore.js` | what a folder's habits may contain, and when they have changed |
+| `src/utils/storageAlerts.js` | when to say the cloud storage is filling up |
+| `src/utils/uploadAllowance.js` | whether a picture can be added, before it is |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered

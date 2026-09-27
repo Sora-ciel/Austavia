@@ -84,6 +84,7 @@
   import { explainSyncFailure } from './utils/syncErrors.js';
   import { describeStorageUsage } from './utils/storageUsage.js';
   import { storageAnnouncement } from './utils/storageAlerts.js';
+  import { attachmentVerdict } from './utils/uploadAllowance.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
@@ -3918,6 +3919,27 @@
   async function addImageBlockFromFile(file) {
     if (!file) return;
     if (!file.type?.startsWith('image/') && !file.type?.startsWith('video/')) return;
+
+    // Asked before the picture is read, not after it has uploaded. The server
+    // is still what enforces the ceiling -- see utils/uploadAllowance.js --
+    // but it can only answer once the file has landed in the bucket, which is
+    // half a minute after the moment the answer was useful.
+    const verdict = attachmentVerdict({
+      bytes: file.size,
+      usage: storageUsage,
+      signedIn: Boolean(authUser),
+      autoSync: autoSyncEnabled
+    });
+
+    if (!verdict.allow) {
+      // A dialog, because this stops something that was just asked for and
+      // owes a reason for it.
+      await appAlert(verdict.message);
+      return;
+    }
+
+    // Worth knowing, not worth interrupting for.
+    if (verdict.message) syncFailureNotice = verdict.message;
 
     const src = await readFileAsDataUrl(file);
     if (typeof src !== 'string') return;
