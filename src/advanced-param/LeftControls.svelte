@@ -16,6 +16,12 @@
   export let colors = {};
   export let birthdayModeUnlocked = false;
   export let birthdayUnlockMessage = '';
+  /**
+   * Asked before a background is applied: a background is kept inside the
+   * folder, and one too large stops the whole folder syncing. App answers,
+   * because the answer needs the account -- see inlinePictureVerdict.
+   */
+  export let mayUseBackground = async () => true;
 
 
   const dispatch = createEventDispatcher();
@@ -334,9 +340,15 @@
   function onBgFileChange(event) {
     const file = event.target?.files?.[0];
     if (!file) return;
+    // Captured now: the slot follows the window width, which can change
+    // while the answer is being waited for.
+    const key = bgImageKey;
     const reader = new FileReader();
-    reader.onload = () =>
-      setBgSetting({ [bgImageKey]: String(reader.result || ''), bgThemeOptOut: false });
+    reader.onload = async () => {
+      const src = String(reader.result || '');
+      if (!(await mayUseBackground(src.length))) return;
+      setBgSetting({ [key]: src, bgThemeOptOut: false });
+    };
     reader.readAsDataURL(file);
     event.target.value = '';
   }

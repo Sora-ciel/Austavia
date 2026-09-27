@@ -129,14 +129,17 @@
   }
 
   .dated .clock-time { --by-height: 70cqh; }
-  .with-seconds .clock-time { --by-width: 25cqi; }
+  .with-seconds .clock-time { --by-width: 21cqi; }
   .with-period .clock-time { --by-width: 25cqi; }
-  .with-seconds.with-period .clock-time { --by-width: 21cqi; }
+  .with-seconds.with-period .clock-time { --by-width: 18cqi; }
 
-  /* Smaller and quieter: seconds are movement, not the reading. */
+  /* The same size and weight as the hours and minutes. They were once a
+     smaller, fainter afterthought; asked for on 2026-09-27 -- "when you put
+     seconds the seconds are small but it really should be like the other
+     numbers". The line is longer for it, which is what the narrower width
+     allowances above are for. */
   .clock-s {
-    font-size: 0.42em;
-    opacity: 0.6;
+    font-size: 1em;
   }
 
   .clock-period {

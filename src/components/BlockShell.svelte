@@ -304,6 +304,7 @@
     flex-direction: column;
     overflow: hidden;
     background-color: color-mix(in srgb, var(--block-surface, var(--bg)) var(--block-bg-opacity, 100%), transparent);
+    text-shadow: var(--block-text-shadow, none);
     color: var(--text);
     outline: 2px solid transparent;
     transition: box-shadow 0.15s ease, outline 0.15s ease;

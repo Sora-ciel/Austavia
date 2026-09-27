@@ -139,3 +139,66 @@ export function attachmentVerdict({
 export function freeSpaceBeforeSaving({ deletedBlocks = false, usage = null } = {}) {
   return Boolean(deletedBlocks) && Boolean(usage && usage.full);
 }
+
+/**
+ * The largest single value the cloud database will take: 10,485,760 bytes of
+ * UTF-8. Not a storage limit and not a plan limit -- a hard limit on one
+ * string, whatever room the account has.
+ */
+export const MAX_INLINE_BYTES = 10485760;
+
+/**
+ * Whether a picture that is kept *inside* the folder -- a background, or a
+ * picture pasted into the writing -- can be added, and what to say about it.
+ *
+ * ## Why this is not attachmentVerdict
+ *
+ * An image block's picture is uploaded to the bucket as a file. A background
+ * is not: it is kept in the folder as a data URL, and the folder is written to
+ * the database whole. The database refuses any one string over
+ * MAX_INLINE_BYTES, so a 13 MB background did not just fail to upload -- the
+ * whole folder stopped syncing, and the app retried it every ten seconds with
+ * the database's own words in the banner (2026-09-27).
+ *
+ * So the size is checked where the picture is chosen, the way a full account
+ * is, and in the same four situations: refused when it would be synced now,
+ * allowed with a warning when auto sync is off, and nothing said when nobody
+ * is signed in. After that the account's room is asked exactly as for any
+ * other picture.
+ *
+ * `bytes` is the length of the data URL, which is what is stored: about a
+ * third larger than the file it came from.
+ */
+export function inlinePictureVerdict({
+  bytes = 0,
+  usage = null,
+  signedIn = false,
+  autoSync = false,
+  what = 'This picture'
+} = {}) {
+  const size = Math.max(0, Number(bytes) || 0);
+  if (!signedIn) return { allow: true, message: '' };
+
+  if (size > MAX_INLINE_BYTES) {
+    const sizes = `${what} is ${formatBytes(size)} once stored, and the cloud takes at most `
+      + `${formatBytes(MAX_INLINE_BYTES)} for one picture kept inside a folder.`;
+
+    if (autoSync) {
+      return {
+        allow: false,
+        message:
+          `${sizes} It was not added, so the folder keeps syncing. Choose a smaller `
+          + 'picture -- the same image saved as a JPEG or WebP is usually a tenth of the size.'
+      };
+    }
+
+    return {
+      allow: true,
+      message:
+        `${sizes} It stays on this device -- with auto sync off nothing is uploaded, `
+        + 'but this folder will not be able to sync while it holds it.'
+    };
+  }
+
+  return attachmentVerdict({ bytes: size, usage, signedIn, autoSync });
+}

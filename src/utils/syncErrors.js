@@ -27,6 +27,19 @@ function codeOf(error) {
 }
 
 /**
+ * The property the database refused as too large, or '' when that is not
+ * what this is. The Realtime Database SDK checks sizes before sending and
+ * throws a plain Error with no code: "...contains a string greater than
+ * 10485760 utf8 bytes in property 'path.to.value'".
+ */
+function oversizedValue(error) {
+  const message = String((error && error.message) || error || '');
+  if (!/greater than \d+ utf8 bytes/i.test(message)) return '';
+  const property = /in property '([^']+)'/.exec(message);
+  return property ? property[1] : '(unknown)';
+}
+
+/**
  * A sentence to show someone whose sync just failed.
  *
  * `storageUsage` is the server's own record for the account. It is what
@@ -35,6 +48,19 @@ function codeOf(error) {
  * storage/unauthorized.
  */
 export function explainSyncFailure(error, { storageUsage } = {}) {
+  const tooLarge = oversizedValue(error);
+  if (tooLarge) {
+    // Refused by the SDK before anything was sent: one value in the folder is
+    // over the database's limit for a single string. Nothing in the folder
+    // syncs until it is gone, which is the part that has to be said.
+    const which = tooLarge.includes('backgroundImage')
+      ? 'The background picture in this folder is'
+      : 'Something in this folder -- most likely a picture -- is';
+    return `${which} larger than the cloud takes for one piece of a folder (10 MB). `
+      + 'The folder is staying on this device, and nothing else in it syncs until that '
+      + 'picture is replaced with a smaller one or removed.';
+  }
+
   const code = codeOf(error);
   const isFull = Boolean(storageUsage && storageUsage.full);
 

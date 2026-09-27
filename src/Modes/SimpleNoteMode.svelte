@@ -765,8 +765,11 @@
 }
 
 .container {
-  background: var(--bg-color);
+  /* Faded by the theme's own dial, as a canvas block is -- a theme that
+     makes block surfaces see-through does so here too. */
+  background: color-mix(in srgb, var(--bg-color) var(--block-bg-opacity, 100%), transparent);
   color: var(--text-color);
+  text-shadow: var(--block-text-shadow, none);
   padding: 4px;
   width: 100%;
   box-sizing: border-box;

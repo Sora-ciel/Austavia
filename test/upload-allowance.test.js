@@ -21,7 +21,9 @@ import assert from 'node:assert/strict';
 import {
   attachmentVerdict,
   roomLeft,
-  freeSpaceBeforeSaving
+  freeSpaceBeforeSaving,
+  inlinePictureVerdict,
+  MAX_INLINE_BYTES
 } from '../src/utils/uploadAllowance.js';
 
 const MB = 1024 * 1024;
@@ -169,5 +171,46 @@ describe('freeSpaceBeforeSaving', () => {
   it('does nothing without a balance to judge by', () => {
     assert.equal(freeSpaceBeforeSaving({ deletedBlocks: true, usage: null }), false);
     assert.equal(freeSpaceBeforeSaving(), false);
+  });
+});
+
+// A background is kept inside the folder, not uploaded as a file, and the
+// database refuses any one value over 10 MB -- so a 13 MB background stopped
+// the whole folder syncing (2026-09-27). Asked for: explain it the way the
+// storage-full dialogs do, instead of an error.
+describe('inlinePictureVerdict', () => {
+  const plenty = { total: 0, limit: 5 * 1024 * MB };
+  const huge = MAX_INLINE_BYTES + 1;
+
+  it("is the database's own limit for one value", () => {
+    assert.equal(MAX_INLINE_BYTES, 10485760);
+  });
+
+  it('refuses a picture too large for one value when it would sync now, however much room there is', () => {
+    const verdict = inlinePictureVerdict({ bytes: huge, usage: plenty, signedIn: true, autoSync: true, what: 'This background' });
+    assert.equal(verdict.allow, false);
+    assert.match(verdict.message, /^This background is/);
+    assert.match(verdict.message, /10 MB/);
+    assert.match(verdict.message, /keeps syncing/);
+  });
+
+  it('allows it with auto sync off, and says the folder will not sync while it holds it', () => {
+    const verdict = inlinePictureVerdict({ bytes: huge, usage: plenty, signedIn: true, autoSync: false });
+    assert.equal(verdict.allow, true);
+    assert.match(verdict.message, /will not be able to sync/);
+  });
+
+  it('says nothing when nobody is signed in', () => {
+    assert.deepEqual(inlinePictureVerdict({ bytes: huge, signedIn: false, autoSync: true }), { allow: true, message: '' });
+  });
+
+  it("asks about the account's room exactly as for any other picture once it is small enough", () => {
+    const verdict = inlinePictureVerdict({ bytes: 200 * 1024, usage: tiny, signedIn: true, autoSync: true });
+    assert.equal(verdict.allow, false);
+    assert.deepEqual(verdict, attachmentVerdict({ bytes: 200 * 1024, usage: tiny, signedIn: true, autoSync: true }));
+  });
+
+  it('allows a picture that fits both', () => {
+    assert.deepEqual(inlinePictureVerdict({ bytes: 3 * MB, usage: plenty, signedIn: true, autoSync: true }), { allow: true, message: '' });
   });
 });

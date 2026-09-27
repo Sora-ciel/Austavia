@@ -7,6 +7,7 @@
   import PlayerIcon from './components/PlayerIcons.svelte';
   import ControlIcon from './components/ControlIcon.svelte';
   import ScrollingText from './components/ScrollingText.svelte';
+  import { OUTLINE_PRESET } from './utils/outlineTheme.js';
   import AlarmRinger from './components/AlarmRinger.svelte';
   import {
     saveBlocks,
@@ -85,7 +86,7 @@
   import { explainSyncFailure } from './utils/syncErrors.js';
   import { describeStorageUsage } from './utils/storageUsage.js';
   import { storageAnnouncement } from './utils/storageAlerts.js';
-  import { attachmentVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
+  import { attachmentVerdict, inlinePictureVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
   import { estimatedUsage, driftReport, describeDrift } from './utils/storageEstimate.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
@@ -438,6 +439,9 @@
       previewBg: '#161b21',
       blockDefaults: { bgColor: '#1b2129', textColor: '#ffb454' }
     },
+    // Everything see-through but the writing, edges and shadows -- see
+    // utils/outlineTheme.js.
+    OUTLINE_PRESET,
     // Guest theme, meant to be pulled back out later — see utils/hatoTheme.js.
     ...HATO_PRESETS
   ];
@@ -3964,12 +3968,15 @@
    * is stored as that string inside the folder, which is about a third larger
    * than the file it came from.
    */
-  async function mayAddPicture(bytes) {
-    const verdict = attachmentVerdict({
+  async function mayAddPicture(bytes, what = 'This picture') {
+    // Kept inside the folder rather than uploaded as a file, so it also has
+    // to fit the database's limit for one value -- see inlinePictureVerdict.
+    const verdict = inlinePictureVerdict({
       bytes,
       usage: shownStorageUsage,
       signedIn: Boolean(authUser),
-      autoSync: autoSyncEnabled
+      autoSync: autoSyncEnabled,
+      what
     });
 
     if (!verdict.allow) {
@@ -6382,6 +6389,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       colors={controlColors.left}
       {birthdayModeUnlocked}
       {birthdayUnlockMessage}
+      mayUseBackground={(bytes) => mayAddPicture(bytes, 'This background')}
       on:addBlock={(e) => addBlock(e.detail)}
       on:clear={clear}
       on:exportJSON={exportJSON}

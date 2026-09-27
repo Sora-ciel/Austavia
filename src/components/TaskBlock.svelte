@@ -334,6 +334,7 @@
     border: var(--block-border-width, 1px) solid var(--block-border-color, rgba(255, 255, 255, 0.2));
     border-radius: var(--block-border-radius, 12px);
     background: color-mix(in srgb, var(--block-surface, var(--bg)) var(--block-bg-opacity, 100%), transparent);
+    text-shadow: var(--block-text-shadow, none);
     box-shadow: var(--block-shadow, 0 0 2px 1px var(--text), 0 0 6px 2px var(--text));
     color: var(--text);
     outline: 2px solid transparent;

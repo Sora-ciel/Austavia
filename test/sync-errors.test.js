@@ -82,3 +82,27 @@ describe('explainSyncFailure', () => {
     );
   });
 });
+
+// Asked for on 2026-09-27, after a 13 MB background stopped a folder syncing:
+// "it should, instead of just throwing an error, explain like the other too
+// much storage pop-ups." The database's own words named a property path and a
+// byte count, and said nothing about the folder having stopped.
+describe('a value too large for the database', () => {
+  const oversized = property => new Error(
+    `set failed: value argument contains a string greater than 10485760 utf8 bytes in property '${property}' ('data:image/png;base64,iVBOR...')`
+  );
+
+  it('says the background is too large, and that the folder has stopped syncing', () => {
+    const message = explainSyncFailure(oversized('sync.default.users.u1.files.default.modeSettings.default.backgroundImage'));
+    assert.match(message, /background picture/i);
+    assert.match(message, /10 MB/);
+    assert.match(message, /nothing else in it syncs/i);
+    assert.doesNotMatch(message, /utf8|argument|sync\.default/);
+  });
+
+  it('still says what happened when it was something other than the background', () => {
+    const message = explainSyncFailure(oversized('sync.default.users.u1.files.default.blocks.3.content'));
+    assert.match(message, /Something in this folder/);
+    assert.match(message, /nothing else in it syncs/i);
+  });
+});

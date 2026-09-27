@@ -47,7 +47,10 @@ export const BLOCK_THEME_DEFAULTS = {
   headerOpacity: 100,
   textOpacity: 100,
   mediaButtonBg: 'rgba(255, 255, 255, 0.08)',
-  mediaButtonText: '#ffffff'
+  mediaButtonText: '#ffffff',
+  // A shadow under a block's writing. None by default; Outline uses one to
+  // keep white writing readable over any wallpaper -- see utils/outlineTheme.js.
+  textShadow: 'none'
 };
 
 export const CUSTOM_THEME_ID = 'custom';
