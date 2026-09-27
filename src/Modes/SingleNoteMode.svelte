@@ -41,6 +41,14 @@
    * footer comes back the moment the keyboard goes.
    */
   export let keyboardOpen = false;
+  /**
+   * Asked before a picture goes into the writing: does it fit?
+   *
+   * Handed down rather than worked out here, because the answer needs the
+   * account's balance and whether sync is on, and neither belongs to a mode.
+   * Returns false to refuse; anything else goes ahead.
+   */
+  export let mayAddPicture = async () => true;
 
   // ── Putting a picture in, without the keyboard ───────────────────
   let noteEditor;
@@ -85,9 +93,26 @@
     }
 
     if (pictureAction({ canRead, found: Boolean(src), failed }) === 'insert') {
+      if (!(await roomForPicture(src))) return; // refused, and already explained
       if (noteEditor?.insertPicture(src)) return;
     }
     pictureInput?.click();
+  }
+
+  /**
+   * Whether this picture fits in what the account has left.
+   *
+   * A picture in writing is stored as the data URL itself, inside the folder,
+   * so what it costs is the length of that string -- about a third more than
+   * the file, which is what base64 does. Measuring the file would under-count
+   * every picture by that third.
+   *
+   * The decision belongs to App, the only place that knows the balance,
+   * whether anybody is signed in, and whether sync is on. This asks and obeys.
+   */
+  async function roomForPicture(src) {
+    if (typeof src !== 'string' || src === '') return false;
+    return (await mayAddPicture(src.length)) !== false;
   }
 
   async function pictureChosen(event) {
@@ -96,7 +121,7 @@
     if (event.currentTarget) event.currentTarget.value = '';
     if (!file || !String(file.type || '').startsWith('image/')) return;
     const src = await asDataUrl(file);
-    if (src) noteEditor?.insertPicture(src);
+    if (src && await roomForPicture(src)) noteEditor?.insertPicture(src);
   }
 
   const dispatch = createEventDispatcher();

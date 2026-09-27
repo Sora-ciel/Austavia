@@ -73,14 +73,70 @@ function withComponent(record, name, value) {
  * it safe to run at any time and safe to run twice — the rule the whole
  * reconcile pass is built on.
  */
+function sizeOf(entry) {
+  // A plain number is how the first version of this wrote them; an object
+  // carrying the folder's stamp alongside is how it writes them now. Both are
+  // on disk, so both are read.
+  if (entry && typeof entry === 'object') return positive(entry.bytes);
+  return positive(entry);
+}
+
+function measuredAt(entry) {
+  return entry && typeof entry === 'object' ? positive(entry.at) : 0;
+}
+
 function totalNoteBytes(sizes) {
   if (!sizes || typeof sizes !== 'object') return 0;
-  return Object.values(sizes).reduce((sum, value) => sum + positive(value), 0);
+  return Object.values(sizes).reduce((sum, entry) => sum + sizeOf(entry), 0);
+}
+
+/**
+ * Which folders the weekly pass has to actually open, and which it does not.
+ *
+ * The pass has to be able to correct a folder whose size was never recorded or
+ * was recorded before its last change -- otherwise a single missed trigger is
+ * wrong for ever, which is the failure CLAUDE.md's whole reconcile rule exists
+ * to prevent.
+ *
+ * But re-reading every folder means downloading every note in every account,
+ * pictures and all, once a week. So the *index* is read instead -- it is tiny,
+ * fixed-shape, and carries each folder's `updatedAt` -- and only folders whose
+ * recorded stamp is missing or behind are opened.
+ *
+ * That makes the pass absolute where it matters and cheap everywhere else: a
+ * folder nobody has touched since it was measured cannot have changed size.
+ */
+function foldersNeedingMeasure({ index, sizes } = {}) {
+  if (!index || typeof index !== 'object') return [];
+
+  return Object.keys(index).filter(fileId => {
+    const entry = index[fileId];
+    const updatedAt = positive(entry && entry.updatedAt);
+    const recorded = sizes && typeof sizes === 'object' ? sizes[fileId] : undefined;
+
+    if (recorded === undefined || recorded === null) return true; // never measured
+    // A plain number carries no stamp, so it cannot be shown to be current.
+    return measuredAt(recorded) < updatedAt;
+  });
+}
+
+/**
+ * Sizes left behind by folders that no longer exist.
+ *
+ * Without this an account carries the weight of everything it has ever deleted
+ * in any week when the delete's own trigger was missed.
+ */
+function orphanSizes({ index, sizes } = {}) {
+  if (!sizes || typeof sizes !== 'object') return [];
+  const live = index && typeof index === 'object' ? index : {};
+  return Object.keys(sizes).filter(fileId => !(fileId in live));
 }
 
 module.exports = {
   EMPTY,
   componentsOf,
   withComponent,
-  totalNoteBytes
+  totalNoteBytes,
+  foldersNeedingMeasure,
+  orphanSizes
 };

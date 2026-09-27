@@ -16,6 +16,9 @@
   // The folder's habits. Kept in modeSettings and synced with the folder, the
   // same way the column count is -- see utils/habitStore.js.
   export let habits = [];
+  // Passed through to Single Note, which asks it before putting a picture into
+  // the writing. See uploadAllowance.js.
+  export let mayAddPicture = async () => true;
   export let canvasRef;
   export let onTouchStart;
   export let onTouchMove;
@@ -161,6 +164,7 @@
       {canvasColors}
       {singleNoteSettings}
       {keyboardOpen}
+      {mayAddPicture}
       fileKey={openFolder}
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}

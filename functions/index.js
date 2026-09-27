@@ -85,7 +85,7 @@ exports.enforceSyncQuota = onValueWritten(
     // that is what a plan is sold in -- see accountBytes.js. Counting only the
     // first is how an account could hold a hundred megabytes of notes and read
     // as empty.
-    await recordNoteBytes(db, uid, fileId, writtenBytes);
+    await recordNoteBytes(db, uid, fileId, writtenBytes, event.data.after.val()?.updatedAt);
     await chargeBandwidth(db, ns, uid, writtenBytes);
   }
 );

@@ -18,7 +18,13 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { componentsOf, withComponent, totalNoteBytes } = require('../functions/accountBytes.js');
+const {
+  componentsOf,
+  withComponent,
+  totalNoteBytes,
+  foldersNeedingMeasure,
+  orphanSizes
+} = require('../functions/accountBytes.js');
 
 describe('componentsOf', () => {
   it('adds the two halves up', () => {
@@ -95,5 +101,68 @@ describe('totalNoteBytes', () => {
 
   it('ignores a folder whose size is junk rather than failing the sum', () => {
     assert.equal(totalNoteBytes({ a: 100, b: 'big', c: -5, d: 20 }), 120);
+  });
+});
+
+// --- What the weekly pass has to open, and what it does not ------------
+//
+// The pass has to be able to correct a folder whose size was never recorded or
+// was recorded before its last change, or one missed trigger is wrong for ever
+// -- the failure the whole reconcile rule exists to prevent.
+//
+// But re-reading every folder means downloading every note in every account,
+// pictures and all, once a week. So the index is read instead: tiny,
+// fixed-shape, and it carries each folder's updatedAt.
+
+describe('foldersNeedingMeasure', () => {
+  const index = { a: { updatedAt: 100 }, b: { updatedAt: 200 }, c: { updatedAt: 50 } };
+
+  it('leaves alone a folder nobody has touched since it was measured', () => {
+    const sizes = { a: { bytes: 10, at: 100 }, b: { bytes: 20, at: 200 }, c: { bytes: 5, at: 50 } };
+    assert.deepEqual(foldersNeedingMeasure({ index, sizes }), []);
+  });
+
+  it('opens one whose size was recorded before its last change', () => {
+    const sizes = { a: { bytes: 10, at: 100 }, b: { bytes: 20, at: 150 }, c: { bytes: 5, at: 50 } };
+    assert.deepEqual(foldersNeedingMeasure({ index, sizes }), ['b']);
+  });
+
+  // The missed-trigger case, and the reason this exists at all.
+  it('opens one that was never measured', () => {
+    assert.deepEqual(foldersNeedingMeasure({ index, sizes: { a: { bytes: 10, at: 100 } } }), ['b', 'c']);
+  });
+
+  // A size written by the first version of this carried no stamp, so it cannot
+  // be shown to be current and is measured again once.
+  it('opens one recorded before stamps were kept', () => {
+    const sizes = { a: 10, b: { bytes: 20, at: 200 }, c: { bytes: 5, at: 50 } };
+    assert.deepEqual(foldersNeedingMeasure({ index, sizes }), ['a']);
+  });
+
+  it('has nothing to open for an account with no folders', () => {
+    assert.deepEqual(foldersNeedingMeasure({ index: null, sizes: { a: 1 } }), []);
+    assert.deepEqual(foldersNeedingMeasure({}), []);
+  });
+});
+
+describe('orphanSizes', () => {
+  // Without this an account carries the weight of everything it has ever
+  // deleted in any week where the delete's own trigger was missed.
+  it('finds sizes left behind by folders that are gone', () => {
+    assert.deepEqual(
+      orphanSizes({ index: { a: { updatedAt: 1 } }, sizes: { a: 10, b: 20, c: 30 } }),
+      ['b', 'c']
+    );
+  });
+
+  it('finds none when every size has a folder', () => {
+    assert.deepEqual(orphanSizes({ index: { a: {}, b: {} }, sizes: { a: 1, b: 2 } }), []);
+  });
+
+  // An account whose index is empty has no folders at all, so every recorded
+  // size is left over.
+  it('treats every size as left over when there are no folders', () => {
+    assert.deepEqual(orphanSizes({ index: null, sizes: { a: 1 } }), ['a']);
+    assert.deepEqual(orphanSizes({ sizes: {} }), []);
   });
 });

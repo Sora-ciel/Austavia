@@ -3916,6 +3916,34 @@
     });
   }
 
+  /**
+   * Whether a picture going into the writing fits in what is left.
+   *
+   * Single Note asks this before inserting one. It is here rather than there
+   * because the answer needs the account's balance, whether anybody is signed
+   * in, and whether sync is on -- none of which is a mode's business.
+   *
+   * `bytes` is the length of the data URL, not the file: a picture in writing
+   * is stored as that string inside the folder, which is about a third larger
+   * than the file it came from.
+   */
+  async function mayAddPicture(bytes) {
+    const verdict = attachmentVerdict({
+      bytes,
+      usage: storageUsage,
+      signedIn: Boolean(authUser),
+      autoSync: autoSyncEnabled
+    });
+
+    if (!verdict.allow) {
+      await appAlert(verdict.message);
+      return false;
+    }
+
+    if (verdict.message) syncFailureNotice = verdict.message;
+    return true;
+  }
+
   async function addImageBlockFromFile(file) {
     if (!file) return;
     if (!file.type?.startsWith('image/') && !file.type?.startsWith('video/')) return;
@@ -6566,6 +6594,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {keyboardOpen}
       {taskAddDirection}
       {habits}
+      {mayAddPicture}
       {musicLibrary}
       {nowPlayingId}
       {isPlaying}

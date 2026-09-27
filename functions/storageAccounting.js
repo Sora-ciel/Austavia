@@ -8,7 +8,13 @@ const { getDatabase } = require('firebase-admin/database');
 const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
-const { componentsOf, withComponent, totalNoteBytes } = require('./accountBytes');
+const {
+  componentsOf,
+  withComponent,
+  totalNoteBytes,
+  foldersNeedingMeasure,
+  orphanSizes
+} = require('./accountBytes');
 const { DEFAULT_PLAN, storageLimitFor, isOverStorageLimit, storableLimit } = require('./limits');
 const {
   uidFromObjectName,
@@ -183,14 +189,11 @@ async function reconcileStorageUsage() {
     const plan = await planFor(db, uid);
     const limit = storageLimitFor(plan);
 
-    // The other half, re-added from what each folder was last measured at.
-    // Absolute with respect to those numbers rather than to the folders
-    // themselves: re-reading every payload would mean downloading every note
-    // in the account, pictures and all, once a week. A folder's recorded size
-    // can only be wrong if its own trigger was missed, and the next write of
-    // that folder corrects it.
-    const noteSizes = (await db.ref(`noteSizes/${uid}`).get()).val();
-    const noteBytes = totalNoteBytes(noteSizes);
+    // The other half, corrected properly without downloading every note in the
+    // account. The index is tiny and carries each folder's updatedAt, so only
+    // folders never measured -- or measured before their last change -- are
+    // actually opened. See foldersNeedingMeasure.
+    const noteBytes = await reconcileNoteSizes(db, uid);
     const total = bytes + noteBytes;
     const isFull = isOverStorageLimit(total, plan);
 
@@ -241,11 +244,14 @@ async function reconcileStorageUsage() {
  * and comes out the same, while a total nudged by deltas is wrong for ever
  * after one missed trigger.
  */
-async function recordNoteBytes(db, uid, fileId, bytes) {
+async function recordNoteBytes(db, uid, fileId, bytes, at = Date.now()) {
   if (!uid || !fileId) return;
 
   const sizeRef = db.ref(`noteSizes/${uid}/${fileId}`);
-  if (bytes > 0) await sizeRef.set(bytes);
+  // The folder's own stamp goes down beside its size, so the weekly pass can
+  // tell a measurement that is current from one taken before the last change
+  // -- without opening the folder to find out. See foldersNeedingMeasure.
+  if (bytes > 0) await sizeRef.set({ bytes, at: Number(at) || Date.now() });
   else await sizeRef.remove(); // the folder is gone; so is its size
 
   const sizes = (await db.ref(`noteSizes/${uid}`).get()).val();
@@ -275,10 +281,52 @@ async function recordNoteBytes(db, uid, fileId, bytes) {
   await syncStorageFullClaim(uid, isFull);
 }
 
+/**
+ * Re-measure whatever the recorded folder sizes cannot be shown to be right
+ * about, drop what is left over, and return the account's note total.
+ *
+ * The expensive part is deliberately rare. Reading the index costs almost
+ * nothing; reading a folder costs whatever that folder weighs, pictures
+ * included, and only folders that need it are read.
+ */
+async function reconcileNoteSizes(db, uid) {
+  const index = (await db.ref(`sync/${SYNC_NAMESPACE}/users/${uid}/index`).get()).val();
+  const sizes = (await db.ref(`noteSizes/${uid}`).get()).val() || {};
+
+  const stale = foldersNeedingMeasure({ index, sizes });
+  const gone = orphanSizes({ index, sizes });
+
+  for (const fileId of gone) {
+    await db.ref(`noteSizes/${uid}/${fileId}`).remove();
+    delete sizes[fileId];
+  }
+
+  for (const fileId of stale) {
+    const snap = await db.ref(`sync/${SYNC_NAMESPACE}/users/${uid}/files/${fileId}`).get();
+    if (!snap.exists()) {
+      await db.ref(`noteSizes/${uid}/${fileId}`).remove();
+      delete sizes[fileId];
+      continue;
+    }
+
+    const bytes = Buffer.byteLength(JSON.stringify(snap.val()), 'utf8');
+    const at = Number((index[fileId] || {}).updatedAt) || Date.now();
+    await db.ref(`noteSizes/${uid}/${fileId}`).set({ bytes, at });
+    sizes[fileId] = { bytes, at };
+  }
+
+  if (stale.length || gone.length) {
+    logger.info('note-sizes-reconciled', { uid, remeasured: stale.length, removed: gone.length });
+  }
+
+  return totalNoteBytes(sizes);
+}
+
 module.exports = {
   syncStorageFullClaim,
   planFor,
   recordStorageDelta,
   recordNoteBytes,
+  reconcileNoteSizes,
   reconcileStorageUsage
 };
