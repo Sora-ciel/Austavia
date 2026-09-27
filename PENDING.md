@@ -356,6 +356,22 @@ Only when full: sweeping before a save that then fails would leave the cloud
 copy pointing at uploads that are gone, which is the worse trade everywhere it
 is not necessary.
 
+**The figure on screen is instant, and the cloud's is still the truth.** Asked
+for 2026-09-27. What is shown is the server's last word plus what this device
+has done since, so it moves the moment a picture is added rather than half a
+minute later — and every refusal is judged against that same figure, so a
+second picture is measured against the room the first one took.
+
+When the server's record arrives the estimate is thrown away and the new
+number adopted whole. Before that, the two are compared: a disagreement beyond
+a few kilobytes of JSON overhead goes into the **sync log** and the
+**diagnostics**, with what was predicted, what was counted and the difference.
+Disagreeing is not a fault — another device uploading, a sweep, the
+punctuation around a picture all move the real number without this one
+knowing. It is recorded because a guess nobody checks is a lie with a refresh
+rate, and because a large one is the first sign the two halves have stopped
+counting the same thing.
+
 All of it can be exercised on staging without filling anything: put the
 staging account's `plan` on `tiny` (1 MB, which exists for this) and one
 photograph is enough.

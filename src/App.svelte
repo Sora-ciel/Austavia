@@ -85,6 +85,7 @@
   import { describeStorageUsage } from './utils/storageUsage.js';
   import { storageAnnouncement } from './utils/storageAlerts.js';
   import { attachmentVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
+  import { estimatedUsage, driftReport, describeDrift } from './utils/storageEstimate.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
@@ -2197,6 +2198,9 @@
         tracks: musicLibrary?.tracks?.length ?? 0,
         playlists: musicLibrary?.playlists?.length ?? 0
       },
+      // What this device predicted against what the cloud counted. Only ever
+      // set when the two disagreed by more than arithmetic.
+      storageDrift: lastStorageDrift,
       // Both halves of the handover to the phone's notification. Asked for
       // after the cover still did not appear: "do you want to make a diagnostic
       // or something to be sure of why it doesn't work?"
@@ -2783,6 +2787,16 @@
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
   let subscriptionRecord = null;
+  // What this device has added or removed since the server's last word, and
+  // the last time the two disagreed. See utils/storageEstimate.js: the
+  // server's figure is the truth and this only covers the gap until it
+  // arrives -- about thirty seconds, measured.
+  let pendingStorageBytes = 0;
+  let lastStorageDrift = null;
+
+  // What the app shows and judges by: the server's record with this device's
+  // uncounted changes folded in.
+  $: shownStorageUsage = estimatedUsage(storageUsage, pendingStorageBytes);
   // When each lock last got somewhere, so one that stopped moving can be let
   // go of. The flags below are cleared in a `finally`, which covers finishing
   // and covers failing — but not an await that never settles, and that is the
@@ -2949,9 +2963,9 @@
   // Said when it changes, not when an upload is refused. The failure path in
   // syncErrors.js is the same sentence arriving too late to act on: by then a
   // picture has already not saved.
-  $: if (storageUsage) {
+  $: if (shownStorageUsage) {
     const verdict = storageAnnouncement({
-      state: describeStorageUsage(storageUsage).state,
+      state: describeStorageUsage(shownStorageUsage).state,
       announced: announcedStorageState
     });
     announcedStorageState = verdict.announced;
@@ -3015,7 +3029,7 @@
     // On a full account the deletions go up before anything is uploaded --
     // otherwise the save that would record them is the save that fails, and
     // deleting can never make room. See freeSpaceBeforeSaving.
-    if (freeSpaceBeforeSaving({ deletedBlocks: blocksWereDeleted, usage: storageUsage })) {
+    if (freeSpaceBeforeSaving({ deletedBlocks: blocksWereDeleted, usage: shownStorageUsage })) {
       await sweepDeletedBlockAttachments(fileName, payload);
     }
 
@@ -3814,6 +3828,12 @@
     if (deletingBlock?.type === 'image') {
       markCloudAttachmentDirty();
     }
+    // The room comes back on screen at once rather than when the server next
+    // speaks. Measured from what the block was actually carrying, so a block
+    // with no picture in it gives nothing back.
+    const freed = String(deletingBlock?.src || '').length + String(deletingBlock?.content || '').length;
+    if (freed > 0) pendingStorageBytes -= freed;
+
     // Any block can carry an upload, not just an image one — a picture pasted
     // into written text is stored the same way — so every deletion arms the
     // sweep rather than only the obvious ones.
@@ -3937,7 +3957,7 @@
   async function mayAddPicture(bytes) {
     const verdict = attachmentVerdict({
       bytes,
-      usage: storageUsage,
+      usage: shownStorageUsage,
       signedIn: Boolean(authUser),
       autoSync: autoSyncEnabled
     });
@@ -3948,6 +3968,10 @@
     }
 
     if (verdict.message) syncFailureNotice = verdict.message;
+    // Counted the moment it is accepted, so a second picture is judged against
+    // the room the first one took rather than against a figure that has not
+    // heard about it yet.
+    pendingStorageBytes += Math.max(0, Number(bytes) || 0);
     return true;
   }
 
@@ -3961,7 +3985,7 @@
     // half a minute after the moment the answer was useful.
     const verdict = attachmentVerdict({
       bytes: file.size,
-      usage: storageUsage,
+      usage: shownStorageUsage,
       signedIn: Boolean(authUser),
       autoSync: autoSyncEnabled
     });
@@ -3975,6 +3999,7 @@
 
     // Worth knowing, not worth interrupting for.
     if (verdict.message) syncFailureNotice = verdict.message;
+    pendingStorageBytes += Math.max(0, Number(file.size) || 0);
 
     const src = await readFileAsDataUrl(file);
     if (typeof src !== 'string') return;
@@ -5528,9 +5553,34 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         stopSubscriptionListener?.();
         stopSubscriptionListener = null;
         subscriptionRecord = null;
+        pendingStorageBytes = 0;
+        announcedStorageState = '';
 
         if (user) {
           stopStorageUsageListener = subscribeStorageUsage(usage => {
+            // Every guess is checked when the truth arrives. A prediction
+            // nobody checks is a lie with a refresh rate -- and disagreeing is
+            // not a fault in itself: another device uploading, a sweep
+            // removing something, or JSON overhead all move the real number
+            // without this one knowing.
+            const drift = driftReport({
+              previous: storageUsage,
+              pendingBytes: pendingStorageBytes,
+              arrived: usage
+            });
+
+            if (pendingStorageBytes !== 0 && !drift.agrees) {
+              lastStorageDrift = { ...drift, at: Date.now() };
+              logSync('storage', currentSaveName || '(account)', describeDrift(drift), {
+                predicted: drift.expected,
+                counted: drift.actual,
+                difference: drift.difference
+              });
+            }
+
+            // The cloud's figure is the true one, adopted whole. The estimate
+            // only ever covered the gap until it arrived.
+            pendingStorageBytes = 0;
             storageUsage = usage;
           });
           stopSubscriptionListener = subscribeSubscription(record => {
@@ -6518,7 +6568,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         on:restoreSnapshot={handleRestoreSnapshot}
         on:forgetSnapshot={handleForgetSnapshot}
         {savedList}
-        {storageUsage}
+        storageUsage={shownStorageUsage}
         {subscriptionRecord}
         {load}
         {deleteSave}

@@ -207,10 +207,41 @@ export function buildDiagnostics(input = {}) {
     picturePaste: input.picturePaste || null,
     localStore: input.localStore || null,
     journal: input.journal || null,
-    fonts: input.fonts || null
+    fonts: input.fonts || null,
+    storageDrift: input.storageDrift || null
   };
   report.notes = flagSuspicions(report);
   return report;
+}
+
+/**
+ * Where this device's running count of the storage last disagreed with the
+ * cloud's.
+ *
+ * The app shows an estimate so the figure moves the moment something is added
+ * rather than half a minute later, and the cloud's number replaces it when it
+ * arrives. This is the check on that: what was predicted against what was
+ * counted.
+ *
+ * A disagreement is not a fault. Another device uploading, a sweep removing
+ * something, the punctuation JSON puts around a picture -- all of them move
+ * the real number without this one knowing. It is here because a guess nobody
+ * checks is a lie with a refresh rate, and because a *large* disagreement is
+ * the first sign that the two halves have stopped counting the same thing.
+ */
+export function describeStorageDrift(drift) {
+  if (!drift) return [];
+
+  const when = new Date(Number(drift.at) || Date.now()).toISOString().slice(0, 19).replace('T', ' ');
+  const direction = drift.difference > 0 ? 'more' : 'less';
+
+  return [
+    '',
+    'storage count: this device and the cloud last disagreed',
+    `  predicted ${drift.expected} · counted ${drift.actual}`
+      + ` · ${Math.abs(drift.difference)} bytes ${direction} than expected`,
+    `  at ${when} UTC`
+  ];
 }
 
 /**
@@ -501,6 +532,7 @@ export function formatDiagnostics(report) {
   for (const line of describeLocalStore(report.localStore)) lines.push(line);
   if (report.journal) for (const line of describeJournal(report.journal)) lines.push(line);
   for (const line of describeFonts(report.fonts)) lines.push(line);
+  for (const line of describeStorageDrift(report.storageDrift)) lines.push(line);
   for (const line of describeNotification(report.notification)) lines.push(line);
   for (const line of describePicturePaste(report.picturePaste?.native, report.picturePaste?.page)) lines.push(line);
 

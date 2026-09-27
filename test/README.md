@@ -42,6 +42,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/habitStore.js` | what a folder's habits may contain, and when they have changed |
 | `src/utils/storageAlerts.js` | when to say the cloud storage is filling up |
 | `src/utils/uploadAllowance.js` | whether a picture can be added, before it is |
+| `src/utils/storageEstimate.js` | what the storage figure shows before the cloud says |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered
