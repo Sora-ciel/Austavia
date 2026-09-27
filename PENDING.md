@@ -281,6 +281,39 @@ time:
   two full releases when the later full release goes out, or leaving them as a
   record — but pick one, rather than letting it be whatever happened.
 
+## 4c. Turning the storage ceiling on
+
+Everything it needs is written and none of it is switched on in production,
+because no function in this repo has ever deployed there — see section 5. The
+ceiling works through three pieces and the middle one is a function:
+`storage/{uid}` counts the bytes, `syncStorageFullClaim` puts `storageFull` on
+the token, and `storage.rules` refuses an upload when it is true. The rules are
+live; the counting is not, so the claim is never written and `notOverQuota()`
+reads as true for everybody.
+
+In order, when the production deploy is unblocked:
+
+1. **Deploy the functions.** That is the whole switch — the moment
+   `trackStorageUpload` runs, accounts start being counted and claimed.
+2. **Force-run `reconcileStorageUsage`** from Cloud Scheduler before anything
+   can bite. It has never run on production, so every account currently reads
+   as zero bytes, and the first upload after the deploy would be measured
+   against a balance that does not know about anything uploaded until now.
+3. **Put every account that exists today on `legacy`.** Decided 2026-09-27:
+   every live account except the owner's gets 5 GB, which is comfortably more
+   than any of them uses. `limits.js` has carried `legacy` for exactly this
+   since it was written — a limit introduced after people are already using
+   something is a limit taken away from them.
+
+New accounts then start on `free` at 100 MB, which is the thing a price
+attaches to.
+
+The warning is already built and needs none of this: `storageAlerts.js` speaks
+when the account's own record crosses into nearly-full and full, in the same
+words the refusal will use. It can be exercised on staging without filling
+anything — put the staging account's `plan` on `tiny` (1 MB, which exists for
+this) and one photograph is enough.
+
 ## 5. Not code
 
 - **Cloud Functions are undeployed.** Blocked on Secret Manager and
