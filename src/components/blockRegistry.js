@@ -4,7 +4,7 @@ export const BLOCK_DEFINITIONS = {
   music: { type: 'music', label: 'Music', icon: '+' },
   embed: { type: 'embed', label: 'Embed', icon: '+' },
   task: { type: 'task', label: 'Task List', icon: '+' },
-  clock: { type: 'clock', label: 'Clock', icon: '+' }
+  clock: { type: 'clock', label: 'Clock & alarm', icon: '+' }
 };
 
 export function getBlockDefinition(type) {

@@ -25,12 +25,13 @@
    * blocks still carry their own copies of all that — PENDING records it — and
    * this one does not add a fourth.
    *
-   * The face is ClockFace.svelte, shared with Simple Note, which draws blocks
-   * without a frame.
+   * The body is ClockAlarm.svelte -- the clock page, the alarm page and the
+   * corner between them -- shared with Simple Note, which draws blocks without
+   * a frame.
    */
   import { tick } from 'svelte';
   import BlockShell from './BlockShell.svelte';
-  import ClockFace from './ClockFace.svelte';
+  import ClockAlarm from './ClockAlarm.svelte';
 
   export let id;
   export let initialPosition = { x: 100, y: 100 };
@@ -44,10 +45,15 @@
   export let initialHour12 = false;
   export let initialShowSeconds = false;
   export let initialShowDate = true;
+  /** The alarm. Saved with the block too: it is part of the note. */
+  export let initialAlarmTime = '';
+  export let initialAlarmEnabled = false;
 
   let hour12 = initialHour12;
   let showSeconds = initialShowSeconds;
   let showDate = initialShowDate;
+  let alarmTime = initialAlarmTime;
+  let alarmEnabled = initialAlarmEnabled;
   let settingsOpen = openPanels.has(id);
 
   function toggleSettings() {
@@ -68,6 +74,13 @@
     await tick();
     commit([key]);
   }
+
+  async function saveAlarm(commit, detail) {
+    alarmTime = detail.alarmTime;
+    alarmEnabled = detail.alarmEnabled;
+    await tick();
+    commit(detail.changedKeys);
+  }
 </script>
 
 <BlockShell
@@ -79,13 +92,14 @@
   {focused}
   {canvasScale}
   label="Clock"
-  fields={{ hour12, showSeconds, showDate }}
+  fields={{ hour12, showSeconds, showDate, alarmTime, alarmEnabled }}
   minWidth={140}
   minHeight={90}
   on:update
   on:delete
   on:focusToggle
   let:commit
+  let:ensureFocus
 >
   <button
     slot="header-controls"
@@ -99,7 +113,16 @@
   >⋯</button>
 
   <div class="clock-body">
-    <ClockFace {hour12} {showSeconds} {showDate} />
+    <ClockAlarm
+      blockId={id}
+      {hour12}
+      {showSeconds}
+      {showDate}
+      {alarmTime}
+      {alarmEnabled}
+      beforeAct={ensureFocus}
+      on:alarm={(e) => saveAlarm(commit, e.detail)}
+    />
 
     {#if settingsOpen}
       <!-- Three switches and nothing else. A clock with a settings page is a

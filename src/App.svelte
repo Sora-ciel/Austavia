@@ -7,6 +7,7 @@
   import PlayerIcon from './components/PlayerIcons.svelte';
   import ControlIcon from './components/ControlIcon.svelte';
   import ScrollingText from './components/ScrollingText.svelte';
+  import AlarmRinger from './components/AlarmRinger.svelte';
   import {
     saveBlocks,
     loadBlocks,
@@ -2649,7 +2650,7 @@
     music: ['position', 'size', 'bgColor', 'textColor', 'playlistId', 'trackUrl', 'title', 'content'],
     embed: ['position', 'size', 'bgColor', 'textColor', 'content'],
     task: ['tasks', 'title'],
-    clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate'],
+    clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate', 'alarmTime', 'alarmEnabled'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };
 
@@ -3571,7 +3572,9 @@
       ...(type === "task" ? { tasks: [], title: "Task List" } : {}),
       // 24-hour by default: the owner is in France, and the setting is one
       // click away for anyone who is not.
-      ...(type === "clock" ? { hour12: false, showSeconds: false, showDate: true } : {}),
+      // The alarm starts at seven and off: a time to change rather than a blank
+      // to fill, and nothing rings until somebody asks it to.
+      ...(type === "clock" ? { hour12: false, showSeconds: false, showDate: true, alarmTime: '07:00', alarmEnabled: false } : {}),
       position,
       size: { width: blockW, height: blockH },
       ...newBlockColors,
@@ -6700,6 +6703,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   preload="metadata"
   hidden
 ></audio>
+
+<!-- Rings the open folder's alarms in every mode, not only where the clock is
+     drawn. -->
+<AlarmRinger {blocks} themeStyle={overlayThemeStyle} />
 
 {#if dialogState}
   <div class="app-dialog-overlay" role="presentation" style={overlayThemeStyle} on:click={handleDialogCancel}>

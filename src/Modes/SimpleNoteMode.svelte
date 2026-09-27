@@ -18,7 +18,7 @@
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import MusicPlayer from '../components/MusicPlayer.svelte';
-  import ClockFace from '../components/ClockFace.svelte';
+  import ClockAlarm from '../components/ClockAlarm.svelte';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
 
@@ -1180,15 +1180,22 @@ input[type="text"] {
               />
             </div>
           {:else if block.type === 'clock'}
-            <!-- The same face the canvas uses, without the frame: Simple Note
+            <!-- The same body the canvas uses, without the frame: Simple Note
                  lays its blocks out itself, the way it does the music player.
-                 Settings are changed from the canvas, where the block has a
-                 header to hold them. -->
+                 The alarm is set here too; how the face reads is changed from
+                 the canvas, where the block has a header to hold it. -->
             <div class="clock-content">
-              <ClockFace
+              <ClockAlarm
+                blockId={block.id}
                 hour12={block.hour12 === true}
                 showSeconds={block.showSeconds === true}
                 showDate={block.showDate !== false}
+                alarmTime={block.alarmTime || ''}
+                alarmEnabled={block.alarmEnabled === true}
+                on:alarm={(e) => {
+                  const { changedKeys, ...alarm } = e.detail;
+                  updateBlock(block.id, alarm, { pushToHistory: true, changedKeys });
+                }}
               />
             </div>
           {:else if block.type === 'embed'}

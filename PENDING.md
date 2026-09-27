@@ -17,7 +17,8 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
-| next | **The clock block**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
+| next | **The clock & alarm block**, in Canvas and Simple Note: the corner flips between the clock and the alarm page, the page it was left on is still open after a reload (on that device only), and an alarm set a minute ahead rings — banner, beeps, and a buzz on a phone — in whatever mode is open. Snooze gives it five minutes; Stop keeps it quiet until tomorrow. Expect it *not* to ring with the app closed or a phone asleep: see 4. |
+| next | **The clock face**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
 | 0.8.65 | **The plan panel, doing nothing.** The subscription groundwork ships with this release and is deliberately inert: no checkout link is committed, so no Upgrade button should appear anywhere, on any platform, signed in or out. If one does, something shipped that should not have. |
 | 0.8.65 | **The word count row** in Single Note, a third shorter, and the **mini player** opening Playlist when pressed anywhere that is not a button. |
 | 0.8.652 | **Holding a habit to delete it** — and scrolling a list of habits without the menu appearing, which is the case it is most likely to get wrong. Also **the note's footer** going while the keyboard is up and coming back after, with the picture behind holding still. |
@@ -248,6 +249,15 @@ speculatively — wait for a report that says so.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
+- **The alarm only rings while the app is open on the alarm's folder.** It is a
+  timer in the page (`AlarmRinger.svelte`), so it cannot ring with the app
+  closed, with a phone that has put the WebView to sleep, or for a clock in a
+  folder that is not open. Answering is per device (`utils/alarm.js` says why),
+  so two open devices both ring and each needs stopping. A real alarm on Android
+  is `AlarmManager.setAlarmClock` from a Capacitor plugin, handed the block's
+  time whenever it is saved — and, per the reconcile rule, re-handed on every
+  launch from the folders themselves rather than trusted from the last save.
+  The desktop builds would want the same from Tauri. Not started.
 
 ## 4a. The notification, as far as it can go
 

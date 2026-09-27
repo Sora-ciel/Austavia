@@ -44,6 +44,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/uploadAllowance.js` | whether a picture can be added, before it is |
 | `src/utils/storageEstimate.js` | what the storage figure shows before the cloud says |
 | `src/utils/clockFace.js` | what a clock block says, and when it next changes |
+| `src/utils/alarm.js` | when a clock block's alarm rings, stops, and what its corner shows |
 | `functions/subscriptionRecord.js` | what a payment webhook changes, once and in order |
 
 ## What is covered

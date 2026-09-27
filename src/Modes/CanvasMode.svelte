@@ -773,6 +773,8 @@
             initialHour12={block.hour12 === true}
             initialShowSeconds={block.showSeconds === true}
             initialShowDate={block.showDate !== false}
+            initialAlarmTime={block.alarmTime || ''}
+            initialAlarmEnabled={block.alarmEnabled === true}
             focused={block.id === focusedBlockId}
             canvasScale={scale}
             on:delete={deleteBlockHandler}
