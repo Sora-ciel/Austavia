@@ -53,3 +53,53 @@ export function orphanedAttachmentIds(storedBlockIds = [], keepBlockIds = []) {
     id => isSafeStorageSegment(id) && !keep.has(id)
   );
 }
+
+/** The wallpaper fields that are uploaded under MODE_SETTINGS_BLOCK_ID. */
+export const WALLPAPER_IMAGE_FIELDS = ['backgroundImage', 'backgroundImageMobile'];
+
+/**
+ * Which uploaded wallpapers a folder no longer uses.
+ *
+ * ## Why this exists
+ *
+ * Wallpapers are uploaded under MODE_SETTINGS_BLOCK_ID, which the block sweep
+ * keeps whole -- so every wallpaper ever chosen stayed in storage for good,
+ * because uploads are named after their bytes and a new picture is a new
+ * object beside the old one. Single Note's own wallpaper made it plain: asked
+ * on 2026-09-27 for "the background that was used only on Single Note mode to
+ * be actually deleted", once every mode had moved to Canvas's, and the setting
+ * going from the folder would still have left its picture in the bucket.
+ *
+ * ## How "in use" is told
+ *
+ * The folder's current value for each field is one of two things. On the
+ * device that chose it, the picture itself as a data URL -- and an upload is
+ * named `hashOf(dataUrl).ext`, so the name is known without asking anyone. On
+ * any other device, the download URL, which carries the object's path. An
+ * object that matches neither is not in use.
+ *
+ * `stored` is what storage holds: `{ field, name, fullPath }` per object.
+ * `current` is the folder's wallpaper settings. `hashOf` is the same function
+ * that named the uploads, handed in so this cannot drift from it.
+ *
+ * A field this does not know is left alone: declining to answer beats
+ * deleting something on a guess.
+ */
+export function staleWallpaperObjects(stored = [], current = {}, hashOf = () => '') {
+  const settings = current || {};
+
+  return stored.filter(object => {
+    if (!object || !WALLPAPER_IMAGE_FIELDS.includes(object.field)) return false;
+
+    const value = settings[object.field];
+    if (typeof value !== 'string' || !value) return true;
+
+    if (value.startsWith('data:')) {
+      return !String(object.name || '').startsWith(`${hashOf(value)}.`);
+    }
+
+    // A download URL names the object with its path percent-encoded.
+    const path = String(object.fullPath || '');
+    return !(path && (value.includes(encodeURIComponent(path)) || value.includes(path)));
+  });
+}

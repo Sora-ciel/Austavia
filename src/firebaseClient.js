@@ -17,7 +17,12 @@ import {
 } from './utils/themeSync.js';
 // Which stored attachments no longer belong to a block. See
 // utils/attachmentCleanup.js.
-import { orphanedAttachmentIds } from './utils/attachmentCleanup.js';
+import {
+  orphanedAttachmentIds,
+  staleWallpaperObjects,
+  WALLPAPER_IMAGE_FIELDS,
+  MODE_SETTINGS_BLOCK_ID
+} from './utils/attachmentCleanup.js';
 
 
 export { firebaseConfig, firebaseSyncNamespace };
@@ -270,22 +275,25 @@ async function uploadBlockAttachments(fileId, payload, ctx, uid) {
   };
 }
 
-// Single Note's background images live in modeSettings, not on a block, so the
-// loop above never saw them — they'd have gone into the database inline as
-// base64, which is far too large to sync. Push them to Storage like any other
-// attachment. Desktop and phone keep their own slot, so each device still gets
-// the image picked for it.
-const SINGLE_NOTE_IMAGE_FIELDS = ['backgroundImage', 'backgroundImageMobile'];
-
+// The folder's wallpaper lives in modeSettings, not on a block, so the loop
+// above never saw it — it would go into the database inline as base64, which
+// is far too large to sync. It is pushed to Storage like any other attachment.
+// Desktop and phone keep their own slot, so each device still gets the image
+// picked for it.
+//
+// This used to be Single Note's own wallpaper, and Canvas's was never
+// uploaded: it went into the folder inline, which is how a 13 MB one stopped
+// a folder syncing. Every mode now draws Canvas's (hasWallpaper in
+// modeRegistry.js), so that is the one uploaded.
 async function uploadModeSettingAttachments(fileId, payload, ctx, uid) {
-  const single = payload?.modeSettings?.single;
-  if (!single) return payload;
+  const wallpaper = payload?.modeSettings?.default;
+  if (!wallpaper) return payload;
 
   let changed = false;
-  const nextSingle = { ...single };
+  const nextWallpaper = { ...wallpaper };
 
-  for (const field of SINGLE_NOTE_IMAGE_FIELDS) {
-    const value = nextSingle[field];
+  for (const field of WALLPAPER_IMAGE_FIELDS) {
+    const value = nextWallpaper[field];
     if (typeof value !== 'string' || !value.startsWith('data:')) continue;
 
     const uploadedUrl = await uploadAttachmentFromDataUrl(value, {
@@ -296,7 +304,7 @@ async function uploadModeSettingAttachments(fileId, payload, ctx, uid) {
       ctx
     });
     if (uploadedUrl) {
-      nextSingle[field] = uploadedUrl;
+      nextWallpaper[field] = uploadedUrl;
       changed = true;
     }
   }
@@ -304,7 +312,7 @@ async function uploadModeSettingAttachments(fileId, payload, ctx, uid) {
   if (!changed) return payload;
   return {
     ...payload,
-    modeSettings: { ...payload.modeSettings, single: nextSingle }
+    modeSettings: { ...payload.modeSettings, default: nextWallpaper }
   };
 }
 
@@ -654,6 +662,30 @@ export async function sweepOrphanBlockAttachments(fileId, keepBlockIds = []) {
   }
 
   return { removed: orphans };
+}
+
+// Removes the uploaded wallpapers a folder no longer uses -- replaced ones,
+// removed ones, and the old Single Note one. `wallpaper` is the folder's
+// settings as just saved. See staleWallpaperObjects for how "in use" is told.
+export async function sweepStaleWallpapers(fileId, wallpaper = {}) {
+  if (!isFirebaseConfigured()) return null;
+  if (!isSyncableFileId(fileId)) return null;
+
+  const ctx = await getFirebaseContext();
+  const user = requireUser(ctx.auth.currentUser);
+  const root = getStorageUserPath(user.uid, `attachments/${fileId}/${MODE_SETTINGS_BLOCK_ID}`);
+
+  const stored = [];
+  for (const field of WALLPAPER_IMAGE_FIELDS) {
+    const listing = await ctx.storageApi.listAll(ctx.storageApi.ref(ctx.storage, `${root}/${field}`));
+    for (const item of listing.items) {
+      stored.push({ field, name: item.name, fullPath: item.fullPath, item });
+    }
+  }
+
+  const stale = staleWallpaperObjects(stored, wallpaper, hashText);
+  await Promise.all(stale.map(object => ctx.storageApi.deleteObject(object.item)));
+  return { removed: stale.map(object => object.fullPath) };
 }
 
 // ── Custom themes ───────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@
   import PlayerIcon from './components/PlayerIcons.svelte';
   import ControlIcon from './components/ControlIcon.svelte';
   import ScrollingText from './components/ScrollingText.svelte';
-  import { OUTLINE_PRESET } from './utils/outlineTheme.js';
+  import { SEE_THROUGH_PRESETS } from './utils/outlineTheme.js';
   import AlarmRinger from './components/AlarmRinger.svelte';
   import {
     saveBlocks,
@@ -40,6 +40,7 @@
     saveRemoteTheme,
     deleteRemoteTheme,
     sweepOrphanBlockAttachments,
+    sweepStaleWallpapers,
     subscribeStorageUsage,
     subscribeSubscription
   } from './firebaseClient.js';
@@ -443,7 +444,7 @@
     },
     // Everything see-through but the writing, edges and shadows -- see
     // utils/outlineTheme.js.
-    OUTLINE_PRESET,
+    ...SEE_THROUGH_PRESETS,
     // Guest theme, meant to be pulled back out later — see utils/hatoTheme.js.
     ...HATO_PRESETS
   ];
@@ -484,11 +485,10 @@
     // devices. It lives here rather than behind its own sync because here it
     // already is one -- see utils/habitStore.js.
     habit: { habits: [] },
-    // Both wallpapers use the same shape, defined once in
-    // utils/modeBackground.js. Single Note had one first; Canvas mode now has
-    // the same one rather than a second implementation that drifts from it.
-    // `default` is Canvas mode's own id.
-    single: { ...BACKGROUND_DEFAULTS },
+    // The folder's one wallpaper, drawn by every mode but Birthday, under
+    // Canvas mode's own id -- see hasWallpaper in modeRegistry.js. Single Note
+    // had one of its own under `single`; it is no longer kept at all, so a
+    // folder that still carries one loses it on its next save.
     default: { ...BACKGROUND_DEFAULTS }
   };
 
@@ -500,7 +500,6 @@
   function normalizeModeSettings(settings) {
     const incomingSimple = settings?.simple || {};
     const incomingTask = settings?.task || {};
-    const incomingSingle = settings?.single || {};
     return {
       ...DEFAULT_MODE_SETTINGS,
       simple: {
@@ -523,9 +522,12 @@
       // anything reads it -- and so that a round trip through the cloud is
       // byte-identical and does not read as an edit.
       habit: { habits: normalizeHabits(settings?.habit?.habits) },
-      // Both wallpapers go through one normaliser, so the awkward parts — the
-      // pre-0.8.35 opacity stored as a 0-1 fraction, all the clamping — are
-      // written once and cannot disagree between the two modes.
+      // The wallpaper goes through the shared normaliser, so the awkward parts
+      // — the pre-0.8.35 opacity stored as a 0-1 fraction, all the clamping —
+      // are written once. Single Note's old `single` is deliberately not
+      // carried: asked on 2026-09-27 for it to be "actually deleted", so it is
+      // dropped here and gone from the folder, locally and in the cloud, at
+      // the next save. Its uploaded picture goes with sweepWallpapersFor.
       //
       // readStoredBackground is handed in rather than known about. A theme's
       // own wallpaper is layered on at render time and must never reach a
@@ -533,7 +535,6 @@
       // stored copy outranks the theme, survives switching away from it, and
       // becomes a dead image reference the day that theme is removed. That is
       // this app's rule, though, not the normaliser's.
-      single: normalizeBackgroundSettings(incomingSingle, { keepImage: readStoredBackground }),
       default: normalizeBackgroundSettings(settings?.default, { keepImage: readStoredBackground })
     };
   }
@@ -2739,9 +2740,8 @@
   // dropping the theme takes the background with it.
   // One wallpaper per folder: Canvas's picture and settings, drawn by every
   // mode but Birthday (see hasWallpaper in modeRegistry.js). The name is from
-  // when Single Note had one of its own. modeSettings.single is still read and
-  // saved as it was, so nothing a folder holds is lost -- it is only no longer
-  // drawn.
+  // when Single Note had one of its own, which is now deleted -- see
+  // normalizeModeSettings.
   $: singleNoteSettings = withThemeBackground(modeSettings.default, activeTheme);
   // Canvas keeps whatever the folder itself set, and nothing else. A theme
   // supplying a wallpaper is a Single Note arrangement; having one appear over
@@ -3055,7 +3055,34 @@
     const syncedAt = Date.now();
     rememberCloudSyncForFile(fileName, syncedAt);
     await sweepDeletedBlockAttachments(fileName, payload);
+    await sweepWallpapersFor(fileName, payload);
     return result;
+  }
+
+  // Uploaded wallpapers a folder no longer uses: replaced, removed, or the old
+  // Single Note one (see staleWallpaperObjects). Looked at once per folder per
+  // session and again whenever a wallpaper changes -- worked out afresh from
+  // storage each time rather than from a record of what changed, so a picture
+  // left behind by an earlier build or another device is found too. Like the
+  // block sweep, after the save and never allowed to fail it.
+  const wallpapersSwept = new Set();
+  let wallpaperChanged = false;
+
+  async function sweepWallpapersFor(fileName, savedPayload) {
+    if (!firebaseReady || !authUser) return;
+    if (wallpapersSwept.has(fileName) && !wallpaperChanged) return;
+    const wallpaper = savedPayload?.modeSettings?.default;
+    // A payload without its settings is one this code does not understand,
+    // and the safe reading of that is to remove nothing.
+    if (!wallpaper || typeof wallpaper !== 'object') return;
+
+    wallpapersSwept.add(fileName);
+    wallpaperChanged = false;
+    try {
+      await sweepStaleWallpapers(fileName, wallpaper);
+    } catch (error) {
+      console.warn('Could not remove wallpapers the folder no longer uses:', error);
+    }
   }
 
   // --- Undo/Redo history ---
@@ -3782,6 +3809,11 @@
       const timer = setTimeout(() => reject(new Error('The wallpaper took too long to load.')), ms);
       image.onload = () => { clearTimeout(timer); resolve(image); };
       image.onerror = () => { clearTimeout(timer); reject(new Error('The wallpaper would not load.')); };
+      // A synced wallpaper is a storage link rather than a data URL, and a
+      // picture from elsewhere drawn without CORS taints the canvas -- the
+      // screenshot then cannot be read back out at all. Asked for with CORS,
+      // it either arrives clean or fails here and is left out.
+      image.crossOrigin = 'anonymous';
       image.src = src;
     });
   }
@@ -4068,6 +4100,33 @@
     // the room the first one took rather than against a figure that has not
     // heard about it yet.
     pendingStorageBytes += Math.max(0, Number(bytes) || 0);
+    return true;
+  }
+
+  /**
+   * Whether a wallpaper fits in what is left.
+   *
+   * Asked of the account's room like an image block's picture, not of the
+   * database's limit for one value: a wallpaper is uploaded as a file (see
+   * uploadModeSettingAttachments), so only its size in storage matters.
+   * `dataUrlLength` is what the picker read; the file is about three quarters
+   * of it.
+   */
+  async function mayUseBackground(dataUrlLength) {
+    const bytes = Math.round(Math.max(0, Number(dataUrlLength) || 0) * 0.75);
+    const verdict = attachmentVerdict({
+      bytes,
+      usage: shownStorageUsage,
+      signedIn: Boolean(authUser),
+      autoSync: autoSyncEnabled
+    });
+
+    if (!verdict.allow) {
+      await appAlert(verdict.message);
+      return false;
+    }
+    if (verdict.message) syncFailureNotice = verdict.message;
+    pendingStorageBytes += bytes;
     return true;
   }
 
@@ -5387,14 +5446,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       patch = { ...patch, task: { ...patch.task, addDirection: detail.taskAddDirection } };
     }
 
-    // Canvas mode's wallpaper, which uses the same settings shape as Single
-    // Note's and reaches here under that mode's own id.
+    // The folder's wallpaper -- every mode's but Birthday's -- which arrives
+    // under Canvas mode's own id.
     if (detail.default && typeof detail.default === 'object') {
       patch = { ...patch, default: { ...patch.default, ...detail.default } };
-    }
-
-    if (detail.single && typeof detail.single === 'object') {
-      patch = { ...patch, single: { ...patch.single, ...detail.single } };
+      if ('backgroundImage' in detail.default || 'backgroundImageMobile' in detail.default) {
+        wallpaperChanged = true;
+      }
     }
 
     if (detail.blocksFollowTheme !== undefined) {
@@ -6488,7 +6546,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       colors={controlColors.left}
       {birthdayModeUnlocked}
       {birthdayUnlockMessage}
-      mayUseBackground={(bytes) => mayAddPicture(bytes, 'This background')}
+      {mayUseBackground}
       on:addBlock={(e) => addBlock(e.detail)}
       on:clear={clear}
       on:exportJSON={exportJSON}

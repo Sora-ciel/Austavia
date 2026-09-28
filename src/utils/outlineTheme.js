@@ -83,6 +83,12 @@ function withAlpha(hex, alpha) {
  * canvas sit on, and should be the opposite of the ink so writing reads over
  * any picture. `blockTheme` and `controlColors` are merged over the template
  * for anything a particular theme wants different.
+ *
+ * How see-through each part is can be set too, which is what makes this a
+ * family rather than one theme in several colours: `surfaceOpacity` and
+ * `headerOpacity` for blocks (0-100, as the theme dials are), `panelOpacity`
+ * for the toolbar and `popupOpacity` for pop-ups (0-1). Left out, each is
+ * Outline's.
  */
 export function seeThroughPreset({
   id,
@@ -91,11 +97,15 @@ export function seeThroughPreset({
   ink = '#ffffff',
   backing = '#000000',
   blockTheme = {},
-  controlColors = {}
+  controlColors = {},
+  surfaceOpacity = 0,
+  headerOpacity = 0,
+  panelOpacity = POPUP_BACKING_OPACITY,
+  popupOpacity = POPUP_BACKING_OPACITY
 } = {}) {
   const clear = '#00000000';
   const line = `${ink}b3`;
-  const panel = hexWithAlpha(backing, POPUP_BACKING_OPACITY);
+  const panel = hexWithAlpha(backing, panelOpacity);
 
   return {
     id,
@@ -123,14 +133,14 @@ export function seeThroughPreset({
       // over a picture of its own colour; the first version only softened the
       // edges.
       textShadow: `0 0 1px ${backing}, 0 0 3px ${backing}, 0 1px 6px ${withAlpha(backing, 0.85)}`,
-      bgOpacity: 0,
-      headerOpacity: 0,
+      bgOpacity: surfaceOpacity,
+      headerOpacity,
       textOpacity: 100,
       ...blockTheme
     }),
     // What pop-ups sit on -- see above. A theme without one keeps its panels'
     // own colour.
-    popupBg: withAlpha(backing, POPUP_BACKING_OPACITY),
+    popupBg: withAlpha(backing, popupOpacity),
     previewBg: 'transparent',
     blockDefaults: { bgColor: backing, textColor: ink }
   };
@@ -141,3 +151,51 @@ export const OUTLINE_PRESET = seeThroughPreset({
   name: 'Outline',
   description: 'Only the writing, the edges and the shadows. Every surface is see-through, so a wallpaper shows through all of it.'
 });
+
+/**
+ * Three more in the family, asked for on 2026-09-27: "make 3 other themes that
+ * are a bit like Outline, with different colours and levels of 'this will not
+ * have opacity, or this will have more'." Each differs from Outline in colour
+ * and in one clear direction of see-through.
+ */
+
+// Warm, and further than Outline: the toolbar is fully clear too, so nothing
+// but the pop-ups has any backing at all.
+export const AMBER_WIRE_PRESET = seeThroughPreset({
+  id: 'amber-wire',
+  name: 'Amber Wire',
+  description: 'Amber writing and edges on nothing at all -- even the toolbar is clear. Only the pop-ups keep a backing.',
+  ink: '#ffc46b',
+  backing: '#140c02',
+  panelOpacity: 0
+});
+
+// Cool, and less far than Outline: blocks keep a faint tint of the backing
+// and their headers a stronger one, so they read as frosted panes rather than
+// bare outlines.
+export const FROST_GLASS_PRESET = seeThroughPreset({
+  id: 'frost-glass',
+  name: 'Frost Glass',
+  description: 'Pale blue writing on frosted panes: blocks keep a light tint and their headers a stronger one, so the wallpaper shows through softened.',
+  ink: '#e8f4ff',
+  backing: '#07121f',
+  surfaceOpacity: 35,
+  headerOpacity: 55,
+  panelOpacity: 0.6,
+  popupOpacity: 0.85
+});
+
+// Light, the other way round: dark writing with pale backings, for bright
+// wallpapers where white writing would disappear.
+export const CHALK_PRESET = seeThroughPreset({
+  id: 'chalk',
+  name: 'Chalk',
+  description: 'Dark writing with pale backings, for bright wallpapers. Blocks keep a whisper of white; the toolbar and pop-ups are chalky panes.',
+  ink: '#16181c',
+  backing: '#f4f1ea',
+  surfaceOpacity: 20,
+  popupOpacity: 0.9
+});
+
+/** Every see-through theme, Outline first -- the order they appear in. */
+export const SEE_THROUGH_PRESETS = [OUTLINE_PRESET, AMBER_WIRE_PRESET, FROST_GLASS_PRESET, CHALK_PRESET];

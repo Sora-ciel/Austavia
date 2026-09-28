@@ -754,8 +754,14 @@
   border-radius: 8px;
 }
 
+/* The frame around each block paints nothing. Asked for on 2026-09-27: the
+   column's direct children should be see-through "so that the background
+   colour is the only one above the background" -- the block's own colour over
+   the wallpaper, with no second sheet under it. That is also what lets a theme
+   that fades blocks to nothing (Outline) actually show nothing here, instead
+   of the frame's colour where the block used to be. */
 .canvas {
-  background: var(--canvas-outer-bg, #00000041);
+  background: transparent;
   border-radius: 8px;
   padding: 5px;
   margin: 0 0 0.45rem;

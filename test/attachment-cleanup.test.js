@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   MODE_SETTINGS_BLOCK_ID,
   isSafeStorageSegment,
-  orphanedAttachmentIds
+  orphanedAttachmentIds,
+  staleWallpaperObjects
 } from '../src/utils/attachmentCleanup.js';
 
 describe('isSafeStorageSegment', () => {
@@ -81,5 +82,47 @@ describe('orphanedAttachmentIds', () => {
       orphanedAttachmentIds(['b1', 'b2', MODE_SETTINGS_BLOCK_ID], []),
       ['b1', 'b2']
     );
+  });
+});
+
+// Asked for on 2026-09-27: "make it so that the background that was used only
+// on Single Note mode is actually deleted." Its setting leaving the folder was
+// not enough -- the picture stayed in storage, under a folder the block sweep
+// keeps whole, and so did every wallpaper ever chosen.
+describe('staleWallpaperObjects', () => {
+  const hashOf = value => `h${value.length}`;
+  const root = 'users/u/attachments/f/mode-settings';
+  const object = (field, name) => ({ field, name, fullPath: `${root}/${field}/${name}` });
+
+  it('keeps the wallpaper this device chose, by the name its upload was given', () => {
+    const current = { backgroundImage: 'data:abc' };
+    const kept = object('backgroundImage', `${hashOf('data:abc')}.png`);
+    assert.deepEqual(staleWallpaperObjects([kept], current, hashOf), []);
+  });
+
+  it('keeps the wallpaper another device chose, by the path in its link', () => {
+    const kept = object('backgroundImage', 'h9.jpg');
+    const current = { backgroundImage: `https://x/o/${encodeURIComponent(kept.fullPath)}?alt=media` };
+    assert.deepEqual(staleWallpaperObjects([kept], current, hashOf), []);
+  });
+
+  it('removes a wallpaper that was replaced, and one that was removed', () => {
+    const old = object('backgroundImage', 'h1.png');
+    const oldPhone = object('backgroundImageMobile', 'h2.png');
+    const current = { backgroundImage: 'data:new-one' };
+    assert.deepEqual(staleWallpaperObjects([old, oldPhone], current, hashOf), [old, oldPhone]);
+  });
+
+  // The Single Note wallpaper was uploaded to the same fields, so once the
+  // folder only holds Canvas's, it is simply one that is not in use.
+  it("removes the old Single Note wallpaper once only Canvas's is kept", () => {
+    const singleNotes = object('backgroundImage', 'h77.jpg');
+    const canvas = object('backgroundImage', `${hashOf('data:canvas')}.png`);
+    const stale = staleWallpaperObjects([singleNotes, canvas], { backgroundImage: 'data:canvas' }, hashOf);
+    assert.deepEqual(stale, [singleNotes]);
+  });
+
+  it('leaves alone anything under a field it does not know', () => {
+    assert.deepEqual(staleWallpaperObjects([object('somethingElse', 'x.png')], {}, hashOf), []);
   });
 });

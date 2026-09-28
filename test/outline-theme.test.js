@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { OUTLINE_PRESET, seeThroughPreset } from '../src/utils/outlineTheme.js';
+import { OUTLINE_PRESET, seeThroughPreset, SEE_THROUGH_PRESETS } from '../src/utils/outlineTheme.js';
 import { BLOCK_THEME_DEFAULTS } from '../src/utils/themeDefaults.js';
 
 const alphaOf = hex => (/^#[0-9a-f]{8}$/i.test(hex) ? parseInt(hex.slice(7), 16) : 255);
@@ -95,4 +95,37 @@ describe('Outline is the template for later see-through themes', () => {
 // that predate it would inherit whatever the page last set.
 it('gives every theme a text shadow, none unless it asks for one', () => {
   assert.equal(BLOCK_THEME_DEFAULTS.textShadow, 'none');
+});
+
+// "Make 3 other themes that are a bit like Outline, with different colours
+// and levels of 'this will not have opacity, or this will have more'."
+describe('the other see-through themes', () => {
+  const others = SEE_THROUGH_PRESETS.filter(theme => theme !== OUTLINE_PRESET);
+  const alpha = rgba => Number(/, ([\d.]+)\)$/.exec(rgba)?.[1]);
+
+  it('are three, each its own theme', () => {
+    assert.equal(others.length, 3);
+    const ids = SEE_THROUGH_PRESETS.map(theme => theme.id);
+    assert.equal(new Set(ids).size, ids.length);
+  });
+
+  it('come from the same template, with their own colours', () => {
+    for (const theme of others) {
+      assert.ok(theme.popupBg, `${theme.id} has a pop-up backing`);
+      assert.equal(alphaOf(theme.controlColors.left.buttonBg), 0, `${theme.id} buttons are clear`);
+      assert.notEqual(theme.blockTheme.headerText, OUTLINE_PRESET.blockTheme.headerText, `${theme.id} has its own ink`);
+    }
+  });
+
+  it('go further than Outline in one direction and less far in another', () => {
+    const [amber, frost, chalk] = others;
+    // No backing on the toolbar at all.
+    assert.equal(alphaOf(amber.controlColors.left.panelBg), 0);
+    // Blocks keep some of their surface, headers more.
+    assert.ok(frost.blockTheme.bgOpacity > 0 && frost.blockTheme.headerOpacity > frost.blockTheme.bgOpacity);
+    // Pop-ups more opaque than Outline's.
+    assert.ok(alpha(frost.popupBg) > alpha(OUTLINE_PRESET.popupBg));
+    assert.ok(alpha(chalk.popupBg) > alpha(OUTLINE_PRESET.popupBg));
+    assert.ok(chalk.blockTheme.bgOpacity > 0);
+  });
 });
