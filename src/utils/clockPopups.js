@@ -12,7 +12,14 @@
  * ## How it behaves, and why
  *
  * - **It opens by itself** when a timer starts, and closes by itself when the
- *   timer is stopped or reset. Nobody should have to manage the window.
+ *   timer is stopped or reset in the app. Nobody should have to manage the
+ *   window.
+ * - **Stop in the pop-up keeps the pop-up**, with the timer set back to its
+ *   length and a Start button, so the same timer can be run again from there.
+ *   Asked for on 2026-09-28 once it had been tried: "clicking Stop on the
+ *   pop-up shouldn't close the pop-up; it should put back the timer that was
+ *   used at first so you can restart it from the pop-up itself." It stays
+ *   until it is hidden with its own ×.
  * - **Hiding it is not stopping the timer**, and it stays hidden for the rest
  *   of that run -- but **it comes back when time is up**, whatever, because
  *   that is the one moment it exists for.
@@ -45,6 +52,8 @@ export const POPUP_MARGIN = 16;
 
 /** Where a pop-up hidden by hand is remembered, per window. */
 export const HIDDEN_KEY_PREFIX = 'austavia.popup.hidden.';
+/** Where a pop-up kept open after its own Stop is remembered, per window. */
+export const KEEP_KEY_PREFIX = 'austavia.popup.keep.';
 /** Where the last place a pop-up was dragged to is remembered. */
 export const POSITION_KEY = 'austavia.popup.position';
 /** Where the app leaves its colours for the pop-ups to read. */
@@ -65,7 +74,7 @@ export function popupLabel(blockId, kind) {
  * `blocks` are the folder's blocks; `devices` is this device's memory of each
  * clock (clockDeviceStore); `hidden` is the labels hidden by hand.
  */
-export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidden = new Set() } = {}) {
+export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidden = new Set(), kept = new Set() } = {}) {
   const wanted = [];
 
   for (const block of blocks || []) {
@@ -74,7 +83,10 @@ export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidd
 
     const phase = timerState(device.timer, now);
     const timerLabel = popupLabel(block.id, 'timer');
-    if (phase === 'ringing' || ((phase === 'running' || phase === 'paused') && !hidden.has(timerLabel))) {
+    const inUse = phase === 'running' || phase === 'paused';
+    // Kept: stopped from the pop-up itself, which stays ready to start again.
+    const keptReady = kept.has(timerLabel) && (phase === 'idle' || phase === 'done');
+    if (phase === 'ringing' || (inUse && !hidden.has(timerLabel)) || keptReady) {
       wanted.push({ blockId: block.id, kind: 'timer', label: timerLabel });
     }
 
@@ -108,6 +120,17 @@ export function hiddenToForget({ blocks = [], devices = {}, now = Date.now(), hi
     }
   }
   return [...hidden].filter(label => !live.has(label));
+}
+
+/**
+ * Kept-open marks for clocks that no longer exist in the folder. A kept
+ * pop-up otherwise lasts until its own × is pressed.
+ */
+export function keptToForget({ blocks = [], kept = new Set() } = {}) {
+  const clocks = new Set(
+    (blocks || []).filter(block => block?.type === 'clock' && block.id).map(block => popupLabel(block.id, 'timer'))
+  );
+  return [...kept].filter(label => !clocks.has(label));
 }
 
 /**

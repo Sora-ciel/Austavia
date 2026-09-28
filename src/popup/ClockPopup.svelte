@@ -20,7 +20,7 @@
     timerReading
   } from '../utils/countdown.js';
   import { isRinging, dismissed, snoozed, alarmReading } from '../utils/alarm.js';
-  import { timerFractionLeft, HIDDEN_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
+  import { timerFractionLeft, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
   import { createRinger } from '../utils/ringTone.js';
 
   const params = new URLSearchParams(location.search);
@@ -44,11 +44,19 @@
   $: alarmRinging = kind === 'alarm' && isRinging({ now, time: alarmTime, enabled: true, device });
   $: ringing = kind === 'timer' ? phase === 'ringing' : alarmRinging;
 
-  // Nothing left to show: the timer was stopped or reset in any window, or
-  // the alarm was answered. The main window would close it on its next look
-  // too; closing here makes it immediate.
-  $: finished = kind === 'timer' ? phase === 'idle' || phase === 'done' : !alarmRinging;
+  // Kept open after its own Stop, ready to start again -- see clockPopups.js.
+  let kept = readKept();
+  $: idle = phase === 'idle' || phase === 'done';
+
+  // Nothing left to show: the timer was stopped or reset in the app, or the
+  // alarm was answered. The main window would close it on its next look too;
+  // closing here makes it immediate. A kept pop-up stays.
+  $: finished = kind === 'timer' ? idle && !kept : !alarmRinging;
   $: if (finished && win) closeWindow();
+
+  function readKept() {
+    try { return localStorage.getItem(KEEP_KEY_PREFIX + label) !== null; } catch { return false; }
+  }
 
   // It rings for itself, so it is heard with Austavia minimised. The main
   // window stays quiet for anything a pop-up is ringing.
@@ -65,6 +73,7 @@
 
   function onStorage(event) {
     if (event.key === THEME_KEY) theme = readTheme();
+    if (event.key === KEEP_KEY_PREFIX + label) kept = readKept();
   }
 
   function change(fn) {
@@ -74,12 +83,19 @@
   function togglePause() {
     if (kind !== 'timer') return;
     if (phase === 'running') change(pauseTimer);
-    else if (phase === 'paused') change(startTimer);
+    else if (phase === 'paused' || idle) change(idle ? (timer, at) => startTimer(resetTimer(timer), at) : startTimer);
   }
 
+  // Stop sets the timer back to its length and keeps the pop-up, so the same
+  // timer can be started again from here. Asked for once it had been tried.
   function stop() {
-    if (kind === 'timer') change(resetTimer);
-    else setClockDevice(blockId, dismissed(device, Date.now()));
+    if (kind === 'timer') {
+      try { localStorage.setItem(KEEP_KEY_PREFIX + label, String(Date.now())); } catch { /* closes instead */ }
+      kept = true;
+      change(resetTimer);
+    } else {
+      setClockDevice(blockId, dismissed(device, Date.now()));
+    }
   }
 
   function snooze() {
@@ -89,7 +105,11 @@
   // Hidden, not stopped. It stays hidden for this run and comes back when
   // time is up -- see popupsWanted.
   function hide() {
-    try { localStorage.setItem(HIDDEN_KEY_PREFIX + label, String(Date.now())); } catch { /* shown again next tick */ }
+    try {
+      localStorage.setItem(HIDDEN_KEY_PREFIX + label, String(Date.now()));
+      localStorage.removeItem(KEEP_KEY_PREFIX + label);
+    } catch { /* shown again next tick */ }
+    kept = false;
     closeWindow();
   }
 
@@ -166,7 +186,7 @@
         Alarm · {alarmReading(alarmTime, hour12)}
       {/if}
     </span>
-    <button class="hide" title="Hide (the timer keeps going)" aria-label="Hide" on:click={hide}>×</button>
+    <button class="hide" title={idle ? 'Close' : 'Hide (the timer keeps going)'} aria-label={idle ? 'Close' : 'Hide'} on:click={hide}>×</button>
   </div>
 
   <div class="figure" data-tauri-drag-region>
@@ -186,6 +206,9 @@
       {#if ringing}
         <button on:click={() => change(oneMoreMinute)}>+1 min</button>
         <button class="primary" on:click={stop}>Stop</button>
+      {:else if idle}
+        <!-- Stopped here: the timer is back to its length, ready to run again. -->
+        <button class="primary" on:click={togglePause}>Start</button>
       {:else}
         <button on:click={togglePause}>{phase === 'paused' ? 'Resume' : 'Pause'}</button>
         <button on:click={() => change(oneMoreMinute)}>+1 min</button>
@@ -201,10 +224,15 @@
 <style>
   /* The window is transparent; the card is what shows, in the app's own
      dialog colours, handed over through local storage (THEME_KEY). */
+  /* Nothing behind the card. The window is transparent so the card's rounded
+     corners are the window's corners -- but the page it opens is the app's,
+     and app.css paints #app black; that drew a square behind the rounded
+     card, reported on 2026-09-28. Cleared here for the pop-up only. */
   :global(html),
-  :global(body) {
+  :global(body),
+  :global(#app) {
     margin: 0;
-    background: transparent;
+    background: transparent !important;
     overflow: hidden;
   }
 

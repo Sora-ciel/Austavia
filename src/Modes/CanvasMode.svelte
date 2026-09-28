@@ -689,6 +689,13 @@
       <div class="canvas-content" style:transform={`translateX(${contentOffsetX}px)`}>
       {#each blocks as block (`${block.id}-${block._version || 0}`)}
         {#if block.type === 'text' || block.type === 'cleantext'}
+          <!-- Scroll comes from this device's memory and nowhere else. It
+               used to fall back to `block.scrollTop`, a field older builds
+               saved into the block -- and the fallback ran whenever nothing
+               was remembered, including after scrolling back to the top, which
+               deletes the entry. A theme change redraws every block, so that
+               was when an old position came back: reported on 2026-09-28 as
+               the scroll being saved "by theme". See utils/scrollMemory.js. -->
           <TextBlock
             id={block.id}
             initialPosition={block.position}
@@ -696,7 +703,7 @@
             initialBgColor={block.bgColor}
             initialTextColor={block.textColor}
             initialContent={block.content}
-            initialScrollTop={recallScroll(openFolder, block.id) || block.scrollTop || 0}
+            initialScrollTop={recallScroll(openFolder, block.id)}
             fileKey={openFolder}
             focused={block.id === focusedBlockId}
             canvasScale={scale}

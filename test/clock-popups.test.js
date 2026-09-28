@@ -13,6 +13,7 @@ import {
   popupLabel,
   popupsWanted,
   hiddenToForget,
+  keptToForget,
   popupPosition,
   timerFractionLeft,
   POPUP_WIDTH,
@@ -70,6 +71,27 @@ describe('which pop-ups are open', () => {
 
   it('ignores anything that is not a clock', () => {
     assert.equal(popupsWanted({ blocks: [{ id: 'x', type: 'text' }], devices: { x: running } }).length, 0);
+  });
+});
+
+// Asked for once it had been tried: "clicking Stop on the pop-up shouldn't
+// close the pop-up; it should put back the timer that was used at first so
+// you can restart it from the pop-up itself."
+describe('Stop in the pop-up keeps the pop-up', () => {
+  const kept = new Set([popupLabel('a', 'timer')]);
+
+  it('stays open, ready to start again, after its own Stop', () => {
+    const wanted = popupsWanted({ blocks: [clock('a')], devices: { a: {} }, now: T, kept });
+    assert.deepEqual(wanted.map(p => [p.blockId, p.kind]), [['a', 'timer']]);
+  });
+
+  it('still closes when stopped in the app, where nobody asked to keep it', () => {
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices: { a: {} }, now: T }).length, 0);
+  });
+
+  it('forgets the keep once the clock is gone', () => {
+    assert.deepEqual(keptToForget({ blocks: [], kept }), [popupLabel('a', 'timer')]);
+    assert.deepEqual(keptToForget({ blocks: [clock('a')], kept }), []);
   });
 });
 

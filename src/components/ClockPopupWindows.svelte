@@ -14,10 +14,12 @@
   import {
     popupsWanted,
     hiddenToForget,
+    keptToForget,
     popupPosition,
     POPUP_WIDTH,
     POPUP_HEIGHT,
     HIDDEN_KEY_PREFIX,
+    KEEP_KEY_PREFIX,
     POSITION_KEY
   } from '../utils/clockPopups.js';
 
@@ -29,15 +31,15 @@
   let tick = null;
   let busy = false;
 
-  function readHidden() {
-    const hidden = new Set();
+  function readMarks(prefix) {
+    const marks = new Set();
     try {
       for (let i = 0; i < localStorage.length; i += 1) {
         const key = localStorage.key(i);
-        if (key?.startsWith(HIDDEN_KEY_PREFIX)) hidden.add(key.slice(HIDDEN_KEY_PREFIX.length));
+        if (key?.startsWith(prefix)) marks.add(key.slice(prefix.length));
       }
-    } catch { /* nothing hidden */ }
-    return hidden;
+    } catch { /* none */ }
+    return marks;
   }
 
   function readSaved() {
@@ -72,13 +74,20 @@
       }
 
       // A hide lasts one run -- see hiddenToForget.
-      const hidden = readHidden();
+      const hidden = readMarks(HIDDEN_KEY_PREFIX);
       for (const label of hiddenToForget({ blocks, devices, now, hidden })) {
         try { localStorage.removeItem(HIDDEN_KEY_PREFIX + label); } catch { /* next time */ }
         hidden.delete(label);
       }
 
-      const wanted = popupsWanted({ blocks, devices, now, hidden });
+      // Kept open after the pop-up's own Stop -- until its × or the clock goes.
+      const kept = readMarks(KEEP_KEY_PREFIX);
+      for (const label of keptToForget({ blocks, kept })) {
+        try { localStorage.removeItem(KEEP_KEY_PREFIX + label); } catch { /* next time */ }
+        kept.delete(label);
+      }
+
+      const wanted = popupsWanted({ blocks, devices, now, hidden, kept });
       const wantedLabels = new Set(wanted.map(popup => popup.label));
 
       const existing = (await api.getAllWebviewWindows())
