@@ -32,10 +32,17 @@
   } from '../utils/alarm.js';
   import { timerState, resetTimer, oneMoreMinute, msUntilTimerRingChange } from '../utils/countdown.js';
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
+  import { createRinger } from '../utils/ringTone.js';
+  import { popupLabel } from '../utils/clockPopups.js';
 
   export let blocks = [];
   /** The dialog palette App hands its other popups, so this reads as one of them. */
   export let themeStyle = '';
+  /**
+   * Pop-up windows that are open, by label, on the Windows app -- they ring
+   * for themselves. See utils/clockPopups.js.
+   */
+  export let quiet = new Set();
 
   let now = Date.now();
   let wake = null;
@@ -89,51 +96,16 @@
   }
 
   // ── Sound ─────────────────────────────────────────────────────────
-  // Made rather than played from a file, so there is nothing to ship or load
-  // and nothing that can fail to arrive. Two short beeps a second, and a
-  // vibration where the device has one.
-  let audio = null;
-  let beeper = null;
+  // The shared ring (utils/ringTone.js). Quiet for anything whose always-on-top
+  // pop-up is open and ringing it already -- two sets of beeps a fraction of a
+  // second apart sound like a fault, not an alarm.
+  const ringer = createRinger();
 
-  function beep() {
-    try {
-      audio ??= new (window.AudioContext || window.webkitAudioContext)();
-      if (audio.state === 'suspended') audio.resume();
-      const start = audio.currentTime;
-      for (const offset of [0, 0.22]) {
-        const tone = audio.createOscillator();
-        const gain = audio.createGain();
-        tone.type = 'sine';
-        tone.frequency.value = 880;
-        gain.gain.setValueAtTime(0.0001, start + offset);
-        gain.gain.exponentialRampToValueAtTime(0.3, start + offset + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.16);
-        tone.connect(gain).connect(audio.destination);
-        tone.start(start + offset);
-        tone.stop(start + offset + 0.18);
-      }
-    } catch {
-      // No audio here; the banner still shows.
-    }
-    try {
-      navigator.vibrate?.([180, 60, 180]);
-    } catch {
-      // Not a device that vibrates.
-    }
-  }
-
-  $: sounding = ringing.length > 0 || rungTimers.length > 0;
-  $: soundFor(sounding);
-  function soundFor(on) {
-    if (on && !beeper) {
-      beep();
-      beeper = setInterval(beep, 1000);
-    } else if (!on && beeper) {
-      clearInterval(beeper);
-      beeper = null;
-      try { navigator.vibrate?.(0); } catch { /* nothing to stop */ }
-    }
-  }
+  $: ringingLabels = [
+    ...ringing.map(alarm => popupLabel(alarm.id, 'alarm')),
+    ...rungTimers.map(entry => popupLabel(entry.id, 'timer'))
+  ];
+  $: ringer.set(ringingLabels.some(label => !quiet.has(label)));
 
   function stop(alarm) {
     setClockDevice(alarm.id, dismissed(alarm.device, Date.now()));
@@ -157,8 +129,7 @@
     // Also stops a reschedule already queued from starting the timer again.
     mounted = false;
     clearTimeout(wake);
-    soundFor(false);
-    audio?.close?.();
+    ringer.destroy();
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', onVisible);
     }

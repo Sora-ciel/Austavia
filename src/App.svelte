@@ -10,6 +10,8 @@
   import { SEE_THROUGH_PRESETS } from './utils/outlineTheme.js';
   import { EXTRA_PRESETS } from './utils/extraThemes.js';
   import AlarmRinger from './components/AlarmRinger.svelte';
+  import ClockPopupWindows from './components/ClockPopupWindows.svelte';
+  import { THEME_KEY as POPUP_THEME_KEY } from './utils/clockPopups.js';
   import {
     saveBlocks,
     loadBlocks,
@@ -2957,6 +2959,17 @@
   // Dialogs and the sync banner render outside .app, so they can't inherit its
   // theme vars — hand them the right-panel palette directly.
   $: rightTheme = controlColors.right || CONTROL_COLOR_DEFAULTS.right;
+
+  // The pop-up windows for timers and alarms are separate pages, so they are
+  // handed the theme's dialog colours through local storage, which they share
+  // with this window -- see utils/clockPopups.js.
+  let popupLabelsOpen = new Set();
+  $: sharePopupTheme(activeTheme?.popupBg || rightTheme.panelBg, rightTheme.textColor, leftTheme.buttonText, rightTheme.borderColor);
+  function sharePopupTheme(bg, text, accent, border) {
+    try {
+      localStorage.setItem(POPUP_THEME_KEY, JSON.stringify({ bg, text, accent, border }));
+    } catch { /* the pop-ups fall back to plain dark */ }
+  }
   $: overlayThemeStyle =
     // A theme's popupBg, when it has one, is what a dialog sits on -- see
     // utils/outlineTheme.js. Otherwise the settings panel's own colour.
@@ -6907,7 +6920,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
 <!-- Rings the open folder's alarms in every mode, not only where the clock is
      drawn. -->
-<AlarmRinger {blocks} themeStyle={overlayThemeStyle} />
+<AlarmRinger {blocks} themeStyle={overlayThemeStyle} quiet={popupLabelsOpen} />
+<!-- The always-on-top timer and alarm windows, on the Windows app only --
+     see utils/clockPopups.js. -->
+<ClockPopupWindows {blocks} bind:open={popupLabelsOpen} />
 
 {#if dialogState}
   <div class="app-dialog-overlay" role="presentation" style={overlayThemeStyle} on:click={handleDialogCancel}>
