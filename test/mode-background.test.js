@@ -172,7 +172,7 @@ describe('which of the two images a screen gets', () => {
 // which on a dark theme is usually a hole burned in the page.
 describe('dimming pictures inside a note', () => {
   it('follows the wallpaper by default, so one pair of dials covers both', () => {
-    const out = noteImageFilter({ bgOpacity: 40, bgLuminosity: 60, imageOpacity: 100, imageLuminosity: 100 });
+    const out = noteImageFilter({ backgroundImage: 'data:w', bgOpacity: 40, bgLuminosity: 60, imageOpacity: 100, imageLuminosity: 100 });
     assert.equal(out.follows, true);
     assert.equal(out.opacity, 0.4);
     assert.equal(out.brightness, 0.6);
@@ -190,9 +190,23 @@ describe('dimming pictures inside a note', () => {
   });
 
   it('treats a folder saved before these existed as following', () => {
-    const out = noteImageFilter({ bgOpacity: 50, bgLuminosity: 100 });
+    const out = noteImageFilter({ backgroundImage: 'data:w', bgOpacity: 50, bgLuminosity: 100 });
     assert.equal(out.follows, true);
     assert.equal(out.opacity, 0.5);
+  });
+
+  // "Being able to change the opacity, luminosity etc. of images you add in
+  // the note in Single Note mode -- you removed that option." With no
+  // wallpaper, following left the pictures on dials nobody could see.
+  it('gives the pictures their own dials when there is no wallpaper to follow', () => {
+    const out = noteImageFilter({ bgOpacity: 20, imageOpacity: 60, imageLuminosity: 80 });
+    assert.equal(out.follows, false);
+    assert.equal(out.opacity, 0.6);
+    assert.equal(out.brightness, 0.8);
+  });
+
+  it('follows on the phone picture too', () => {
+    assert.equal(noteImageFilter({ backgroundImageMobile: 'data:w' }).follows, true);
   });
 
   it('clamps nonsense rather than producing an invalid filter', () => {
@@ -211,7 +225,7 @@ describe('dimming pictures inside a note', () => {
   });
 
   it('writes a filter when something would change', () => {
-    assert.equal(noteImageFilterCss({ bgOpacity: 50, bgLuminosity: 100 }), 'opacity(0.5) brightness(1)');
+    assert.equal(noteImageFilterCss({ backgroundImage: 'data:w', bgOpacity: 50, bgLuminosity: 100 }), 'opacity(0.5) brightness(1)');
   });
 
   it('normalising keeps the new dials and defaults them to following', () => {

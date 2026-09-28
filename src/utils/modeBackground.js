@@ -90,12 +90,30 @@ export function normalizeBackgroundSettings(raw = {}, { keepImage = value => val
  */
 export function noteImageFilter(settings) {
   const s = settings || {};
-  const follows = s.imagesFollowBackground !== false;
+  const follows = picturesFollowWallpaper(s);
 
   const opacity = clampRange(follows ? s.bgOpacity : s.imageOpacity, 0, 100, 100);
   const luminosity = clampRange(follows ? s.bgLuminosity : s.imageLuminosity, 0, 200, 100);
 
   return { opacity: opacity / 100, brightness: luminosity / 100, follows };
+}
+
+/**
+ * Whether the pictures in a note take the wallpaper's dials rather than their
+ * own.
+ *
+ * Only when there is a wallpaper to follow. With none, "follow" left the
+ * pictures on dials nobody could see -- the wallpaper's sliders are only shown
+ * with a wallpaper -- and the picture sliders were hidden because they were
+ * following. Reported on 2026-09-28 once Single Note's own wallpaper went:
+ * "being able to change the opacity, luminosity etc. of images you add in the
+ * note in Single Note mode -- you removed that option." With no wallpaper the
+ * pictures have their own dials, always shown.
+ */
+export function picturesFollowWallpaper(settings) {
+  const s = settings || {};
+  const hasWallpaper = Boolean(s.backgroundImage || s.backgroundImageMobile);
+  return hasWallpaper && s.imagesFollowBackground !== false;
 }
 
 /**

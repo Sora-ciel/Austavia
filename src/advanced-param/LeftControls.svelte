@@ -1316,19 +1316,27 @@ onMount(() => {
             <!-- Outside the wallpaper condition on purpose: a picture pasted
                  into a note is whatever brightness it happened to be, and that
                  is worth turning down whether or not the folder has a
-                 background. With none, following simply leaves them alone. -->
+                 background.
+
+                 "Follow" is only offered when there is a wallpaper to follow.
+                 With none, it hid these sliders behind a choice that did
+                 nothing, and the pictures had no dials anyone could see --
+                 reported as the option having been removed. See
+                 picturesFollowWallpaper in utils/modeBackground.js. -->
             <div class="bg-section-divider" role="presentation"></div>
 
-            <label class="bg-check-row">
-              <input
-                type="checkbox"
-                checked={imagesFollowBackground}
-                on:change={(e) => setBgSetting({ imagesFollowBackground: e.target.checked })}
-              />
-              <span>Pictures in the note follow these</span>
-            </label>
+            {#if bgImage}
+              <label class="bg-check-row">
+                <input
+                  type="checkbox"
+                  checked={imagesFollowBackground}
+                  on:change={(e) => setBgSetting({ imagesFollowBackground: e.target.checked })}
+                />
+                <span>Pictures in the note follow these</span>
+              </label>
+            {/if}
 
-            {#if !imagesFollowBackground}
+            {#if !bgImage || !imagesFollowBackground}
               <label class="bg-slider-row">
                 <span>Picture opacity</span>
                 <span class="bg-slider" on:pointerdown={startSliderDrag} on:pointerup={endSliderDrag} on:pointercancel={endSliderDrag} on:pointerleave={endSliderDrag} style="--fill: {imageOpacity}%">
