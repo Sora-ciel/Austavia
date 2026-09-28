@@ -183,3 +183,14 @@ describe('Indigo Gilt', () => {
     assert.ok(headerOpacity > 0 && headerOpacity < 100, `header ${headerOpacity}`);
   });
 });
+
+// Asked for on 2026-09-28: the mini player "has no veil or background, which
+// makes the image darker and makes it easier to see the buttons, and each
+// see-through theme should have that in a colour that follows their theme.
+// Even if it's see-through, we need this."
+it('gives every see-through theme a solid player veil in its own backing colour', () => {
+  for (const theme of SEE_THROUGH_PRESETS) {
+    assert.match(theme.playerVeil, /^#[0-9a-f]{6}$/i, `${theme.id} veil is a solid colour`);
+    assert.equal(theme.playerVeil, theme.blockDefaults.bgColor, `${theme.id} veil follows its backing`);
+  }
+});

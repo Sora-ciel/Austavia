@@ -145,6 +145,14 @@ export function seeThroughPreset({
     // What pop-ups sit on -- see above. A theme without one keeps its panels'
     // own colour.
     popupBg: withAlpha(backing, popupOpacity),
+    // What the mini player veils its cover art with. Asked for on 2026-09-28:
+    // "it has no veil or background, which makes the image darker and the
+    // buttons easier to see -- each see-through theme should have that, in a
+    // colour that follows its theme. Even if it's see-through, we need this."
+    // The veil is drawn from the toolbar's colour otherwise, and this family's
+    // toolbar is clear; so it is the theme's backing, solid, which the player
+    // then lays over the cover at its usual strength.
+    playerVeil: backing,
     // The card in the theme list is drawn on the theme's own backing. It was
     // see-through, like the theme, and a see-through card over the dark
     // settings panel hid Chalk's dark writing entirely.

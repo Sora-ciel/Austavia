@@ -1651,7 +1651,7 @@
       ' background-size: cover; background-position: center;'
     );
   }
-  $: miniPlayerArtStyle = artBackground(nowPlayingCoverUrl, '--controls-bg', '--controls-bg');
+  $: miniPlayerArtStyle = artBackground(nowPlayingCoverUrl, '--player-veil', '--controls-bg');
   $: panelArtStyle = artBackground(nowPlayingCoverUrl, '--dlg-bg', '--dlg-bg');
   // Volume is a device setting, not a per-file one, so it survives reloads
   // without riding along with the folder.
@@ -2932,7 +2932,12 @@
   $: controlsStyle =
     `--controls-bg: ${leftTheme.panelBg}; --controls-border: ${leftTheme.borderColor};` +
     ` --controls-text: ${leftTheme.textColor};` +
-    ` --controls-button-text: ${leftTheme.buttonText};`;
+    ` --controls-button-text: ${leftTheme.buttonText};` +
+    // What the mini player darkens its cover art with, and sits on without
+    // one. The toolbar's own colour unless the theme names one -- a
+    // see-through theme's toolbar is clear, which left the cover bare behind
+    // the buttons. See playerVeil in utils/outlineTheme.js.
+    ` --player-veil: ${activeTheme?.playerVeil || leftTheme.panelBg};`;
   // Dialogs and the sync banner render outside .app, so they can't inherit its
   // theme vars — hand them the right-panel palette directly.
   $: rightTheme = controlColors.right || CONTROL_COLOR_DEFAULTS.right;
@@ -6021,7 +6026,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   min-height: 42px;
   border-radius: 8px;
   border: 1px solid var(--controls-border, #333);
-  background: color-mix(in srgb, var(--controls-bg, #111) 75%, transparent);
+  background: color-mix(in srgb, var(--player-veil, var(--controls-bg, #111)) 75%, transparent);
   color: var(--controls-button-text, var(--controls-text, #fff));
   max-width: 300px;
   flex-shrink: 0;
