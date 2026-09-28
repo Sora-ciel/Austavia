@@ -575,7 +575,7 @@
      Small, and quiet until they have something to say. */
   /* Sized from the block, like the figure in the middle. Asked for on
      2026-09-28: the corners "should also get bigger as the block gets bigger,
-     like what's written in the middle". About a tenth of the block's shorter
+     like what's written in the middle" -- then "around half smaller" once seen. About a twentieth of the block's shorter
      side, never smaller than they were (so the default block looks as it
      did) and capped, so on a very large block they stay corners rather than
      crowding the stage. Padding and gap are in em so they grow with it. */
@@ -589,7 +589,7 @@
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: clamp(0.7rem, 9cqmin, 2rem);
+    font-size: clamp(0.7rem, 4.5cqmin, 1rem);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1;
