@@ -171,8 +171,16 @@ describe('which of the two images a screen gets', () => {
 // Pictures pasted into a note are whatever brightness they happened to be,
 // which on a dark theme is usually a hole burned in the page.
 describe('dimming pictures inside a note', () => {
-  it('follows the wallpaper by default, so one pair of dials covers both', () => {
-    const out = noteImageFilter({ backgroundImage: 'data:w', bgOpacity: 40, bgLuminosity: 60, imageOpacity: 100, imageLuminosity: 100 });
+  // Asked for on 2026-09-28: "make this setting unchecked by default". It was
+  // on by default before.
+  it('does not follow the wallpaper unless told to', () => {
+    const out = noteImageFilter({ backgroundImage: 'data:w', bgOpacity: 40, imageOpacity: 70 });
+    assert.equal(out.follows, false);
+    assert.equal(out.opacity, 0.7);
+  });
+
+  it('follows the wallpaper once told to, so one pair of dials covers both', () => {
+    const out = noteImageFilter({ backgroundImage: 'data:w', imagesFollowBackground: true, bgOpacity: 40, bgLuminosity: 60, imageOpacity: 100, imageLuminosity: 100 });
     assert.equal(out.follows, true);
     assert.equal(out.opacity, 0.4);
     assert.equal(out.brightness, 0.6);
@@ -189,10 +197,10 @@ describe('dimming pictures inside a note', () => {
     assert.equal(out.brightness, 1.2);
   });
 
-  it('treats a folder saved before these existed as following', () => {
+  it('treats a folder that never said as not following', () => {
     const out = noteImageFilter({ backgroundImage: 'data:w', bgOpacity: 50, bgLuminosity: 100 });
-    assert.equal(out.follows, true);
-    assert.equal(out.opacity, 0.5);
+    assert.equal(out.follows, false);
+    assert.equal(out.opacity, 1);
   });
 
   // "Being able to change the opacity, luminosity etc. of images you add in
@@ -206,7 +214,7 @@ describe('dimming pictures inside a note', () => {
   });
 
   it('follows on the phone picture too', () => {
-    assert.equal(noteImageFilter({ backgroundImageMobile: 'data:w' }).follows, true);
+    assert.equal(noteImageFilter({ backgroundImageMobile: 'data:w', imagesFollowBackground: true }).follows, true);
   });
 
   it('clamps nonsense rather than producing an invalid filter', () => {
@@ -225,14 +233,15 @@ describe('dimming pictures inside a note', () => {
   });
 
   it('writes a filter when something would change', () => {
-    assert.equal(noteImageFilterCss({ backgroundImage: 'data:w', bgOpacity: 50, bgLuminosity: 100 }), 'opacity(0.5) brightness(1)');
+    assert.equal(noteImageFilterCss({ imageOpacity: 50 }), 'opacity(0.5) brightness(1)');
   });
 
-  it('normalising keeps the new dials and defaults them to following', () => {
+  it('normalising keeps the new dials and defaults them to not following', () => {
     const out = normalizeBackgroundSettings({});
     assert.equal(out.imageOpacity, 100);
     assert.equal(out.imageLuminosity, 100);
-    assert.equal(out.imagesFollowBackground, true);
+    assert.equal(out.imagesFollowBackground, false);
+    assert.equal(normalizeBackgroundSettings({ imagesFollowBackground: true }).imagesFollowBackground, true);
   });
 });
 
@@ -275,9 +284,9 @@ describe('carryNotePictureSettings', () => {
 // Every save writes the settings whole, so a folder that never touched the
 // picture dials still holds them at their defaults -- that is not a choice.
 it('carries the old dials over settings that only hold the defaults', () => {
-  const saved = { imagesFollowBackground: true, imageOpacity: 100, imageLuminosity: 100 };
-  const shared = carryNotePictureSettings(saved, { imagesFollowBackground: false, imageOpacity: 40 });
-  assert.equal(shared.imagesFollowBackground, false);
+  const saved = { imagesFollowBackground: false, imageOpacity: 100, imageLuminosity: 100 };
+  const shared = carryNotePictureSettings(saved, { imagesFollowBackground: true, imageOpacity: 40 });
+  assert.equal(shared.imagesFollowBackground, true);
   assert.equal(shared.imageOpacity, 40);
   assert.equal(shared.imageLuminosity, 100);
 });

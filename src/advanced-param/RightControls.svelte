@@ -285,6 +285,10 @@
     bottom: 0;
     width: 260px;
     background: var(--app-popup-bg, var(--right-panel-bg, #222222));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--right-panel-bg, #222222));
     border-left: 1px solid var(--right-border-color, #444444);
     z-index: 999;
     box-shadow: -2px 0 10px rgba(0,0,0,0.4);
@@ -332,6 +336,10 @@
     max-width: 92vw;
     max-height: calc(100dvh - var(--controls-height, 56px) - 16px);
     background: var(--app-popup-bg, var(--right-panel-bg, #222222));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--right-panel-bg, #222222));
     border: 1px solid var(--right-border-color, #444444);
     border-radius: 12px;
     padding: 0;

@@ -22,10 +22,10 @@ export const BACKGROUND_DEFAULTS = {
   // is usually a hole burned in the page.
   imageOpacity: 100,
   imageLuminosity: 100,
-  // On by default, because one pair of controls is the simpler thing to meet
-  // first: the pictures in the note match the picture behind it until somebody
-  // wants them not to.
-  imagesFollowBackground: true,
+  // Off by default: the pictures in a note have their own dials unless somebody
+  // ties them to the wallpaper's. It was on at first, as the simpler thing to
+  // meet; asked on 2026-09-28 to be "unchecked by default".
+  imagesFollowBackground: false,
   // Set when somebody removes a background a theme supplied, so it stays
   // removed for this folder instead of coming straight back on next render.
   bgThemeOptOut: false
@@ -70,9 +70,9 @@ export function normalizeBackgroundSettings(raw = {}, { keepImage = value => val
     bgThemeOptOut: given.bgThemeOptOut === true,
     imageOpacity: clampRange(given.imageOpacity, 0, 100, BACKGROUND_DEFAULTS.imageOpacity),
     imageLuminosity: clampRange(given.imageLuminosity, 0, 200, BACKGROUND_DEFAULTS.imageLuminosity),
-    // Absent means following, so a folder saved before these existed behaves
-    // the way it always did rather than suddenly holding two unset dials.
-    imagesFollowBackground: given.imagesFollowBackground !== false
+    // Only a folder that says so follows. A folder that never said is on the
+    // default, which is now not to.
+    imagesFollowBackground: given.imagesFollowBackground === true
   };
 }
 
@@ -113,7 +113,7 @@ export function noteImageFilter(settings) {
 export function picturesFollowWallpaper(settings) {
   const s = settings || {};
   const hasWallpaper = Boolean(s.backgroundImage || s.backgroundImageMobile);
-  return hasWallpaper && s.imagesFollowBackground !== false;
+  return hasWallpaper && s.imagesFollowBackground === true;
 }
 
 /**

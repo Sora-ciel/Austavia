@@ -316,7 +316,7 @@
   // Pictures pasted into the note. They follow the wallpaper unless told not
   // to, so the two extra dials are only shown once that is turned off — a pair
   // of sliders that cannot do anything is worse than no sliders.
-  $: imagesFollowBackground = backgroundSettings?.imagesFollowBackground !== false;
+  $: imagesFollowBackground = backgroundSettings?.imagesFollowBackground === true;
   $: imageOpacity = backgroundSettings?.imageOpacity ?? 100;
   $: imageLuminosity = backgroundSettings?.imageLuminosity ?? 100;
   $: bgSize = backgroundSettings?.bgSize || 'cover';
@@ -475,6 +475,10 @@ onMount(() => {
     /* The panel the compact menu uses, so the two are one thing wearing two
        shapes rather than two panels that have to be kept looking alike. */
     background: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
     /* The Bg panel is anchored inside its own control and has to be able to
        reach past this box; clipping it would be a panel with no bottom. */
@@ -562,6 +566,10 @@ onMount(() => {
     left: 0;
     min-width: 200px;
     background: var(--app-popup-bg, var(--left-panel-bg, #111111));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 6px;
@@ -596,6 +604,10 @@ onMount(() => {
     left: 0;
     min-width: 190px;
     background: var(--app-popup-bg, var(--left-panel-bg, #111111));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 6px;
@@ -743,6 +755,10 @@ onMount(() => {
     z-index: 1002;
     width: 260px;
     background: var(--app-popup-bg, var(--left-panel-bg, #111111));
+    /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+       tick, a slider's groove. The panel's own colour is clear on a
+       see-through theme, which left a filled box with no tick. */
+    --sb-track: var(--app-popup-bg, var(--left-panel-bg, #111111));
     border: 1px solid var(--left-border-color, #333333);
     border-radius: 10px;
     padding: 10px;
@@ -920,6 +936,10 @@ onMount(() => {
       align-items: stretch;
       gap: 3px;
       background: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
+      /* What this pop-up sits on, for what is drawn inside it -- a checkbox's
+         tick, a slider's groove. The panel's own colour is clear on a
+         see-through theme, which left a filled box with no tick. */
+      --sb-track: var(--app-popup-bg, var(--left-panel-bg, #111111f0));
       padding: 12px;
       border-radius: 12px;
       position: fixed;
