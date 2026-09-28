@@ -102,6 +102,7 @@
       columnCount={simpleNoteColumnCount}
       bind:canvasRef
       {canvasColors}
+      backgroundSettings={singleNoteSettings}
       {leftControlColors}
       library={musicLibrary}
       {nowPlayingId}
@@ -122,6 +123,7 @@
       {modeLabels}
       activeMode={mode}
       {canvasColors}
+      backgroundSettings={singleNoteSettings}
       {habits}
       on:modeSettingChange
     />
@@ -131,6 +133,7 @@
       {focusedBlockId}
       bind:canvasRef
       {canvasColors}
+      backgroundSettings={singleNoteSettings}
       addDirection={taskAddDirection}
       on:update={updateBlockHandler}
       on:delete={deleteBlockHandler}

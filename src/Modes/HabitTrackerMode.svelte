@@ -1,4 +1,8 @@
 <script>
+  import ModeWallpaper from '../components/ModeWallpaper.svelte';
+  // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
+  // in modeRegistry.js.
+  export let backgroundSettings = {};
   import { onMount } from "svelte";
   // The shared one, rather than the copy that used to live here: that copy did
   // not understand 4- or 8-digit hex, so a theme using either fell through to
@@ -538,9 +542,17 @@
     border-style: dashed;
     border-color: var(--block-border-color, var(--app-border, color-mix(in srgb, var(--mode-text-color, #ffffff) 20%, transparent)));
   }
+
+  /* Above the wallpaper, which sits at z-index 0 between this mode's own
+     background and its content -- see ModeWallpaper.svelte. */
+  .habit-tracker > :not(.mode-wallpaper) {
+    position: relative;
+    z-index: 1;
+  }
 </style>
 
 <section class="habit-tracker" style={canvasCssVars}>
+  <ModeWallpaper settings={backgroundSettings} />
   <div class="habit-header">
     <h2>{modeLabels?.[activeMode] ?? "Habit Tracker"}</h2>
     <p>Tap a day to mark it ✓, again for ✕, again to clear. Today is the last square.</p>

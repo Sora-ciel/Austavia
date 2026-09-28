@@ -1,4 +1,8 @@
 <script>
+  import ModeWallpaper from '../components/ModeWallpaper.svelte';
+  // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
+  // in modeRegistry.js.
+  export let backgroundSettings = {};
   import MarkdownIt from 'markdown-it';
   import { sanitizeRichText, looksLikeHtml } from '../utils/sanitizeRichText.js';
 
@@ -1090,6 +1094,13 @@ input[type="text"] {
 
 }
 
+
+/* Above the wallpaper, which sits at z-index 0 between this mode's own
+   background and its content -- see ModeWallpaper.svelte. */
+.simple-wrapper > .simple-column {
+  position: relative;
+  z-index: 1;
+}
 </style>
 
 
@@ -1101,6 +1112,7 @@ input[type="text"] {
 
 
 <div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
+  <ModeWallpaper settings={backgroundSettings} />
   {#each renderColumns as column}
     <div class="simple-column">
       {#each column as block (blockKey(block))}

@@ -2736,7 +2736,12 @@
   // theme across every file rather than sticking to whichever one happened to
   // be open when the theme was picked — and it leaves saves untouched, so
   // dropping the theme takes the background with it.
-  $: singleNoteSettings = withThemeBackground(modeSettings.single, activeTheme);
+  // One wallpaper per folder: Canvas's picture and settings, drawn by every
+  // mode but Birthday (see hasWallpaper in modeRegistry.js). The name is from
+  // when Single Note had one of its own. modeSettings.single is still read and
+  // saved as it was, so nothing a folder holds is lost -- it is only no longer
+  // drawn.
+  $: singleNoteSettings = withThemeBackground(modeSettings.default, activeTheme);
   // Canvas keeps whatever the folder itself set, and nothing else. A theme
   // supplying a wallpaper is a Single Note arrangement; having one appear over
   // the board the moment somebody changed theme would be a surprise rather

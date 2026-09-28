@@ -37,6 +37,11 @@
  * dark enough for white writing over the brightest picture, light enough
  * that the picture is still there behind it.
  *
+ * The toolbar followed, the next day's ask: "make it so that controls
+ * background is also a black at the same opacity" -- so the panels are the
+ * backing at the same 78% (eight-digit hex, which is what a panel colour is),
+ * and only their buttons stay see-through, drawn as outlines on it.
+ *
  * Single Note's page is black for a related reason; that one is in
  * modeSurface.js, because it is true of every theme and not only this one.
  *
@@ -55,6 +60,12 @@ export const OUTLINE_THEME_ID = 'outline';
 
 /** How opaque the backing under a pop-up is -- see above. */
 export const POPUP_BACKING_OPACITY = 0.78;
+
+/** An #rrggbb colour at an opacity, as eight-digit hex -- a panel colour's form. */
+function hexWithAlpha(hex, alpha) {
+  const value = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''))?.[1] || '000000';
+  return `#${value}${Math.round(alpha * 255).toString(16).padStart(2, '0')}`;
+}
 
 /** An #rrggbb colour at an opacity, as rgba(). */
 function withAlpha(hex, alpha) {
@@ -84,14 +95,15 @@ export function seeThroughPreset({
 } = {}) {
   const clear = '#00000000';
   const line = `${ink}b3`;
+  const panel = hexWithAlpha(backing, POPUP_BACKING_OPACITY);
 
   return {
     id,
     name,
     description,
     controlColors: {
-      left: { panelBg: clear, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, inputBg: clear, ...controlColors.left },
-      right: { panelBg: clear, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, ...controlColors.right },
+      left: { panelBg: panel, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, inputBg: clear, ...controlColors.left },
+      right: { panelBg: panel, textColor: ink, buttonBg: clear, buttonText: ink, borderColor: line, ...controlColors.right },
       canvas: { outerBg: backing, ...controlColors.canvas }
     },
     blockTheme: normalizeBlockTheme({

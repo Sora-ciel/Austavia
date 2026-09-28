@@ -21,9 +21,8 @@ describe('Outline makes everything invisible but the text, the shadows and the o
     assert.equal(blockTheme.headerOpacity, 0);
   });
 
-  it('has invisible panels, buttons and fields', () => {
+  it('has invisible buttons and fields', () => {
     for (const side of ['left', 'right']) {
-      assert.equal(alphaOf(controlColors[side].panelBg), 0, `${side} panel`);
       assert.equal(alphaOf(controlColors[side].buttonBg), 0, `${side} buttons`);
     }
     assert.equal(alphaOf(controlColors.left.inputBg), 0, 'fields');
@@ -42,6 +41,16 @@ describe('Outline makes everything invisible but the text, the shadows and the o
     assert.notEqual(blockTheme.textShadow, 'none');
     assert.ok(alphaOf(controlColors.left.borderColor) > 0);
   });
+});
+
+// Asked for afterwards: "make it so that controls background is also a black
+// at the same opacity" as the pop-ups.
+it('puts the toolbar on the same black as the pop-ups', () => {
+  for (const side of ['left', 'right']) {
+    const panel = OUTLINE_PRESET.controlColors[side].panelBg;
+    assert.equal(panel.slice(0, 7), '#000000', `${side} is black`);
+    assert.ok(Math.abs(alphaOf(panel) / 255 - 0.78) < 0.01, `${side} alpha ${alphaOf(panel) / 255}`);
+  }
 });
 
 // Asked for once it had been tried: pop-ups "should have a black background
@@ -65,8 +74,8 @@ describe('Outline is the template for later see-through themes', () => {
       assert.equal(later.blockTheme[key], OUTLINE_PRESET.blockTheme[key], key);
     }
     assert.equal(later.popupBg, OUTLINE_PRESET.popupBg);
-    assert.equal(alphaOf(later.controlColors.left.panelBg), 0);
-    assert.equal(alphaOf(later.controlColors.right.panelBg), 0);
+    assert.equal(later.controlColors.left.panelBg, OUTLINE_PRESET.controlColors.left.panelBg);
+    assert.equal(later.controlColors.right.panelBg, OUTLINE_PRESET.controlColors.right.panelBg);
   });
 
   it('takes its own colours for the writing and the edges', () => {

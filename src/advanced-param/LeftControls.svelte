@@ -1,7 +1,7 @@
 <script>
   import ControlIcon from '../components/ControlIcon.svelte';
   import { createEventDispatcher, onMount, afterUpdate } from "svelte";
-  import { getModeDefinition, getModeOptions } from "../Modes/modeRegistry.js";
+  import { getModeDefinition, getModeOptions, hasWallpaper } from "../Modes/modeRegistry.js";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
   import { fitControls } from '../utils/controlsOverflow.js';
@@ -77,12 +77,12 @@
 
 
   $: isSimpleNoteMode = Boolean(activeModeDefinition?.settings?.simpleColumns);
-  // Named for what the flag means rather than for the mode that had it first:
-  // Single Note and Playlist both draw the wallpaper kept in modeSettings.single,
-  // and more modes may. Canvas has the same panel but its own settings, which is
-  // the only difference between them and what backgroundSettingsKey answers.
-  $: usesSharedWallpaper = Boolean(activeModeDefinition?.settings?.singleBackground);
-  $: hasModeBackground = usesSharedWallpaper || mode === "default";
+  // Every mode but Birthday draws the folder's one wallpaper, kept in Canvas's
+  // settings -- see hasWallpaper in modeRegistry.js. The others read it with a
+  // theme's own wallpaper filled in where the folder has none, which Canvas
+  // deliberately does not; that is the only difference between them.
+  $: usesSharedWallpaper = mode !== "default" && hasWallpaper(mode);
+  $: hasModeBackground = hasWallpaper(mode);
 
   // ── How much of the bar fits on one line ──────────────────────────
   //
@@ -225,7 +225,7 @@
   }
 
   afterUpdate(measureControls);
-  $: backgroundSettingsKey = usesSharedWallpaper ? "single" : "default";
+  $: backgroundSettingsKey = "default";
   $: backgroundSettings = usesSharedWallpaper ? singleNoteSettings : canvasBackgroundSettings;
   $: availableAddBlockTypes = activeModeDefinition?.addBlockTypes || [];
   $: canAddBlock = (type) => availableAddBlockTypes.includes(type);

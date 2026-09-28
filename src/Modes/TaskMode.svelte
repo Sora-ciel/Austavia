@@ -1,4 +1,8 @@
 <script>
+  import ModeWallpaper from '../components/ModeWallpaper.svelte';
+  // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
+  // in modeRegistry.js.
+  export let backgroundSettings = {};
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import ColorField from '../components/ColorField.svelte';
@@ -796,10 +800,18 @@
       z-index: 2;
     }
   }
+
+  /* Above the wallpaper, which sits at z-index 0 between this mode's own
+     background and its content -- see ModeWallpaper.svelte. */
+  .task-mode > :not(.mode-wallpaper) {
+    position: relative;
+    z-index: 1;
+  }
 </style>
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="task-mode" bind:this={canvasRef} style={`${canvasCssVars} ${taskColorVars} ${viewportVar}`} on:contextmenu={handleContextMenu}>
+  <ModeWallpaper settings={backgroundSettings} />
   {#if taskBlocks.length}
     <div class="task-header">
       <div class="task-tabs-row" role="tablist">
