@@ -94,7 +94,7 @@
   import { usageForPlan } from './utils/planLimits.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
-  import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
+  import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings } from './utils/modeBackground.js';
   import { ensureMusicCover } from './utils/musicCovers.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
   import {
@@ -109,6 +109,8 @@
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
+  import { pasteKind, textChunks } from './utils/pasteIntent.js';
+  import { sanitizeRichText } from './utils/sanitizeRichText.js';
   import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, habitsToAdopt } from './utils/habitStore.js';
@@ -541,7 +543,13 @@
       // stored copy outranks the theme, survives switching away from it, and
       // becomes a dead image reference the day that theme is removed. That is
       // this app's rule, though, not the normaliser's.
-      default: normalizeBackgroundSettings(settings?.default, { keepImage: readStoredBackground })
+      // The note-picture dials are carried over from `single` first, so
+      // dropping it takes only the old wallpaper -- see
+      // carryNotePictureSettings.
+      default: normalizeBackgroundSettings(
+        carryNotePictureSettings(settings?.default, settings?.single),
+        { keepImage: readStoredBackground }
+      )
     };
   }
 
@@ -4271,39 +4279,40 @@
     const t = event.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
 
-    const items = Array.from(event.clipboardData?.items || []);
+    // Read now, while the event is live -- a clipboard is emptied once the
+    // handler returns.
+    const clipboard = event.clipboardData;
+    const items = Array.from(clipboard?.items || []);
     const imageItems = items.filter(i => i.kind === 'file' && i.type.startsWith('image/'));
-    const textItem   = items.find(i  => i.kind === 'string' && i.type === 'text/plain');
+    const html = clipboard?.getData('text/html') || '';
+    const text = clipboard?.getData('text/plain') || '';
 
-    let handled = false;
-    if (imageItems.length) {
-      event.preventDefault();
-      handled = true;
-      for (const item of imageItems) {
-        const file = item.getAsFile();
-        if (file) {
-          try { await addImageBlockFromFile(file); }
-          catch (e) { console.error('Paste image failed:', e); }
+    // What the paste is decides what it becomes -- utils/pasteIntent.js. This
+    // used to read the plain text only and cut it at every blank line, so a
+    // copied list became one block per item and its pictures were lost.
+    const kind = pasteKind({ html, text, imageCount: imageItems.length });
+    if (kind === 'none') return;
+    event.preventDefault();
+
+    try {
+      if (kind === 'image') {
+        for (const item of imageItems) {
+          const file = item.getAsFile();
+          if (file) await addImageBlockFromFile(file);
         }
+      } else if (kind === 'html') {
+        // One block, as it was copied: lists, headings, pictures and all.
+        // Through the same allowlist task text uses, since this came from
+        // anywhere; the editor's own schema tidies the rest when it opens.
+        const clean = sanitizeRichText(html);
+        if (clean.trim()) await addTextBlockFromContent(clean);
+      } else {
+        // Plain text still makes one block per paragraph, but never cuts a
+        // list or a code block apart.
+        for (const chunk of textChunks(text)) await addTextBlockFromContent(chunk);
       }
-    }
-    if (textItem && !handled) {
-      textItem.getAsString(async (text) => {
-        const trimmed = text?.trim();
-        if (!trimmed) return;
-        event.preventDefault();
-        // Split on blank lines to create one block per distinct chunk
-        const chunks = trimmed.split(/\n\s*\n/).map(c => c.trim()).filter(Boolean);
-        try {
-          if (chunks.length <= 1) {
-            await addTextBlockFromContent(trimmed);
-          } else {
-            for (const chunk of chunks) {
-              await addTextBlockFromContent(chunk);
-            }
-          }
-        } catch (e) { console.error('Paste text failed:', e); }
-      });
+    } catch (error) {
+      console.error('Paste failed:', error);
     }
   }
 

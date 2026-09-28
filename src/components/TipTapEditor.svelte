@@ -8,6 +8,7 @@
   import { Markdown } from 'tiptap-markdown';
   import { shortcutFor, markShortcutFor, separatorFillsLine } from '../utils/markdownShortcuts.js';
   import { imagesFrom, hasImage } from '../utils/pastedImages.js';
+  import { pasteKind } from '../utils/pasteIntent.js';
   import {
     initTextHistory,
     recordText,
@@ -382,6 +383,18 @@
   function handleImagePaste(view, event) {
     const clipboard = event?.clipboardData;
     if (!hasImage(clipboard)) return false;
+
+    // Unless the picture is a preview of what was really copied. Word, Google
+    // Docs and the like put a rendered image of the selection beside the real
+    // content, and taking the picture pasted an image of a list instead of the
+    // list. If the HTML has writing in it, ProseMirror gets it -- see
+    // utils/pasteIntent.js.
+    const kind = pasteKind({
+      html: clipboard.getData?.('text/html') || '',
+      text: clipboard.getData?.('text/plain') || '',
+      imageCount: imagesFrom(clipboard).length
+    });
+    if (kind !== 'image') return false;
 
     // The picture wins over whatever came with it. Copying an image in a
     // browser also puts the <img> markup on the clipboard, and copying one in a

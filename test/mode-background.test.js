@@ -8,7 +8,8 @@ import {
   noteImageFilter,
   noteImageFilterCss,
   usesPortraitBackground,
-  backgroundLayerStyle
+  backgroundLayerStyle,
+  carryNotePictureSettings
 } from '../src/utils/modeBackground.js';
 
 describe('normalizeBackgroundSettings', () => {
@@ -219,4 +220,50 @@ describe('dimming pictures inside a note', () => {
     assert.equal(out.imageLuminosity, 100);
     assert.equal(out.imagesFollowBackground, true);
   });
+});
+
+// Reported 2026-09-28: dropping Single Note's own settings took the dials for
+// pictures in the note with it -- "the parameters for the images' opacity that
+// you put in the note, not the background, you removed that." The wallpaper
+// was meant to go; these were not.
+describe('carryNotePictureSettings', () => {
+  const legacy = {
+    backgroundImage: 'data:old-wallpaper',
+    imagesFollowBackground: false,
+    imageOpacity: 40,
+    imageLuminosity: 70
+  };
+
+  it('keeps the note-picture dials from Single Note\'s old settings', () => {
+    const shared = carryNotePictureSettings({ backgroundImage: 'data:canvas' }, legacy);
+    assert.equal(shared.imagesFollowBackground, false);
+    assert.equal(shared.imageOpacity, 40);
+    assert.equal(shared.imageLuminosity, 70);
+  });
+
+  it('does not bring the old wallpaper back', () => {
+    const shared = carryNotePictureSettings({ backgroundImage: 'data:canvas' }, legacy);
+    assert.equal(shared.backgroundImage, 'data:canvas');
+    assert.equal(carryNotePictureSettings({}, legacy).backgroundImage, undefined);
+  });
+
+  it('lets a value set since the move win', () => {
+    const shared = carryNotePictureSettings({ imageOpacity: 90 }, legacy);
+    assert.equal(shared.imageOpacity, 90);
+    assert.equal(shared.imageLuminosity, 70);
+  });
+
+  it('changes nothing when there are no old settings', () => {
+    assert.deepEqual(carryNotePictureSettings({ bgOpacity: 50 }, null), { bgOpacity: 50 });
+  });
+});
+
+// Every save writes the settings whole, so a folder that never touched the
+// picture dials still holds them at their defaults -- that is not a choice.
+it('carries the old dials over settings that only hold the defaults', () => {
+  const saved = { imagesFollowBackground: true, imageOpacity: 100, imageLuminosity: 100 };
+  const shared = carryNotePictureSettings(saved, { imagesFollowBackground: false, imageOpacity: 40 });
+  assert.equal(shared.imagesFollowBackground, false);
+  assert.equal(shared.imageOpacity, 40);
+  assert.equal(shared.imageLuminosity, 100);
 });

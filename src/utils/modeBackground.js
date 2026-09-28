@@ -166,3 +166,37 @@ export function backgroundLayerStyle(settings, { isMobile = false } = {}) {
     bleed: blur > 0 ? Math.ceil(blur * 2) : 0
   };
 }
+
+/** The settings that dim pictures inside a note, as opposed to the wallpaper. */
+export const NOTE_PICTURE_KEYS = ['imagesFollowBackground', 'imageOpacity', 'imageLuminosity'];
+
+/**
+ * The folder's shared wallpaper settings, with the note-picture settings
+ * carried over from Single Note's old ones where the shared settings have
+ * none of their own.
+ *
+ * Single Note used to keep its own settings, and those held the dials for
+ * pictures pasted into a note. When every mode moved to one wallpaper, the old
+ * settings were dropped whole -- the wallpaper with them, as asked -- and the
+ * picture dials went too, which nobody asked for: reported on 2026-09-28 as
+ * "the parameters for the images' opacity that you put in the note, not the
+ * background, you removed that". The wallpaper is still dropped; these three
+ * are kept.
+ *
+ * Only where the shared settings have not been changed: a value set since the
+ * move is the newer decision and wins. "Not changed" includes holding the
+ * default -- every save writes the settings out whole, so a folder that never
+ * touched these dials still carries them, at their defaults.
+ */
+export function carryNotePictureSettings(shared = {}, legacySingle = null) {
+  const target = { ...(shared || {}) };
+  if (!legacySingle || typeof legacySingle !== 'object') return target;
+
+  for (const key of NOTE_PICTURE_KEYS) {
+    const untouched = target[key] === undefined || target[key] === BACKGROUND_DEFAULTS[key];
+    if (untouched && legacySingle[key] !== undefined) {
+      target[key] = legacySingle[key];
+    }
+  }
+  return target;
+}
