@@ -1323,8 +1323,10 @@
   /* Same as Single Note's wallpaper, and for the same reason: the keyboard
      shrinks the page, and a picture re-fitted into a shorter box looks like it
      moved. See the note on .note-bg-clip in SingleNoteMode.svelte. */
+  /* Behind the toolbar too, and fixed for it -- see .note-bg-clip in
+     SingleNoteMode.svelte. */
   .pl-bg-holder {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;

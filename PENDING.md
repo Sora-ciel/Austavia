@@ -21,6 +21,7 @@ list below with what was observed.
 | next | **The stopwatch**, from the clock block's top-left corner: Start, Lap, Pause, Resume, Reset; the corner shows the running figure from the other two pages. Start it on a phone, lock the screen for a minute, and it should read the right time on return -- it is worked out from when it started, not counted. It is per device, like the page. |
 | next | **A background too big to sync**, signed in with auto sync on: choosing one over 10 MB once stored (a 4K PNG does it) should be refused with a dialog saying why, and the folder should keep syncing. With auto sync off it is kept, with a banner saying the folder will not sync while it holds it. If one got through anyway, the banner should now say so in words rather than print the database's error. |
 | next | **Outline**, the see-through theme, over a Canvas wallpaper: blocks, headers, both panels and their buttons should show the wallpaper through them, with only the writing (shadowed), outlines and shadows drawn. Pop-ups -- Settings, Bg, More, the add-block and mode menus, dialogs -- sit on black at 72% under it, and Single Note's page is black rather than whatever colour its block last had. |
+| next | **Wallpapers behind the toolbar**, in Canvas, Single Note and Playlist: with a see-through toolbar (Outline, or any theme's translucent bar) the wallpaper should show behind the controls, and the picture should fill the whole window from the top. On a phone, check that typing still leaves the wallpaper where it was -- it keeps the held window height it already had. |
 | next | **Screenshots with a wallpaper**: in Canvas, the wallpaper now fills the whole screenshot under the blocks, with its opacity, blur and luminosity. Single Note and Playlist already had theirs. |
 | next | **The timer**, from the bottom-left corner: type `5` or `1:30` into the reading, Start, and it rings — banner, beeps, buzz — in whatever mode is open when it runs out, with +1 min and Stop. Start one on a phone and lock the screen past its end: it should be found run out and ring on return (within ten minutes), since it is kept as the moment it ends. Per device. The same limit as the alarm applies: nothing rings with the app closed. |
 | next | **The clock face**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
@@ -254,14 +255,6 @@ speculatively — wait for a report that says so.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **`functions/package.json` is on Node 20** and wants 22.
-- **Wallpapers should reach behind the toolbar.** Asked for 2026-09-27 and
-  put off to a later session: with a see-through toolbar (Outline), the
-  wallpaper should show behind the controls rather than start just below
-  them. In Canvas it is `.canvas-bg-holder` in `CanvasMode.svelte`, pinned at
-  `top: var(--controls-height)`; Single Note (`.note-bg-clip`) and Playlist
-  (`ModeBackground`) sit inside their mode's box, which also starts below the
-  toolbar. Probably top: 0 plus letting the bar's own background stay clear
-  -- check that the toolbar's buttons still read over a bright picture.
 - **The alarm and the timer only ring while the app is open on their folder.** It is a
   timer in the page (`AlarmRinger.svelte`), so it cannot ring with the app
   closed, with a phone that has put the WebView to sleep, or for a clock in a

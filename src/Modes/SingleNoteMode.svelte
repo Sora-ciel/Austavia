@@ -412,9 +412,20 @@
      still leaves the picture where it was, with its bottom behind the keyboard,
      which is what it looks like it should do.
 
-     Falls back to the old behaviour wherever the variable is not set. */
+     Falls back to the old behaviour wherever the variable is not set.
+
+     Pinned to the window from its very top, behind the toolbar rather than
+     below it, so a toolbar with any see-through in it shows the wallpaper
+     instead of a strip of plain colour. Asked for on 2026-09-27: "the
+     backgrounds of modes and folders should consider the controls space too,
+     so when the controls have an opacity you can see the background behind
+     them." The toolbar stays above it -- it is sticky at z-index 1000 -- so
+     nothing here can cover a button.
+     Fixed rather than absolute for that: the mode's box starts below the
+     toolbar and clips what it holds, and the held height above is already the
+     whole window's. */
   .note-bg-clip {
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;

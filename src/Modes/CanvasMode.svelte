@@ -599,14 +599,22 @@
   background: transparent;
 }
 
-/* Pinned to the canvas viewport and deliberately outside everything the zoom
+/* Pinned to the window and deliberately outside everything the zoom
    transforms, so the wallpaper neither scales with the board nor scrolls with
    it — it stays filling the screen the way Single Note's does. Clipped,
    because the layer inside bleeds past its edges to hide the soft border a
-   blur would otherwise leave. */
+   blur would otherwise leave.
+
+   Pinned to the window from its very top, behind the toolbar rather than
+   below it, so a toolbar with any see-through in it shows the wallpaper
+   instead of a strip of plain colour. Asked for on 2026-09-27: "the
+   backgrounds of modes and folders should consider the controls space too,
+   so when the controls have an opacity you can see the background behind
+   them." The toolbar stays above it -- it is sticky at z-index 1000 -- so
+   nothing here can cover a button. */
 .canvas-bg-holder {
   position: fixed;
-  top: var(--controls-height, 56px);
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
