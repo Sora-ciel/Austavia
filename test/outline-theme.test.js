@@ -8,9 +8,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { OUTLINE_PRESET, seeThroughPreset, SEE_THROUGH_PRESETS } from '../src/utils/outlineTheme.js';
+import {
+  OUTLINE_PRESET,
+  seeThroughPreset,
+  SEE_THROUGH_PRESETS,
+  SEE_THROUGH_CORE,
+  SEE_THROUGH_EXPERIMENTS,
+  INDIGO_GILT_GLASS_PRESET
+} from '../src/utils/outlineTheme.js';
 import { BLOCK_THEME_DEFAULTS } from '../src/utils/themeDefaults.js';
-import { EXTRA_PRESETS } from '../src/utils/extraThemes.js';
+import { EXTRA_PRESETS, INDIGO_GILT_PRESET } from '../src/utils/extraThemes.js';
 
 const alphaOf = hex => (/^#[0-9a-f]{8}$/i.test(hex) ? parseInt(hex.slice(7), 16) : 255);
 
@@ -111,15 +118,37 @@ describe('the see-through family', () => {
   });
 
   it("all follow Amber Wire's opacity settings", () => {
-    for (const theme of SEE_THROUGH_PRESETS) {
+    for (const theme of SEE_THROUGH_CORE) {
       assert.deepEqual(levels(theme), levels(amber), theme.id);
     }
   });
 
-  it('are ten, each its own theme with its own colour', () => {
-    assert.equal(SEE_THROUGH_PRESETS.length, 10);
+  it('each have their own colour', () => {
     const inks = SEE_THROUGH_PRESETS.map(theme => theme.blockTheme.headerText);
     assert.equal(new Set(inks).size, inks.length);
+  });
+
+  // "Remove Chalk, Coral Wire and Rose Wire."
+  it('no longer has the three that were taken out', () => {
+    const ids = SEE_THROUGH_PRESETS.map(theme => theme.id);
+    for (const gone of ['chalk', 'coral-wire', 'rose-wire']) assert.ok(!ids.includes(gone), gone);
+  });
+
+  // "Even see-throughs with different levels of opacity on things we haven't
+  // yet tested" -- each experiment is only worth having if it differs.
+  it("has experiments that each vary something from Amber Wire's levels", () => {
+    for (const theme of SEE_THROUGH_EXPERIMENTS) {
+      // The same colours on the family's own levels, for comparison.
+      const plain = seeThroughPreset({
+        id: theme.id,
+        name: theme.name,
+        description: theme.description,
+        ink: theme.blockTheme.headerText,
+        backing: theme.blockDefaults.bgColor
+      });
+      const shape = t => JSON.stringify([t.blockTheme, t.controlColors, t.popupBg]);
+      assert.notEqual(shape(theme), shape(plain), `${theme.id} is just a colour`);
+    }
   });
 
   it('are marked as one family, so the list can show where they start', () => {
@@ -127,8 +156,8 @@ describe('the see-through family', () => {
     for (const theme of EXTRA_PRESETS) assert.notEqual(theme.family, 'see-through', theme.id);
   });
 
-  // Seven ordinary themes live in App.svelte; with these three that is ten,
-  // the same as the see-through family.
+  // Seven ordinary themes live in App.svelte; with the ones in
+  // extraThemes.js that is as many as the see-through family.
   it('are matched by as many ordinary themes', () => {
     assert.equal(7 + EXTRA_PRESETS.length, SEE_THROUGH_PRESETS.length);
   });
@@ -136,5 +165,21 @@ describe('the see-through family', () => {
   it('never share an id with an ordinary theme', () => {
     const ids = [...SEE_THROUGH_PRESETS, ...EXTRA_PRESETS].map(theme => theme.id);
     assert.equal(new Set(ids).size, ids.length);
+  });
+});
+
+// Asked for on 2026-09-28: Indigo Gilt's block writing in "the same colour as
+// you use on the buttons in the controls", and "one like Indigo Gilt but with
+// transparency for the backgrounds".
+describe('Indigo Gilt', () => {
+  it("writes in its buttons' gold", () => {
+    assert.equal(INDIGO_GILT_PRESET.blockDefaults.textColor, INDIGO_GILT_PRESET.controlColors.left.buttonText);
+  });
+
+  it('has a see-through twin in the same gold, with its backgrounds partly clear', () => {
+    assert.equal(INDIGO_GILT_GLASS_PRESET.blockTheme.headerText, INDIGO_GILT_PRESET.blockTheme.headerText);
+    const { bgOpacity, headerOpacity } = INDIGO_GILT_GLASS_PRESET.blockTheme;
+    assert.ok(bgOpacity > 0 && bgOpacity < 100, `surface ${bgOpacity}`);
+    assert.ok(headerOpacity > 0 && headerOpacity < 100, `header ${headerOpacity}`);
   });
 });

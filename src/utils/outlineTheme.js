@@ -164,6 +164,9 @@ export const OUTLINE_PRESET = seeThroughPreset({
  * Outline, with different colours" -- and six more the same day, so that
  * there are as many see-through themes as ordinary ones. All of them on the
  * family's levels (see seeThroughPreset); only their colours differ.
+ *
+ * Chalk, Coral Wire and Rose Wire were in this list and were taken out on
+ * 2026-09-28, after being looked at.
  */
 const wire = (id, name, ink, backing, description) =>
   seeThroughPreset({ id, name, ink, backing, description });
@@ -174,25 +177,14 @@ export const AMBER_WIRE_PRESET = wire('amber-wire', 'Amber Wire', '#ffc46b', '#1
 export const FROST_GLASS_PRESET = wire('frost-glass', 'Frost Glass', '#e8f4ff', '#07121f',
   'Pale ice-blue writing and edges over the wallpaper, with navy pop-ups.');
 
-// The other way round from the rest: dark writing, pale backings -- for a
-// bright wallpaper, where white writing would disappear.
-export const CHALK_PRESET = wire('chalk', 'Chalk', '#16181c', '#f4f1ea',
-  'Dark writing with pale pop-ups, for bright wallpapers where white writing would vanish.');
-
 export const MINT_WIRE_PRESET = wire('mint-wire', 'Mint Wire', '#7dffb2', '#02140a',
   'Fresh mint-green writing and edges over the wallpaper, with deep green pop-ups.');
-
-export const CORAL_WIRE_PRESET = wire('coral-wire', 'Coral Wire', '#ff8a70', '#1a0703',
-  'Warm coral writing and edges, like a sunset traced over the wallpaper.');
 
 export const LILAC_WIRE_PRESET = wire('lilac-wire', 'Lilac Wire', '#cdb4ff', '#0e0717',
   'Soft lilac writing and edges, with dusky violet pop-ups.');
 
 export const LIME_WIRE_PRESET = wire('lime-wire', 'Lime Wire', '#d4ff5c', '#0c1200',
   'Electric lime writing and edges -- loud on purpose, and readable over almost anything.');
-
-export const ROSE_WIRE_PRESET = wire('rose-wire', 'Rose Wire', '#ff9ecb', '#1a0610',
-  'Rose-pink writing and edges over the wallpaper, with deep berry pop-ups.');
 
 export const COBALT_WIRE_PRESET = wire('cobalt-wire', 'Cobalt Wire', '#7aa2ff', '#030a1f',
   'Vivid cobalt-blue writing and edges, with midnight pop-ups.');
@@ -201,15 +193,98 @@ export const COBALT_WIRE_PRESET = wire('cobalt-wire', 'Cobalt Wire', '#7aa2ff', 
  * Every see-through theme, Outline first -- the order they appear in, after
  * all the ordinary themes, so the list reads as two groups.
  */
-export const SEE_THROUGH_PRESETS = [
+/*
+ * Indigo Gilt with its backgrounds see-through -- asked for on 2026-09-28,
+ * "make one like Indigo Gilt but with transparency for the backgrounds". It
+ * keeps that theme's gold, indigo and lettering, and lets the wallpaper
+ * through its surfaces rather than taking them away entirely.
+ */
+export const INDIGO_GILT_GLASS_PRESET = seeThroughPreset({
+  id: 'indigo-gilt-glass',
+  name: 'Indigo Gilt Glass',
+  description: 'Indigo Gilt, see-through: gold writing on indigo glass, with the wallpaper showing through every surface.',
+  ink: '#f2c14e',
+  backing: '#12122e',
+  surfaceOpacity: 45,
+  headerOpacity: 65,
+  panelOpacity: 0.55,
+  popupOpacity: 0.85,
+  controlColors: {
+    left: { textColor: '#ecebff', buttonBg: '#1c1c4480', inputBg: '#16163866' },
+    right: { textColor: '#ecebff', buttonBg: '#1f1f4a80' }
+  },
+  blockTheme: {
+    borderColor: 'rgba(242, 193, 78, 0.45)',
+    headerFont: "'Chakra Petch', 'Segoe UI', sans-serif",
+    headerLetterSpacing: '0.12em'
+  }
+});
+
+/*
+ * Experiments with levels the family had not tried -- asked for the same day:
+ * "even see-throughs with different levels of opacity on things we haven't
+ * yet tested. I will check them and keep the good ideas." Each changes one
+ * thing from Amber Wire's levels, named on its line.
+ */
+export const SEE_THROUGH_EXPERIMENTS = [
+  // Headers kept, bodies clear: a smoky title bar floating over the picture.
+  seeThroughPreset({
+    id: 'smoke-headers', name: 'Smoke Headers', ink: '#e6e6e6', backing: '#141414',
+    headerOpacity: 70,
+    description: 'Clear blocks under smoky header bars -- the titles keep a backing, the writing floats.'
+  }),
+  // Everything half-veiled: blocks, toolbar and pop-ups all partly backed.
+  seeThroughPreset({
+    id: 'veil', name: 'Veil', ink: '#fff4d6', backing: '#2a1f14',
+    surfaceOpacity: 40, panelOpacity: 0.4, popupOpacity: 0.9,
+    description: 'A warm veil over everything: blocks and toolbar half-backed, so the wallpaper is softened rather than bare.'
+  }),
+  // The writing itself translucent, not only the surfaces.
+  seeThroughPreset({
+    id: 'faint-ink', name: 'Faint Ink', ink: '#b8fff4', backing: '#001a17',
+    blockTheme: { textOpacity: 75 },
+    description: 'Even the writing lets the wallpaper through: aqua ink at three quarters, like a watermark.'
+  }),
+  // A glassy toolbar and lighter pop-ups than the family's.
+  seeThroughPreset({
+    id: 'silver-pane', name: 'Silver Pane', ink: '#d7dde6', backing: '#101418',
+    panelOpacity: 0.45, popupOpacity: 0.6,
+    description: 'Silver writing with a glassy toolbar and lighter pop-ups than the rest of the family.'
+  }),
+  // The shadow under the writing used as a glow, in the writing's own colour.
+  seeThroughPreset({
+    id: 'cyan-glow', name: 'Cyan Glow', ink: '#00f0ff', backing: '#000a0c',
+    blockTheme: {
+      textShadow: '0 0 4px rgba(0, 240, 255, 0.9), 0 0 12px rgba(0, 240, 255, 0.5)',
+      shadow: '0 0 8px rgba(0, 240, 255, 0.55), 0 0 24px rgba(0, 240, 255, 0.25)'
+    },
+    description: 'Neon on nothing: glowing cyan writing and edges, lit rather than outlined.'
+  }),
+  // No outlines at all: only the writing and the shadows are left.
+  seeThroughPreset({
+    id: 'bare', name: 'Bare', ink: '#fff3e0', backing: '#120d06',
+    blockTheme: { borderColor: 'transparent', borderWidth: '0px' },
+    description: 'No outlines at all -- just the writing and its shadow over the wallpaper.'
+  })
+];
+
+/**
+ * Every see-through theme, Outline first -- the order they appear in, after
+ * all the ordinary themes, so the list reads as two groups. The first seven
+ * are the family proper, on Amber Wire's levels; the rest vary them.
+ */
+export const SEE_THROUGH_CORE = [
   OUTLINE_PRESET,
   AMBER_WIRE_PRESET,
   FROST_GLASS_PRESET,
-  CHALK_PRESET,
   MINT_WIRE_PRESET,
-  CORAL_WIRE_PRESET,
   LILAC_WIRE_PRESET,
   LIME_WIRE_PRESET,
-  ROSE_WIRE_PRESET,
   COBALT_WIRE_PRESET
+];
+
+export const SEE_THROUGH_PRESETS = [
+  ...SEE_THROUGH_CORE,
+  INDIGO_GILT_GLASS_PRESET,
+  ...SEE_THROUGH_EXPERIMENTS
 ].map(theme => ({ ...theme, family: 'see-through' }));
