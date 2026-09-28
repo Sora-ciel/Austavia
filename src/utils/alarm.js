@@ -140,7 +140,12 @@ export function readClockDevice(raw) {
     // This device's stopwatch -- utils/stopwatch.js.
     stopwatch: readStopwatch(value.stopwatch),
     // This device's timer -- utils/countdown.js.
-    timer: readTimer(value.timer)
+    timer: readTimer(value.timer),
+    // Whether this block's timer opens the always-on-top pop-up on the Windows
+    // app. On unless switched off -- asked for on 2026-09-28, "an on/off in
+    // the bottom-left corner where you can turn off the pop-up for timers,
+    // on by default". See utils/clockPopups.js.
+    timerPopup: value.timerPopup !== false
   };
 }
 

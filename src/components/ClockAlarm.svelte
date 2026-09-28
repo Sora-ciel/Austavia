@@ -171,6 +171,15 @@
     saveAlarm({ alarmEnabled: !alarmEnabled }, ['alarmEnabled']);
   }
 
+  // The pop-ups exist on the Windows app only, so the switch does too.
+  const onDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+  $: popupOn = device.timerPopup !== false;
+
+  function togglePopup() {
+    beforeAct();
+    setClockDevice(blockId, { ...device, timerPopup: !popupOn });
+  }
+
   function changeTimer(change) {
     beforeAct();
     setClockDevice(blockId, { ...device, timer: change(device.timer, Date.now()) });
@@ -352,7 +361,9 @@
     {/if}
   </div>
 
-  <!-- Bottom left is the timer. -->
+  <!-- Bottom left is the timer, and beside it -- on the Windows app, where
+       the pop-up exists -- the switch for its always-on-top pop-up. -->
+  <div class="bottom-left">
   <button
     class="corner corner-bl"
     class:active={countdownCorner.kind === 'timer'}
@@ -374,6 +385,32 @@
       {#if countdownCorner.kind === 'timer'}<span>{countdownCorner.text}</span>{/if}
     {/if}
   </button>
+
+  {#if onDesktop}
+    <!-- Asked for on 2026-09-28: "an on/off in the bottom-left corner where
+         you can turn off the pop-up for timers, on by default". This device,
+         this block -- see timerPopup in utils/alarm.js. -->
+    <button
+      class="corner popup-switch"
+      class:active={popupOn}
+      role="switch"
+      aria-checked={popupOn}
+      data-focus-guard
+      title={popupOn ? 'Timer pop-up on: click to turn it off' : 'Timer pop-up off: click to turn it on'}
+      aria-label="Timer pop-up"
+      on:mousedown|stopPropagation
+      on:pointerdown|stopPropagation
+      on:touchstart|stopPropagation
+      on:click|stopPropagation={togglePopup}
+    >
+      <svg class="corner-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M13 3h8v8M21 3l-8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>{popupOn ? 'On' : 'Off'}</span>
+    </button>
+  {/if}
+  </div>
 </div>
 
 <style>
@@ -406,7 +443,18 @@
 
   .corner-tl { grid-area: tl; justify-self: start; }
   .corner-tr { grid-area: tr; justify-self: end; }
-  .corner-bl { grid-area: bl; justify-self: start; }
+  .bottom-left {
+    grid-area: bl;
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* Off reads as off: struck through and quieter than the other corners. */
+  .popup-switch:not(.active) span {
+    text-decoration: line-through;
+  }
 
   /* What every size below is measured against: `cqh` and `cqi` are
      hundredths of the stage's height and width. */

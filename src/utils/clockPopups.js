@@ -45,8 +45,13 @@
 import { timerState } from './countdown.js';
 import { isRinging, normalizeAlarmTime } from './alarm.js';
 
-export const POPUP_WIDTH = 260;
-export const POPUP_HEIGHT = 112;
+// A third less tall and a little narrower than the first version, asked for
+// once it had been tried: "use less height and less width -- the line that
+// shows the passing of time for the width, and for the height I believe we can
+// lose between a fourth and a third". The figure and its buttons share one
+// row, and the bar is a hairline along the bottom edge.
+export const POPUP_WIDTH = 228;
+export const POPUP_HEIGHT = 76;
 export const POPUP_GAP = 10;
 export const POPUP_MARGIN = 16;
 
@@ -83,10 +88,13 @@ export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidd
 
     const phase = timerState(device.timer, now);
     const timerLabel = popupLabel(block.id, 'timer');
+    // Switched off on this block's bottom-left corner: no pop-up for its
+    // timer at all, running, kept or ringing.
+    const popupOn = device.timerPopup !== false;
     const inUse = phase === 'running' || phase === 'paused';
     // Kept: stopped from the pop-up itself, which stays ready to start again.
     const keptReady = kept.has(timerLabel) && (phase === 'idle' || phase === 'done');
-    if (phase === 'ringing' || (inUse && !hidden.has(timerLabel)) || keptReady) {
+    if (popupOn && (phase === 'ringing' || (inUse && !hidden.has(timerLabel)) || keptReady)) {
       wanted.push({ blockId: block.id, kind: 'timer', label: timerLabel });
     }
 

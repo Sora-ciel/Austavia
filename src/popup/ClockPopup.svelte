@@ -189,36 +189,41 @@
     <button class="hide" title={idle ? 'Close' : 'Hide (the timer keeps going)'} aria-label={idle ? 'Close' : 'Hide'} on:click={hide}>×</button>
   </div>
 
-  <div class="figure" data-tauri-drag-region>
-    {#if kind === 'timer'}
-      {timerReading(left)}
-    {:else}
-      {alarmReading(alarmTime, hour12)}
-    {/if}
+  <!-- The time and what to do about it on one row, and how much is left as a
+       hairline along the bottom: the same things as before in two thirds of
+       the height -- see POPUP_HEIGHT in utils/clockPopups.js. -->
+  <div class="row" data-tauri-drag-region>
+    <div class="figure" class:long={kind === 'timer' && left >= 3600000} data-tauri-drag-region>
+      {#if kind === 'timer'}
+        {timerReading(left)}
+      {:else}
+        {alarmReading(alarmTime, hour12)}
+      {/if}
+    </div>
+
+    <div class="actions">
+      {#if kind === 'timer'}
+        {#if ringing}
+          <button title="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+          <button class="primary" on:click={stop}>Stop</button>
+        {:else if idle}
+          <!-- Stopped here: the timer is back to its length, ready to run again. -->
+          <button class="primary" on:click={togglePause}>Start</button>
+        {:else}
+          <button on:click={togglePause}>{phase === 'paused' ? 'Resume' : 'Pause'}</button>
+          <button title="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+          <button class="primary" on:click={stop}>Stop</button>
+        {/if}
+      {:else}
+        <button on:click={snooze}>Snooze</button>
+        <button class="primary" on:click={stop}>Stop</button>
+      {/if}
+    </div>
   </div>
 
   {#if kind === 'timer'}
-    <div class="bar" data-tauri-drag-region><span style="width: {fraction * 100}%"></span></div>
+    <div class="bar" aria-hidden="true"><span style="width: {fraction * 100}%"></span></div>
   {/if}
-
-  <div class="actions">
-    {#if kind === 'timer'}
-      {#if ringing}
-        <button on:click={() => change(oneMoreMinute)}>+1 min</button>
-        <button class="primary" on:click={stop}>Stop</button>
-      {:else if idle}
-        <!-- Stopped here: the timer is back to its length, ready to run again. -->
-        <button class="primary" on:click={togglePause}>Start</button>
-      {:else}
-        <button on:click={togglePause}>{phase === 'paused' ? 'Resume' : 'Pause'}</button>
-        <button on:click={() => change(oneMoreMinute)}>+1 min</button>
-        <button class="primary" on:click={stop}>Stop</button>
-      {/if}
-    {:else}
-      <button on:click={snooze}>Snooze</button>
-      <button class="primary" on:click={stop}>Stop</button>
-    {/if}
-  </div>
 </div>
 
 <style>
@@ -237,52 +242,80 @@
   }
 
   .card {
+    position: relative;
     box-sizing: border-box;
     width: 100vw;
     height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 8px 10px 9px;
-    border-radius: 14px;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 8px 8px 10px;
+    border-radius: 12px;
     border: 1px solid var(--pp-border);
     background: var(--pp-bg);
     color: var(--pp-text);
     font-family: 'Inter', system-ui, sans-serif;
     user-select: none;
     cursor: default;
+    overflow: hidden;
   }
 
   .top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
   }
 
   .what {
-    font-size: 0.72rem;
+    font-size: 0.66rem;
     font-weight: 600;
     letter-spacing: 0.04em;
-    opacity: 0.75;
+    opacity: 0.7;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .figure {
-    font-size: 1.9rem;
+    flex: none;
+    font-size: 1.55rem;
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
+    white-space: nowrap;
   }
 
-  /* How much is left, readable from the corner of an eye. */
+  /* An hour or more is two characters longer; it gives up a little size
+     rather than push the buttons out of the card. */
+  .figure.long {
+    font-size: 1.2rem;
+  }
+
+  .actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  /* How much is left: a hairline along the bottom edge rather than a row of
+     its own. */
   .bar {
-    height: 3px;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--pp-text) 18%, transparent);
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--pp-text) 16%, transparent);
     overflow: hidden;
   }
 
@@ -293,21 +326,15 @@
     transition: width 0.25s linear;
   }
 
-  .actions {
-    display: flex;
-    gap: 6px;
-    margin-top: auto;
-  }
-
   button {
     font: inherit;
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: var(--pp-text);
     background: color-mix(in srgb, var(--pp-text) 10%, transparent);
     border: 1px solid color-mix(in srgb, var(--pp-text) 28%, transparent);
     border-radius: 999px;
-    padding: 3px 11px;
+    padding: 2px 8px;
     cursor: pointer;
   }
 
@@ -322,9 +349,9 @@
   }
 
   .hide {
-    padding: 0 7px;
-    font-size: 0.95rem;
-    line-height: 1.2;
+    padding: 0 6px;
+    font-size: 0.85rem;
+    line-height: 1.1;
     border: none;
     background: transparent;
     opacity: 0.6;

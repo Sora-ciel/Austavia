@@ -267,3 +267,9 @@ describe('inReading', () => {
     assert.equal(inReading(125 * MINUTE), 'in 2 h 5 min');
   });
 });
+
+// "On by default" -- see test/clock-popups.test.js for what the switch does.
+it('remembers the timer pop-up as on unless switched off', () => {
+  assert.equal(readClockDevice(null).timerPopup, true);
+  assert.equal(readClockDevice(JSON.stringify({ timerPopup: false })).timerPopup, false);
+});

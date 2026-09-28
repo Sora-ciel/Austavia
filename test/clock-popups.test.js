@@ -136,3 +136,25 @@ it('reads how much of a timer is left, for the bar', () => {
   assert.equal(timerFractionLeft(0, 60_000), 0);
   assert.equal(timerFractionLeft(10, 0), 0);
 });
+
+// Asked for on 2026-09-28: "an on/off in the bottom-left corner of the clock
+// block where you can turn off the pop-up for timers, or turn it on -- on by
+// default."
+describe('the pop-up switch on the clock block', () => {
+  const running = startTimer(readTimer(null), T);
+
+  it('is on by default', () => {
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices: { a: { timer: running } }, now: T + 1 }).length, 1);
+  });
+
+  it("opens no pop-up for that block's timer when switched off -- not even when it rings", () => {
+    const off = { timer: running, timerPopup: false };
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices: { a: off }, now: T + 1 }).length, 0);
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices: { a: off }, now: T + 5 * MIN + 1 }).length, 0);
+  });
+
+  it('leaves other blocks alone', () => {
+    const devices = { a: { timer: running, timerPopup: false }, b: { timer: running } };
+    assert.deepEqual(popupsWanted({ blocks: [clock('a'), clock('b')], devices, now: T + 1 }).map(p => p.blockId), ['b']);
+  });
+});
