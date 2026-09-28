@@ -122,6 +122,14 @@
     outline-offset: 1px;
   }
 
+  .family-label {
+    margin: 8px 2px 0;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+
   .custom-note {
     margin-top: 6px;
     font-size: 0.68rem;
@@ -132,7 +140,12 @@
 </style>
 
 <div class="preset-grid">
-  {#each themes as theme (theme.id)}
+  {#each themes as theme, index (theme.id)}
+    <!-- The see-through family is listed last and together; a label where it
+         starts makes the two groups findable at a glance. -->
+    {#if theme.family === 'see-through' && themes[index - 1]?.family !== 'see-through'}
+      <div class="family-label">See-through</div>
+    {/if}
     <button
       type="button"
       class="preset-card"

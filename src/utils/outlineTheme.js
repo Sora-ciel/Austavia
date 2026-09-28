@@ -37,10 +37,10 @@
  * dark enough for white writing over the brightest picture, light enough
  * that the picture is still there behind it.
  *
- * The toolbar followed, the next day's ask: "make it so that controls
- * background is also a black at the same opacity" -- so the panels are the
- * backing at the same 78% (eight-digit hex, which is what a panel colour is),
- * and only their buttons stay see-through, drawn as outlines on it.
+ * The toolbar was put on the same 78% for a while ("make it so that controls
+ * background is also a black at the same opacity"), and then taken back off:
+ * once Amber Wire showed a fully clear toolbar, that was the one wanted for
+ * the whole family. See seeThroughPreset.
  *
  * Single Note's page is black for a related reason; that one is in
  * modeSurface.js, because it is true of every theme and not only this one.
@@ -84,11 +84,15 @@ function withAlpha(hex, alpha) {
  * any picture. `blockTheme` and `controlColors` are merged over the template
  * for anything a particular theme wants different.
  *
- * How see-through each part is can be set too, which is what makes this a
- * family rather than one theme in several colours: `surfaceOpacity` and
+ * How see-through each part is can be set too: `surfaceOpacity` and
  * `headerOpacity` for blocks (0-100, as the theme dials are), `panelOpacity`
- * for the toolbar and `popupOpacity` for pop-ups (0-1). Left out, each is
- * Outline's.
+ * for the toolbar and `popupOpacity` for pop-ups (0-1).
+ *
+ * The defaults are Amber Wire's, because they were chosen: "I really love the
+ * opacity settings of Amber Wire, so I would like all the Outline themes to
+ * follow those" (2026-09-27). Blocks and headers clear, the toolbar clear too,
+ * and only pop-ups on the 78% backing. Every see-through theme takes them, and
+ * one that differs should be a decision, not a leftover.
  */
 export function seeThroughPreset({
   id,
@@ -100,7 +104,7 @@ export function seeThroughPreset({
   controlColors = {},
   surfaceOpacity = 0,
   headerOpacity = 0,
-  panelOpacity = POPUP_BACKING_OPACITY,
+  panelOpacity = 0,
   popupOpacity = POPUP_BACKING_OPACITY
 } = {}) {
   const clear = '#00000000';
@@ -141,7 +145,10 @@ export function seeThroughPreset({
     // What pop-ups sit on -- see above. A theme without one keeps its panels'
     // own colour.
     popupBg: withAlpha(backing, popupOpacity),
-    previewBg: 'transparent',
+    // The card in the theme list is drawn on the theme's own backing. It was
+    // see-through, like the theme, and a see-through card over the dark
+    // settings panel hid Chalk's dark writing entirely.
+    previewBg: withAlpha(backing, popupOpacity),
     blockDefaults: { bgColor: backing, textColor: ink }
   };
 }
@@ -153,49 +160,56 @@ export const OUTLINE_PRESET = seeThroughPreset({
 });
 
 /**
- * Three more in the family, asked for on 2026-09-27: "make 3 other themes that
- * are a bit like Outline, with different colours and levels of 'this will not
- * have opacity, or this will have more'." Each differs from Outline in colour
- * and in one clear direction of see-through.
+ * The rest of the family. Three asked for on 2026-09-27 -- "a bit like
+ * Outline, with different colours" -- and six more the same day, so that
+ * there are as many see-through themes as ordinary ones. All of them on the
+ * family's levels (see seeThroughPreset); only their colours differ.
  */
+const wire = (id, name, ink, backing, description) =>
+  seeThroughPreset({ id, name, ink, backing, description });
 
-// Warm, and further than Outline: the toolbar is fully clear too, so nothing
-// but the pop-ups has any backing at all.
-export const AMBER_WIRE_PRESET = seeThroughPreset({
-  id: 'amber-wire',
-  name: 'Amber Wire',
-  description: 'Amber writing and edges on nothing at all -- even the toolbar is clear. Only the pop-ups keep a backing.',
-  ink: '#ffc46b',
-  backing: '#140c02',
-  panelOpacity: 0
-});
+export const AMBER_WIRE_PRESET = wire('amber-wire', 'Amber Wire', '#ffc46b', '#140c02',
+  'Amber writing and edges on nothing at all. Only the pop-ups keep a backing.');
 
-// Cool, and less far than Outline: blocks keep a faint tint of the backing
-// and their headers a stronger one, so they read as frosted panes rather than
-// bare outlines.
-export const FROST_GLASS_PRESET = seeThroughPreset({
-  id: 'frost-glass',
-  name: 'Frost Glass',
-  description: 'Pale blue writing on frosted panes: blocks keep a light tint and their headers a stronger one, so the wallpaper shows through softened.',
-  ink: '#e8f4ff',
-  backing: '#07121f',
-  surfaceOpacity: 35,
-  headerOpacity: 55,
-  panelOpacity: 0.6,
-  popupOpacity: 0.85
-});
+export const FROST_GLASS_PRESET = wire('frost-glass', 'Frost Glass', '#e8f4ff', '#07121f',
+  'Pale ice-blue writing and edges over the wallpaper, with navy pop-ups.');
 
-// Light, the other way round: dark writing with pale backings, for bright
-// wallpapers where white writing would disappear.
-export const CHALK_PRESET = seeThroughPreset({
-  id: 'chalk',
-  name: 'Chalk',
-  description: 'Dark writing with pale backings, for bright wallpapers. Blocks keep a whisper of white; the toolbar and pop-ups are chalky panes.',
-  ink: '#16181c',
-  backing: '#f4f1ea',
-  surfaceOpacity: 20,
-  popupOpacity: 0.9
-});
+// The other way round from the rest: dark writing, pale backings -- for a
+// bright wallpaper, where white writing would disappear.
+export const CHALK_PRESET = wire('chalk', 'Chalk', '#16181c', '#f4f1ea',
+  'Dark writing with pale pop-ups, for bright wallpapers where white writing would vanish.');
 
-/** Every see-through theme, Outline first -- the order they appear in. */
-export const SEE_THROUGH_PRESETS = [OUTLINE_PRESET, AMBER_WIRE_PRESET, FROST_GLASS_PRESET, CHALK_PRESET];
+export const MINT_WIRE_PRESET = wire('mint-wire', 'Mint Wire', '#7dffb2', '#02140a',
+  'Fresh mint-green writing and edges over the wallpaper, with deep green pop-ups.');
+
+export const CORAL_WIRE_PRESET = wire('coral-wire', 'Coral Wire', '#ff8a70', '#1a0703',
+  'Warm coral writing and edges, like a sunset traced over the wallpaper.');
+
+export const LILAC_WIRE_PRESET = wire('lilac-wire', 'Lilac Wire', '#cdb4ff', '#0e0717',
+  'Soft lilac writing and edges, with dusky violet pop-ups.');
+
+export const LIME_WIRE_PRESET = wire('lime-wire', 'Lime Wire', '#d4ff5c', '#0c1200',
+  'Electric lime writing and edges -- loud on purpose, and readable over almost anything.');
+
+export const ROSE_WIRE_PRESET = wire('rose-wire', 'Rose Wire', '#ff9ecb', '#1a0610',
+  'Rose-pink writing and edges over the wallpaper, with deep berry pop-ups.');
+
+export const COBALT_WIRE_PRESET = wire('cobalt-wire', 'Cobalt Wire', '#7aa2ff', '#030a1f',
+  'Vivid cobalt-blue writing and edges, with midnight pop-ups.');
+
+/**
+ * Every see-through theme, Outline first -- the order they appear in, after
+ * all the ordinary themes, so the list reads as two groups.
+ */
+export const SEE_THROUGH_PRESETS = [
+  OUTLINE_PRESET,
+  AMBER_WIRE_PRESET,
+  FROST_GLASS_PRESET,
+  CHALK_PRESET,
+  MINT_WIRE_PRESET,
+  CORAL_WIRE_PRESET,
+  LILAC_WIRE_PRESET,
+  LIME_WIRE_PRESET,
+  ROSE_WIRE_PRESET,
+  COBALT_WIRE_PRESET
+].map(theme => ({ ...theme, family: 'see-through' }));

@@ -8,6 +8,7 @@
   import ControlIcon from './components/ControlIcon.svelte';
   import ScrollingText from './components/ScrollingText.svelte';
   import { SEE_THROUGH_PRESETS } from './utils/outlineTheme.js';
+  import { EXTRA_PRESETS } from './utils/extraThemes.js';
   import AlarmRinger from './components/AlarmRinger.svelte';
   import {
     saveBlocks,
@@ -442,11 +443,14 @@
       previewBg: '#161b21',
       blockDefaults: { bgColor: '#1b2129', textColor: '#ffb454' }
     },
-    // Everything see-through but the writing, edges and shadows -- see
-    // utils/outlineTheme.js.
-    ...SEE_THROUGH_PRESETS,
+    // More ordinary themes -- see utils/extraThemes.js.
+    ...EXTRA_PRESETS,
     // Guest theme, meant to be pulled back out later — see utils/hatoTheme.js.
-    ...HATO_PRESETS
+    ...HATO_PRESETS,
+    // The see-through family last and together, so the list reads as two
+    // groups: "around here are all the low-opacity ones" (2026-09-27). See
+    // utils/outlineTheme.js.
+    ...SEE_THROUGH_PRESETS
   ];
 
   const CONTROL_COLOR_STORAGE_KEY = 'controlColors';

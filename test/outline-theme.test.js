@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 import { OUTLINE_PRESET, seeThroughPreset, SEE_THROUGH_PRESETS } from '../src/utils/outlineTheme.js';
 import { BLOCK_THEME_DEFAULTS } from '../src/utils/themeDefaults.js';
+import { EXTRA_PRESETS } from '../src/utils/extraThemes.js';
 
 const alphaOf = hex => (/^#[0-9a-f]{8}$/i.test(hex) ? parseInt(hex.slice(7), 16) : 255);
 
@@ -43,13 +44,12 @@ describe('Outline makes everything invisible but the text, the shadows and the o
   });
 });
 
-// Asked for afterwards: "make it so that controls background is also a black
-// at the same opacity" as the pop-ups.
-it('puts the toolbar on the same black as the pop-ups', () => {
+// The toolbar went on the pop-ups' 78% black for a while, and then came back
+// off: "I really love the opacity settings of Amber Wire, so I would like all
+// the Outline themes to follow those." Amber Wire's toolbar is fully clear.
+it('leaves the toolbar clear, as Amber Wire does', () => {
   for (const side of ['left', 'right']) {
-    const panel = OUTLINE_PRESET.controlColors[side].panelBg;
-    assert.equal(panel.slice(0, 7), '#000000', `${side} is black`);
-    assert.ok(Math.abs(alphaOf(panel) / 255 - 0.78) < 0.01, `${side} alpha ${alphaOf(panel) / 255}`);
+    assert.equal(alphaOf(OUTLINE_PRESET.controlColors[side].panelBg), 0, side);
   }
 });
 
@@ -97,35 +97,44 @@ it('gives every theme a text shadow, none unless it asks for one', () => {
   assert.equal(BLOCK_THEME_DEFAULTS.textShadow, 'none');
 });
 
-// "Make 3 other themes that are a bit like Outline, with different colours
-// and levels of 'this will not have opacity, or this will have more'."
-describe('the other see-through themes', () => {
-  const others = SEE_THROUGH_PRESETS.filter(theme => theme !== OUTLINE_PRESET);
-  const alpha = rgba => Number(/, ([\d.]+)\)$/.exec(rgba)?.[1]);
-
-  it('are three, each its own theme', () => {
-    assert.equal(others.length, 3);
-    const ids = SEE_THROUGH_PRESETS.map(theme => theme.id);
-    assert.equal(new Set(ids).size, ids.length);
+// "I really love the opacity settings of Amber Wire, so I would like all the
+// Outline themes to follow those" -- and "make it so that there's as much
+// normal as low opacity ones", with the see-through ones kept together.
+describe('the see-through family', () => {
+  const amber = SEE_THROUGH_PRESETS.find(theme => theme.id === 'amber-wire');
+  const levels = theme => ({
+    surface: theme.blockTheme.bgOpacity,
+    header: theme.blockTheme.headerOpacity,
+    toolbarLeft: alphaOf(theme.controlColors.left.panelBg),
+    toolbarRight: alphaOf(theme.controlColors.right.panelBg),
+    popup: /, ([\d.]+)\)$/.exec(theme.popupBg)?.[1]
   });
 
-  it('come from the same template, with their own colours', () => {
-    for (const theme of others) {
-      assert.ok(theme.popupBg, `${theme.id} has a pop-up backing`);
-      assert.equal(alphaOf(theme.controlColors.left.buttonBg), 0, `${theme.id} buttons are clear`);
-      assert.notEqual(theme.blockTheme.headerText, OUTLINE_PRESET.blockTheme.headerText, `${theme.id} has its own ink`);
+  it("all follow Amber Wire's opacity settings", () => {
+    for (const theme of SEE_THROUGH_PRESETS) {
+      assert.deepEqual(levels(theme), levels(amber), theme.id);
     }
   });
 
-  it('go further than Outline in one direction and less far in another', () => {
-    const [amber, frost, chalk] = others;
-    // No backing on the toolbar at all.
-    assert.equal(alphaOf(amber.controlColors.left.panelBg), 0);
-    // Blocks keep some of their surface, headers more.
-    assert.ok(frost.blockTheme.bgOpacity > 0 && frost.blockTheme.headerOpacity > frost.blockTheme.bgOpacity);
-    // Pop-ups more opaque than Outline's.
-    assert.ok(alpha(frost.popupBg) > alpha(OUTLINE_PRESET.popupBg));
-    assert.ok(alpha(chalk.popupBg) > alpha(OUTLINE_PRESET.popupBg));
-    assert.ok(chalk.blockTheme.bgOpacity > 0);
+  it('are ten, each its own theme with its own colour', () => {
+    assert.equal(SEE_THROUGH_PRESETS.length, 10);
+    const inks = SEE_THROUGH_PRESETS.map(theme => theme.blockTheme.headerText);
+    assert.equal(new Set(inks).size, inks.length);
+  });
+
+  it('are marked as one family, so the list can show where they start', () => {
+    for (const theme of SEE_THROUGH_PRESETS) assert.equal(theme.family, 'see-through', theme.id);
+    for (const theme of EXTRA_PRESETS) assert.notEqual(theme.family, 'see-through', theme.id);
+  });
+
+  // Seven ordinary themes live in App.svelte; with these three that is ten,
+  // the same as the see-through family.
+  it('are matched by as many ordinary themes', () => {
+    assert.equal(7 + EXTRA_PRESETS.length, SEE_THROUGH_PRESETS.length);
+  });
+
+  it('never share an id with an ordinary theme', () => {
+    const ids = [...SEE_THROUGH_PRESETS, ...EXTRA_PRESETS].map(theme => theme.id);
+    assert.equal(new Set(ids).size, ids.length);
   });
 });
