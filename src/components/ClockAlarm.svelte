@@ -398,6 +398,10 @@
     height: 100%;
     padding: 2px 3px;
     color: inherit;
+    /* The whole block is a container too, so the corners can be sized from
+       it -- see .corner. The stage inside stays its own container for the
+       figures. */
+    container-type: size;
   }
 
   .corner-tl { grid-area: tl; justify-self: start; }
@@ -569,17 +573,23 @@
 
   /* ── Corners ─────────────────────────────────────────────────────────
      Small, and quiet until they have something to say. */
+  /* Sized from the block, like the figure in the middle. Asked for on
+     2026-09-28: the corners "should also get bigger as the block gets bigger,
+     like what's written in the middle". About a tenth of the block's shorter
+     side, never smaller than they were (so the default block looks as it
+     did) and capped, so on a very large block they stay corners rather than
+     crowding the stage. Padding and gap are in em so they grow with it. */
   .corner {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 1px 5px;
+    gap: 0.25em;
+    padding: 0.1em 0.45em;
     border: none;
     border-radius: 999px;
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 0.7rem;
+    font-size: clamp(0.7rem, 9cqmin, 2rem);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 1;
