@@ -104,6 +104,7 @@
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
+  import { playerClickAction } from './utils/playerClicks.js';
   import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, habitsToAdopt } from './utils/habitStore.js';
@@ -5983,15 +5984,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 .mini-btn:hover { background: color-mix(in srgb, var(--controls-button-text, var(--controls-text, #fff)) 16%, transparent); }
 
-/* One drawing, turned over, so open and shut are the same shape rather than
-   two icons that have to be kept looking like each other. */
-.mini-expand { transform: rotate(180deg); transition: transform 0.18s ease; }
-.mini-expand.open { transform: rotate(0deg); }
-
-@media (prefers-reduced-motion: reduce) {
-  .mini-expand { transition: none; }
-}
-
 .mini-cover {
   width: 20px;
   height: 20px;
@@ -6158,10 +6150,39 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   color: var(--dlg-btn-text, var(--dlg-text, #fff));
   cursor: pointer;
 }
-/* Geometry comes from the shared .vertical variant in app.css. Left at its
-   fixed height on purpose: letting it stretch made the slider drive the card's
-   height instead of the other way round, and the panel grew a good 40px. */
-.pp-volume-range { padding: 0; }
+/* The upright volume: a normal horizontal slider, rotated a quarter turn
+   inside a slot of the size it takes up standing.
+
+   It was a writing-mode "vertical" slider first, and that could not be made
+   right: its track rules listed WebKit's and Firefox's pseudo-elements in one
+   selector, and a browser drops a whole rule over a pseudo-element it does
+   not know -- so in Chrome, Android and the desktop app none of them applied,
+   whatever was put in them. Asked on 2026-09-27 to "look at how people do
+   volume" rather than keep patching: this is that. The horizontal slider's
+   styling is the shared one in app.css, per engine and already right, and
+   rotating it keeps the thumb centred on an even track because nothing about
+   it changes but the direction. Fixed at its height on purpose: letting it
+   stretch made the slider drive the card's height, and the panel grew 40px. */
+.pp-volume-slot {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 84px;
+  flex: none;
+}
+.pp-volume-range {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 84px;
+  margin: 0;
+  padding: 0;
+  /* -90deg puts the start of the slider at the bottom: up is louder. */
+  transform: translate(-50%, -50%) rotate(-90deg);
+}
+/* The surface around the controls goes to Playlist mode, so it says so. */
+.player-panel { cursor: pointer; }
+.player-panel :is(button, input, label) { cursor: pointer; }
 /* Number then icon, both in the button text colour, matching the timeline's
    readouts. */
 .pp-vol-readout {
@@ -6483,16 +6504,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->
     {#if nowPlayingTrack}
-      <!-- Asked for on 2026-09-26: "when we click on the music player anywhere
-           other than the places where there's already buttons it will put you
-           in the playlist mode."
-
-           So the strip itself is now a way back to the music, and every
-           control on it keeps its own click through stopPropagation. The
-           bigger controls used to open by pressing the strip, which is what
-           this replaces -- so they get a button of their own at the end
-           rather than quietly becoming unreachable. The cover art is already
-           the strip's background, so no thumbnail competes with the title. -->
+      <!-- Pressing the strip anywhere but its buttons opens the player, as it
+           always did. The Playlist jump belongs to the player, not here --
+           see utils/playerClicks.js for the request and its correction. -->
       <div
         class="mini-player"
         class:open={playerExpanded}
@@ -6500,13 +6514,18 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         bind:this={playerToggleRef}
         role="button"
         tabindex="0"
-        aria-label="Open Playlist"
-        title="Open Playlist"
-        on:click={() => setMode('playlist')}
+        aria-expanded={playerExpanded}
+        aria-label={playerExpanded ? 'Hide the player' : 'Open the player'}
+        on:click={(event) => {
+          if (playerClickAction('mini', event.target, event.currentTarget) === 'open-player') {
+            playerExpanded = !playerExpanded;
+          }
+        }}
         on:keydown={(event) => {
+          if (event.target !== event.currentTarget) return;
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            setMode('playlist');
+            playerExpanded = !playerExpanded;
           }
         }}
       >
@@ -6539,24 +6558,24 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           <ScrollingText text={nowPlayingTrack.title || 'Untitled'} always={!Pc} />
         </div>
 
-        <!-- What pressing the strip used to do. It is last so the title keeps
-             the room it had, and it stops the click so the strip underneath
-             does not also change mode. -->
-        <button
-          class="mini-btn mini-expand"
-          class:open={playerExpanded}
-          on:click|stopPropagation={() => (playerExpanded = !playerExpanded)}
-          aria-expanded={playerExpanded}
-          aria-label={playerExpanded ? 'Hide music controls' : 'Show music controls'}
-          title={playerExpanded ? 'Hide music controls' : 'Show music controls'}
-        ><PlayerIcon name="chevron" size={14} /></button>
       </div>
 
       {#if playerExpanded}
+        <!-- Clicking the player anywhere but its controls goes to Playlist
+             mode -- see utils/playerClicks.js. Its controls keep their own
+             clicks; the keyboard reaches Playlist through the mode picker. -->
+        <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
         <div
           class="player-panel"
           style={`${overlayThemeStyle} ${panelArtStyle}`}
+          title="Open Playlist"
           use:clickOutside={{ onOutside: () => (playerExpanded = false), ignore: () => [playerToggleRef] }}
+          on:click={(event) => {
+            if (playerClickAction('player', event.target, event.currentTarget) === 'open-playlist') {
+              playerExpanded = false;
+              setMode('playlist');
+            }
+          }}
         >
           <div class="pp-main-col">
             <div class="pp-now">
@@ -6622,14 +6641,19 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           </div>
 
           <label class="pp-volume" title="Volume">
-            <input
-              class="vertical filled pp-volume-range"
-              type="range" min="0" max="1" step="0.01"
-              value={musicVolume}
-              style="--range-progress: {Math.round(musicVolume * 100)}%"
-              on:input={(e) => setMusicVolume(e.target.value)}
-              aria-label="Volume"
-            />
+            <!-- An ordinary horizontal slider turned on its side, the way
+                 players usually do an upright volume -- see .pp-volume-slot. -->
+            <span class="pp-volume-slot">
+              <input
+                class="filled pp-volume-range"
+                type="range" min="0" max="1" step="0.01"
+                value={musicVolume}
+                style="--range-progress: {Math.round(musicVolume * 100)}%"
+                on:input={(e) => setMusicVolume(e.target.value)}
+                aria-label="Volume"
+                aria-orientation="vertical"
+              />
+            </span>
             <span class="pp-vol-readout">
               <span class="pp-vol-number">{Math.round(musicVolume * 100)}</span>
               <PlayerIcon name={musicVolume === 0 ? 'mute' : 'volume'} size={13} />

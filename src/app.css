@@ -310,51 +310,11 @@ input[type="range"]::-moz-range-thumb {
   background: var(--sb-thumb, rgba(255, 255, 255, 0.4));
 }
 
-/* Upright variant. writing-mode is the modern way to turn a range; the
-   slider-vertical appearance is kept for WebKit, which doesn't honour it yet.
-   The thumb offset flips axis with it. */
-input[type="range"].vertical {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  /* Deliberately NOT `appearance: slider-vertical`: that hands the control
-     back to the browser's native widget, which ignores the track and thumb
-     styling below — so an upright slider stopped matching the horizontal one.
-     writing-mode alone turns it while keeping our own look. */
-  -webkit-appearance: none;
-  appearance: none;
-  /* Wide enough for the handle. The line itself is the track below, and the
-     two are centred on each other rather than each being placed from an
-     edge. */
-  width: 14px;
-  height: 84px;
-}
-/* Asked for on 2026-09-26: "the line where the thumb moves should not change
-   thickness and be in the middle."
-
-   It was neither. The track was given a width inside a control twice as wide
-   and then left wherever the browser put it, which is against one edge -- so
-   the 6px line ran down one side of the column while the handle sat on the
-   other, and the two together read as a line that swelled where the handle
-   was. `margin: auto` is the whole fix: it centres the track in the control,
-   and the handle's existing offset then lands on it.
-   
-   Making the *control* 6px instead was tried first and is worse: the handle is
-   wider than that and gets clipped to the track's width, so the slider becomes
-   a solid bar with no visible handle at all. */
-input[type="range"].vertical::-webkit-slider-runnable-track,
-input[type="range"].vertical::-moz-range-track {
-  width: 6px;
-  height: 100%;
-  margin-left: auto;
-  margin-right: auto;
-}
-input[type="range"].vertical::-webkit-slider-thumb {
-  /* Centres the handle on the track. Negative because `direction: rtl` turns
-     this axis around -- a positive value moves it the other way, which was
-     checked rather than reasoned about. */
-  margin-top: 0;
-  margin-left: -4px;
-}
+/* There is no upright variant. One was built on writing-mode and listed
+   WebKit's and Firefox's track pseudo-elements in one selector, which makes a
+   browser drop the whole rule -- so it never worked in Chrome. An upright
+   slider is a horizontal one rotated; see .pp-volume-slot in App.svelte. And
+   keep the two engines' pseudo-elements in separate rules, as below. */
 
 /* Sliders that show how far along they are.
  *
@@ -382,18 +342,6 @@ input[type="range"].filled::-moz-range-track {
       var(--range-progress, 0%) 100%
   );
 }
-
-/* Upright, the filled side is the bottom — the direction the handle rises. */
-input[type="range"].vertical.filled::-webkit-slider-runnable-track,
-input[type="range"].vertical.filled::-moz-range-track {
-  background: linear-gradient(
-    to top,
-    var(--sb-thumb, rgba(255, 255, 255, 0.4)) 0 var(--range-progress, 0%),
-    color-mix(in srgb, var(--sb-thumb, rgba(255, 255, 255, 0.4)) 28%, var(--sb-track, transparent))
-      var(--range-progress, 0%) 100%
-  );
-}
-
 
 /* Re-enable for form elements */
 textarea,
