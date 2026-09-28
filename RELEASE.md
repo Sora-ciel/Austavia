@@ -111,6 +111,16 @@ whole codebase, targeted deploys included. Enable Secret Manager and set the
 secret, or comment out the three `exports.bandwidth*` lines in
 `functions/index.js`. See `functions/monitoring/README.md`.
 
+If it fails with *"User code failed to load. Cannot determine backend
+specification. Timeout after 10000"*, nothing is wrong with the code: the CLI
+gives it ten seconds to load, and a cold machine can take longer. Give it more
+rather than retrying -- two retries in a row failed the same way on
+2026-09-28, and this went through first time:
+
+```bash
+FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions
+```
+
 The payment webhook declares `POLAR_WEBHOOK_SECRET` and blocks a deploy the
 same way, for the same reason. Unlike the monitoring one it cannot be commented
 out and still work — an endpoint that cannot check a signature is an endpoint

@@ -17,16 +17,16 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
-| next | **The clock & alarm block**, in Canvas and Simple Note: the corner flips between the clock and the alarm page, the page it was left on is still open after a reload (on that device only), and an alarm set a minute ahead rings — banner, beeps, and a buzz on a phone — in whatever mode is open. Snooze gives it five minutes; Stop keeps it quiet until tomorrow. Expect it *not* to ring with the app closed or a phone asleep: see 4. |
-| next | **The stopwatch**, from the clock block's top-left corner: Start, Lap, Pause, Resume, Reset; the corner shows the running figure from the other two pages. Start it on a phone, lock the screen for a minute, and it should read the right time on return -- it is worked out from when it started, not counted. It is per device, like the page. |
-| next | **A background too big to sync**, signed in with auto sync on: choosing one over 10 MB once stored (a 4K PNG does it) should be refused with a dialog saying why, and the folder should keep syncing. With auto sync off it is kept, with a banner saying the folder will not sync while it holds it. If one got through anyway, the banner should now say so in words rather than print the database's error. |
-| next | **Outline**, the see-through theme, over a Canvas wallpaper: blocks, headers, both panels and their buttons should show the wallpaper through them, with only the writing (shadowed), outlines and shadows drawn. Pop-ups -- Settings, Bg, More, the add-block and mode menus, dialogs -- sit on black at 72% under it, and Single Note's page is black rather than whatever colour its block last had. |
-| next | **Twenty-eight themes, in two groups of fourteen** -- ordinary, then See-through. New to look at and keep or drop: Flatline (no shadows), Neon Grid (glowing writing and edges), Harbor Signal (three colours, three jobs), Brutal Mono (square, thick, hard offset shadows); Indigo Gilt Glass; and the see-through experiments Smoke Headers, Veil, Faint Ink, Silver Pane, Cyan Glow and Bare. Most want "blocks follow the theme" on to be seen as meant. Chalk, Coral Wire and Rose Wire are gone. |
-| next | **One wallpaper per folder, in every mode but Birthday**: the picture set in Canvas (Bg) should show in Simple Note, Single Note, Habit Tracker, Task and Playlist too, with the same opacity, blur and luminosity, and changing it from any of them changes it everywhere. A Single Note wallpaper set before this is now deleted: gone from the folder at its next save, and its uploaded picture removed from storage by the wallpaper sweep on that folder's first save of the session. The wallpaper itself now uploads as a file, like a picture block, instead of going into the folder -- so a big one counts against storage rather than stopping the folder syncing. |
-| next | **Wallpapers behind the toolbar**, in Canvas, Single Note and Playlist: with a see-through toolbar (Outline, or any theme's translucent bar) the wallpaper should show behind the controls, and the picture should fill the whole window from the top. On a phone, check that typing still leaves the wallpaper where it was -- it keeps the held window height it already had. |
-| next | **Screenshots with a wallpaper**: in Canvas, the wallpaper now fills the whole screenshot under the blocks, with its opacity, blur and luminosity. Single Note and Playlist already had theirs. |
-| next | **The timer**, from the bottom-left corner: type `5` or `1:30` into the reading, Start, and it rings — banner, beeps, buzz — in whatever mode is open when it runs out, with +1 min and Stop. Start one on a phone and lock the screen past its end: it should be found run out and ring on return (within ten minutes), since it is kept as the moment it ends. Per device. The same limit as the alarm applies: nothing rings with the app closed. |
-| next | **The clock face**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
+| 0.8.653 | **The clock & alarm block**, in Canvas and Simple Note: the corner flips between the clock and the alarm page, the page it was left on is still open after a reload (on that device only), and an alarm set a minute ahead rings — banner, beeps, and a buzz on a phone — in whatever mode is open. Snooze gives it five minutes; Stop keeps it quiet until tomorrow. Expect it *not* to ring with the app closed or a phone asleep: see 4. |
+| 0.8.653 | **The stopwatch**, from the clock block's top-left corner: Start, Lap, Pause, Resume, Reset; the corner shows the running figure from the other two pages. Start it on a phone, lock the screen for a minute, and it should read the right time on return -- it is worked out from when it started, not counted. It is per device, like the page. |
+| 0.8.653 | **A background too big to sync**, signed in with auto sync on: choosing one over 10 MB once stored (a 4K PNG does it) should be refused with a dialog saying why, and the folder should keep syncing. With auto sync off it is kept, with a banner saying the folder will not sync while it holds it. If one got through anyway, the banner should now say so in words rather than print the database's error. |
+| 0.8.653 | **Outline**, the see-through theme, over a Canvas wallpaper: blocks, headers, both panels and their buttons should show the wallpaper through them, with only the writing (shadowed), outlines and shadows drawn. Pop-ups -- Settings, Bg, More, the add-block and mode menus, dialogs -- sit on black at 72% under it, and Single Note's page is black rather than whatever colour its block last had. |
+| 0.8.653 | **Twenty-eight themes, in two groups of fourteen** -- ordinary, then See-through. New to look at and keep or drop: Flatline (no shadows), Neon Grid (glowing writing and edges), Harbor Signal (three colours, three jobs), Brutal Mono (square, thick, hard offset shadows); Indigo Gilt Glass; and the see-through experiments Smoke Headers, Veil, Faint Ink, Silver Pane, Cyan Glow and Bare. Most want "blocks follow the theme" on to be seen as meant. Chalk, Coral Wire and Rose Wire are gone. |
+| 0.8.653 | **One wallpaper per folder, in every mode but Birthday**: the picture set in Canvas (Bg) should show in Simple Note, Single Note, Habit Tracker, Task and Playlist too, with the same opacity, blur and luminosity, and changing it from any of them changes it everywhere. A Single Note wallpaper set before this is now deleted: gone from the folder at its next save, and its uploaded picture removed from storage by the wallpaper sweep on that folder's first save of the session. The wallpaper itself now uploads as a file, like a picture block, instead of going into the folder -- so a big one counts against storage rather than stopping the folder syncing. |
+| 0.8.653 | **Wallpapers behind the toolbar**, in Canvas, Single Note and Playlist: with a see-through toolbar (Outline, or any theme's translucent bar) the wallpaper should show behind the controls, and the picture should fill the whole window from the top. On a phone, check that typing still leaves the wallpaper where it was -- it keeps the held window height it already had. |
+| 0.8.653 | **Screenshots with a wallpaper**: in Canvas, the wallpaper now fills the whole screenshot under the blocks, with its opacity, blur and luminosity. Single Note and Playlist already had theirs. |
+| 0.8.653 | **The timer**, from the bottom-left corner: type `5` or `1:30` into the reading, Start, and it rings — banner, beeps, buzz — in whatever mode is open when it runs out, with +1 min and Stop. Start one on a phone and lock the screen past its end: it should be found run out and ring on return (within ten minutes), since it is kept as the moment it ends. Per device. The same limit as the alarm applies: nothing rings with the app closed. |
+| 0.8.653 | **The clock face**, in Canvas and Simple Note: the right local time, the day beneath it, and its three settings (12-hour, seconds, date) surviving a reload. Worth leaving one open on a phone for a few minutes with the screen off and back on — it wakes once a minute, not once a second, and each tick reads the time afresh, so it should be right the moment the screen comes back rather than catching up. |
 | 0.8.65 | **The plan panel, doing nothing.** The subscription groundwork ships with this release and is deliberately inert: no checkout link is committed, so no Upgrade button should appear anywhere, on any platform, signed in or out. If one does, something shipped that should not have. |
 | 0.8.65 | **The word count row** in Single Note, a third shorter, and the **mini player** opening Playlist when pressed anywhere that is not a button. |
 | 0.8.652 | **Holding a habit to delete it** — and scrolling a list of habits without the menu appearing, which is the case it is most likely to get wrong. Also **the note's footer** going while the keyboard is up and coming back after, with the picture behind holding still. |
@@ -62,6 +62,39 @@ Two standing checks worth doing at the same time:
   so both sliders read 100. The one to check is that a slider you had *already
   moved* still gives the size it did: the stored number changed meaning and is
   converted on read, not reset.
+
+## 0a. Music that keeps playing with the app closed (Android)
+
+Asked for on 2026-09-28: "when removing the app from the opened apps on
+Android the music stops -- it would be great that even with all the app's
+windows closed you can still listen to your music and playlist."
+
+**Why it stops.** The sound is played by the web view (an `<audio>` element in
+`App.svelte`). `MediaNotificationService` only shows the notification and
+answers its buttons; it plays nothing. Swiping the app away destroys the
+activity and its web view, and the sound goes with them. The service surviving
+would not help: there is nothing in it to keep playing.
+
+**What it takes** is playback moved into the service -- Media3 ExoPlayer inside
+a media session service -- with the web view becoming a remote control while it
+exists. Staged so each step lands on its own:
+
+1. **Files the service can open.** The audio lives in IndexedDB, inside the web
+   view, where native code cannot read it. Copy the playing track (then the
+   queue) to the app's files directory, keyed by track id, and hand the service
+   a path. Nothing else changes yet.
+2. **The service plays one track** from that path; the web view stops using its
+   own `<audio>` on Android and sends play/pause/seek over the plugin instead.
+   Position and state come back as events, so the player and lyrics keep
+   working. Swiping the app away now keeps the current track going.
+3. **The queue moves too**, so next, previous, shuffle and the end of a track
+   are decided in the service without the web view. This is the step that
+   makes "all windows closed" actually true for a playlist.
+4. **Coming back.** When the app opens again it asks the service what is
+   playing and where, rather than starting over -- the reconcile rule: the
+   service is the truth, the page reads it.
+
+Desktop and web keep the `<audio>` element; only Android changes. Not started.
 
 ## 1. Typing in a long note
 
