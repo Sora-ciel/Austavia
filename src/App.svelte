@@ -43,6 +43,7 @@
     sweepOrphanBlockAttachments,
     sweepStaleWallpapers,
     subscribeStorageUsage,
+    subscribeAccountPlan,
     subscribeSubscription
   } from './firebaseClient.js';
   import { reconcileThemes } from './utils/themeSync.js';
@@ -90,6 +91,7 @@
   import { storageAnnouncement } from './utils/storageAlerts.js';
   import { attachmentVerdict, inlinePictureVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
   import { estimatedUsage, driftReport, describeDrift } from './utils/storageEstimate.js';
+  import { usageForPlan } from './utils/planLimits.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings } from './utils/modeBackground.js';
@@ -2807,6 +2809,10 @@
   // someone signs in and the first snapshot arrives.
   let storageUsage = null;
   let subscriptionRecord = null;
+  // The account's plan, as the server keeps it. Undefined until it arrives,
+  // null when none is recorded (free). See utils/planLimits.js.
+  let accountPlan = undefined;
+  let stopPlanListener = null;
   // What this device has added or removed since the server's last word, and
   // the last time the two disagreed. See utils/storageEstimate.js: the
   // server's figure is the truth and this only covers the gap until it
@@ -2814,9 +2820,11 @@
   let pendingStorageBytes = 0;
   let lastStorageDrift = null;
 
-  // What the app shows and judges by: the server's record with this device's
-  // uncounted changes folded in.
-  $: shownStorageUsage = estimatedUsage(storageUsage, pendingStorageBytes);
+  // What the app shows and judges by: the server's record, with its ceiling
+  // taken from the account's current plan rather than the one it was written
+  // under, and this device's uncounted changes folded in. See planLimits.js.
+  $: planUsage = usageForPlan(storageUsage, accountPlan);
+  $: shownStorageUsage = estimatedUsage(planUsage, pendingStorageBytes);
   // When each lock last got somewhere, so one that stopped moving can be let
   // go of. The flags below are cleared in a `finally`, which covers finishing
   // and covers failing — but not an await that never settles, and that is the
@@ -5112,7 +5120,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       // The account's own record is passed in because the error cannot tell
       // "you are out of space" from "something else refused this" — both
       // arrive as an identical storage/unauthorized.
-      const detail = explainSyncFailure(error, { storageUsage });
+      const detail = explainSyncFailure(error, { storageUsage: planUsage });
       syncFailureNotice = failures.length > 1
         ? `${failures.length} folders could not sync. "${fileName}": ${detail}`
         : `"${fileName}" could not sync: ${detail}`;
@@ -5716,6 +5724,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         stopSubscriptionListener?.();
         stopSubscriptionListener = null;
         subscriptionRecord = null;
+        stopPlanListener?.();
+        stopPlanListener = null;
+        accountPlan = undefined;
         pendingStorageBytes = 0;
         announcedStorageState = '';
 
@@ -5748,6 +5759,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           });
           stopSubscriptionListener = subscribeSubscription(record => {
             subscriptionRecord = record;
+          });
+          stopPlanListener = subscribeAccountPlan(plan => {
+            accountPlan = plan;
           });
         }
       });
@@ -5891,6 +5905,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     if (gateTimer) clearInterval(gateTimer);
     stopStorageUsageListener?.();
     stopSubscriptionListener?.();
+    stopPlanListener?.();
     stopRemoteIndexWatch();
     document.removeEventListener('visibilitychange', handleVisibilityForSync);
     window.removeEventListener('focus', onWindowReturned);

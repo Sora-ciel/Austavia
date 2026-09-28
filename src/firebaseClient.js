@@ -626,6 +626,36 @@ export function subscribeSubscription(callback) {
   };
 }
 
+// The account's plan, straight from where the server keeps it. Owner-readable
+// and never client-writable (database.rules.json). The app works its storage
+// ceiling out from this rather than trusting the storage record's copy, which
+// only moves when something is uploaded -- see utils/planLimits.js. Calls back
+// with null when no plan is recorded, which reads as free.
+export function subscribeAccountPlan(callback) {
+  let detach = () => {};
+  let cancelled = false;
+
+  getFirebaseContext()
+    .then(ctx => {
+      if (cancelled || !ctx) return;
+      const user = ctx.auth.currentUser;
+      if (!user) return;
+
+      const planRef = ctx.dbApi.ref(ctx.db, getUserPath(user.uid, 'plan'));
+      detach = ctx.dbApi.onValue(
+        planRef,
+        snapshot => callback(snapshot.exists() ? String(snapshot.val()) : null),
+        error => console.warn('Plan subscription failed:', error)
+      );
+    })
+    .catch(error => console.warn('Plan subscription failed:', error));
+
+  return () => {
+    cancelled = true;
+    detach();
+  };
+}
+
 // Removes the uploads left behind by blocks that no longer exist.
 //
 // Deleting an image block never removed its upload: attachments were only

@@ -48,9 +48,14 @@ async function applyPlan(db, uid, plan, via = 'unknown') {
   await planRef(db, uid).set(plan);
 
   const snap = await db.ref(`storage/${uid}`).get();
-  const bytes = Number((snap.val() || {}).bytes) || 0;
+  const record = snap.val() || {};
+  const bytes = Number(record.bytes) || 0;
+  // Everything the account holds, notes as well as attachments -- what every
+  // other writer of this record judges by. Judging by attachments alone let a
+  // plan change clear `full` on an account that was over through its notes.
+  const total = Number.isFinite(Number(record.total)) ? Number(record.total) : bytes;
   const limit = storageLimitFor(plan);
-  const full = isOverStorageLimit(bytes, plan);
+  const full = isOverStorageLimit(total, plan);
 
   await db.ref(`storage/${uid}`).update({
     plan,
@@ -68,7 +73,7 @@ async function applyPlan(db, uid, plan, via = 'unknown') {
   // plan-applied lines cannot say whether a refund was ever processed -- which
   // is exactly the question a log gets read for, and it could not answer it
   // once already.
-  logger.info('plan-applied', { uid, plan, bytes, full, via });
+  logger.info('plan-applied', { uid, plan, bytes, total, full, via });
 }
 
 /**
