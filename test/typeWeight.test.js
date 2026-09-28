@@ -19,7 +19,10 @@ import { readFileSync } from 'node:fs';
 // some JavaScript constant instead would be a test on the deciding rather than
 // on the behaviour.
 
-const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+// Line endings evened out first: a Windows checkout can give every line a
+// carriage return, and the selectors below are written with a plain line feed
+// between their lines.
+const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 const css = read('../src/app.css');
 const simpleNote = read('../src/Modes/SimpleNoteMode.svelte');
