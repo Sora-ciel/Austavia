@@ -22,6 +22,7 @@
   import { isRinging, dismissed, snoozed, alarmReading } from '../utils/alarm.js';
   import { timerFractionLeft, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
   import { createRinger } from '../utils/ringTone.js';
+  import PlayerIcon from '../components/PlayerIcons.svelte';
 
   const params = new URLSearchParams(location.search);
   const blockId = params.get('block') || '';
@@ -187,9 +188,13 @@
   aria-label={kind === 'timer' ? 'Timer' : 'Alarm'}
 >
   <div class="top" data-tauri-drag-region>
+    <!-- The line stays even when it says nothing: it is where the pop-up is
+         dragged from, and it holds the ×. What it says is dropped once the
+         timer is going -- asked for on 2026-09-29, "remove the 'Timer ·
+         00:00' when the timer has started, we don't need that". -->
     <span class="what" data-tauri-drag-region>
       {#if kind === 'timer'}
-        {ringing ? "Time's up" : `Timer · ${timerReading(device.timer?.duration || 0)}`}
+        {#if ringing}Time's up{:else if idle}Timer · {timerReading(device.timer?.duration || 0)}{/if}
       {:else}
         Alarm · {alarmReading(alarmTime, hour12)}
       {/if}
@@ -211,16 +216,25 @@
 
     <div class="actions">
       {#if kind === 'timer'}
+        <!-- Icons, asked for on 2026-09-29: play and pause as the music
+             player draws them, Stop as a loop arrow (it sets the timer back
+             to its length), +1 as it was. -->
         {#if ringing}
-          <button title="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
-          <button class="primary" on:click={stop}>Stop</button>
+          <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+          <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         {:else if idle}
           <!-- Stopped here: the timer is back to its length, ready to run again. -->
-          <button class="primary" on:click={togglePause}>Start</button>
+          <button class="primary icon" title="Start" aria-label="Start" on:click={togglePause}><PlayerIcon name="play" size={13} /></button>
         {:else}
-          <button on:click={togglePause}>{phase === 'paused' ? 'Resume' : 'Pause'}</button>
-          <button title="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
-          <button class="primary" on:click={stop}>Stop</button>
+          <button class="icon" title={phase === 'paused' ? 'Resume' : 'Pause'} aria-label={phase === 'paused' ? 'Resume' : 'Pause'} on:click={togglePause}>
+            <PlayerIcon name={phase === 'paused' ? 'play' : 'pause'} size={13} />
+          </button>
+          <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+          <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         {/if}
       {:else}
         <button on:click={snooze}>Snooze</button>
@@ -354,6 +368,15 @@
 
   button:hover {
     background: color-mix(in srgb, var(--pp-text) 20%, transparent);
+  }
+
+  /* An icon button is as tall as a word one and square-ish, so a row of them
+     lines up. */
+  button.icon {
+    display: inline-grid;
+    place-items: center;
+    min-width: 26px;
+    padding: 2px 6px;
   }
 
   button.primary {
