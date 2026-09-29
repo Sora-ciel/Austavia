@@ -52,7 +52,10 @@ import { isRinging, normalizeAlarmTime } from './alarm.js';
 // row, and the bar is a hairline along the bottom edge. Then thinner again --
 // "2 pixels as margins, even 4, should be the max": 48 is the two rows, the
 // hairline and 2 to 5 pixels of padding, measured, with nothing to spare.
-export const POPUP_WIDTH = 228;
+// Narrower again once the buttons sat right beside the time instead of at the
+// far edge (2026-09-29): 200 holds the widest case, a timer of an hour or
+// more, measured.
+export const POPUP_WIDTH = 200;
 export const POPUP_HEIGHT = 48;
 export const POPUP_GAP = 10;
 export const POPUP_MARGIN = 16;

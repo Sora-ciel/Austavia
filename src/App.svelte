@@ -11,6 +11,7 @@
   import { EXTRA_PRESETS } from './utils/extraThemes.js';
   import AlarmRinger from './components/AlarmRinger.svelte';
   import ClockPopupWindows from './components/ClockPopupWindows.svelte';
+  import TimerChip from './components/TimerChip.svelte';
   import { THEME_KEY as POPUP_THEME_KEY } from './utils/clockPopups.js';
   import {
     saveBlocks,
@@ -6023,6 +6024,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   margin-left: auto;
 }
 
+/* The timer chip sits at the right of the toolbar like the mini player: it
+   takes the free space before it when it is alone, and sits right after the
+   player when both are there. */
+.controls > :global(.timer-chip-wrap) { margin-left: auto; }
+.controls > .mini-player ~ :global(.timer-chip-wrap) { margin-left: 0; }
+
 .screenshot-btn {
   display: inline-flex;
   align-items: center;
@@ -6766,6 +6773,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         </div>
       {/if}
     {/if}
+
+    <!-- A timer in use, reachable from any mode -- see utils/timerChip.js. -->
+    <TimerChip {blocks} themeStyle={overlayThemeStyle} />
 
     <!-- The outcome is said on the button itself rather than in a dialog:
          this is pressed often, and a box to dismiss every time would be worse

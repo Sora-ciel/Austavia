@@ -187,6 +187,19 @@
   role="timer"
   aria-label={kind === 'timer' ? 'Timer' : 'Alarm'}
 >
+  <!-- Two columns: the time on the left, as tall as the card; on the right,
+       what it is (only while that says something) with the × above, and the
+       buttons right beside the time. Asked for on 2026-09-29: less space
+       between the time and the first button, and a bigger count now the
+       label line is empty while it runs. -->
+  <div class="figure" class:long={kind === 'alarm' || left >= 3600000} data-tauri-drag-region>
+    {#if kind === 'timer'}
+      {timerReading(left)}
+    {:else}
+      {alarmReading(alarmTime, hour12)}
+    {/if}
+  </div>
+
   <div class="top" data-tauri-drag-region>
     <!-- The line stays even when it says nothing: it is where the pop-up is
          dragged from, and it holds the ×. What it says is dropped once the
@@ -202,45 +215,32 @@
     <button class="hide" title={idle ? 'Close' : 'Hide (the timer keeps going)'} aria-label={idle ? 'Close' : 'Hide'} on:click={hide}>×</button>
   </div>
 
-  <!-- The time and what to do about it on one row, and how much is left as a
-       hairline along the bottom: the same things as before in two thirds of
-       the height -- see POPUP_HEIGHT in utils/clockPopups.js. -->
-  <div class="row" data-tauri-drag-region>
-    <div class="figure" class:long={kind === 'timer' && left >= 3600000} data-tauri-drag-region>
-      {#if kind === 'timer'}
-        {timerReading(left)}
+  <div class="actions">
+    {#if kind === 'timer'}
+      <!-- Icons, asked for on 2026-09-29: play and pause as the music
+           player draws them, Stop as a loop arrow (it sets the timer back
+           to its length), +1 as it was. -->
+      {#if ringing}
+        <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+        <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
+          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      {:else if idle}
+        <!-- Stopped here: the timer is back to its length, ready to run again. -->
+        <button class="primary icon" title="Start" aria-label="Start" on:click={togglePause}><PlayerIcon name="play" size={13} /></button>
       {:else}
-        {alarmReading(alarmTime, hour12)}
+        <button class="icon" title={phase === 'paused' ? 'Resume' : 'Pause'} aria-label={phase === 'paused' ? 'Resume' : 'Pause'} on:click={togglePause}>
+          <PlayerIcon name={phase === 'paused' ? 'play' : 'pause'} size={13} />
+        </button>
+        <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
+        <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
+          <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       {/if}
-    </div>
-
-    <div class="actions">
-      {#if kind === 'timer'}
-        <!-- Icons, asked for on 2026-09-29: play and pause as the music
-             player draws them, Stop as a loop arrow (it sets the timer back
-             to its length), +1 as it was. -->
-        {#if ringing}
-          <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
-          <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
-            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        {:else if idle}
-          <!-- Stopped here: the timer is back to its length, ready to run again. -->
-          <button class="primary icon" title="Start" aria-label="Start" on:click={togglePause}><PlayerIcon name="play" size={13} /></button>
-        {:else}
-          <button class="icon" title={phase === 'paused' ? 'Resume' : 'Pause'} aria-label={phase === 'paused' ? 'Resume' : 'Pause'} on:click={togglePause}>
-            <PlayerIcon name={phase === 'paused' ? 'play' : 'pause'} size={13} />
-          </button>
-          <button title="One more minute" aria-label="One more minute" on:click={() => change(oneMoreMinute)}>+1</button>
-          <button class="primary icon" title="Stop and set back to the start" aria-label="Stop" on:click={stop}>
-            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        {/if}
-      {:else}
-        <button on:click={snooze}>Snooze</button>
-        <button class="primary" on:click={stop}>Stop</button>
-      {/if}
-    </div>
+    {:else}
+      <button on:click={snooze}>Snooze</button>
+      <button class="primary" on:click={stop}>Stop</button>
+    {/if}
   </div>
 
   {#if kind === 'timer'}
@@ -268,14 +268,11 @@
     box-sizing: border-box;
     width: 100vw;
     height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 1px;
-    /* 2 to 4 pixels all round, asked for on 2026-09-28: "I think 2 pixels as
-       margins, even 4, should be the max". The bottom keeps room for the
-       hairline under the buttons; the sides a little more than the top, so
-       the text clears the rounded corners. */
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
+    column-gap: 8px;
+    align-items: center;
     padding: 2px 4px 5px 6px;
     border-radius: 9px;
     border: 1px solid var(--pp-border);
@@ -287,17 +284,37 @@
     overflow: hidden;
   }
 
+  .figure {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    font-size: 2.3rem;
+    font-weight: 700;
+    line-height: 0.9;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    white-space: nowrap;
+  }
+
+  /* An hour or more is two characters longer, and an alarm reads a clock
+     time; both give up some size to stay inside the card. */
+  .figure.long {
+    font-size: 1.6rem;
+  }
+
   .top {
+    grid-column: 2;
+    grid-row: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+    min-height: 13px;
     /* The app's 1.5 made this line half as tall again as its writing. */
     line-height: 1.1;
   }
 
   .what {
-    font-size: 0.66rem;
+    font-size: 0.62rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     opacity: 0.7;
@@ -306,32 +323,12 @@
     text-overflow: ellipsis;
   }
 
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .figure {
-    flex: none;
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
-  }
-
-  /* An hour or more is two characters longer; it gives up a little size
-     rather than push the buttons out of the card. */
-  .figure.long {
-    font-size: 1.2rem;
-  }
-
   .actions {
+    grid-column: 2;
+    grid-row: 2;
     display: flex;
     gap: 4px;
-    margin-left: auto;
+    align-self: start;
   }
 
   /* How much is left: a hairline along the bottom edge rather than a row of
