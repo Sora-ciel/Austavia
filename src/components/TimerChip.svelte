@@ -4,6 +4,9 @@
    * and what it shows. Pressing it opens a panel with every timer in use and
    * its buttons; it closes on a click anywhere else, like the other menus.
    *
+   * In the Android app it is in the notification shade instead, and this
+   * keeps that notification true (utils/timerNotificationBridge.js).
+   *
    * Keeps nothing of its own: the timers are this device's memory of each
    * clock (clockDeviceStore.js), the same record the block and the pop-ups
    * read, so a change here is a change everywhere.
@@ -11,7 +14,13 @@
   import { onDestroy } from 'svelte';
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
   import { startTimer, pauseTimer, resetTimer, oneMoreMinute, timerReading } from '../utils/countdown.js';
-  import { activeTimers } from '../utils/timerChip.js';
+  import { activeTimers, timerPlace, timerNotice, sameNotice } from '../utils/timerChip.js';
+  import {
+    isNativeAndroid,
+    onTimerNotificationAction,
+    showTimerNotification,
+    clearTimerNotification
+  } from '../utils/timerNotificationBridge.js';
   import { clickOutside } from '../utils/clickOutside.js';
   import PlayerIcon from './PlayerIcons.svelte';
 
@@ -20,6 +29,9 @@
   export let themeStyle = '';
 
   const onDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+  const nativeAndroid = isNativeAndroid();
+  let width = typeof window !== 'undefined' ? window.innerWidth : Infinity;
+  $: place = timerPlace({ nativeAndroid, width });
 
   let now = Date.now();
   let open = false;
@@ -38,12 +50,48 @@
   // Ticks only while there is a timer to show -- a toolbar that wakes four
   // times a second for nothing is a phone kept awake for nothing.
   let tick = null;
-  $: setTicking(timers.length > 0);
-  function setTicking(on) {
-    if (on && !tick) tick = setInterval(() => { now = Date.now(); }, 250);
-    else if (!on && tick) { clearInterval(tick); tick = null; }
+  // The notification counts down on its own, so the shade needs a look once
+  // a second at most -- for a timer running out, not for its figure.
+  $: setTicking(timers.length > 0 && place !== 'none' ? (place === 'toolbar' ? 250 : 1000) : 0);
+  let tickEvery = 0;
+  function setTicking(every) {
+    if (every === tickEvery) return;
+    clearInterval(tick);
+    tick = every ? setInterval(() => { now = Date.now(); }, every) : null;
+    tickEvery = every;
   }
-  onDestroy(() => clearInterval(tick));
+
+  // The notification: redrawn when what it says changes, and again every
+  // thirty seconds and whenever the app comes back to the front, from
+  // scratch -- one lost update must not leave the shade wrong for good (the
+  // recompute rule in CLAUDE.md).
+  let lastNotice;
+  $: notice = place === 'notification' ? timerNotice(timers, devices) : null;
+  $: if (place === 'notification' && !sameNotice(notice, lastNotice)) sendNotice(notice);
+  function sendNotice(next) {
+    lastNotice = next;
+    if (next) showTimerNotification(next);
+    else clearTimerNotification();
+  }
+  const resend = () => { if (place === 'notification') sendNotice(timerNotice(timers, devices)); };
+  const resendTimer = nativeAndroid ? setInterval(resend, 30000) : null;
+  const onVisible = () => { if (document.visibilityState === 'visible') { now = Date.now(); resend(); } };
+  if (nativeAndroid) {
+    document.addEventListener('visibilitychange', onVisible);
+    onTimerNotificationAction(({ action, blockId }) => {
+      if (!blockId) return;
+      const entry = activeTimers({ blocks, devices, now: Date.now() }).find(item => item.blockId === blockId);
+      if (action === 'toggle' && entry) togglePause(entry);
+      else if (action === 'plus') change(blockId, oneMoreMinute);
+      else if (action === 'stop') change(blockId, resetTimer);
+    });
+  }
+
+  onDestroy(() => {
+    clearInterval(tick);
+    clearInterval(resendTimer);
+    if (nativeAndroid) document.removeEventListener('visibilitychange', onVisible);
+  });
 
   function toggleOpen() {
     if (open) return closePanel();
@@ -77,7 +125,9 @@
   }
 </script>
 
-{#if first}
+<svelte:window bind:innerWidth={width} />
+
+{#if first && place === 'toolbar'}
   <div class="timer-chip-wrap">
     <button
       class="timer-chip"
@@ -151,27 +201,38 @@
     flex-shrink: 0;
   }
 
-  /* Sized and coloured as the mini player beside it: the toolbar's own
-     button colours, nothing picked here. */
+  /* The mini player follows the chip rather than taking the free space to
+     its own left -- see App's .controls rules. */
+  .timer-chip-wrap ~ :global(.mini-player) {
+    margin-left: 8px;
+  }
+
+  /* Drawn as the Bg button is -- asked for on 2026-09-29, "css wise I think
+     it should be called after bg button": the toolbar's button colours,
+     handed down as --controls-button-* (App's controlsStyle), and the left
+     buttons' size and corners. */
   .timer-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    box-sizing: border-box;
     min-height: 42px;
-    padding: 0 12px;
-    border-radius: 8px;
-    border: 1px solid var(--controls-border, #333);
-    background: color-mix(in srgb, var(--player-veil, var(--controls-bg, #111)) 75%, transparent);
-    color: var(--controls-button-text, var(--controls-text, #fff));
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--controls-border, #444444);
+    background: var(--controls-button-bg, #333333);
+    color: var(--controls-button-text, #ffffff);
     font: inherit;
-    font-weight: 600;
+    /* The toolbar buttons' weight and line; the app's own 1.5 made the chip
+       two pixels taller than the rest. */
+    font-weight: 500;
+    line-height: normal;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
 
-  .timer-chip.open {
-    border-color: color-mix(in srgb, var(--controls-button-text, var(--controls-text, #fff)) 55%, transparent);
-  }
 
   .chip-icon {
     width: 16px;
@@ -192,14 +253,14 @@
     50% { opacity: 0.45; }
   }
 
-  /* Below the toolbar at the right, where the player's panel opens: the
-     dialog colours App gives its other pop-ups. */
+  /* Just under the chip, its right edges lined up: the dialog colours App
+     gives its other pop-ups. */
   .timer-panel {
     --sb-track: var(--dlg-bg, #17171a);
     --sb-thumb: var(--dlg-btn-text, var(--dlg-text, #f0f0f0));
-    position: fixed;
-    top: calc(var(--controls-height, 56px) + 8px);
-    right: 8px;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
     z-index: 1400;
     display: flex;
     flex-direction: column;

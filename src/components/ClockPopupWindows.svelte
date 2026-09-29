@@ -87,7 +87,10 @@
         kept.delete(label);
       }
 
-      const wanted = popupsWanted({ blocks, devices, now, hidden, kept });
+      // Looked at afresh each second as well as on focus and blur, so a
+      // missed event costs a second at most.
+      const appInFront = typeof document !== 'undefined' && document.hasFocus();
+      const wanted = popupsWanted({ blocks, devices, now, hidden, kept, appInFront });
       const wantedLabels = new Set(wanted.map(popup => popup.label));
 
       const existing = (await api.getAllWebviewWindows())
@@ -155,6 +158,8 @@
       api = { WebviewWindow, getAllWebviewWindows, primaryMonitor };
       reconcile();
       tick = setInterval(reconcile, 1000);
+      window.addEventListener('focus', reconcile);
+      window.addEventListener('blur', reconcile);
     } catch (error) {
       console.warn('Timer pop-ups are not available here:', error);
     }
@@ -164,5 +169,9 @@
   // the next second, so a pop-up opens as Start is pressed.
   $: if (api) { $clockDevices; blocks; reconcile(); }
 
-  onDestroy(() => clearInterval(tick));
+  onDestroy(() => {
+    clearInterval(tick);
+    window.removeEventListener('focus', reconcile);
+    window.removeEventListener('blur', reconcile);
+  });
 </script>

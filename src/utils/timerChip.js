@@ -16,10 +16,18 @@
  * is not "in use" and shows nothing, so the chip is only there while there is
  * something to see.
  *
+ * ## Where it goes
+ *
+ * "On phone I believe the timer should be a notification instead, but not
+ * show on controls, cause that would take too much space" -- 2026-09-29. So
+ * the Android app puts it in the notification shade (TimerNotifications.java)
+ * and not on the toolbar, and a phone-sized browser, which has no shade to
+ * put it in, leaves it on the clock block. See `timerPlace`.
+ *
  * Pure: the chip reads this device's memory of each clock
  * (clockDeviceStore.js) and hands it here.
  */
-import { timerState, timeLeft } from './countdown.js';
+import { timerState, timeLeft, timerReading } from './countdown.js';
 
 const ORDER = { ringing: 0, running: 1, paused: 2 };
 
@@ -48,4 +56,43 @@ export function activeTimers({ blocks = [], devices = {}, now = Date.now(), keep
   }
   const rank = phase => ORDER[phase] ?? STOPPED;
   return found.sort((a, b) => rank(a.phase) - rank(b.phase) || a.left - b.left);
+}
+
+/** At or under this width a browser is a phone, and the toolbar has no room. */
+export const PHONE_WIDTH = 600;
+
+/**
+ * Where the timer shows: 'toolbar', 'notification' (the Android app) or
+ * 'none' (a phone-sized browser -- the clock block still has it).
+ */
+export function timerPlace({ nativeAndroid = false, width = Infinity } = {}) {
+  if (nativeAndroid) return 'notification';
+  return width <= PHONE_WIDTH ? 'none' : 'toolbar';
+}
+
+/**
+ * What the notification says, from `activeTimers`: the most pressing timer,
+ * with a count of the others in its title. Null when there is nothing to
+ * show. A running one is shown as the moment it ends, which Android counts
+ * down to on its own -- so it stays right with the app asleep. `endsAt` is a
+ * string because that is how it crosses to Java intact.
+ */
+export function timerNotice(timers = [], devices = {}) {
+  const shown = (timers || []).filter(entry => entry.phase !== 'stopped');
+  const first = shown[0];
+  if (!first) return null;
+  const endsAt = first.phase === 'running' ? Number(devices[first.blockId]?.timer?.endsAt) || 0 : 0;
+  return {
+    blockId: first.blockId,
+    phase: first.phase,
+    endsAt: String(endsAt),
+    title: shown.length > 1 ? `Timer (+${shown.length - 1} more)` : 'Timer',
+    text: first.phase === 'ringing' ? "Time's up" : first.phase === 'paused' ? `Paused · ${timerReading(first.left)}` : ''
+  };
+}
+
+/** Two notices that would draw the same notification. */
+export function sameNotice(a, b) {
+  if (!a || !b) return a === b;
+  return a.blockId === b.blockId && a.phase === b.phase && a.endsAt === b.endsAt && a.title === b.title && a.text === b.text;
 }

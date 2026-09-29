@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
         // as soon as it loads.
         registerPlugin(MediaNotificationPlugin.class);
         registerPlugin(DiagnosticsPlugin.class);
+        registerPlugin(TimerNotificationPlugin.class);
         super.onCreate(savedInstanceState);
         keepTheWebViewAboveTheKeyboard();
     }

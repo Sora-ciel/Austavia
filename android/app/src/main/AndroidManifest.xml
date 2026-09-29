@@ -53,6 +53,13 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- The timer notification's buttons and the alarm for its end; see
+             TimerNotifications.java. Not exported: only our own pending
+             intents reach it. -->
+        <receiver
+            android:name=".TimerNotificationReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

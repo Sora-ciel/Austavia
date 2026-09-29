@@ -40,6 +40,19 @@ describe('which pop-ups are open', () => {
     assert.equal(popupsWanted({ blocks: [clock('a')], devices, now: T + 2 * MIN }).length, 1);
   });
 
+  // Asked for on 2026-09-29: "when in app the pop-up should close and when
+  // out of it come back".
+  it('closes while the app is in front and comes back when it is not', () => {
+    const devices = { a: running };
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices, now: T + 1000, appInFront: true }).length, 0);
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices, now: T + 1000, appInFront: false }).length, 1);
+  });
+
+  it('a ringing one is not shown over the app either -- the app rings for itself', () => {
+    const devices = { a: { timer: startTimer({ duration: MIN }, T) } };
+    assert.equal(popupsWanted({ blocks: [clock('a')], devices, now: T + MIN + 1000, appInFront: true }).length, 0);
+  });
+
   it('closes it when the timer is stopped or reset', () => {
     assert.equal(popupsWanted({ blocks: [clock('a')], devices: { a: {} }, now: T }).length, 0);
   });

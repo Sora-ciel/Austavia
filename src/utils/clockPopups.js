@@ -52,10 +52,11 @@ import { isRinging, normalizeAlarmTime } from './alarm.js';
 // row, and the bar is a hairline along the bottom edge. Then thinner again --
 // "2 pixels as margins, even 4, should be the max": 48 is the two rows, the
 // hairline and 2 to 5 pixels of padding, measured, with nothing to spare.
-// Narrower again once the buttons sat right beside the time instead of at the
-// far edge (2026-09-29): 200 holds the widest case, a timer of an hour or
-// more, measured.
-export const POPUP_WIDTH = 200;
+// 200 was tried with the buttons pressed up against the time, in two columns,
+// and taken back (2026-09-29): "add some width so that we can accommodate the
+// buttons", with the one-row layout. 240 leaves the time and the three icon
+// buttons room between them, an hour-long timer included.
+export const POPUP_WIDTH = 240;
 export const POPUP_HEIGHT = 48;
 export const POPUP_GAP = 10;
 export const POPUP_MARGIN = 16;
@@ -83,9 +84,17 @@ export function popupLabel(blockId, kind) {
  *
  * `blocks` are the folder's blocks; `devices` is this device's memory of each
  * clock (clockDeviceStore); `hidden` is the labels hidden by hand.
+ *
+ * `appInFront` is whether Austavia's own window has the focus. Then there are
+ * none: "when in app the pop-up should close and when out of it come back"
+ * (2026-09-29). Inside the app the toolbar has the timer (TimerChip) and the
+ * app rings for itself, so a card on top would only cover it. Nothing is
+ * forgotten meanwhile -- a pop-up hidden or kept is still hidden or kept when
+ * the app goes to the back and they return.
  */
-export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidden = new Set(), kept = new Set() } = {}) {
+export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidden = new Set(), kept = new Set(), appInFront = false } = {}) {
   const wanted = [];
+  if (appInFront) return wanted;
 
   for (const block of blocks || []) {
     if (block?.type !== 'clock' || !block.id) continue;

@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { activeTimers } from '../src/utils/timerChip.js';
+import { activeTimers, timerPlace, timerNotice, sameNotice, PHONE_WIDTH } from '../src/utils/timerChip.js';
 import { readTimer, startTimer, pauseTimer } from '../src/utils/countdown.js';
 
 const T = 1_790_000_000_000;
@@ -50,5 +50,68 @@ describe('activeTimers', () => {
   it('ignores anything that is not a clock', () => {
     const devices = { x: { timer: startTimer(readTimer(null), T) } };
     assert.deepEqual(activeTimers({ blocks: [{ id: 'x', type: 'text' }], devices, now: T + 1 }), []);
+  });
+});
+
+// Asked for on 2026-09-29: "on phone I believe the timer should be a
+// notification instead, but not show on controls, cause that would take too
+// much space".
+describe('where the timer shows', () => {
+  it('on the toolbar on a computer', () => {
+    assert.equal(timerPlace({ width: 1400 }), 'toolbar');
+  });
+
+  it('in the notification shade in the Android app, never on the toolbar', () => {
+    assert.equal(timerPlace({ nativeAndroid: true, width: 400 }), 'notification');
+    assert.equal(timerPlace({ nativeAndroid: true, width: 1400 }), 'notification');
+  });
+
+  it('not on the toolbar of a phone-sized browser either', () => {
+    assert.equal(timerPlace({ width: PHONE_WIDTH }), 'none');
+  });
+});
+
+describe('what the notification says', () => {
+  it('nothing when no timer is in use', () => {
+    assert.equal(timerNotice([], {}), null);
+  });
+
+  it('a running timer as the moment it ends, for Android to count down to', () => {
+    const timer = startTimer(readTimer(null), T);
+    const timers = activeTimers({ blocks: [clock('a')], devices: { a: { timer } }, now: T + MIN });
+    assert.deepEqual(timerNotice(timers, { a: { timer } }), {
+      blockId: 'a', phase: 'running', endsAt: String(T + 5 * MIN), title: 'Timer', text: ''
+    });
+  });
+
+  it('a paused one with what it has left, and the others counted in the title', () => {
+    const devices = {
+      a: { timer: pauseTimer(startTimer(readTimer(null), T), T + MIN) },
+      b: { timer: pauseTimer(startTimer(readTimer(null), T), T + 2 * MIN) }
+    };
+    const timers = activeTimers({ blocks: [clock('a'), clock('b')], devices, now: T + 3 * MIN });
+    const notice = timerNotice(timers, devices);
+    assert.equal(notice.blockId, 'b');
+    assert.equal(notice.text, 'Paused · 3:00');
+    assert.equal(notice.title, 'Timer (+1 more)');
+    assert.equal(notice.endsAt, '0');
+  });
+
+  it("says Time's up when one is ringing", () => {
+    const devices = { a: { timer: startTimer({ duration: MIN }, T) } };
+    const timers = activeTimers({ blocks: [clock('a')], devices, now: T + MIN + 1000 });
+    assert.equal(timerNotice(timers, devices).text, "Time's up");
+  });
+
+  it('a stopped one kept in the toolbar panel is not in the shade', () => {
+    assert.equal(timerNotice([{ blockId: 'a', phase: 'stopped', left: MIN }], {}), null);
+  });
+
+  it('tells two notices that draw the same apart from two that do not', () => {
+    const a = { blockId: 'a', phase: 'running', endsAt: '5', title: 'Timer', text: '' };
+    assert.ok(sameNotice(a, { ...a }));
+    assert.ok(!sameNotice(a, { ...a, endsAt: '6' }));
+    assert.ok(sameNotice(null, null));
+    assert.ok(!sameNotice(a, null));
   });
 });

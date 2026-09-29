@@ -2952,6 +2952,7 @@
     `--controls-bg: ${leftTheme.panelBg}; --controls-border: ${leftTheme.borderColor};` +
     ` --controls-text: ${leftTheme.textColor};` +
     ` --controls-button-text: ${leftTheme.buttonText};` +
+    ` --controls-button-bg: ${leftTheme.buttonBg};` +
     // What the mini player darkens its cover art with, and sits on without
     // one. The toolbar's own colour unless the theme names one -- a
     // see-through theme's toolbar is clear, which left the cover bare behind
@@ -6024,11 +6025,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   margin-left: auto;
 }
 
-/* The timer chip sits at the right of the toolbar like the mini player: it
-   takes the free space before it when it is alone, and sits right after the
-   player when both are there. */
+/* The timer chip opens the right-hand group, before the mini player: it takes
+   the free space to its left, and the player then sits just after it rather
+   than pushing off on its own (that half is in TimerChip.svelte). */
 .controls > :global(.timer-chip-wrap) { margin-left: auto; }
-.controls > .mini-player ~ :global(.timer-chip-wrap) { margin-left: 0; }
 
 .screenshot-btn {
   display: inline-flex;
@@ -6612,6 +6612,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:moveDown={moveFocusedBlockDown}
       on:modeSettingChange={handleModeSettingChange}
     />
+    <!-- A timer in use, reachable from any mode, just before the mini player
+         (asked for on 2026-09-29) -- see utils/timerChip.js. On a phone it is
+         a notification instead. -->
+    <TimerChip {blocks} themeStyle={overlayThemeStyle} />
+
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->
     {#if nowPlayingTrack}
@@ -6773,9 +6778,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         </div>
       {/if}
     {/if}
-
-    <!-- A timer in use, reachable from any mode -- see utils/timerChip.js. -->
-    <TimerChip {blocks} themeStyle={overlayThemeStyle} />
 
     <!-- The outcome is said on the button itself rather than in a dialog:
          this is pressed often, and a box to dismiss every time would be worse
