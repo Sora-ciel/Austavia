@@ -49,9 +49,11 @@ import { isRinging, normalizeAlarmTime } from './alarm.js';
 // once it had been tried: "use less height and less width -- the line that
 // shows the passing of time for the width, and for the height I believe we can
 // lose between a fourth and a third". The figure and its buttons share one
-// row, and the bar is a hairline along the bottom edge.
+// row, and the bar is a hairline along the bottom edge. Then thinner again --
+// "2 pixels as margins, even 4, should be the max": 48 is the two rows, the
+// hairline and 2 to 5 pixels of padding, measured, with nothing to spare.
 export const POPUP_WIDTH = 228;
-export const POPUP_HEIGHT = 76;
+export const POPUP_HEIGHT = 48;
 export const POPUP_GAP = 10;
 export const POPUP_MARGIN = 16;
 

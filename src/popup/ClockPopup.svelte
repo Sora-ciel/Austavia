@@ -257,9 +257,13 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 2px;
-    padding: 5px 8px 8px 10px;
-    border-radius: 12px;
+    gap: 1px;
+    /* 2 to 4 pixels all round, asked for on 2026-09-28: "I think 2 pixels as
+       margins, even 4, should be the max". The bottom keeps room for the
+       hairline under the buttons; the sides a little more than the top, so
+       the text clears the rounded corners. */
+    padding: 2px 4px 5px 6px;
+    border-radius: 9px;
     border: 1px solid var(--pp-border);
     background: var(--pp-bg);
     color: var(--pp-text);
@@ -274,6 +278,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+    /* The app's 1.5 made this line half as tall again as its writing. */
+    line-height: 1.1;
   }
 
   .what {
@@ -318,9 +324,9 @@
      its own. */
   .bar {
     position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 4px;
+    left: 6px;
+    right: 6px;
+    bottom: 2px;
     height: 2px;
     border-radius: 1px;
     background: color-mix(in srgb, var(--pp-text) 16%, transparent);
@@ -357,9 +363,9 @@
   }
 
   .hide {
-    padding: 0 6px;
+    padding: 0 5px;
     font-size: 0.85rem;
-    line-height: 1.1;
+    line-height: 1;
     border: none;
     background: transparent;
     opacity: 0.6;
