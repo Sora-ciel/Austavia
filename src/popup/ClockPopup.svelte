@@ -16,11 +16,10 @@
     startTimer,
     pauseTimer,
     resetTimer,
-    oneMoreMinute,
-    timerReading
+    oneMoreMinute
   } from '../utils/countdown.js';
   import { isRinging, dismissed, snoozed, alarmReading } from '../utils/alarm.js';
-  import { timerFractionLeft, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
+  import { timerFractionLeft, popupTimerReading, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
   import { createRinger } from '../utils/ringTone.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
 
@@ -42,6 +41,9 @@
   $: phase = timerState(device.timer, now);
   $: left = timeLeft(device.timer, now);
   $: fraction = timerFractionLeft(left, device.timer?.duration);
+  // What the big figure says -- an hour or more as `1h 05`, see
+  // popupTimerReading.
+  $: figure = kind === 'timer' ? popupTimerReading(left) : alarmReading(alarmTime, hour12);
   $: alarmRinging = kind === 'alarm' && isRinging({ now, time: alarmTime, enabled: true, device });
   $: ringing = kind === 'timer' ? phase === 'ringing' : alarmRinging;
 
@@ -194,7 +196,7 @@
          00:00' when the timer has started, we don't need that". -->
     <span class="what" data-tauri-drag-region>
       {#if kind === 'timer'}
-        {#if ringing}Time's up{:else if idle}Timer · {timerReading(device.timer?.duration || 0)}{/if}
+        {#if ringing}Time's up{:else if idle}Timer · {popupTimerReading(device.timer?.duration || 0)}{/if}
       {:else}
         Alarm · {alarmReading(alarmTime, hour12)}
       {/if}
@@ -206,12 +208,8 @@
        hairline along the bottom: the same things as before in two thirds of
        the height -- see POPUP_HEIGHT in utils/clockPopups.js. -->
   <div class="row" data-tauri-drag-region>
-    <div class="figure" class:long={kind === 'timer' && left >= 3600000} data-tauri-drag-region>
-      {#if kind === 'timer'}
-        {timerReading(left)}
-      {:else}
-        {alarmReading(alarmTime, hour12)}
-      {/if}
+    <div class="figure" class:long={figure.length > 5} data-tauri-drag-region>
+      {figure}
     </div>
 
     <div class="actions">
@@ -326,10 +324,11 @@
     white-space: nowrap;
   }
 
-  /* An hour or more is two characters longer; it gives up a little size
-     rather than push the buttons out of the card. */
+  /* Anything wider than `59:59`, which the window is sized for -- a timer of
+     ten hours or more, an alarm with AM/PM -- gives up a little size rather
+     than push the buttons out of the card. */
   .figure.long {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
   }
 
   .actions {

@@ -16,6 +16,8 @@ import {
   keptToForget,
   popupPosition,
   timerFractionLeft,
+  popupTimerReading,
+  POPUP_GAP_TO_BUTTONS,
   POPUP_WIDTH,
   POPUP_HEIGHT,
   POPUP_GAP,
@@ -169,5 +171,34 @@ describe('the pop-up switch on the clock block', () => {
   it('leaves other blocks alone', () => {
     const devices = { a: { timer: running, timerPopup: false }, b: { timer: running } };
     assert.deepEqual(popupsWanted({ blocks: [clock('a'), clock('b')], devices, now: T + 1 }).map(p => p.blockId), ['b']);
+  });
+});
+
+// Asked for on 2026-09-29: "between the count and the icons I would want
+// around 20px of space, after accounting for if it's more than 10 minutes ...
+// if the timer is in hours then it shows hours and minutes instead of hours,
+// minutes and seconds".
+describe('how the pop-up reads a timer', () => {
+  it('under an hour, as everywhere else', () => {
+    assert.equal(popupTimerReading(4 * MIN + 59_000), '4:59');
+    assert.equal(popupTimerReading(60 * MIN - 1000), '59:59');
+  });
+
+  it('an hour or more as hours and minutes, without seconds', () => {
+    assert.equal(popupTimerReading(60 * MIN), '1h 00');
+    assert.equal(popupTimerReading(65 * MIN + 30_000), '1h 05');
+    assert.equal(popupTimerReading(10 * 60 * MIN), '10h 00');
+  });
+
+  it('never wider than 59:59 below ten hours, which the window is sized for', () => {
+    for (const ms of [MIN, 10 * MIN, 59 * MIN, 60 * MIN, 9 * 60 * MIN + 59 * MIN]) {
+      assert.ok(popupTimerReading(ms).length <= 5, popupTimerReading(ms));
+    }
+  });
+
+  it('leaves 20px between the widest of those and the buttons', () => {
+    assert.equal(POPUP_GAP_TO_BUTTONS, 20);
+    // border 1 + padding 6 + "59:59" 70.5 + gap + buttons 92 + padding 4 + border 1, measured.
+    assert.ok(Math.abs(POPUP_WIDTH - (1 + 6 + 70.5 + POPUP_GAP_TO_BUTTONS + 92 + 4 + 1)) < 1);
   });
 });

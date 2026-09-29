@@ -42,7 +42,7 @@
  * a record of what was opened -- so a window that failed to open is opened on
  * the next tick, and one left over is closed.
  */
-import { timerState } from './countdown.js';
+import { timerState, timerReading } from './countdown.js';
 import { isRinging, normalizeAlarmTime } from './alarm.js';
 
 // A third less tall and a little narrower than the first version, asked for
@@ -53,10 +53,18 @@ import { isRinging, normalizeAlarmTime } from './alarm.js';
 // "2 pixels as margins, even 4, should be the max": 48 is the two rows, the
 // hairline and 2 to 5 pixels of padding, measured, with nothing to spare.
 // 200 was tried with the buttons pressed up against the time, in two columns,
-// and taken back (2026-09-29): "add some width so that we can accommodate the
-// buttons", with the one-row layout. 240 leaves the time and the three icon
-// buttons room between them, an hour-long timer included.
-export const POPUP_WIDTH = 240;
+// and taken back (2026-09-29), then 240 with the one-row layout. Then, the
+// same day: "between the count and the icons I would want around 20px of
+// space, after accounting for if it's more than 10 minutes" -- so the width is
+// worked out from the widest reading a timer normally shows, "59:59" (an hour
+// or more reads "1h 05", the same width; see popupTimerReading), measured at
+// the figure's 1.65rem:
+//
+//   border 1 + padding 6 + figure 70.5 + gap 20 + three buttons 92 + padding 4 + border 1
+//
+// A shorter reading ("4:59") just leaves more room.
+export const POPUP_GAP_TO_BUTTONS = 20;
+export const POPUP_WIDTH = 195;
 export const POPUP_HEIGHT = 48;
 export const POPUP_GAP = 10;
 export const POPUP_MARGIN = 16;
@@ -69,6 +77,24 @@ export const KEEP_KEY_PREFIX = 'austavia.popup.keep.';
 export const POSITION_KEY = 'austavia.popup.position';
 /** Where the app leaves its colours for the pop-ups to read. */
 export const THEME_KEY = 'austavia.popup.theme';
+
+/**
+ * How the pop-up reads a timer: `4:59` and `59:59` as everywhere else, but an
+ * hour or more as hours and minutes, `1h 05` -- "if the timer is in hours
+ * then it shows hours and minutes instead of hours, minutes and seconds"
+ * (2026-09-29). It keeps the reading as wide as `59:59`, which the window is
+ * sized for, and nobody watching a two-hour timer needs its seconds.
+ *
+ * Counted the way `timerReading` counts, so the two agree on the second the
+ * pop-up switches from `1h 00` to `59:59`.
+ */
+export function popupTimerReading(ms) {
+  const total = Math.ceil(Math.max(0, Number(ms) || 0) / 1000);
+  if (total < 3600) return timerReading(total * 1000);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor(total / 60) % 60;
+  return `${hours}h ${String(minutes).padStart(2, '0')}`;
+}
 
 /**
  * A window label for a block's pop-up. Tauri allows letters, digits and
