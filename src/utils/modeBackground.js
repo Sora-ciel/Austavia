@@ -26,6 +26,13 @@ export const BACKGROUND_DEFAULTS = {
   // ties them to the wallpaper's. It was on at first, as the simpler thing to
   // meet; asked on 2026-09-28 to be "unchecked by default".
   imagesFollowBackground: false,
+  // Set only when somebody ticks or unticks that box themselves. Builds before
+  // 0.8.656 saved "follow" as true into every folder simply because it was
+  // the default then, so a stored true on its own is not a choice anybody
+  // made -- and without this, turning the default off changed nothing for any
+  // folder that already existed. Asked on 2026-09-29: "it should be unchecked
+  // by default".
+  imagesFollowChosen: false,
   // Set when somebody removes a background a theme supplied, so it stays
   // removed for this folder instead of coming straight back on next render.
   bgThemeOptOut: false
@@ -72,7 +79,8 @@ export function normalizeBackgroundSettings(raw = {}, { keepImage = value => val
     imageLuminosity: clampRange(given.imageLuminosity, 0, 200, BACKGROUND_DEFAULTS.imageLuminosity),
     // Only a folder that says so follows. A folder that never said is on the
     // default, which is now not to.
-    imagesFollowBackground: given.imagesFollowBackground === true
+    imagesFollowBackground: given.imagesFollowBackground === true && given.imagesFollowChosen === true,
+    imagesFollowChosen: given.imagesFollowChosen === true
   };
 }
 

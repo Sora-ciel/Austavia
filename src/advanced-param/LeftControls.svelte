@@ -400,6 +400,15 @@
       showModeLadder = false;
     }
 
+    // The Bg panel closes the same way the mode menu does: any click outside
+    // it, and nothing else -- a scroll is not a click, so it stays open while
+    // the page is scrolled. Asked for on 2026-09-28. Found by class rather
+    // than by one element, because the panel is drawn in whichever place the
+    // Bg button is -- the bar, or the More menu.
+    if (bgPanelOpen && !target?.closest?.('.bg-settings-wrap')) {
+      bgPanelOpen = false;
+    }
+
     if (
       showAddBlockMenu &&
       !clickedInsideAny(target, [
@@ -745,7 +754,8 @@ onMount(() => {
 
   /* ── Single Note Mode background image ─────────────────── */
   .bg-settings-wrap { position: relative; display: inline-flex; align-items: center; }
-  .bg-settings-wrap > button.active { background: var(--left-border-color, #444444); }
+  /* No colour of its own while open, like every other button on the bar --
+     asked for on 2026-09-28. (The phone menu still turns its ▾ over.) */
   .bg-panel {
     position: absolute;
     /* The Bg button sits at the end of the toolbar, so open leftwards —
@@ -1350,7 +1360,7 @@ onMount(() => {
                 <input
                   type="checkbox"
                   checked={imagesFollowBackground}
-                  on:change={(e) => setBgSetting({ imagesFollowBackground: e.target.checked })}
+                  on:change={(e) => setBgSetting({ imagesFollowBackground: e.target.checked, imagesFollowChosen: true })}
                 />
                 <span>Pictures in the note follow these</span>
               </label>

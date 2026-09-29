@@ -241,7 +241,19 @@ describe('dimming pictures inside a note', () => {
     assert.equal(out.imageOpacity, 100);
     assert.equal(out.imageLuminosity, 100);
     assert.equal(out.imagesFollowBackground, false);
-    assert.equal(normalizeBackgroundSettings({ imagesFollowBackground: true }).imagesFollowBackground, true);
+  });
+
+  // Asked on 2026-09-29: "it should be unchecked by default". Earlier builds
+  // saved "follow" into every folder because it was the default then; that
+  // stored true is not a choice, and reads as unchecked.
+  it('reads a "follow" nobody chose as unchecked', () => {
+    assert.equal(normalizeBackgroundSettings({ imagesFollowBackground: true }).imagesFollowBackground, false);
+  });
+
+  it('keeps "follow" once somebody ticks it themselves', () => {
+    const out = normalizeBackgroundSettings({ imagesFollowBackground: true, imagesFollowChosen: true });
+    assert.equal(out.imagesFollowBackground, true);
+    assert.equal(out.imagesFollowChosen, true);
   });
 });
 
