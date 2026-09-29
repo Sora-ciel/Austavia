@@ -128,12 +128,18 @@
     } catch { /* not the desktop app */ }
   }
 
+  // Space does nothing here. It used to pause, and a focused button answered
+  // it as well -- so the Pause just clicked went on pausing and resuming with
+  // every space typed while the pop-up still had the keyboard. Asked on
+  // 2026-09-28 to be switched off. Both the down and the up are swallowed:
+  // a button presses on the up.
   function onKey(event) {
-    if (event.key === 'Escape') hide();
-    else if (event.key === ' ') {
+    if (event.key === ' ' || event.code === 'Space') {
       event.preventDefault();
-      togglePause();
+      event.stopPropagation();
+      return;
     }
+    if (event.type === 'keydown' && event.key === 'Escape') hide();
   }
 
   let stopMoved = null;
@@ -141,7 +147,8 @@
   onMount(async () => {
     tick = setInterval(() => { now = Date.now(); }, 250);
     window.addEventListener('storage', onStorage);
-    window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('keyup', onKey, true);
 
     try {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
@@ -163,7 +170,8 @@
     ringer.destroy();
     stopMoved?.();
     window.removeEventListener('storage', onStorage);
-    window.removeEventListener('keydown', onKey);
+    window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('keyup', onKey, true);
   });
 </script>
 
