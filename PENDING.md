@@ -366,30 +366,28 @@ time:
 
 ## 4c. Turning the storage ceiling on
 
-Everything it needs is written and none of it is switched on in production,
-because no function in this repo has ever deployed there — see section 5. The
-ceiling works through three pieces and the middle one is a function:
-`storage/{uid}` counts the bytes, `syncStorageFullClaim` puts `storageFull` on
-the token, and `storage.rules` refuses an upload when it is true. The rules are
-live; the counting is not, so the claim is never written and `notOverQuota()`
-reads as true for everybody.
+**Switched on in production on 2026-10-05.** The ceiling works through three
+pieces and the middle one is a function: `storage/{uid}` counts the bytes,
+`syncStorageFullClaim` puts `storageFull` on the token, and `storage.rules`
+refuses an upload when it is true.
 
-In order, when the production deploy is unblocked:
+How it was done, in this order, and the order mattered:
 
-1. **Deploy the functions.** That is the whole switch — the moment
-   `trackStorageUpload` runs, accounts start being counted and claimed.
-2. **Force-run `reconcileStorageUsage`** from Cloud Scheduler before anything
-   can bite. It has never run on production, so every account currently reads
-   as zero bytes, and the first upload after the deploy would be measured
-   against a balance that does not know about anything uploaded until now.
-3. **Put every account that exists today on `legacy`.** Decided 2026-09-27:
-   every live account except the owner's gets 5 GB, which is comfortably more
-   than any of them uses. `limits.js` has carried `legacy` for exactly this
-   since it was written — a limit introduced after people are already using
-   something is a limit taken away from them.
+1. **Every existing account put on a plan first**, by hand with
+   `firebase database:set /sync/default/users/<uid>/plan`: the owner's on
+   `owner`, the other five on `legacy` (5 GB, decided 2026-09-27). Doing this
+   before the deploy is what kept anyone from being cut off -- two accounts
+   already held more than `free`'s 100 MB (665 MB and 110 MB) and would have
+   been refused uploads the moment counting started.
+2. **The functions deployed** (Node 22), with `ARIAL_SMTP_PASS` set and the two
+   Polar secrets set to placeholders until Polar goes live -- see section 6.
+3. **`reconcileStorageUsage` force-run** from Cloud Scheduler straight after.
+   It scanned 2,337 objects and corrected 4 accounts, 1.37 GB in all; every
+   account came out `full: false`. The two accounts that have never synced
+   have no record yet and are on `legacy` already.
 
-New accounts then start on `free` at 100 MB, which is the thing a price
-attaches to.
+New accounts start on `free` at 100 MB, which is the thing a price attaches
+to.
 
 The warning is already built and needs none of this: `storageAlerts.js` speaks
 when the account's own record crosses into nearly-full and full, in the same
@@ -461,10 +459,9 @@ photograph is enough.
 
 ## 5. Not code
 
-- **Cloud Functions are undeployed.** Blocked on Secret Manager and
-  `ARIAL_SMTP_PASS`, which only the account owner can set. See
-  `functions/monitoring/README.md`; `RELEASE.md` explains why a missing secret
-  blocks even a targeted deploy.
+- **Cloud Functions are deployed** to production since 2026-10-05 (Node 22).
+  `POLAR_WEBHOOK_SECRET` and `POLAR_ACCESS_TOKEN` there hold placeholders, so
+  the webhook refuses every delivery until Polar goes live -- section 6, step 3.
 - **Server-side version history** — the next rung of the sync ladder, and a
   plausible paid feature: it turns every future bug of the "my folder reverted"
   class from lost into restore.

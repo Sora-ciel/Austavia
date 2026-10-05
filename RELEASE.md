@@ -104,12 +104,16 @@ every user out of their own files, so they are never deployed without it.
 firebase deploy --only functions
 ```
 
-Currently blocked: the production-only monitoring functions declare
-`ARIAL_SMTP_PASS`, and the CLI resolves every secret in the codebase before
-working out which functions were asked for — so a missing secret blocks the
-whole codebase, targeted deploys included. Enable Secret Manager and set the
-secret, or comment out the three `exports.bandwidth*` lines in
-`functions/index.js`. See `functions/monitoring/README.md`.
+Deployed to production since 2026-10-05. The CLI resolves every secret in
+the codebase before working out which functions were asked for, so all three
+must exist in Secret Manager or nothing deploys, targeted deploys included:
+`ARIAL_SMTP_PASS` (the monitoring mail), `POLAR_WEBHOOK_SECRET` and
+`POLAR_ACCESS_TOKEN` (the payment webhook -- placeholders until Polar goes
+live). Set each from a file outside the repository, never by pasting:
+
+```bash
+firebase functions:secrets:set ARIAL_SMTP_PASS --data-file E:\secrets\smtp.txt --project arial-473c1
+```
 
 If it fails with *"User code failed to load. Cannot determine backend
 specification. Timeout after 10000"*, nothing is wrong with the code: the CLI
