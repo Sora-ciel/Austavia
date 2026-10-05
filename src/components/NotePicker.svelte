@@ -52,6 +52,40 @@
     }
   });
 
+  /**
+   * Lays a folder's wallpaper across all its cards at once. Each card's
+   * picture layer is given the size of the whole run of cards and moved back
+   * by the card's own position in it, so the card shows only its part -- a
+   * window onto one picture. Measured again whenever the group changes size
+   * or a search adds or removes a card.
+   */
+  function windowsOnto(group) {
+    const place = () => {
+      const cards = [...group.querySelectorAll(':scope > .picker-note')];
+      if (!cards.length) return;
+      const top = cards[0].offsetTop;
+      const bottom = cards[cards.length - 1].offsetTop + cards[cards.length - 1].offsetHeight;
+      const width = group.clientWidth;
+      for (const card of cards) {
+        card.style.setProperty('--wall-left', `${-card.offsetLeft}px`);
+        card.style.setProperty('--wall-top', `${top - card.offsetTop}px`);
+        card.style.setProperty('--wall-width', `${width}px`);
+        card.style.setProperty('--wall-height', `${bottom - top}px`);
+      }
+    };
+    const sized = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
+    sized?.observe(group);
+    const changed = new MutationObserver(place);
+    changed.observe(group, { childList: true });
+    place();
+    return {
+      destroy() {
+        sized?.disconnect();
+        changed.disconnect();
+      }
+    };
+  }
+
   function pick(entry) {
     dispatch('pick', { folder: entry.folder, id: entry.id });
   }
@@ -85,24 +119,31 @@
   </div>
 
   <div class="picker-list">
-    {#each results.here as entry (entry.id)}
-      <button
-        class="picker-note"
-        class:current={entry.id === currentNoteId}
-        style={cardStyle(entry)}
-        on:click={() => pick(entry)}
-      >
-        <span class="picker-wall" aria-hidden="true"></span>
-        <span class="picker-tint" aria-hidden="true"></span>
-        <span class="picker-words">
-          <span class="picker-title">{entry.title}</span>
-          {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
-        </span>
-        {#if entry.picture && !brokenPictures.has(entry.picture)}
-          <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
-        {/if}
-      </button>
-    {/each}
+    <!-- Each folder's notes are one group, and its wallpaper is laid across the
+         whole group: every card is a window onto its part of the one picture
+         (use:windowsOnto), rather than each repeating it. Asked for on
+         2026-10-05. -->
+    {#if results.here.length}
+      <section class="picker-folder-group" aria-label="This folder" use:windowsOnto>
+        {#each results.here as entry (entry.id)}
+          <button
+            class="picker-note"
+            class:current={entry.id === currentNoteId}
+            style={cardStyle(entry)}
+            on:click={() => pick(entry)}
+          >
+            <span class="picker-wall" aria-hidden="true"></span>
+            <span class="picker-words">
+              <span class="picker-title">{entry.title}</span>
+              {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
+            </span>
+            {#if entry.picture && !brokenPictures.has(entry.picture)}
+              <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+            {/if}
+          </button>
+        {/each}
+      </section>
+    {/if}
 
     {#if results.elsewhere.length || loadingElsewhere}
       <div class="picker-separator" role="separator">
@@ -117,12 +158,16 @@
     <!-- One heading per folder, its notes under it -- "it'll show easier for
          people which note is where". A folder with none is not listed. -->
     {#each results.elsewhere as group (group.folder)}
-      <section class="picker-folder-group" aria-label={group.folder}>
-        <h3 class="picker-folder">{group.folder}</h3>
+      <h3 class="picker-folder">{group.folder}</h3>
+      <section class="picker-folder-group" aria-label={group.folder} use:windowsOnto>
         {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
-          <button class="picker-note" style={cardStyle(entry)} on:click={() => pick(entry)}>
+          <button
+            class="picker-note"
+            class:current={entry.id === currentNoteId}
+            style={cardStyle(entry)}
+            on:click={() => pick(entry)}
+          >
             <span class="picker-wall" aria-hidden="true"></span>
-            <span class="picker-tint" aria-hidden="true"></span>
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
@@ -209,9 +254,11 @@
     gap: 4px;
   }
 
-  /* A card, in three layers: its folder's wallpaper, the note's colour over
-     it, the writing on top (cardStyle), with the note's last picture on the
-     right. */
+  /* A card over its folder's wallpaper (cardStyle): the note's colour as it
+     sits behind that wallpaper in its own folder, so nothing of the open
+     folder shows through, then the wallpaper, then the writing. A folder with
+     no wallpaper gives its cards no background at all, and the open folder's
+     shows through. Asked for on 2026-10-05. */
   .picker-note {
     position: relative;
     isolation: isolate;
@@ -223,7 +270,7 @@
     text-align: left;
     font: inherit;
     color: var(--card-text, inherit);
-    background: transparent;
+    background: var(--card-backdrop, transparent);
     border: 1px solid color-mix(in srgb, var(--card-text, currentColor) 22%, transparent);
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
@@ -242,15 +289,16 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-text, currentColor) 45%, transparent);
   }
 
-  .picker-wall,
-  .picker-tint {
+  /* The folder's whole run of cards in size, moved back by this card's place
+     in it (windowsOnto) -- plus the blur's bleed on every side. */
+  .picker-wall {
     position: absolute;
     pointer-events: none;
-  }
-
-  .picker-wall {
-    z-index: -2;
-    inset: var(--card-wall-bleed, 0);
+    z-index: -1;
+    left: calc(var(--wall-left, 0px) + var(--card-wall-bleed, 0px));
+    top: calc(var(--wall-top, 0px) + var(--card-wall-bleed, 0px));
+    width: calc(var(--wall-width, 100%) - 2 * var(--card-wall-bleed, 0px));
+    height: calc(var(--wall-height, 100%) - 2 * var(--card-wall-bleed, 0px));
     background-image: var(--card-wall, none);
     background-size: var(--card-wall-size, cover);
     background-position: center;
@@ -259,11 +307,6 @@
     filter: var(--card-wall-filter, none);
   }
 
-  .picker-tint {
-    z-index: -1;
-    inset: 0;
-    background: var(--card-bg, color-mix(in srgb, currentColor 6%, transparent));
-  }
 
   .picker-words {
     flex: 1;
@@ -296,15 +339,16 @@
     border-radius: 7px;
   }
 
+  /* Positioned, so a card's place in it can be measured from it. */
   .picker-folder-group {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-top: 6px;
   }
 
   .picker-folder {
-    margin: 4px 2px 2px;
+    margin: 10px 2px 2px;
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.03em;
