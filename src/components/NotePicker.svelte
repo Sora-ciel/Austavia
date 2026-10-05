@@ -224,6 +224,7 @@
      colour (the theme's, over a wallpaper) or the page's, and a hairline of
      it. */
   .picker-note {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -298,12 +299,28 @@
     position: relative;
     isolation: isolate;
     overflow: hidden;
+    /* Never squeezed: the list scrolls instead. overflow: hidden takes away a
+       flex item's floor at its content, and the list was shrinking the
+       categories to fit the page, cutting notes off the bottom. */
+    flex: none;
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 6px 8px 8px;
+    padding: 8px 10px 10px;
     border-radius: 12px;
     background: var(--group-backdrop, transparent);
+    /* A frame in the category's own writing colour, so where one folder ends
+       and the next begins reads at a glance -- wallpaper or not. Asked for on
+       2026-10-05: "make each difference of the category easier to see". */
+    border: 2px solid color-mix(in srgb, var(--group-text, currentColor) 45%, transparent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  }
+
+  /* Room between one category and the next. */
+  .picker-folder-group + .picker-folder-group,
+  .picker-separator + .picker-folder-group,
+  .picker-quiet + .picker-folder-group {
+    margin-top: 10px;
   }
 
   .picker-group-wall {
@@ -319,13 +336,15 @@
     filter: var(--group-wall-filter, none);
   }
 
+  /* The folder's name, bold, with a rule under it between it and its notes. */
   .picker-folder {
     color: var(--group-text, inherit);
-    margin: 0 2px 2px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    opacity: 0.8;
+    margin: 0 2px 4px;
+    padding-bottom: 5px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid color-mix(in srgb, var(--group-text, currentColor) 35%, transparent);
   }
 
   .picker-separator {
