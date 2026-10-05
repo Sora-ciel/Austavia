@@ -89,7 +89,9 @@
          name, and its notes on top with no background of their own. Asked
          for on 2026-10-05: "easier to see and cleaner". -->
     {#if results.here.length}
-      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper)}>
+      <!-- This folder's own notes: no category background -- the mode's own
+           shows through, which is already this folder's (2026-10-05). -->
+      <section class="picker-folder-group" aria-label={currentFolder}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{currentFolder}</h3>
         {#each results.here as entry (entry.id)}
