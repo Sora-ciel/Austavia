@@ -6733,7 +6733,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
 
 
-<div class="app" style="{appThemeCssVars}; {blockThemeCssVars}">
+<!-- --toolbar-bg and --toolbar-button-text: the toolbar's own colours, for
+     anything elsewhere that is meant to match it -- Single Note's search page
+     frames its folders in them (2026-10-05). -->
+<div class="app" style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText};">
   <div class="controls" bind:this={controlsRef} style={controlsStyle}>
     <LeftControls
       bind:currentSaveName

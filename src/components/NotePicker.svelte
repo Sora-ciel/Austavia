@@ -601,9 +601,7 @@
     text-align: left;
     font: inherit;
     color: var(--group-text, inherit);
-    /* A soft plate of the page colour under each note, so its writing is not
-       read straight off the wallpaper and each note reads as its own box. */
-    background: color-mix(in srgb, var(--group-backdrop, var(--active-note-bg, #000000)) 62%, transparent);
+    background: transparent;
     border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
     border-radius: 10px;
     padding: 4px 6px 4px 12px;
@@ -681,7 +679,9 @@
     /* A frame in the category's own writing colour, so where one folder ends
        and the next begins reads at a glance -- wallpaper or not. Asked for on
        2026-10-05: "make each difference of the category easier to see". */
-    border: 4px solid color-mix(in srgb, var(--group-text, currentColor) 60%, transparent);
+    /* The toolbar's background, opacity and all, so the frames read as part
+       of the app's own chrome -- asked for on 2026-10-05. */
+    border: 4px solid var(--toolbar-bg, color-mix(in srgb, currentColor 60%, transparent));
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
   }
 
@@ -705,20 +705,19 @@
     filter: var(--group-wall-filter, none);
   }
 
-  /* The folder's name on a solid bar across the top of its category, in the
-     reverse of its colours -- the writing colour behind, the page colour on
-     it -- so a category's start can't be missed. Asked for on 2026-10-05:
-     "it's a little hard to read still". */
+  /* The folder's name on a bar across the top of its category, in the
+     toolbar's colours -- its background, opacity included, and its buttons'
+     writing -- so a category's start can't be missed. Asked for on
+     2026-10-05: "it's a little hard to read still", then "the same as the
+     background of the controls, with the same opacity". */
   .picker-folder {
     margin: -8px -10px 6px;
     padding: 6px 12px;
     font-size: 1.15rem;
     font-weight: 800;
     letter-spacing: 0.01em;
-    /* Named, not currentColor: on the heading currentColor is its own colour,
-       which is the page colour here, and the name vanished into the bar. */
-    background: var(--group-text, var(--active-note-text, var(--mode-text-color, #ffffff)));
-    color: var(--group-backdrop, var(--active-note-bg, var(--canvas-inner-bg, #000000)));
+    background: var(--toolbar-bg, #111111);
+    color: var(--toolbar-button-text, #ffffff);
     text-shadow: none;
   }
 
