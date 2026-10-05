@@ -6,9 +6,14 @@
    *
    * Opened from the note's title, which now shares one line with the word
    * count instead of a row of tabs above it -- asked for on 2026-10-05.
+   *
+   * Two ways to show it, with a switch between them that this device
+   * remembers: the list of folder categories, and a shelf of folders over a
+   * grid of tiles (shelfView). Both asked for the same day, "to see both
+   * styles".
    */
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import { searchNotes } from '../utils/noteSearch.js';
+  import { searchNotes, shelfView } from '../utils/noteSearch.js';
 
   /** This folder's notes, in the order the mode shows them. */
   export let notes = [];
@@ -23,6 +28,22 @@
   export let groupStyle = () => '';
   /** This folder's wallpaper settings, for the cards of its own notes. */
   export let hereWallpaper = null;
+  /** The notes last opened, newest first: [{ folder, id }]. See recentNotes. */
+  export let recentlyOpened = [];
+
+  // Which way to show the page, kept on this device.
+  const LAYOUT_KEY = 'singleNotePickerLayout';
+  let layout = 'list';
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(LAYOUT_KEY) === 'grid') layout = 'grid';
+  } catch { /* the list, then */ }
+  function toggleLayout() {
+    layout = layout === 'grid' ? 'list' : 'grid';
+    try { localStorage.setItem(LAYOUT_KEY, layout); } catch { /* for this time only */ }
+  }
+
+  // The grid's chosen folder: 'all', or a folder's name.
+  let chosenFolder = 'all';
 
   const dispatch = createEventDispatcher();
 
@@ -33,6 +54,16 @@
 
   $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, elsewhere, query });
   $: nothingFound = !results.here.length && !results.elsewhere.length && !loadingElsewhere;
+  $: view = shelfView({ currentFolder, here: notes, hereWallpaper, elsewhere, query, folder: chosenFolder, recentlyOpened });
+  // A chosen folder that the list no longer has goes back to every folder.
+  $: keepChosenFolder(view, loadingElsewhere);
+  function keepChosenFolder(current, loading) {
+    if (chosenFolder !== 'all' && !loading && !current.folders.some(f => f.folder === chosenFolder)) chosenFolder = 'all';
+  }
+  $: totalNotes = view.folders.reduce((sum, f) => sum + f.count, 0);
+  $: gridLabel = query.trim()
+    ? `${view.notes.length} ${view.notes.length === 1 ? 'note matches' : 'notes match'}`
+    : chosenFolder === 'all' ? 'Every note, this folder first' : chosenFolder;
   // A picture that will not load is simply left out of its card.
   let brokenPictures = new Set();
   function pictureFailed(src) {
@@ -61,7 +92,9 @@
       event.preventDefault();
       dispatch('close');
     } else if (event.key === 'Enter') {
-      const first = results.here[0] || results.elsewhere[0];
+      const first = layout === 'grid'
+        ? view.notes[0]
+        : results.here[0] || results.elsewhere[0]?.notes[0];
       if (first) {
         event.preventDefault();
         pick(first);
@@ -75,14 +108,108 @@
     <input
       class="picker-search"
       type="search"
-      placeholder="Search notes"
-      aria-label="Search notes"
+      placeholder="Search notes and folders"
+      aria-label="Search notes and folders"
       bind:this={input}
       bind:value={query}
       on:keydown={onKeydown}
     />
+    <button
+      class="picker-layout"
+      title={layout === 'grid' ? 'Show as a list of folders' : 'Show as a grid'}
+      aria-label={layout === 'grid' ? 'Show as a list of folders' : 'Show as a grid'}
+      on:click={toggleLayout}
+    >
+      {#if layout === 'grid'}
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" /></svg>
+      {:else}
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg>
+      {/if}
+    </button>
     <button class="picker-close" title="Back to the note" aria-label="Back to the note" on:click={() => dispatch('close')}>×</button>
   </div>
+
+  {#if layout === 'grid'}
+  <!-- The shelf and grid: folders along the top, each with a circle of its
+       wallpaper and how many notes it holds; the notes as tiles under it,
+       each with a strip of its folder's wallpaper. -->
+  <div class="picker-list">
+    <div class="shelf" role="tablist" aria-label="Folders">
+      <button class="shelf-chip" class:on={chosenFolder === 'all'} role="tab" aria-selected={chosenFolder === 'all'} on:click={() => (chosenFolder = 'all')}>
+        <span class="shelf-swatch shelf-all" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="14" height="14"><path d="M4 7l8-4 8 4-8 4zM4 12l8 4 8-4M4 17l8 4 8-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" /></svg>
+        </span>
+        <span>All folders</span>
+        <span class="shelf-count">{totalNotes}</span>
+      </button>
+      {#each view.folders as f (f.folder)}
+        <button class="shelf-chip" class:on={chosenFolder === f.folder} role="tab" aria-selected={chosenFolder === f.folder} on:click={() => (chosenFolder = f.folder)}>
+          <span class="shelf-swatch" style={groupStyle(f.wallpaper)} aria-hidden="true"><span class="picker-group-wall"></span></span>
+          <span>{f.folder}{f.here ? ' (here)' : ''}</span>
+          <span class="shelf-count">{f.count}</span>
+        </button>
+      {/each}
+    </div>
+
+    {#if view.recent.length}
+      <h3 class="grid-label">Recently opened</h3>
+      <div class="tiles">
+        {#each view.recent as entry (`recent/${entry.folder}/${entry.id}`)}
+          <button
+            class="tile"
+            class:current={entry.folder === currentFolder && entry.id === currentNoteId}
+            on:click={() => pick(entry)}
+          >
+            <span class="tile-band" style={groupStyle(entry.wallpaper)}>
+              <span class="picker-group-wall" aria-hidden="true"></span>
+              <span class="tile-folder">{entry.folder}{entry.folder === currentFolder ? ' · this folder' : ''}</span>
+            </span>
+            <span class="tile-body">
+              <span class="picker-words">
+                <span class="picker-title">{entry.title}</span>
+                {#if entry.snippet}<span class="tile-snippet">{entry.snippet}</span>{/if}
+              </span>
+              {#if entry.picture && !brokenPictures.has(entry.picture)}
+                <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+              {/if}
+            </span>
+          </button>
+        {/each}
+      </div>
+    {/if}
+
+    <h3 class="grid-label">{gridLabel}</h3>
+    {#if loadingElsewhere}
+      <div class="picker-quiet">Looking through the other folders…</div>
+    {/if}
+    <div class="tiles">
+      {#each view.notes as entry (`${entry.folder}/${entry.id}`)}
+          <button
+            class="tile"
+            class:current={entry.folder === currentFolder && entry.id === currentNoteId}
+            on:click={() => pick(entry)}
+          >
+            <span class="tile-band" style={groupStyle(entry.wallpaper)}>
+              <span class="picker-group-wall" aria-hidden="true"></span>
+              <span class="tile-folder">{entry.folder}{entry.folder === currentFolder ? ' · this folder' : ''}</span>
+            </span>
+            <span class="tile-body">
+              <span class="picker-words">
+                <span class="picker-title">{entry.title}</span>
+                {#if entry.snippet}<span class="tile-snippet">{entry.snippet}</span>{/if}
+              </span>
+              {#if entry.picture && !brokenPictures.has(entry.picture)}
+                <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+              {/if}
+            </span>
+          </button>
+      {/each}
+    </div>
+    {#if !view.notes.length && !loadingElsewhere}
+      <div class="picker-quiet">No note or folder has “{query}” in it.</div>
+    {/if}
+  </div>
+  {:else}
 
   <div class="picker-list">
     <!-- Each folder is a category: its wallpaper behind the whole of it, its
@@ -146,9 +273,10 @@
     {/each}
 
     {#if nothingFound}
-      <div class="picker-quiet">No note has “{query}” in it.</div>
+      <div class="picker-quiet">No note or folder has “{query}” in it.</div>
     {/if}
   </div>
+  {/if}
 </div>
 
 <style>
@@ -189,6 +317,152 @@
 
   .picker-search:focus {
     border-color: color-mix(in srgb, currentColor 60%, transparent);
+  }
+
+  .picker-layout {
+    flex: none;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    color: inherit;
+    background: transparent;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* ── The shelf and grid ─────────────────────────────────────── */
+  .shelf {
+    flex: none;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 0 6px;
+    scrollbar-width: thin;
+  }
+
+  .shelf-chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
+    border-radius: 999px;
+    border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .shelf-chip.on {
+    border-color: currentColor;
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  .shelf-swatch {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--group-backdrop, color-mix(in srgb, currentColor 14%, transparent));
+  }
+
+  .shelf-all {
+    display: grid;
+    place-items: center;
+  }
+
+  .shelf-count {
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.7;
+  }
+
+  .grid-label {
+    flex: none;
+    margin: 12px 2px 6px;
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .tiles {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px;
+  }
+
+  .tile {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 2px solid color-mix(in srgb, currentColor 22%, transparent);
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    cursor: pointer;
+  }
+
+  .tile:hover,
+  .tile:focus-visible {
+    border-color: color-mix(in srgb, currentColor 55%, transparent);
+    outline: none;
+  }
+
+  .tile.current {
+    border-color: currentColor;
+  }
+
+  /* The strip of the folder's wallpaper across the top, its name on it. */
+  .tile-band {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    height: 36px;
+    padding: 0 10px 5px;
+    background: var(--group-backdrop, color-mix(in srgb, currentColor 12%, transparent));
+    color: var(--group-text, inherit);
+  }
+
+  .tile-folder {
+    font-size: 0.75rem;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tile-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 10px;
+    min-height: 74px;
+  }
+
+  .tile-snippet {
+    font-size: 0.8rem;
+    line-height: 1.3;
+    opacity: 0.75;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 
   .picker-close {

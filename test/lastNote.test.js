@@ -6,6 +6,7 @@ import {
   rememberedNote,
   withRememberedNote,
   noteToOpen,
+  recentNotes,
   REMEMBERED_FILES
 } from '../src/utils/lastNote.js';
 
@@ -96,4 +97,9 @@ test('nothing asked for, nothing taken over -- a note arriving by sync opens not
 
 test('waits for the note to be there before opening it', () => {
   assert.equal(noteToOpen({ notes, requested: 'not-yet' }), null);
+});
+
+test('the notes last opened come newest first, one per folder', () => {
+  const store = { Old: 'o', Work: 'w', Notes: 'n' };
+  assert.deepEqual(recentNotes(store, 2), [{ folder: 'Notes', id: 'n' }, { folder: 'Work', id: 'w' }]);
 });

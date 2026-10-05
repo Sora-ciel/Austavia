@@ -65,7 +65,11 @@ function entriesOf(notes = [], folder = '', wallpaper = null) {
       // The folder's wallpaper settings, drawn behind the card so the folder
       // can be told at a glance -- asked for on 2026-10-05.
       wallpaper,
-      text: text.toLowerCase()
+      // What a search looks through: the writing, the note's name -- the
+      // "Note 3" a note with no writing is given included -- and the name of
+      // its folder. Asked for on 2026-10-05: searching a folder's name finds
+      // every note in it, and "note 1" finds the notes called that.
+      text: `${noteTitle(note?.content, index)}\n${text}\n${folder}`.toLowerCase()
     };
   });
 }
@@ -79,12 +83,39 @@ function entriesOf(notes = [], folder = '', wallpaper = null) {
  * note matches when its writing contains every word of the query, in any
  * order and any case.
  */
-export function searchNotes({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '' } = {}) {
-  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = entry => words.every(word => entry.text.includes(word));
-  const strip = ({ text, ...entry }) => entry;
+/**
+ * How well an entry answers a search, best first: named exactly that, then
+ * named with it, then in a folder named with it, then anything else that
+ * matched. Keeps "note 1" from burying "Note 1" under every note that merely
+ * mentions a note and a 1.
+ */
+function rank(entry, phrase) {
+  if (!phrase) return 0;
+  const title = entry.title.toLowerCase();
+  if (title === phrase) return 0;
+  if (title.includes(phrase)) return 1;
+  if (String(entry.folder).toLowerCase().includes(phrase)) return 2;
+  return 3;
+}
 
-  const inThisFolder = entriesOf(here, currentFolder, hereWallpaper).filter(matches).map(strip);
+function matcher(query) {
+  const phrase = String(query || '').trim().toLowerCase();
+  const words = phrase.split(/\s+/).filter(Boolean);
+  const matches = entry => words.every(word => entry.text.includes(word));
+  // Stable: equal ranks keep the folder's own order.
+  const order = list => list
+    .map((entry, i) => ({ entry, i, r: rank(entry, phrase) }))
+    .sort((a, b) => a.r - b.r || a.i - b.i)
+    .map(({ entry }) => entry);
+  return { matches, order };
+}
+
+const strip = ({ text, ...entry }) => entry;
+
+export function searchNotes({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '' } = {}) {
+  const { matches, order } = matcher(query);
+
+  const inThisFolder = order(entriesOf(here, currentFolder, hereWallpaper).filter(matches)).map(strip);
 
   const inOthers = [...(elsewhere || [])]
     .filter(group => group && group.folder !== currentFolder)
@@ -93,9 +124,49 @@ export function searchNotes({ currentFolder = '', here = [], hereWallpaper = nul
       folder: group.folder,
       // Drawn behind the whole category, its notes on top of it.
       wallpaper: group.wallpaper || null,
-      notes: entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches).map(strip)
+      notes: order(entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches)).map(strip)
     }))
     .filter(group => group.notes.length > 0);
 
   return { here: inThisFolder, elsewhere: inOthers };
+}
+
+/**
+ * The other way to show the search page: a shelf of folders along the top
+ * and the notes as a grid of tiles. Proposed on 2026-10-05 and asked to be
+ * built beside the list of categories, with a switch between the two.
+ *
+ * - `folders`: this folder first, then the others by name, each with how many
+ *   notes it holds and its wallpaper -- only folders that hold any.
+ * - `notes`: the tiles to show -- one folder's (`folder`), or every folder's
+ *   with this one's first (`'all'`), narrowed and ordered by the search.
+ * - `recent`: the notes last opened, newest first, from `recentlyOpened`
+ *   (`[{ folder, id }]`), only where they still exist -- shown while nothing
+ *   is being searched for and every folder is in view.
+ */
+export function shelfView({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '', folder = 'all', recentlyOpened = [] } = {}) {
+  const groups = [
+    { folder: currentFolder, wallpaper: hereWallpaper, entries: entriesOf(here, currentFolder, hereWallpaper), here: true },
+    ...[...(elsewhere || [])]
+      .filter(group => group && group.folder !== currentFolder)
+      .sort((a, b) => String(a.folder).localeCompare(String(b.folder)))
+      .map(group => ({ folder: group.folder, wallpaper: group.wallpaper || null, entries: entriesOf(group.notes, group.folder, group.wallpaper || null), here: false }))
+  ].filter(group => group.entries.length > 0);
+
+  const folders = groups.map(group => ({ folder: group.folder, count: group.entries.length, wallpaper: group.wallpaper, here: group.here }));
+
+  const { matches, order } = matcher(query);
+  const chosen = folder === 'all' ? groups : groups.filter(group => group.folder === folder);
+  const notes = order(chosen.flatMap(group => group.entries).filter(matches)).map(strip);
+
+  const searching = String(query || '').trim() !== '';
+  const byKey = new Map(groups.flatMap(group => group.entries.map(entry => [`${entry.folder}\n${entry.id}`, entry])));
+  const recent = searching || folder !== 'all'
+    ? []
+    : (recentlyOpened || [])
+        .map(item => byKey.get(`${item?.folder}\n${item?.id}`))
+        .filter(Boolean)
+        .map(strip);
+
+  return { folders, notes, recent };
 }

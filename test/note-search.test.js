@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { noteTitle, searchNotes, lastPicture } from '../src/utils/noteSearch.js';
+import { noteTitle, searchNotes, lastPicture, shelfView } from '../src/utils/noteSearch.js';
 
 const note = (id, content) => ({ id, content });
 
@@ -111,5 +111,65 @@ describe("each card's folder", () => {
     const wall = { backgroundImage: 'work.jpg' };
     const result = searchNotes({ elsewhere: [{ folder: 'Work', notes: [{ id: 'w', content: '<p>W</p>' }], wallpaper: wall }] });
     assert.equal(result.elsewhere[0].wallpaper, wall);
+  });
+});
+
+// Asked for on 2026-10-05: "the search should be able to search for the
+// names of the folders themselves and also the name given by default to the
+// text block. If I search for a folder named bruh, it gives me all the text
+// notes in it, and if I search note 1 it shows all the text blocks with that
+// title, even if it's a default title."
+describe('what a search looks through', () => {
+  const elsewhere = [
+    { folder: 'bruh', notes: [note('b1', '<p>Groceries</p>'), note('b2', '<p>Plans</p>')] },
+    { folder: 'Work', notes: [note('w1', ''), note('w2', '<p>Budget</p>')] }
+  ];
+
+  it("a folder's name finds every note in it", () => {
+    const result = searchNotes({ currentFolder: 'Notes', here: [], elsewhere, query: 'bruh' });
+    assert.deepEqual(result.elsewhere.map(g => [g.folder, g.notes.map(n => n.id)]), [['bruh', ['b1', 'b2']]]);
+  });
+
+  it('"note 1" finds a note named Note 1 by default, with nothing written in it', () => {
+    const result = searchNotes({ currentFolder: 'Notes', here: [], elsewhere, query: 'note 1' });
+    assert.deepEqual(result.elsewhere.flatMap(g => g.notes).map(n => n.id), ['w1']);
+  });
+
+  it('puts a note named exactly that first, ahead of ones that only mention it', () => {
+    const here = [note('x', '<p>Diary</p><p>a note about 2 things</p>'), note('y', '')];
+    const result = searchNotes({ currentFolder: 'Notes', here, query: 'note 2' });
+    assert.deepEqual(result.here.map(n => n.id), ['y', 'x']);
+  });
+});
+
+// The second style of the page, built on 2026-10-05 beside the categories:
+// a shelf of folders and a grid of tiles.
+describe('the shelf and grid', () => {
+  const here = [note('a', '<p>Shopping</p>'), note('b', '<p>Ideas</p>')];
+  const elsewhere = [
+    { folder: 'Work', notes: [note('w1', '<p>Meeting</p>')], wallpaper: { backgroundImage: 'w.jpg' } },
+    { folder: 'Empty', notes: [] },
+    { folder: 'Home', notes: [note('h1', '<p>Garden</p>')] }
+  ];
+
+  it('lists this folder first, then the others by name, each with its count -- none without notes', () => {
+    const view = shelfView({ currentFolder: 'Notes', here, elsewhere });
+    assert.deepEqual(view.folders.map(f => [f.folder, f.count, f.here]), [['Notes', 2, true], ['Home', 1, false], ['Work', 1, false]]);
+  });
+
+  it("shows every folder's notes, this one's first, or one folder's when it is chosen", () => {
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere }).notes.map(n => n.id), ['a', 'b', 'h1', 'w1']);
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, folder: 'Work' }).notes.map(n => n.id), ['w1']);
+  });
+
+  it('searches every folder, or only the chosen one', () => {
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, query: 'garden' }).notes.map(n => n.id), ['h1']);
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, query: 'garden', folder: 'Work' }).notes, []);
+  });
+
+  it('shows the notes last opened while not searching, leaving out any that are gone', () => {
+    const recentlyOpened = [{ folder: 'Work', id: 'w1' }, { folder: 'Gone', id: 'x' }, { folder: 'Notes', id: 'a' }];
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, recentlyOpened }).recent.map(n => n.id), ['w1', 'a']);
+    assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, recentlyOpened, query: 'x' }).recent, []);
   });
 });

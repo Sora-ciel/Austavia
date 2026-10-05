@@ -98,3 +98,18 @@ export function noteToOpen({ notes = [], requested = null, consumed = null } = {
   const list = Array.isArray(notes) ? notes : [];
   return list.some((note) => note?.id === requested) ? requested : null;
 }
+
+/**
+ * The notes last opened, newest first: `[{ folder, id }]`, one per folder --
+ * the last note opened in each of the folders opened most recently. The store
+ * keeps its files in the order they were last written, which is exactly the
+ * order they were last opened in. For Single Note's search page.
+ */
+export function recentNotes(store, limit = 6) {
+  if (!store || typeof store !== 'object') return [];
+  return Object.entries(store)
+    .filter(([folder, id]) => folder && typeof id === 'string' && id)
+    .reverse()
+    .slice(0, Math.max(0, limit))
+    .map(([folder, id]) => ({ folder, id }));
+}

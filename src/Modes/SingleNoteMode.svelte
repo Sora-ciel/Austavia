@@ -11,7 +11,8 @@
     chooseOpenNote,
     rememberedNote,
     withRememberedNote,
-    noteToOpen
+    noteToOpen,
+    recentNotes
   } from '../utils/lastNote.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import {
@@ -788,6 +789,7 @@
         currentNoteId={selectedNoteId}
         loadElsewhere={loadOtherFolderNotes}
         hereWallpaper={singleNoteSettings}
+        recentlyOpened={recentNotes(readLastOpen())}
         {groupStyle}
         on:pick={pickNote}
         on:close={() => (pickerOpen = false)}
