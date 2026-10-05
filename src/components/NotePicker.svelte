@@ -237,7 +237,6 @@
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
     cursor: pointer;
-    text-shadow: inherit;
   }
 
   .picker-note:hover,
@@ -295,6 +294,13 @@
     padding: 6px 8px 8px;
     border-radius: 12px;
     background: var(--group-backdrop, transparent);
+    /* No theme glow inside a category. The theme's text shadow is a haze of
+       its own page colour round every line -- right on its own page, where it
+       keeps writing readable over a wallpaper, but here it laid a veil of the
+       open folder's theme between each note and its folder's wallpaper.
+       Reported on 2026-10-05: "it shouldn't be there, for each note to stand
+       out more". */
+    text-shadow: none;
   }
 
   .picker-group-wall {
