@@ -321,7 +321,6 @@ speculatively — wait for a report that says so.
   `project-content-architecture`.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
-- **`functions/package.json` is on Node 20** and wants 22.
 - **The alarm and the timer only ring while the app is open on their folder.** It is a
   timer in the page (`AlarmRinger.svelte`), so it cannot ring with the app
   closed, with a phone that has put the WebView to sleep, or for a clock in a
