@@ -297,18 +297,28 @@
 
   // The search page's categories, one per folder: that folder's wallpaper
   // behind the whole category -- the phone one at a phone's shape, with that
-  // folder's opacity, blur and brightness -- on the theme's page colour, so
-  // nothing of the open folder shows through. A folder with no wallpaper gets
-  // nothing, and the open folder shows through. The notes sit on top with no
-  // background of their own, in their own writing colour. Asked for on
-  // 2026-10-05: "the whole category has the background of the folder behind
-  // the notes ... easier to see and cleaner".
-  function groupStyle(wallpaper) {
+  // folder's opacity, blur and brightness -- and the notes on top with no
+  // background of their own. Asked for on 2026-10-05: "the whole category has
+  // the background of the folder behind the notes ... easier to see and
+  // cleaner". A folder with no wallpaper gets nothing, and the open folder
+  // shows through.
+  //
+  // Nothing in a category comes from the theme in use now: "the notes should
+  // be one of the only things that doesn't change no matter the theme you're
+  // using". Under the wallpaper is the folder's own colour -- the colour its
+  // notes carry, which is what it shows under its wallpaper -- not this
+  // theme's page colour, which tinted every wallpaper not drawn at full
+  // opacity (peach under Peach Sorbet). The folder's name takes its writing
+  // colour for the same reason.
+  function groupStyle(wallpaper, notes = []) {
     const wall = backgroundLayerStyle(wallpaper, { isMobile: isMobileViewport });
     if (!wall) return '';
     const url = String(wall.image).replace(/"/g, '%22');
+    const first = (notes || []).find(note => note?.bgColor) || {};
+    const base = first.bgColor || '#000000';
+    const text = first.textColor || getReadableTextColor(base);
     return (
-      `--group-backdrop: ${canvasTheme.innerBg};` +
+      `--group-backdrop: ${base}; --group-text: ${text};` +
       ` --group-wall: url("${url}"); --group-wall-opacity: ${wall.opacity};` +
       ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
     );

@@ -91,7 +91,7 @@
          name, and its notes on top with no background of their own. Asked
          for on 2026-10-05: "easier to see and cleaner". -->
     {#if results.here.length}
-      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper)}>
+      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper, results.here)}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{currentFolder}</h3>
         {#each results.here as entry (entry.id)}
@@ -125,7 +125,7 @@
 
     <!-- A folder with no notes, or none the search finds, is not listed. -->
     {#each results.elsewhere as group (group.folder)}
-      <section class="picker-folder-group" aria-label={group.folder} style={groupStyle(group.wallpaper)}>
+      <section class="picker-folder-group" aria-label={group.folder} style={groupStyle(group.wallpaper, group.notes)}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{group.folder}</h3>
         {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
@@ -317,6 +317,7 @@
   }
 
   .picker-folder {
+    color: var(--group-text, inherit);
     margin: 0 2px 2px;
     font-size: 0.8rem;
     font-weight: 700;
