@@ -295,6 +295,17 @@
   let pickerOpen = false;
   $: noteIndex = noteBlocks.findIndex(block => block.id === selectedNoteId);
 
+  // Each card on the search page is drawn as this mode draws that note: its
+  // own colours, faded by the theme's surface dial -- toward see-through when
+  // there is a wallpaper to show, toward the page otherwise, as the note is.
+  function noteCardStyle(entry) {
+    const surface = surfaceColors({ bgColor: entry?.bgColor, textColor: entry?.textColor }, canvasTheme);
+    const bg = bgImage
+      ? `color-mix(in srgb, ${surface.bg} var(--block-bg-opacity, 100%), transparent)`
+      : drawnSurface(surface.bg, canvasTheme.innerBg);
+    return `--card-bg: ${bg}; --card-text: ${surface.text};`;
+  }
+
   function pickNote(event) {
     const { folder, id } = event.detail || {};
     pickerOpen = false;
@@ -454,6 +465,12 @@
     flex-direction: column;
   }
 
+  /* The search page is see-through, so the note under it is hidden while it
+     is open -- hidden, not removed, so it keeps its place and its caret. */
+  .note-body.picking :global(.tiptap-wrap) {
+    visibility: hidden;
+  }
+
   /* Only the editor flexes. Without this the tabs, the word count and the
      footer all default to flex-shrink: 1, so a growing note squeezed them a
      little further with every line instead of scrolling inside the editor. */
@@ -538,10 +555,6 @@
     opacity: 0.7;
   }
 
-  .note-title svg {
-    flex: none;
-    opacity: 0.8;
-  }
 
   /* A phone's width: the picture button is its icon alone -- "it takes too much
      width" -- and the counts sit closer. */
@@ -693,9 +706,6 @@
       >
         <span class="note-title-text">{noteTitle(noteBlock.content, Math.max(0, noteIndex))}</span>
         {#if noteCount > 1}<span class="note-count">{noteCount}</span>{/if}
-        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
       </button>
       <div class="note-stats">
         <span>Words: {wordCount}</span>
@@ -728,7 +738,7 @@
         on:change={pictureChosen}
       />
     </div>
-    <div class="note-body">
+    <div class="note-body" class:picking={pickerOpen}>
     {#key noteBlock.id}
       <TipTapEditor
         bind:this={noteEditor}
@@ -751,6 +761,7 @@
         currentFolder={fileKey}
         currentNoteId={selectedNoteId}
         loadElsewhere={loadOtherFolderNotes}
+        cardStyle={noteCardStyle}
         on:pick={pickNote}
         on:close={() => (pickerOpen = false)}
       />

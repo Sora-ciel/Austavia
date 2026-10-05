@@ -336,8 +336,8 @@ export async function loadBlocks(name) {
 }
 
 /**
- * A folder's notes -- text blocks, id and writing only -- for Single Note's
- * search page, which lists every folder's.
+ * A folder's notes -- text blocks: id, writing and colours -- for Single
+ * Note's search page, which lists every folder's.
  *
  * Not loadBlocks: that puts every stored piece back, pictures included, and
  * doing it for every folder to show a list of names would turn opening the
@@ -356,7 +356,7 @@ export async function loadFolderNotes(name) {
       const blob = await db.get(FILE_STORE_NAME, ref.key);
       if (blob) content = await blob.text();
     }
-    notes.push({ id: block.id, content });
+    notes.push({ id: block.id, content, bgColor: block.bgColor, textColor: block.textColor });
   }
   return notes;
 }

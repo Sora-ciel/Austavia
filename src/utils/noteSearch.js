@@ -17,7 +17,13 @@
  *
  * What a note is called, which notes a search finds, and in what order: this
  * folder's notes as the folder keeps them, then every other folder's, grouped
- * by folder in name order. The page itself (NotePicker.svelte) only draws it.
+ * by folder in name order -- each folder a heading with its notes under it,
+ * and a folder with none not shown at all ("it'll show easier for people which
+ * note is where", 2026-10-05). The page itself (NotePicker.svelte) only draws
+ * it.
+ *
+ * Each entry also carries what its card is drawn with: the note's own colours,
+ * and the last picture in it, shown beside the text -- asked for the same day.
  */
 import { htmlToText } from './htmlToText.js';
 
@@ -37,6 +43,12 @@ function snippetOf(text) {
   return rest.length > SNIPPET_LENGTH ? `${rest.slice(0, SNIPPET_LENGTH)}…` : rest;
 }
 
+/** The last picture in a note's writing, or null. The newest one is the likeliest to say what it is. */
+export function lastPicture(content) {
+  const sources = [...String(content || '').matchAll(/<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi)].map(m => m[1]);
+  return sources.length ? sources[sources.length - 1] : null;
+}
+
 function entriesOf(notes = [], folder = '') {
   return (notes || []).map((note, index) => {
     const text = htmlToText(note?.content || '');
@@ -45,6 +57,9 @@ function entriesOf(notes = [], folder = '') {
       folder,
       title: noteTitle(note?.content, index),
       snippet: snippetOf(text),
+      picture: lastPicture(note?.content),
+      bgColor: note?.bgColor || null,
+      textColor: note?.textColor || null,
       text: text.toLowerCase()
     };
   });
@@ -68,7 +83,8 @@ export function searchNotes({ currentFolder = '', here = [], elsewhere = [], que
   const inOthers = [...(elsewhere || [])]
     .filter(group => group && group.folder !== currentFolder)
     .sort((a, b) => String(a.folder).localeCompare(String(b.folder)))
-    .flatMap(group => entriesOf(group.notes, group.folder).filter(matches).map(strip));
+    .map(group => ({ folder: group.folder, notes: entriesOf(group.notes, group.folder).filter(matches).map(strip) }))
+    .filter(group => group.notes.length > 0);
 
   return { here: inThisFolder, elsewhere: inOthers };
 }

@@ -16,6 +16,11 @@
   export let currentNoteId = null;
   /** Every other folder's notes: async () => [{ folder, notes }]. */
   export let loadElsewhere = async () => [];
+  /**
+   * A card's colours from its note's: (entry) => css variables. Single Note
+   * draws each card the way it draws that note, theme opacity included.
+   */
+  export let cardStyle = () => '';
 
   const dispatch = createEventDispatcher();
 
@@ -26,6 +31,11 @@
 
   $: results = searchNotes({ currentFolder, here: notes, elsewhere, query });
   $: nothingFound = !results.here.length && !results.elsewhere.length && !loadingElsewhere;
+  // A picture that will not load is simply left out of its card.
+  let brokenPictures = new Set();
+  function pictureFailed(src) {
+    brokenPictures = new Set([...brokenPictures, src]);
+  }
 
   onMount(async () => {
     await tick();
@@ -74,9 +84,19 @@
 
   <div class="picker-list">
     {#each results.here as entry (entry.id)}
-      <button class="picker-note" class:current={entry.id === currentNoteId} on:click={() => pick(entry)}>
-        <span class="picker-title">{entry.title}</span>
-        {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
+      <button
+        class="picker-note"
+        class:current={entry.id === currentNoteId}
+        style={cardStyle(entry)}
+        on:click={() => pick(entry)}
+      >
+        <span class="picker-words">
+          <span class="picker-title">{entry.title}</span>
+          {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
+        </span>
+        {#if entry.picture && !brokenPictures.has(entry.picture)}
+          <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+        {/if}
       </button>
     {/each}
 
@@ -90,12 +110,23 @@
       <div class="picker-quiet">Looking through the other folders…</div>
     {/if}
 
-    {#each results.elsewhere as entry (`${entry.folder}/${entry.id}`)}
-      <button class="picker-note" on:click={() => pick(entry)}>
-        <span class="picker-title">{entry.title}</span>
-        <span class="picker-folder">{entry.folder}</span>
-        {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
-      </button>
+    <!-- One heading per folder, its notes under it -- "it'll show easier for
+         people which note is where". A folder with none is not listed. -->
+    {#each results.elsewhere as group (group.folder)}
+      <section class="picker-folder-group" aria-label={group.folder}>
+        <h3 class="picker-folder">{group.folder}</h3>
+        {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
+          <button class="picker-note" style={cardStyle(entry)} on:click={() => pick(entry)}>
+            <span class="picker-words">
+              <span class="picker-title">{entry.title}</span>
+              {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
+            </span>
+            {#if entry.picture && !brokenPictures.has(entry.picture)}
+              <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+            {/if}
+          </button>
+        {/each}
+      </section>
     {/each}
 
     {#if nothingFound}
@@ -105,18 +136,20 @@
 </div>
 
 <style>
-  /* Over the note, below the title row: the mode's own surface and writing,
-     so it is part of the page rather than a dialog on top of it. */
+  /* Over the note, below the title row, and see-through: Single Note hides the
+     note underneath while this is open, so what shows behind is the page's
+     own background -- the theme's opacity and the wallpaper through it, as
+     the note has them (asked for on 2026-10-05). */
   .note-picker {
-    --sb-thumb: var(--mode-text-color, #ffffff);
-    --sb-track: var(--active-note-bg, var(--canvas-inner-bg, #000000));
+    --sb-thumb: var(--active-note-text, var(--mode-text-color, #ffffff));
+    --sb-track: transparent;
     position: absolute;
     inset: 0;
     z-index: 5;
     display: flex;
     flex-direction: column;
-    background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
-    color: var(--mode-text-color, #ffffff);
+    background: transparent;
+    color: var(--active-note-text, var(--mode-text-color, #ffffff));
   }
 
   .picker-head {
@@ -170,29 +203,41 @@
     gap: 4px;
   }
 
+  /* A card in its note's own colours (cardStyle), with the note's last
+     picture on the right. */
   .picker-note {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: baseline;
-    column-gap: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
     text-align: left;
     font: inherit;
-    color: inherit;
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 8px 10px;
+    color: var(--card-text, inherit);
+    background: var(--card-bg, color-mix(in srgb, currentColor 6%, transparent));
+    border: 1px solid color-mix(in srgb, var(--card-text, currentColor) 22%, transparent);
+    border-radius: 10px;
+    padding: 6px 6px 6px 12px;
     cursor: pointer;
+    text-shadow: inherit;
   }
 
   .picker-note:hover,
   .picker-note:focus-visible {
-    background: color-mix(in srgb, currentColor 8%, transparent);
+    border-color: color-mix(in srgb, var(--card-text, currentColor) 55%, transparent);
     outline: none;
   }
 
   .picker-note.current {
-    border-color: color-mix(in srgb, currentColor 35%, transparent);
+    border-color: var(--card-text, currentColor);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-text, currentColor) 45%, transparent);
+  }
+
+  .picker-words {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .picker-title {
@@ -202,19 +247,35 @@
     white-space: nowrap;
   }
 
-  .picker-folder {
-    font-size: 0.75rem;
-    opacity: 0.65;
-    white-space: nowrap;
-  }
-
   .picker-snippet {
-    grid-column: 1 / -1;
     font-size: 0.8rem;
-    opacity: 0.65;
+    opacity: 0.7;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .picker-picture {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 7px;
+  }
+
+  .picker-folder-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .picker-folder {
+    margin: 4px 2px 2px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    opacity: 0.8;
   }
 
   .picker-separator {
