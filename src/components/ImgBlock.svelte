@@ -29,6 +29,12 @@
   let size = { ...initialSize };
   let bgColor = initialBgColor;
   let textColor = initialTextColor || '#000000';
+  // Followed, not only taken once: a theme repaints blocks by changing these,
+  // and a block that only read them when it was built had to be rebuilt to
+  // show it -- which made text blocks with pictures jump on every theme change
+  // (2026-10-05). See utils/blockVersions.js.
+  $: bgColor = initialBgColor;
+  $: textColor = initialTextColor || '#000000';
   let src = initialSrc;
   let resolvedSrc = initialResolvedSrc;
   let attachmentRequiresAuth = initialAttachmentRequiresAuth;

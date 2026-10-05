@@ -17,6 +17,10 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Blocks that do not jump.** On the canvas, with a text block holding pictures scrolled half way: tick a task, change a clock setting, change theme (with "blocks follow the theme" on) -- the note should not move at all, and nothing else on the canvas should flicker or reload (an embedded video keeps playing). Undo and a mode switch still rebuild the block: it may show lower lines for a moment while pictures load, then must settle exactly where it was, not further down. |
+| next | **Clicking into a scrolled note.** Scroll a note with pictures down, click another block, then click once low in the note: the caret goes where you clicked and the note stays put. Click in the space between two paragraphs or beside a picture: the same, never a jump to the top. Worth trying in Single Note too, where a short note should still be clickable all the way down the page. |
+| next | **Single Note's "+ Text".** With notes already there, it adds a note and opens it on its own tab; choosing another tab afterwards stays chosen. |
+| next | **The timer panel's pop-up switch**, on the Windows app: in the toolbar timer's panel, a small window icon with On or Off, the same height as the other buttons, on one line. The panel opens under the hourglass even on a narrow window. |
 | next | **The timer on the toolbar**, on a computer: start a timer on a clock block and an hourglass button, drawn like Bg, appears just before the mini player (or where it would be), in every mode. Pressing it opens a panel under it with pause/resume, +1 and the loop-arrow Stop (and on Windows the pop-up On/Off switch); Stop leaves it in the panel with a Start button until the panel closes; a click anywhere else closes it. Two timers: the one ending soonest shows. A ringing one blinks "Time's up". It should vanish once no timer is in use, and never show on a phone-sized window. |
 | next | **The timer in the Android notification shade**, instead of the toolbar. Start a timer: a quiet notification says "Timer", "Ends at 14:32", with Android's own countdown, and Pause/Resume, +1 min and Stop. Each button should change the timer in the app, and the other way round. Lock the phone past the end with the app in the background: "Time's up" should arrive with sound and vibration -- possibly a little late on an idle phone, because the alarm is inexact (an exact one needs a permission). With the app in front it rings in the app and the notification changes silently. **Known gap:** with the app swiped away and its process gone, Pause and +1 on the notification do nothing and Stop only removes the notification -- the timer itself lives in the app's storage, so it is still running when the app is next opened. The first time, Android should ask for the notification permission. |
 | next | **Timer pop-up, back to one row.** 195×48: the time (a touch bigger than 0.8.656's) and the icon buttons on one row, about 20px apart at "59:59" and more below ten minutes; an hour or more reads "1h 05", without seconds, the label line with × above; "Timer · 5:00" only while it is not running. The two-column 200px layout of 0.8.657 is gone. **And it stays out of the way while Austavia is in front**: with the main window focused, no pop-up; click another app (or minimise) and it comes back where it was dragged to, within a second. A hidden or kept pop-up should still be hidden or kept after going in and out. Also the **Bg** button: no colour change while its panel is open, and a click outside closes it; in Single Note, "pictures follow these" is unchecked on a folder that never ticked it. |
@@ -284,6 +288,23 @@ speculatively — wait for a report that says so.
   worth showing again. Untested, and worth re-checking after the editor's height
   is restructured rather than chased on its own. Coalescing the update handler
   did not touch the layout, so it will not have fixed this.
+
+- **A rebuilt note still shows the wrong lines for a moment while its pictures
+  load.** Since 2026-10-05 a block is only rebuilt when something changed it
+  behind its back (`utils/blockVersions.js`), and a theme change or a ticked task
+  rebuilds nothing -- so this is now an undo, a mode switch, a sync bringing
+  the note in. On those, the editor puts the scroll back before the pictures
+  have a height, so until they load the reader sees lines further down; the
+  hold (`utils/scrollHold.js`) then puts them back exactly once the pictures
+  arrive -- measured: 1200 -> "Line 23" for 600ms with deliberately slowed
+  pictures, then back to "Line 16". Before the hold it ended at 1837, the wrong
+  place, for good. The real fix is giving pictures their size before they
+  load: store `width`/`height` on the image node when a picture is put in (the
+  Image extension can carry attributes), and old notes fill theirs in on first
+  load. That changes stored content and so syncs -- do it with item 2, pictures
+  by reference, rather than on its own. Hiding the writing until the pictures
+  load was considered and rejected: a blank flash on every rebuild is worse
+  than a short wrong one on some.
 
 - **Canvas pan and the column-list scroll are not remembered.** `scrollMemory.js`
   already has `modeSurfaceKey` for exactly this; only notes and text blocks are

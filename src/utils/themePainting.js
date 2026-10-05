@@ -60,8 +60,9 @@ function painted(block, colors) {
     _themedBgColor: colors.bgColor,
     _themedTextColor: colors.textColor,
     bgColor: colors.bgColor,
-    textColor: colors.textColor,
-    _version: (block._version || 0) + 1
+    textColor: colors.textColor
+    // No new _version: blocks follow their colours live, so a repaint is not
+    // a rebuild (2026-10-05) -- see utils/blockVersions.js.
   };
 }
 

@@ -63,6 +63,12 @@
   let size = { ...initialSize };
   let bgColor = initialBgColor;
   let textColor = initialTextColor;
+  // Followed, not only taken once: a theme repaints blocks by changing these,
+  // and a block that only read them when it was built had to be rebuilt to
+  // show it -- which made text blocks with pictures jump on every theme change
+  // (2026-10-05). See utils/blockVersions.js.
+  $: bgColor = initialBgColor;
+  $: textColor = initialTextColor;
 
   let dragging = false;
   let resizing = false;
@@ -204,9 +210,13 @@
     if (!pointIsInside({ x: clientX, y: clientY }, editorEl.getBoundingClientRect())) return;
 
     const at = editor.view.posAtCoords({ left: clientX, top: clientY });
-    const chain = editor.chain().focus();
-    if (typeof at?.pos === 'number') chain.setTextSelection(at.pos);
-    chain.run();
+    // Nowhere to put it: focus without moving, rather than let focus() scroll
+    // to wherever the caret was last -- the top, for a note never clicked in.
+    if (typeof at?.pos !== 'number') {
+      editor.commands.focus(null, { scrollIntoView: false });
+      return;
+    }
+    editor.chain().focus(null, { scrollIntoView: false }).setTextSelection(at.pos).run();
   }
 
   function handleClick(event) {

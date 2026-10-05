@@ -59,9 +59,14 @@ test('the original colour is never overwritten by a second theme', () => {
   assert.equal(out._themedBgColor, OTHER.bgColor, 'the stamp follows the new theme');
 });
 
-test('painting bumps the version, so a block that caches its colours redraws', () => {
+// This used to be the opposite -- "painting bumps the version, so a block that
+// caches its colours redraws". Changed on purpose on 2026-10-05: a rebuild made
+// text blocks with pictures jump on every theme change, so blocks now follow
+// their colours live (test/block-versions.test.js checks they do) and a
+// repaint leaves the version alone.
+test('painting does not rebuild a block -- its colours are followed live', () => {
   const [out] = paintAll([block({ _version: 3 })], THEME);
-  assert.equal(out._version, 4);
+  assert.equal(out._version, 3);
 });
 
 // ── the pass that runs when the blocks change ─────────────────────

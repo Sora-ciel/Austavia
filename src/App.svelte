@@ -12,6 +12,7 @@
   import AlarmRinger from './components/AlarmRinger.svelte';
   import ClockPopupWindows from './components/ClockPopupWindows.svelte';
   import TimerChip from './components/TimerChip.svelte';
+  import { blockState, remountOnlyChanged, restoredVersions } from './utils/blockVersions.js';
   import { THEME_KEY as POPUP_THEME_KEY } from './utils/clockPopups.js';
   import {
     saveBlocks,
@@ -2288,8 +2289,8 @@
       const restored = {
         ...block,
         bgColor: block._baseBgColor,
-        textColor: block._baseTextColor,
-        _version: (block._version || 0) + 1
+        textColor: block._baseTextColor
+        // No new _version: blocks follow their colours live.
       };
       delete restored._baseBgColor;
       delete restored._baseTextColor;
@@ -3128,6 +3129,23 @@
   // --- Undo/Redo history ---
   let history = [];
   let historyIndex = -1;
+
+  // What each block's component is showing, as blockState -- so a history
+  // step rebuilds only the blocks that are out of date rather than all of
+  // them. See utils/blockVersions.js.
+  const shownBlocks = new Map();
+  function markShown(blockList) {
+    for (const block of blockList || []) {
+      if (block?.id) shownBlocks.set(block.id, blockState(block));
+    }
+  }
+  // A block that appears without a history step -- a folder opened, a block
+  // arriving by sync -- is built from what is stored, so that is what it
+  // shows. Only ids not seen yet: one already recorded keeps its record until
+  // something says otherwise.
+  $: for (const block of blocks || []) {
+    if (block?.id && !shownBlocks.has(block.id)) shownBlocks.set(block.id, blockState(block));
+  }
   let hasUnsnapshottedChanges = false;
 
   async function ensureCurrentHistorySnapshot() {
@@ -3348,7 +3366,11 @@
 
 
   async function pushHistory(newBlocks, newOrders = modeOrders, options = {}) {
-    const stateSnapshot = cloneState(newBlocks, newOrders, { bumpVersion: true });
+    // Only the blocks whose component is out of date get a new version, and so
+    // a rebuild: ticking a task used to rebuild every block on the canvas, and
+    // text blocks with pictures jumped each time (2026-10-05).
+    const stateSnapshot = cloneState(remountOnlyChanged(newBlocks, shownBlocks), newOrders, { bumpVersion: false });
+    markShown(stateSnapshot.blocks);
     const snapshot = JSON.stringify(stateSnapshot);
 
     if (historyIndex >= 0 && history[historyIndex] === snapshot) {
@@ -3403,16 +3425,15 @@
       blocks.map(block => [block.id, block._version || 0])
     );
 
-    return snapshotBlocksRaw.map(block => {
-      const currentVersion = currentVersionById.get(block.id) || 0;
-      const restoredVersion = Math.max((block._version || 0) + 1, currentVersion + 1);
-      return {
-        ...block,
-        _version: restoredVersion,
-        position: { ...block.position },
-        size: { ...block.size }
-      };
-    });
+    // Rebuilt only where what comes back differs from what is shown -- see
+    // utils/blockVersions.js.
+    const restored = restoredVersions(snapshotBlocksRaw, currentVersionById, shownBlocks).map(block => ({
+      ...block,
+      position: { ...block.position },
+      size: { ...block.size }
+    }));
+    markShown(restored);
+    return restored;
   }
 
   async function undo() {
@@ -4087,6 +4108,11 @@
     const newBlocks = blocks.map((block, index) =>
       index === idx ? updatedBlock : block
     );
+
+    // The block reported this change itself, so it is already showing it --
+    // unless it asked to be rebuilt, or was already out of date before it (a
+    // change made behind its back is still waiting for its rebuild).
+    if (!bumpVersion && shownBlocks.get(id) === blockState(existing)) markShown([updatedBlock]);
 
     if (shouldSnapshot) {
       blocks = [...newBlocks];

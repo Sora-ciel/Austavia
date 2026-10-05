@@ -17,6 +17,7 @@
     syncTextHistory
   } from '../utils/textHistory.js';
   import { createUpdateCoalescer } from '../utils/editorUpdates.js';
+  import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -829,6 +830,7 @@
     // one landing mid-word would have taken the word with it.
     updates.flush();
     updates.stop();
+    releasePlace();
     separatorWatcher?.disconnect();
     window.removeEventListener('resize', fitSeparators);
     editor?.destroy();
@@ -905,6 +907,7 @@
 
     if (wrapEl.scrollHeight - wrapEl.clientHeight >= pendingScroll) {
       wrapEl.scrollTop = pendingScroll;
+      holdPlace(pendingScroll);
       pendingScroll = 0;
       return;
     }
@@ -912,6 +915,65 @@
     pendingTries -= 1;
     if (pendingTries > 0) scheduleRestore();
     else pendingScroll = 0;
+  }
+
+  /**
+   * Holds the reader where they were put back while the writing settles --
+   * pictures arriving give it height after the position was set, and every
+   * line below them moves. See utils/scrollHold.js.
+   *
+   * Two things, both needed:
+   *
+   * - **The browser's scroll anchoring is off for the hold.** Left on, it
+   *   keeps whichever line was on screen in place as a picture above it grows
+   *   -- and that line is the wrong one, since the position was set with the
+   *   pictures missing. Measured: put back to 1200, a picture arriving moved
+   *   it to 1837.
+   * - **Each picture arriving puts the position back.** Its load event, caught
+   *   on the way down, since it does not bubble. No size observer: the
+   *   writing's own box is held to the scroller's height and never changes
+   *   size, so one would never fire.
+   */
+  let holdTarget = 0;
+  let holdUntil = 0;
+  let holdReleased = true;
+
+  function holdPlace(target) {
+    releasePlace();
+    if (!wrapEl) return;
+    holdTarget = target;
+    holdUntil = Date.now() + HOLD_MS;
+    holdReleased = false;
+    wrapEl.style.overflowAnchor = 'none';
+    wrapEl.addEventListener('load', keepPlace, true);
+    wrapEl.addEventListener('error', keepPlace, true);
+    setTimeout(() => { if (Date.now() >= holdUntil) releasePlace(); }, HOLD_MS + 50);
+  }
+
+  function keepPlace() {
+    if (!wrapEl) return;
+    const now = Date.now();
+    if (holdReleased || now > holdUntil) return releasePlace();
+    const top = heldScrollTop({
+      target: holdTarget,
+      until: holdUntil,
+      now,
+      room: wrapEl.scrollHeight - wrapEl.clientHeight,
+      released: holdReleased
+    });
+    if (top !== null && Math.abs(wrapEl.scrollTop - top) > 1) wrapEl.scrollTop = top;
+  }
+
+  // The reader doing anything themselves ends the hold -- their scroll is
+  // theirs.
+  function releasePlace() {
+    if (holdReleased) return;
+    holdReleased = true;
+    holdTarget = 0;
+    if (!wrapEl) return;
+    wrapEl.style.overflowAnchor = '';
+    wrapEl.removeEventListener('load', keepPlace, true);
+    wrapEl.removeEventListener('error', keepPlace, true);
   }
 
   function onScroll() {
@@ -1000,7 +1062,18 @@
      and gets native/ProseMirror click-to-position instead of falling back
      to a plain (and imprecise) editor.commands.focus() on the outer wrap. */
   :global(.tiptap-inner) {
-    flex: 1 1 auto;
+    /* As tall as the writing, never squeezed to the block's height.
+     *
+     * It was `1 1 auto`, and the min-height below, being explicit, switched
+     * off the floor a flex item normally has at its content -- so the editor
+     * shrank to the scroller and its writing overflowed it. Scrolled down, the
+     * editor's own box sat above the visible part: a click on a gap between
+     * paragraphs landed on the scroller, whose fallback focus scrolled to a
+     * caret at the top, and the first click into an unfocused note fell
+     * outside the box and placed no caret at all. Reported on 2026-10-05:
+     * "it just scrolls all the way up and puts a caret up when I clicked a
+     * lot lower". */
+    flex: 1 0 auto;
     /* Contains the floated pictures. This is the clearfix that used to sit
        after the text, without the empty block at the end of the content. */
     display: flow-root;
@@ -1182,6 +1255,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="tiptap-wrap" class:tiptap-inline={variant === 'inline'} bind:this={wrapEl} on:scroll={onScroll}
-  on:click={() => editor?.commands.focus()}>
+  on:wheel|passive={releasePlace} on:touchstart|passive={releasePlace} on:pointerdown={releasePlace} on:keydown={releasePlace}
+  on:click={() => editor?.commands.focus(null, { scrollIntoView: false })}>
   <div class="tiptap-mount" bind:this={element}></div>
 </div>
