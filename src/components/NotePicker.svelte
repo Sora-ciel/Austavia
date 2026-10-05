@@ -287,9 +287,11 @@
          name, and its notes on top with no background of their own. Asked
          for on 2026-10-05: "easier to see and cleaner". -->
     {#if results.here.length}
-      <!-- This folder's own notes: no category background -- the mode's own
-           shows through, which is already this folder's (2026-10-05). -->
-      <section class="picker-folder-group" aria-label={currentFolder}>
+      <!-- This folder's notes, framed like any other folder's, over its own
+           wallpaper. It went without for a while, when the page itself showed
+           the open folder's wallpaper; once the page became the theme's plain
+           colour, it was asked to match the others (2026-10-05). -->
+      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper)}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{currentFolder}</h3>
         {#each results.here as entry (entry.id)}
