@@ -1,6 +1,8 @@
 <script>
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
+  import NotePicker from '../components/NotePicker.svelte';
+  import { noteTitle } from '../utils/noteSearch.js';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import { surfaceColors, drawnSurface } from '../utils/modeSurface.js';
@@ -23,8 +25,14 @@
 
   export let blocks = [];
   export let focusedBlockId = null;
-  /** A note to open once it is there -- the one just added. See noteToOpen. */
+  /**
+   * A note to open once it is there -- the one just added, or one picked from
+   * another folder on the search page. `{ id, at }`: the time makes each
+   * request its own, so asking for the same note twice opens it twice.
+   */
   export let openNoteId = null;
+  /** Every other folder's notes, for the search page: async () => [{ folder, notes }]. */
+  export let loadOtherFolderNotes = async () => [];
   export let canvasColors = {};
   export let canvasRef;
   /** The open file's name, used only to remember which note was last read. */
@@ -269,12 +277,34 @@
     });
   }
 
-  let openedOnRequest = null;
-  $: openRequested(noteToOpen({ notes: noteBlocks, requested: openNoteId, consumed: openedOnRequest }));
-  function openRequested(id) {
+  let handledRequestAt = null;
+  $: openRequested(openNoteId, noteBlocks);
+  function openRequested(request) {
+    const id = request?.id ?? null;
+    const target = noteToOpen({
+      notes: noteBlocks,
+      requested: id,
+      consumed: request && request.at === handledRequestAt ? id : null
+    });
+    if (!target) return;
+    selectedNoteId = target;
+    handledRequestAt = request.at;
+  }
+
+  // The search page, opened from the note's title -- see utils/noteSearch.js.
+  let pickerOpen = false;
+  $: noteIndex = noteBlocks.findIndex(block => block.id === selectedNoteId);
+
+  function pickNote(event) {
+    const { folder, id } = event.detail || {};
+    pickerOpen = false;
     if (!id) return;
-    selectedNoteId = id;
-    openedOnRequest = id;
+    if (!folder || folder === fileKey) {
+      selectedNoteId = id;
+      return;
+    }
+    // Another folder: App opens it, then hands the note back as openNoteId.
+    dispatch('openNote', { folder, id });
   }
 
   $: rememberOpenNote(selectedNoteId, fileKey);
@@ -324,21 +354,7 @@
   // jump away and come back the first time it was touched.
 
 
-  function getNoteLabel(block, index) {
-    const content = htmlToText(block?.content || '');
-    const firstLine = content.split('\n')[0]?.trim();
-    if (firstLine) {
-      const trimmed = firstLine.length > 28 ? `${firstLine.slice(0, 28)}…` : firstLine;
-      return trimmed;
-    }
-    return `Note ${index + 1}`;
-  }
 
-  function getTabStyle(block) {
-    const bg = block?.bgColor || canvasTheme.outerBg;
-    const text = block?.textColor || getReadableTextColor(bg);
-    return `--tab-bg: ${bg}; --tab-text: ${text};`;
-  }
 </script>
 
 <style>
@@ -373,43 +389,6 @@
     transition: scrollbar-color 0.35s ease;
   }
 
-  .note-tabs {
-    display: flex;
-    gap: 8px;
-    padding: 4px 6px 4px;
-    overflow-x: auto;
-    /* A scrollbar in this strip would add to its height and make the row
-       jump the moment the tabs overflow. Swipe/drag it instead. */
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .note-tabs::-webkit-scrollbar { display: none; }
-
-  .note-tab {
-    /* Flex items shrink by default, so with several tabs the box narrowed
-       while nowrap kept the label full width — the text spilled out past the
-       tab's own background. Never shrink below the label. */
-    flex: 0 0 auto;
-    border: 1px solid color-mix(in srgb, var(--tab-text, #ffffff) 50%, transparent);
-    background: color-mix(in srgb, var(--tab-bg, #000000) 88%, #000000 12%);
-    color: var(--tab-text, inherit);
-    padding: 6px 12px;
-    border-radius: 9px;
-    font-size: 0.85rem;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-
-  .note-tab[aria-selected='true'] {
-    border-color: var(--tab-text);
-    background: var(--tab-bg, rgba(255, 255, 255, 0.12));
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-text, #ffffff) 55%, transparent);
-  }
-
-  .note-tab:focus-visible {
-    outline: 2px solid rgba(255, 255, 255, 0.7);
-    outline-offset: 2px;
-  }
 
   /* Per-file background image sitting behind the text */
   /* Crops the oversized blurred layer back to the note's bounds. */
@@ -463,15 +442,21 @@
   .single-note :global(.tiptap-inner img) {
     filter: var(--note-image-filter);
   }
-  .single-note > .note-tabs,
   .single-note > .note-meta,
-  .single-note > :global(.tiptap-wrap),
+  .single-note > .note-body,
   .single-note > .note-footer { position: relative; z-index: 1; }
+
+  /* The writing, with room over it for the search page. */
+  .note-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
 
   /* Only the editor flexes. Without this the tabs, the word count and the
      footer all default to flex-shrink: 1, so a growing note squeezed them a
      little further with every line instead of scrolling inside the editor. */
-  .single-note > .note-tabs,
   .single-note > .note-meta,
   .single-note > .note-footer { flex: 0 0 auto; }
 
@@ -486,10 +471,11 @@
      trimmed to match rather than left to hold the row open on its own. */
   .note-meta {
     display: flex;
-    flex-wrap: wrap;
+    /* One line, always: the name gives up width before anything wraps. */
+    flex-wrap: nowrap;
     gap: 12px;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     width: 100%;
     padding: 3px 12px;
     box-sizing: border-box;
@@ -503,6 +489,67 @@
     font-size: 0.85rem;
     letter-spacing: 0.02em;
     color: inherit;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  /* The picture button keeps to the right-hand end. */
+  .note-meta > .note-picture {
+    margin-left: auto;
+  }
+
+  /* Drawn as the picture button is: the note's own writing colour, and a tint
+     of it for the surface. */
+  .note-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 50%;
+    min-height: 28px;
+    padding: 3px 10px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    color: inherit;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .note-title:hover,
+  .note-title.open {
+    background: color-mix(in srgb, currentColor 18%, transparent);
+  }
+
+  .note-title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .note-count {
+    flex: none;
+    font-size: 0.72rem;
+    font-weight: 500;
+    opacity: 0.7;
+  }
+
+  .note-title svg {
+    flex: none;
+    opacity: 0.8;
+  }
+
+  /* A phone's width: the picture button is its icon alone -- "it takes too much
+     width" -- and the counts sit closer. */
+  @media (max-width: 768px) {
+    .note-meta { gap: 8px; padding-inline: 8px; }
+    .note-stats { gap: 8px; font-size: 0.8rem; }
+    .note-picture-label { display: none; }
+    .note-picture { padding: 3px 7px; }
   }
 
   .note-stats span {
@@ -632,24 +679,24 @@
     </div>
   {/if}
   {#if noteBlock}
-    {#if noteCount > 1}
-      <div class="note-tabs" role="tablist" aria-label="Notes">
-        {#each noteBlocks as block, index (block.id)}
-          <button
-            class="note-tab"
-            role="tab"
-            aria-selected={block.id === selectedNoteId}
-            style={getTabStyle(block)}
-            on:click={() => {
-              selectedNoteId = block.id;
-            }}
-          >
-            {getNoteLabel(block, index)}
-          </button>
-        {/each}
-      </div>
-    {/if}
     <div class="note-meta">
+      <!-- The note's name, on the same line as the counts: it replaces the row
+           of tabs that used to sit above, and opens the search page. Asked for
+           on 2026-10-05, "so that space is only one line height instead of two". -->
+      <button
+        class="note-title"
+        class:open={pickerOpen}
+        title="Find a note"
+        aria-haspopup="dialog"
+        aria-expanded={pickerOpen}
+        on:click={() => (pickerOpen = !pickerOpen)}
+      >
+        <span class="note-title-text">{noteTitle(noteBlock.content, Math.max(0, noteIndex))}</span>
+        {#if noteCount > 1}<span class="note-count">{noteCount}</span>{/if}
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
       <div class="note-stats">
         <span>Words: {wordCount}</span>
         <span>Characters: {characterCount}</span>
@@ -671,7 +718,7 @@
           <circle cx="8.5" cy="10.5" r="1.5" fill="currentColor" stroke="none" />
           <path d="M21 16l-5-5L6 19" />
         </svg>
-        Picture
+        <span class="note-picture-label">Picture</span>
       </button>
       <input
         class="note-picture-input"
@@ -681,6 +728,7 @@
         on:change={pictureChosen}
       />
     </div>
+    <div class="note-body">
     {#key noteBlock.id}
       <TipTapEditor
         bind:this={noteEditor}
@@ -695,6 +743,19 @@
         on:focus={() => ensureFocus(noteBlock.id)}
       />
     {/key}
+    <!-- Over the note rather than instead of it, so the note keeps its place
+         and its caret while somebody looks for another one. -->
+    {#if pickerOpen}
+      <NotePicker
+        notes={noteBlocks}
+        currentFolder={fileKey}
+        currentNoteId={selectedNoteId}
+        loadElsewhere={loadOtherFolderNotes}
+        on:pick={pickNote}
+        on:close={() => (pickerOpen = false)}
+      />
+    {/if}
+    </div>
 
     <div class="note-footer" class:keyboard-open={keyboardOpen}>
       <button on:click={() => deleteBlock(noteBlock.id)} aria-label="Delete note">

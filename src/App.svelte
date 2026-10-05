@@ -17,6 +17,7 @@
   import {
     saveBlocks,
     loadBlocks,
+    loadFolderNotes,
     deleteBlocks,
     listSavedBlocks,
     loadMusicTrack,
@@ -3679,8 +3680,23 @@
 
   // --- Block operations ---
   // The note Single Note should open once it is there: the one just added
-  // from its menu. See noteToOpen in utils/lastNote.js.
+  // from its menu, or one picked from another folder on its search page. See
+  // noteToOpen in utils/lastNote.js.
   let singleNoteToOpen = null;
+
+  /** Every other folder's notes, writing only -- for Single Note's search page. */
+  async function listOtherFolderNotes() {
+    const names = (savedList || []).filter(name => name && name !== currentSaveName);
+    return Promise.all(names.map(async folder => ({ folder, notes: await loadFolderNotes(folder) })));
+  }
+
+  /** A note picked in another folder: open that folder, then that note. */
+  async function openNoteInFolder(event) {
+    const { folder, id } = event.detail || {};
+    if (!folder || !id || !savedList.includes(folder)) return;
+    if (folder !== currentSaveName) await load(folder);
+    singleNoteToOpen = { id, at: Date.now() };
+  }
 
   function addBlock(type = "text") {
     // Single Note holds only notes, and as many as you like -- it shows them
@@ -3715,7 +3731,7 @@
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
     pushHistory(blocks, modeOrders);
-    if (mode === "single") singleNoteToOpen = newBlock.id;
+    if (mode === "single") singleNoteToOpen = { id: newBlock.id, at: Date.now() };
   }
 
   // ── Screenshot the whole canvas ───────────────────────────────────
@@ -6993,6 +7009,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {simpleNoteColumnCount}
       {singleNoteSettings}
       openNoteId={singleNoteToOpen}
+      loadOtherFolderNotes={listOtherFolderNotes}
+      on:openNote={openNoteInFolder}
       {keyboardOpen}
       {taskAddDirection}
       {habits}

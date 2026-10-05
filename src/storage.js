@@ -335,6 +335,32 @@ export async function loadBlocks(name) {
   return await hydratePayload(db, localPayload || []);
 }
 
+/**
+ * A folder's notes -- text blocks, id and writing only -- for Single Note's
+ * search page, which lists every folder's.
+ *
+ * Not loadBlocks: that puts every stored piece back, pictures included, and
+ * doing it for every folder to show a list of names would turn opening the
+ * search into reading the whole account. Only a note's own writing is read
+ * here; a picture stored beside it is never touched.
+ */
+export async function loadFolderNotes(name) {
+  const db = await getDB();
+  const payload = asPayloadWithTimestamp((await db.get(STORE_NAME, name)) || []);
+  const notes = [];
+  for (const block of payload.blocks || []) {
+    if (block?.type !== 'text' && block?.type !== 'cleantext') continue;
+    let content = typeof block.content === 'string' ? block.content : '';
+    const ref = block.__fileRefs?.content;
+    if (ref?.key && ref.encoding !== 'binary') {
+      const blob = await db.get(FILE_STORE_NAME, ref.key);
+      if (blob) content = await blob.text();
+    }
+    notes.push({ id: block.id, content });
+  }
+  return notes;
+}
+
 export async function deleteBlocks(name) {
   const db = await getDB();
   await db.delete(STORE_NAME, name);

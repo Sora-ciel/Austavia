@@ -31,6 +31,8 @@
   export let singleNoteSettings = {};
   /** Single Note opens this note once it is there -- the one just added. */
   export let openNoteId = null;
+  /** Every other folder's notes, for Single Note's search page. */
+  export let loadOtherFolderNotes = async () => [];
   /** The on-screen keyboard is up, so anything at the bottom should stand aside. */
   export let keyboardOpen = false;
   // Canvas mode's wallpaper. Same shape as singleNoteSettings; see
@@ -171,7 +173,9 @@
       {keyboardOpen}
       {mayAddPicture}
       {openNoteId}
+      {loadOtherFolderNotes}
       fileKey={openFolder}
+      on:openNote
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}
       on:touchend={onTouchEnd}
