@@ -16,6 +16,7 @@
   import { searchNotes, shelfView } from '../utils/noteSearch.js';
   import { createLongPress } from '../utils/longPress.js';
   import BlockContextMenu from './BlockContextMenu.svelte';
+  import { thumbnail } from '../utils/thumbnails.js';
 
   /** This folder's notes, in the order the mode shows them. */
   export let notes = [];
@@ -32,8 +33,6 @@
   export let hereWallpaper = null;
   /** The notes last opened, newest first: [{ folder, id }]. See recentNotes. */
   export let recentlyOpened = [];
-  /** This folder's picture -- its first -- shown on each of its notes. */
-  export let herePicture = null;
 
   // Which way to show the page, kept on this device.
   const LAYOUT_KEY = 'singleNotePickerLayout';
@@ -56,9 +55,9 @@
   let elsewhere = [];
   let loadingElsewhere = true;
 
-  $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, herePicture, elsewhere, query });
+  $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, elsewhere, query });
   $: nothingFound = !results.here.length && !results.elsewhere.length && !loadingElsewhere;
-  $: view = shelfView({ currentFolder, here: notes, hereWallpaper, herePicture, elsewhere, query, folder: chosenFolder, recentlyOpened });
+  $: view = shelfView({ currentFolder, here: notes, hereWallpaper, elsewhere, query, folder: chosenFolder, recentlyOpened });
   // A chosen folder that the list no longer has goes back to every folder.
   $: keepChosenFolder(view, loadingElsewhere);
   function keepChosenFolder(current, loading) {
@@ -237,7 +236,7 @@
                 {#if entry.snippet}<span class="tile-snippet">{entry.snippet}</span>{/if}
               </span>
               {#if entry.picture && !brokenPictures.has(entry.picture)}
-                <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+                <img class="picker-picture" use:thumbnail={entry.picture} alt="" on:error={() => pictureFailed(entry.picture)} />
               {/if}
             </span>
           </button>
@@ -271,7 +270,7 @@
                 {#if entry.snippet}<span class="tile-snippet">{entry.snippet}</span>{/if}
               </span>
               {#if entry.picture && !brokenPictures.has(entry.picture)}
-                <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+                <img class="picker-picture" use:thumbnail={entry.picture} alt="" on:error={() => pictureFailed(entry.picture)} />
               {/if}
             </span>
           </button>
@@ -309,7 +308,7 @@
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
             </span>
             {#if entry.picture && !brokenPictures.has(entry.picture)}
-              <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+              <img class="picker-picture" use:thumbnail={entry.picture} alt="" on:error={() => pictureFailed(entry.picture)} />
             {/if}
           </button>
         {/each}
@@ -347,7 +346,7 @@
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
             </span>
             {#if entry.picture && !brokenPictures.has(entry.picture)}
-              <img class="picker-picture" src={entry.picture} alt="" loading="lazy" on:error={() => pictureFailed(entry.picture)} />
+              <img class="picker-picture" use:thumbnail={entry.picture} alt="" on:error={() => pictureFailed(entry.picture)} />
             {/if}
           </button>
         {/each}
@@ -705,19 +704,19 @@
     filter: var(--group-wall-filter, none);
   }
 
-  /* The folder's name on a bar across the top of its category, in the
-     toolbar's colours -- its background, opacity included, and its buttons'
-     writing -- so a category's start can't be missed. Asked for on
-     2026-10-05: "it's a little hard to read still", then "the same as the
-     background of the controls, with the same opacity". */
+  /* The folder's name across the top of its category, big and bold, inside
+     the frame. A filled bar in the toolbar's colours was tried on 2026-10-05
+     and its fill taken away the same day; the frame keeps the colour. */
   .picker-folder {
     margin: -8px -10px 6px;
     padding: 6px 12px;
     font-size: 1.15rem;
     font-weight: 800;
     letter-spacing: 0.01em;
-    background: var(--toolbar-bg, #111111);
-    color: var(--toolbar-button-text, #ffffff);
+    /* No fill -- asked for on 2026-10-05; the frame round the category is
+       what keeps the toolbar's colour. The name in the category's writing. */
+    background: transparent;
+    color: var(--group-text, inherit);
     text-shadow: none;
   }
 

@@ -51,28 +51,7 @@ export function lastPicture(content) {
   return sources.length ? sources[sources.length - 1] : null;
 }
 
-/**
- * A folder's picture: the first one in it, in the folder's order -- an
- * image block's, or the first picture in a note's writing, whichever comes
- * first. Every note of the folder shows it on the search page, so a folder
- * keeps one face and is easier to recognise -- asked for on 2026-10-05, in
- * place of each note's own last picture.
- */
-export function firstPicture(blocks = []) {
-  for (const block of blocks || []) {
-    if (!block || typeof block !== 'object') continue;
-    if (block.type === 'image') {
-      const src = block.resolvedSrc || block.src;
-      if (typeof src === 'string' && src) return src;
-    } else if (block.type === 'text' || block.type === 'cleantext') {
-      const match = String(block.content || '').match(/<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/i);
-      if (match) return match[1];
-    }
-  }
-  return null;
-}
-
-function entriesOf(notes = [], folder = '', wallpaper = null, folderPicture = null) {
+function entriesOf(notes = [], folder = '', wallpaper = null) {
   return (notes || []).map((note, index) => {
     const text = htmlToText(note?.content || '');
     return {
@@ -80,8 +59,10 @@ function entriesOf(notes = [], folder = '', wallpaper = null, folderPicture = nu
       folder,
       title: noteTitle(note?.content, index),
       snippet: snippetOf(text),
-      // The folder's picture, the same on every one of its notes.
-      picture: folderPicture,
+      // The note's own last picture. A folder's first picture on every note
+      // was tried on 2026-10-05 and taken back the same day: "honestly I think
+      // we should just go back to it showing the last image".
+      picture: lastPicture(note?.content),
       bgColor: note?.bgColor || null,
       textColor: note?.textColor || null,
       // The folder's wallpaper settings, drawn behind the card so the folder
@@ -134,10 +115,10 @@ function matcher(query) {
 
 const strip = ({ text, ...entry }) => entry;
 
-export function searchNotes({ currentFolder = '', here = [], hereWallpaper = null, herePicture = null, elsewhere = [], query = '' } = {}) {
+export function searchNotes({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '' } = {}) {
   const { matches, order } = matcher(query);
 
-  const inThisFolder = order(entriesOf(here, currentFolder, hereWallpaper, herePicture).filter(matches)).map(strip);
+  const inThisFolder = order(entriesOf(here, currentFolder, hereWallpaper).filter(matches)).map(strip);
 
   const inOthers = [...(elsewhere || [])]
     .filter(group => group && group.folder !== currentFolder)
@@ -146,7 +127,7 @@ export function searchNotes({ currentFolder = '', here = [], hereWallpaper = nul
       folder: group.folder,
       // Drawn behind the whole category, its notes on top of it.
       wallpaper: group.wallpaper || null,
-      notes: order(entriesOf(group.notes, group.folder, group.wallpaper || null, group.picture || null).filter(matches)).map(strip)
+      notes: order(entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches)).map(strip)
     }))
     .filter(group => group.notes.length > 0);
 
@@ -166,13 +147,13 @@ export function searchNotes({ currentFolder = '', here = [], hereWallpaper = nul
  *   (`[{ folder, id }]`), only where they still exist -- shown while nothing
  *   is being searched for and every folder is in view.
  */
-export function shelfView({ currentFolder = '', here = [], hereWallpaper = null, herePicture = null, elsewhere = [], query = '', folder = 'all', recentlyOpened = [] } = {}) {
+export function shelfView({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '', folder = 'all', recentlyOpened = [] } = {}) {
   const groups = [
-    { folder: currentFolder, wallpaper: hereWallpaper, entries: entriesOf(here, currentFolder, hereWallpaper, herePicture), here: true },
+    { folder: currentFolder, wallpaper: hereWallpaper, entries: entriesOf(here, currentFolder, hereWallpaper), here: true },
     ...[...(elsewhere || [])]
       .filter(group => group && group.folder !== currentFolder)
       .sort((a, b) => String(a.folder).localeCompare(String(b.folder)))
-      .map(group => ({ folder: group.folder, wallpaper: group.wallpaper || null, entries: entriesOf(group.notes, group.folder, group.wallpaper || null, group.picture || null), here: false }))
+      .map(group => ({ folder: group.folder, wallpaper: group.wallpaper || null, entries: entriesOf(group.notes, group.folder, group.wallpaper || null), here: false }))
   ].filter(group => group.entries.length > 0);
 
   const folders = groups.map(group => ({ folder: group.folder, count: group.entries.length, wallpaper: group.wallpaper, here: group.here }));

@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { noteTitle, searchNotes, lastPicture, shelfView, firstPicture } from '../src/utils/noteSearch.js';
+import { noteTitle, searchNotes, lastPicture, shelfView } from '../src/utils/noteSearch.js';
 
 const note = (id, content) => ({ id, content });
 
@@ -174,28 +174,15 @@ describe('the shelf and grid', () => {
   });
 });
 
-// Asked for on 2026-10-05: "the image that shows when searching notes ...
-// should be the first image of the folder, so that it will generally stay the
-// same and make it easier to recognise".
-describe("a folder's picture", () => {
-  it('is the first one in the folder: an image block, or a picture in a note, whichever comes first', () => {
-    assert.equal(firstPicture([
-      { type: 'text', content: '<p>no picture</p>' },
-      { type: 'image', src: 'photo.jpg' },
-      { type: 'text', content: '<img src="later.png">' }
-    ]), 'photo.jpg');
-    assert.equal(firstPicture([{ type: 'text', content: '<p>a</p><img src="first.png"><img src="second.png">' }]), 'first.png');
-    assert.equal(firstPicture([{ type: 'clock' }]), null);
-  });
-
-  it('is shown on every note of that folder', () => {
+// Each note shows its own last picture. A folder's first picture on every
+// note was tried and taken back on 2026-10-05: "honestly I think we should
+// just go back to it showing the last image".
+describe("a note's picture", () => {
+  it('is its own last one, not its folder\'s', () => {
     const result = searchNotes({
       currentFolder: 'Notes',
-      here: [{ id: 'a', content: '<p>A</p><img src="own.png">' }, { id: 'b', content: '<p>B</p>' }],
-      herePicture: 'folder.png',
-      elsewhere: [{ folder: 'Work', notes: [{ id: 'w', content: '<p>W</p>' }], picture: 'work.png' }]
+      here: [{ id: 'a', content: '<p>A</p><img src="one.png"><img src="two.png">' }, { id: 'b', content: '<p>B</p>' }]
     });
-    assert.deepEqual(result.here.map(n => n.picture), ['folder.png', 'folder.png']);
-    assert.equal(result.elsewhere[0].notes[0].picture, 'work.png');
+    assert.deepEqual(result.here.map(n => n.picture), ['two.png', null]);
   });
 });

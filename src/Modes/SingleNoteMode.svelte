@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import NotePicker from '../components/NotePicker.svelte';
-  import { noteTitle, firstPicture } from '../utils/noteSearch.js';
+  import { noteTitle } from '../utils/noteSearch.js';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import { surfaceColors, drawnSurface } from '../utils/modeSurface.js';
@@ -799,7 +799,6 @@
         loadElsewhere={loadOtherFolderNotes}
         hereWallpaper={singleNoteSettings}
         recentlyOpened={recentNotes(readLastOpen())}
-        herePicture={firstPicture(blocks)}
         on:deleteNote={deleteFromSearch}
         {groupStyle}
         on:pick={pickNote}
