@@ -78,3 +78,23 @@ export function withRememberedNote(store, fileKey, noteId, limit = REMEMBERED_FI
 
   return next;
 }
+
+/**
+ * A note asked to be opened -- the one just added from the add-block menu --
+ * if it is there and has not already been opened.
+ *
+ * Adding a text block in Single Note did nothing at all until 2026-10-05: the
+ * add was refused whenever the folder already held a note, a rule from when
+ * the mode showed exactly one. It shows several now, with tabs, so the add
+ * goes through, and the note added is the one that opens -- otherwise it
+ * lands on a tab behind the note being read and looks like nothing happened.
+ *
+ * Asked for once, by id: a note that arrives from another device, or is added
+ * in another mode, does not take the page away from the one being read. And
+ * once opened it is `consumed`, so picking another tab afterwards sticks.
+ */
+export function noteToOpen({ notes = [], requested = null, consumed = null } = {}) {
+  if (!requested || requested === consumed) return null;
+  const list = Array.isArray(notes) ? notes : [];
+  return list.some((note) => note?.id === requested) ? requested : null;
+}

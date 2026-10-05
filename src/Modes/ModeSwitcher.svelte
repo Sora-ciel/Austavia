@@ -29,6 +29,8 @@
   export let modeLabels = {};
   export let simpleNoteColumnCount = 2;
   export let singleNoteSettings = {};
+  /** Single Note opens this note once it is there -- the one just added. */
+  export let openNoteId = null;
   /** The on-screen keyboard is up, so anything at the bottom should stand aside. */
   export let keyboardOpen = false;
   // Canvas mode's wallpaper. Same shape as singleNoteSettings; see
@@ -168,6 +170,7 @@
       {singleNoteSettings}
       {keyboardOpen}
       {mayAddPicture}
+      {openNoteId}
       fileKey={openFolder}
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}

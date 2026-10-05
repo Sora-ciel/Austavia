@@ -3631,13 +3631,15 @@
   }
 
   // --- Block operations ---
+  // The note Single Note should open once it is there: the one just added
+  // from its menu. See noteToOpen in utils/lastNote.js.
+  let singleNoteToOpen = null;
+
   function addBlock(type = "text") {
-    if (mode === "single") {
-      if (blocks.some(block => block.type === "text" || block.type === "cleantext")) {
-        return;
-      }
-      type = "text";
-    }
+    // Single Note holds only notes, and as many as you like -- it shows them
+    // as tabs. It used to refuse an add whenever one existed, from when it
+    // showed exactly one; that made "+ Text" do nothing (2026-10-05).
+    if (mode === "single") type = "text";
     // A clock is read at a glance, so it starts the size of one rather than the
     // size of a note.
     const blockW = type === 'clock' ? 260 : 300;
@@ -3666,6 +3668,7 @@
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
     pushHistory(blocks, modeOrders);
+    if (mode === "single") singleNoteToOpen = newBlock.id;
   }
 
   // ── Screenshot the whole canvas ───────────────────────────────────
@@ -6884,6 +6887,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       blocks={modeOrderedBlocks}
       {simpleNoteColumnCount}
       {singleNoteSettings}
+      openNoteId={singleNoteToOpen}
       {keyboardOpen}
       {taskAddDirection}
       {habits}

@@ -5,6 +5,7 @@ import {
   chooseOpenNote,
   rememberedNote,
   withRememberedNote,
+  noteToOpen,
   REMEMBERED_FILES
 } from '../src/utils/lastNote.js';
 
@@ -76,4 +77,23 @@ test('nonsense in local storage is ignored rather than believed', () => {
   assert.equal(rememberedNote({ Work: 'note' }, ''), null);
   assert.deepEqual(withRememberedNote({}, '', 'note'), {});
   assert.deepEqual(withRememberedNote({}, 'Work', ''), {});
+});
+
+// Reported on 2026-10-05: "why is adding text block broken on Single Note?"
+// The add was refused whenever the folder already had a note.
+
+test('a note added from the menu is the one that opens', () => {
+  assert.equal(noteToOpen({ notes: [...notes, { id: 'new' }], requested: 'new' }), 'new');
+});
+
+test('once opened, choosing another tab sticks', () => {
+  assert.equal(noteToOpen({ notes: [...notes, { id: 'new' }], requested: 'new', consumed: 'new' }), null);
+});
+
+test('nothing asked for, nothing taken over -- a note arriving by sync opens nothing', () => {
+  assert.equal(noteToOpen({ notes: [...notes, { id: 'synced' }] }), null);
+});
+
+test('waits for the note to be there before opening it', () => {
+  assert.equal(noteToOpen({ notes, requested: 'not-yet' }), null);
 });

@@ -8,7 +8,8 @@
     STORAGE_KEY as LAST_NOTE_KEY,
     chooseOpenNote,
     rememberedNote,
-    withRememberedNote
+    withRememberedNote,
+    noteToOpen
   } from '../utils/lastNote.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import {
@@ -22,6 +23,8 @@
 
   export let blocks = [];
   export let focusedBlockId = null;
+  /** A note to open once it is there -- the one just added. See noteToOpen. */
+  export let openNoteId = null;
   export let canvasColors = {};
   export let canvasRef;
   /** The open file's name, used only to remember which note was last read. */
@@ -264,6 +267,14 @@
       notes: noteBlocks,
       remembered: rememberedNote(readLastOpen(), fileKey)
     });
+  }
+
+  let openedOnRequest = null;
+  $: openRequested(noteToOpen({ notes: noteBlocks, requested: openNoteId, consumed: openedOnRequest }));
+  function openRequested(id) {
+    if (!id) return;
+    selectedNoteId = id;
+    openedOnRequest = id;
   }
 
   $: rememberOpenNote(selectedNoteId, fileKey);
