@@ -89,3 +89,19 @@ describe('what a note card is drawn with', () => {
     assert.equal(entry.textColor, '#ffffff');
   });
 });
+
+// Asked for on 2026-10-05: "behind each note there's the background of their
+// folders, so that you can visually see easier which folder it is".
+describe("each card's folder", () => {
+  it("carries its folder's wallpaper settings, this folder's and the others'", () => {
+    const wall = { backgroundImage: 'work.jpg', backgroundImageMobile: 'work-phone.jpg' };
+    const result = searchNotes({
+      currentFolder: 'Notes',
+      here: [{ id: 'a', content: '<p>A</p>' }],
+      hereWallpaper: { backgroundImage: 'notes.jpg' },
+      elsewhere: [{ folder: 'Work', notes: [{ id: 'w', content: '<p>W</p>' }], wallpaper: wall }]
+    });
+    assert.equal(result.here[0].wallpaper.backgroundImage, 'notes.jpg');
+    assert.equal(result.elsewhere[0].notes[0].wallpaper, wall);
+  });
+});

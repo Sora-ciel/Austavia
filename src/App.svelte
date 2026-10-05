@@ -3687,7 +3687,7 @@
   /** Every other folder's notes, writing only -- for Single Note's search page. */
   async function listOtherFolderNotes() {
     const names = (savedList || []).filter(name => name && name !== currentSaveName);
-    return Promise.all(names.map(async folder => ({ folder, notes: await loadFolderNotes(folder) })));
+    return Promise.all(names.map(async folder => ({ folder, ...(await loadFolderNotes(folder)) })));
   }
 
   /** A note picked in another folder: open that folder, then that note. */

@@ -49,7 +49,7 @@ export function lastPicture(content) {
   return sources.length ? sources[sources.length - 1] : null;
 }
 
-function entriesOf(notes = [], folder = '') {
+function entriesOf(notes = [], folder = '', wallpaper = null) {
   return (notes || []).map((note, index) => {
     const text = htmlToText(note?.content || '');
     return {
@@ -60,6 +60,9 @@ function entriesOf(notes = [], folder = '') {
       picture: lastPicture(note?.content),
       bgColor: note?.bgColor || null,
       textColor: note?.textColor || null,
+      // The folder's wallpaper settings, drawn behind the card so the folder
+      // can be told at a glance -- asked for on 2026-10-05.
+      wallpaper,
       text: text.toLowerCase()
     };
   });
@@ -68,22 +71,23 @@ function entriesOf(notes = [], folder = '') {
 /**
  * The notes to show for a search.
  *
- * `here` is this folder's notes, in its order; `elsewhere` is
- * `[{ folder, notes }]` for the others. An empty query finds everything. A
+ * `here` is this folder's notes, in its order, and `hereWallpaper` its
+ * wallpaper settings; `elsewhere` is `[{ folder, notes, wallpaper }]` for the
+ * others. An empty query finds everything. A
  * note matches when its writing contains every word of the query, in any
  * order and any case.
  */
-export function searchNotes({ currentFolder = '', here = [], elsewhere = [], query = '' } = {}) {
+export function searchNotes({ currentFolder = '', here = [], hereWallpaper = null, elsewhere = [], query = '' } = {}) {
   const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
   const matches = entry => words.every(word => entry.text.includes(word));
   const strip = ({ text, ...entry }) => entry;
 
-  const inThisFolder = entriesOf(here, currentFolder).filter(matches).map(strip);
+  const inThisFolder = entriesOf(here, currentFolder, hereWallpaper).filter(matches).map(strip);
 
   const inOthers = [...(elsewhere || [])]
     .filter(group => group && group.folder !== currentFolder)
     .sort((a, b) => String(a.folder).localeCompare(String(b.folder)))
-    .map(group => ({ folder: group.folder, notes: entriesOf(group.notes, group.folder).filter(matches).map(strip) }))
+    .map(group => ({ folder: group.folder, notes: entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches).map(strip) }))
     .filter(group => group.notes.length > 0);
 
   return { here: inThisFolder, elsewhere: inOthers };

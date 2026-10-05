@@ -336,8 +336,10 @@ export async function loadBlocks(name) {
 }
 
 /**
- * A folder's notes -- text blocks: id, writing and colours -- for Single
- * Note's search page, which lists every folder's.
+ * A folder's notes -- text blocks: id, writing and colours -- and its
+ * wallpaper settings, for Single Note's search page, which lists every
+ * folder's and draws each card over its own folder's wallpaper.
+ * `{ notes, wallpaper }`.
  *
  * Not loadBlocks: that puts every stored piece back, pictures included, and
  * doing it for every folder to show a list of names would turn opening the
@@ -358,7 +360,10 @@ export async function loadFolderNotes(name) {
     }
     notes.push({ id: block.id, content, bgColor: block.bgColor, textColor: block.textColor });
   }
-  return notes;
+  // The folder's wallpaper lives in its settings under Canvas mode's id --
+  // the one wallpaper every mode but Birthday shows.
+  const wallpaper = payload.modeSettings?.default;
+  return { notes, wallpaper: wallpaper && typeof wallpaper === 'object' ? wallpaper : null };
 }
 
 export async function deleteBlocks(name) {

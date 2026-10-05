@@ -21,6 +21,8 @@
    * draws each card the way it draws that note, theme opacity included.
    */
   export let cardStyle = () => '';
+  /** This folder's wallpaper settings, for the cards of its own notes. */
+  export let hereWallpaper = null;
 
   const dispatch = createEventDispatcher();
 
@@ -29,7 +31,7 @@
   let elsewhere = [];
   let loadingElsewhere = true;
 
-  $: results = searchNotes({ currentFolder, here: notes, elsewhere, query });
+  $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, elsewhere, query });
   $: nothingFound = !results.here.length && !results.elsewhere.length && !loadingElsewhere;
   // A picture that will not load is simply left out of its card.
   let brokenPictures = new Set();
@@ -90,6 +92,8 @@
         style={cardStyle(entry)}
         on:click={() => pick(entry)}
       >
+        <span class="picker-wall" aria-hidden="true"></span>
+        <span class="picker-tint" aria-hidden="true"></span>
         <span class="picker-words">
           <span class="picker-title">{entry.title}</span>
           {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
@@ -117,6 +121,8 @@
         <h3 class="picker-folder">{group.folder}</h3>
         {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
           <button class="picker-note" style={cardStyle(entry)} on:click={() => pick(entry)}>
+            <span class="picker-wall" aria-hidden="true"></span>
+            <span class="picker-tint" aria-hidden="true"></span>
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
@@ -203,9 +209,13 @@
     gap: 4px;
   }
 
-  /* A card in its note's own colours (cardStyle), with the note's last
-     picture on the right. */
+  /* A card, in three layers: its folder's wallpaper, the note's colour over
+     it, the writing on top (cardStyle), with the note's last picture on the
+     right. */
   .picker-note {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -213,7 +223,7 @@
     text-align: left;
     font: inherit;
     color: var(--card-text, inherit);
-    background: var(--card-bg, color-mix(in srgb, currentColor 6%, transparent));
+    background: transparent;
     border: 1px solid color-mix(in srgb, var(--card-text, currentColor) 22%, transparent);
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
@@ -230,6 +240,29 @@
   .picker-note.current {
     border-color: var(--card-text, currentColor);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-text, currentColor) 45%, transparent);
+  }
+
+  .picker-wall,
+  .picker-tint {
+    position: absolute;
+    pointer-events: none;
+  }
+
+  .picker-wall {
+    z-index: -2;
+    inset: var(--card-wall-bleed, 0);
+    background-image: var(--card-wall, none);
+    background-size: var(--card-wall-size, cover);
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: var(--card-wall-opacity, 1);
+    filter: var(--card-wall-filter, none);
+  }
+
+  .picker-tint {
+    z-index: -1;
+    inset: 0;
+    background: var(--card-bg, color-mix(in srgb, currentColor 6%, transparent));
   }
 
   .picker-words {
