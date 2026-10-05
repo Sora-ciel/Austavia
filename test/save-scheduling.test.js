@@ -5,7 +5,9 @@ import {
   SAVE_QUIET_MS,
   SAVE_MAX_WAIT_MS,
   nextSaveDelay,
-  saveVerdict
+  saveVerdict,
+  mayTakeSave,
+  saveTarget
 } from '../src/utils/saveScheduling.js';
 
 const NOW = 1_000_000;
@@ -132,4 +134,22 @@ it('an ordinary save writes', () => {
   assert.equal(saveVerdict({}), 'write');
   assert.equal(saveVerdict(), 'write');
 });
+});
+
+// Reported on 2026-10-05: a phone's log showed "save [default] blocks.length:
+// 1 -> 0" while that folder was still opening -- an empty folder written over
+// a real one. See mayTakeSave.
+describe('saves while folders change', () => {
+  it('nothing is saved while a folder is opening, so an empty screen never overwrites a folder', () => {
+    assert.equal(mayTakeSave({ folderOpening: true }), false);
+    assert.equal(mayTakeSave({ folderOpening: false }), true);
+  });
+
+  it('an edit still waiting when you switch folders is written to the folder it was made in', () => {
+    assert.equal(saveTarget({ folder: 'Recipes', blocks: [] }, 'Work'), 'Recipes');
+  });
+
+  it('a save that does not say where it was made goes to the open folder, as before', () => {
+    assert.equal(saveTarget({ blocks: [] }, 'Work'), 'Work');
+  });
 });

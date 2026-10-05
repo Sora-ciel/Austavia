@@ -20,6 +20,12 @@ import {
   normalizeHabits,
   habitsEqual,
   habitsToAdopt,
+  dayMark,
+  nextMark,
+  withDayTapped,
+  mergeDeviceHabits,
+  describeHabitChange,
+  summariseHabits,
   MAX_HABITS,
   MAX_NAME_LENGTH
 } from '../src/utils/habitStore.js';
@@ -27,14 +33,14 @@ import {
 const habit = (over = {}) => ({
   id: 'h1',
   name: 'Drink water',
-  log: { '2026-09-25': true },
+  log: { '2026-09-25': 'done' },
   ...over
 });
 
 describe('normalizeHabits', () => {
   it('keeps a well-formed list as it is', () => {
     assert.deepEqual(normalizeHabits([habit()]), [
-      { id: 'h1', name: 'Drink water', log: { '2026-09-25': true } }
+      { id: 'h1', name: 'Drink water', log: { '2026-09-25': 'done' } }
     ]);
   });
 
@@ -51,20 +57,20 @@ describe('normalizeHabits', () => {
 
   // The day keys are what habitDays.js writes. Anything else in there is not a
   // day, and this list is now downloaded by every device.
-  it('keeps only real days, and only the ticked ones', () => {
+  it('keeps only real days, and only the marked ones', () => {
     const out = normalizeHabits([
-      habit({ log: { '2026-09-25': true, '2026-09-26': false, nonsense: true, '25/09/2026': true } })
+      habit({ log: { '2026-09-25': 'done', '2026-09-26': false, '2026-09-27': 'none', nonsense: 'done', '25/09/2026': 'done' } })
     ]);
 
-    assert.deepEqual(out[0].log, { '2026-09-25': true });
+    assert.deepEqual(out[0].log, { '2026-09-25': 'done' });
   });
 
   // Key order is part of what JSON.stringify produces, and two devices have to
   // serialise the same habits to the same string or each will read the other's
   // copy as an edit.
   it('puts the days in a fixed order whatever order they arrived in', () => {
-    const forwards = normalizeHabits([habit({ log: { '2026-09-01': true, '2026-09-30': true } })]);
-    const backwards = normalizeHabits([habit({ log: { '2026-09-30': true, '2026-09-01': true } })]);
+    const forwards = normalizeHabits([habit({ log: { '2026-09-01': 'done', '2026-09-30': 'missed' } })]);
+    const backwards = normalizeHabits([habit({ log: { '2026-09-30': 'missed', '2026-09-01': 'done' } })]);
 
     assert.equal(JSON.stringify(forwards), JSON.stringify(backwards));
     assert.deepEqual(Object.keys(forwards[0].log), ['2026-09-01', '2026-09-30']);
@@ -111,15 +117,15 @@ describe('habitsEqual', () => {
   it('sees through a round trip that changed nothing', () => {
     assert.equal(habitsEqual([habit()], normalizeHabits([habit()])), true);
     assert.equal(
-      habitsEqual([habit({ log: { '2026-09-01': true, '2026-09-02': true } })],
-                  [habit({ log: { '2026-09-02': true, '2026-09-01': true } })]),
+      habitsEqual([habit({ log: { '2026-09-01': 'done', '2026-09-02': 'missed' } })],
+                  [habit({ log: { '2026-09-02': 'missed', '2026-09-01': 'done' } })]),
       true
     );
   });
 
   it('notices a tick', () => {
     const before = [habit({ log: {} })];
-    const after = [habit({ log: { '2026-09-26': true } })];
+    const after = [habit({ log: { '2026-09-26': 'done' } })];
     assert.equal(habitsEqual(before, after), false);
   });
 
@@ -158,5 +164,110 @@ describe('habitsToAdopt', () => {
     assert.equal(habitsToAdopt({ inFolder: [], onDevice: [] }), null);
     assert.equal(habitsToAdopt({}), null);
     assert.equal(habitsToAdopt({ inFolder: [], onDevice: 'corrupt' }), null);
+  });
+});
+
+// Reported on 2026-10-05: "clicking on days doesn't do anything when it should
+// mark them as done or not done". The store kept only `true`; the tracker
+// draws ✓ for 'done' and ✕ for 'missed', so a tap was saved and drew nothing,
+// and could not be taken back. Wanted: a tap marks the day, as it always did.
+describe('marking a day', () => {
+  it('a tap goes nothing, then ✓, then ✕, then nothing again', () => {
+    assert.equal(nextMark(undefined), 'done');
+    assert.equal(nextMark('done'), 'missed');
+    assert.equal(nextMark('missed'), null);
+  });
+
+  it('a tap is saved as the mark the tracker draws', () => {
+    const once = withDayTapped([habit({ log: {} })], 'h1', '2026-09-30');
+    assert.equal(once[0].log['2026-09-30'], 'done');
+    const twice = withDayTapped(once, 'h1', '2026-09-30');
+    assert.equal(twice[0].log['2026-09-30'], 'missed');
+    const thrice = withDayTapped(twice, 'h1', '2026-09-30');
+    assert.equal('2026-09-30' in thrice[0].log, false);
+  });
+
+  it('a day saved as `true` by the builds in between reads as ✓, and the next tap moves on from it', () => {
+    assert.equal(dayMark(true), 'done');
+    const next = withDayTapped([habit({ log: { '2026-09-30': true } })], 'h1', '2026-09-30');
+    assert.equal(next[0].log['2026-09-30'], 'missed');
+  });
+
+  it('keeps ✕ through a round trip', () => {
+    assert.deepEqual(normalizeHabits([habit({ log: { '2026-09-29': 'missed' } })])[0].log, { '2026-09-29': 'missed' });
+  });
+});
+
+// Asked for on 2026-10-05: "normally we should keep if a habit was already
+// being kept and the day it was before the syncs, instead of wiping it out".
+// The first version only moved a device's old list into a folder with no
+// habits at all (habitsToAdopt, above, still says so for that case), and what
+// it did move had lost its ✕ days. What follows was wanted.
+describe('merging what this device kept before habits synced', () => {
+  const device = [
+    { id: 'h1', name: 'Drink water', log: { '2026-09-01': 'done', '2026-09-02': 'missed', '2026-09-03': 'done' } },
+    { id: 'h9', name: 'Stretch', log: { '2026-09-02': 'done' } }
+  ];
+
+  it('a folder that already has the habit gets the days it is missing', () => {
+    const result = mergeDeviceHabits({ inFolder: [habit({ log: { '2026-09-30': 'done' } })], onDevice: device });
+    assert.deepEqual(result.habits[0].log, {
+      '2026-09-01': 'done', '2026-09-02': 'missed', '2026-09-03': 'done', '2026-09-30': 'done'
+    });
+  });
+
+  it('a ✕ that became a bare `true` in the move comes back as ✕', () => {
+    const moved = [habit({ log: { '2026-09-01': true, '2026-09-02': true, '2026-09-03': true } })];
+    const result = mergeDeviceHabits({ inFolder: moved, onDevice: device });
+    assert.equal(result.habits[0].log['2026-09-02'], 'missed');
+    assert.equal(result.habits[0].log['2026-09-01'], 'done');
+  });
+
+  it('a mark written since, as ✓ or ✕, is the folder\'s and stays', () => {
+    const result = mergeDeviceHabits({ inFolder: [habit({ log: { '2026-09-02': 'done' } })], onDevice: device });
+    assert.equal(result.habits[0].log['2026-09-02'], 'done');
+  });
+
+  it('a habit only this device kept is added', () => {
+    const result = mergeDeviceHabits({ inFolder: [habit({ log: {} })], onDevice: device });
+    assert.deepEqual(result.habits.map(h => h.name), ['Drink water', 'Stretch']);
+    assert.equal(result.added, 1);
+  });
+
+  it('matches by name when the ids differ', () => {
+    const result = mergeDeviceHabits({ inFolder: [habit({ id: 'other', log: {} })], onDevice: [device[0]] });
+    assert.equal(result.habits.length, 1);
+    assert.equal(result.habits[0].log['2026-09-02'], 'missed');
+  });
+
+  it('leaves alone a folder with none of these habits -- it is not where the list belongs', () => {
+    assert.equal(mergeDeviceHabits({ inFolder: [habit({ id: 'x', name: 'Piano' })], onDevice: device }), null);
+  });
+
+  it('an empty folder takes the whole list only if the list never moved', () => {
+    assert.equal(mergeDeviceHabits({ inFolder: [], onDevice: device }).habits.length, 2);
+    assert.equal(mergeDeviceHabits({ inFolder: [], onDevice: device, intoEmpty: false }), null);
+  });
+
+  it('nothing to change when the folder already has it all -- but it is the right folder, so the device can stop looking', () => {
+    assert.deepEqual(mergeDeviceHabits({ inFolder: normalizeHabits(device), onDevice: device }), { habits: null, added: 0, restored: 0 });
+  });
+});
+
+describe('the habit log', () => {
+  it('says what changed in words', () => {
+    const before = [habit({ log: {} })];
+    const after = [habit({ log: { '2026-09-30': 'done' } }), { id: 'h2', name: 'Read', log: {} }];
+    assert.deepEqual(describeHabitChange(before, after), [
+      '"Drink water" 2026-09-30: • -> ✓',
+      'added "Read"'
+    ]);
+    assert.deepEqual(describeHabitChange(after, [after[0]]), ['removed "Read"']);
+  });
+
+  it('counts each habit\'s marks for the diagnostics', () => {
+    assert.deepEqual(summariseHabits([habit({ log: { '2026-09-01': 'done', '2026-09-02': 'missed', '2026-09-03': true } })]), [
+      { name: 'Drink water', done: 2, missed: 1, last: '2026-09-03' }
+    ]);
   });
 });

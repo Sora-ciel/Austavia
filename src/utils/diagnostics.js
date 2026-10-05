@@ -24,6 +24,7 @@
  */
 
 import { describePicturePaste } from './picturePasteReport.js';
+import { summariseHabits } from './habitStore.js';
 
 /** The value a header background holds when it is meant to follow its block. */
 export const FOLLOWS_BLOCK = 'var(--bg)';
@@ -208,7 +209,8 @@ export function buildDiagnostics(input = {}) {
     localStore: input.localStore || null,
     journal: input.journal || null,
     fonts: input.fonts || null,
-    storageDrift: input.storageDrift || null
+    storageDrift: input.storageDrift || null,
+    habits: Array.isArray(input.habits) ? summariseHabits(input.habits) : null
   };
   report.notes = flagSuspicions(report);
   return report;
@@ -461,6 +463,21 @@ export function artworkVerdict(sent, native, cover = null) {
   return `the artwork arrived and decoded at ${native.artworkWidth}x${native.artworkHeight} — it is in Android's hands, so what is left is how the system chooses to draw it`;
 }
 
+/**
+ * The open folder's habits: how many ✓ and ✕ each holds, and the last day
+ * marked. Asked for on 2026-10-05 -- "make logs for habit tracker" -- after
+ * taps that were saved but never drawn could not be told apart from taps that
+ * were never saved.
+ */
+export function describeHabits(habits) {
+  if (!habits) return [];
+  const lines = ['', `habits in this folder: ${habits.length}`];
+  for (const h of habits) {
+    lines.push(`  ${h.name} — ✓ ${h.done} · ✕ ${h.missed} · last ${h.last ?? 'never'}`);
+  }
+  return lines;
+}
+
 /** The snapshot as text, for pasting into a message. */
 export function formatDiagnostics(report) {
   const bt = report.blockTheme || {};
@@ -529,6 +546,7 @@ export function formatDiagnostics(report) {
   );
   lines.push(`music: ${report.library.tracks ?? 0} track(s), ${report.library.playlists ?? 0} playlist(s)`);
 
+  for (const line of describeHabits(report.habits)) lines.push(line);
   for (const line of describeLocalStore(report.localStore)) lines.push(line);
   if (report.journal) for (const line of describeJournal(report.journal)) lines.push(line);
   for (const line of describeFonts(report.fonts)) lines.push(line);

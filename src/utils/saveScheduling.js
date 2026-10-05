@@ -81,3 +81,37 @@ export function saveVerdict({ applyingRemoteCopy = false, saveInFlight = false }
   if (saveInFlight) return 'queue';
   return 'write';
 }
+
+/**
+ * Whether a save can be taken at all, and which folder it belongs to.
+ *
+ * ## What happened
+ *
+ * Reported on 2026-10-05, in a phone's sync log: `save [default] blocks.length:
+ * 1 -> 0`, two seconds before that folder had finished opening. Opening a
+ * folder starts by clearing the one that was open -- no name, no blocks -- and
+ * reads the new one from storage after an `await`. A save in that gap found no
+ * folder name, fell back to "default" (the name a fresh install starts with),
+ * and wrote an empty list of blocks over it. The folder's one block was gone,
+ * and the empty copy was queued for upload.
+ *
+ * And a save always wrote to whichever folder was open *when it ran*, not
+ * when it was made. An edit still waiting out its debounce when you switched
+ * folders would have been written into the next one.
+ *
+ * ## So
+ *
+ * - Nothing is taken while a folder is opening: what is on screen then is
+ *   neither folder. Dropped rather than held, for the reason `saveVerdict`
+ *   gives -- it is about to be replaced.
+ * - A save carries the folder it was made in, and is written there whenever
+ *   it runs.
+ */
+export function mayTakeSave({ folderOpening = false } = {}) {
+  return !folderOpening;
+}
+
+/** The folder a save is written to: the one it was made in. */
+export function saveTarget(payload, currentFolder = '') {
+  return (payload && typeof payload.folder === 'string' && payload.folder) || currentFolder;
+}

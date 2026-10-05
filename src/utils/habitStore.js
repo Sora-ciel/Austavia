@@ -63,19 +63,38 @@ function idFor(habit, index) {
   return name ? `name:${name}` : `habit:${index}`;
 }
 
-/** The ticks, keyed by day, in a fixed order and with nothing else in them. */
+/**
+ * What a day says: `'done'` (✓) or `'missed'` (✕). Anything else is no mark.
+ *
+ * The tracker has always had both -- "Tap a day to mark ✓ or ✕" -- but when
+ * habits moved into the folder this store kept only "ticked or not", as
+ * `true`. The tracker draws ✓ only for 'done', so every tap was saved and drew
+ * nothing; the next tap could not take it back; and every ✕ in the lists that
+ * moved over became a tick. Reported on 2026-10-05: "clicking on days doesn't
+ * do anything when it should mark them as done or not done".
+ *
+ * `true` is still read, as done: it is what the builds in between wrote, and
+ * in them a tap was the only way to make one.
+ */
+export function dayMark(value) {
+  if (value === 'done' || value === true) return 'done';
+  if (value === 'missed') return 'missed';
+  return null;
+}
+
+/** The marks, keyed by day, in a fixed order and with nothing else in them. */
 function normalizeLog(log) {
   if (!log || typeof log !== 'object') return {};
 
   const days = Object.keys(log)
-    .filter(key => DAY_KEY.test(key) && log[key])
+    .filter(key => DAY_KEY.test(key) && dayMark(log[key]))
     .sort();
 
   // Rebuilt rather than filtered in place: an object's key order is part of
   // what JSON.stringify produces, and two devices must serialise the same
   // habits to the same string or each will think the other has edited it.
   const out = {};
-  for (const day of days) out[day] = true;
+  for (const day of days) out[day] = dayMark(log[day]);
   return out;
 }
 
@@ -138,4 +157,152 @@ export function habitsToAdopt({ inFolder, onDevice } = {}) {
 
   const mine = normalizeHabits(onDevice);
   return mine.length > 0 ? mine : null;
+}
+
+/** A tap on a day: nothing, then ✓, then ✕, then nothing again. */
+export function nextMark(current) {
+  const mark = dayMark(current);
+  if (mark === null) return 'done';
+  if (mark === 'done') return 'missed';
+  return null;
+}
+
+/** The habits with one day of one habit moved on by a tap. */
+export function withDayTapped(habits, habitId, day) {
+  return normalizeHabits(habits).map(habit => {
+    if (habit.id !== habitId) return habit;
+    const log = { ...habit.log };
+    const next = nextMark(log[day]);
+    if (next) log[day] = next;
+    else delete log[day];
+    return { ...habit, log: normalizeLog(log) };
+  });
+}
+
+const nameKey = name => String(name || '').trim().toLowerCase();
+
+/**
+ * This device's list from before habits synced, merged into a folder's.
+ *
+ * ## What was asked for
+ *
+ * "Normally we should keep if a habit was already being kept and the day it
+ * was before the syncs, instead of wiping it out" -- 2026-10-05.
+ *
+ * The first version moved the old list into a folder only when the folder had
+ * no habits at all; a folder that already had some -- from another device,
+ * say -- left this device's whole history behind. And what did move had its ✕
+ * days turned into ticks (see dayMark).
+ *
+ * ## The rules
+ *
+ * - A habit on the device is the folder's habit with the same id, or failing
+ *   that the same name. One the folder does not have is added.
+ * - A day the folder has nothing for takes the device's mark.
+ * - A day the folder holds as a bare `true` -- the in-between builds' way of
+ *   saying "marked, but which?" -- takes the device's mark, which is how a
+ *   ✕ comes back.
+ * - A day the folder holds as ✓ or ✕ is the folder's: that was written since,
+ *   by somebody who could see both.
+ * - A folder with habits but none in common with the device's list is not the
+ *   folder the list belongs to, and is left alone (`null`).
+ * - `intoEmpty`: whether a folder with no habits takes the whole list. True
+ *   for a device whose list never moved; false once it has, or every empty
+ *   folder would be handed a copy.
+ *
+ * `inFolder` is the folder's list *as stored*, before normalising, so a bare
+ * `true` can still be told from a ✓. Returns null when this is not the
+ * list's folder; otherwise `{ habits, added, restored }`, with `habits` null
+ * when the folder already has everything -- which still settles where the
+ * list belongs, so the device stops looking.
+ */
+export function mergeDeviceHabits({ inFolder, onDevice, intoEmpty = true } = {}) {
+  const device = normalizeHabits(onDevice);
+  if (!device.length) return null;
+
+  const folder = normalizeHabits(inFolder);
+  if (!folder.length) {
+    return intoEmpty ? { habits: device, added: device.length, restored: 0 } : null;
+  }
+
+  // The stored logs, by habit id, to tell `true` from 'done'.
+  const rawLogs = new Map();
+  (Array.isArray(inFolder) ? inFolder : []).forEach((habit, index) => {
+    if (habit && typeof habit === 'object') rawLogs.set(idFor(habit, index), habit.log || {});
+  });
+
+  const merged = folder.map(habit => ({ ...habit, log: { ...habit.log } }));
+  const byId = new Map(merged.map(habit => [habit.id, habit]));
+  const byName = new Map(merged.map(habit => [nameKey(habit.name), habit]));
+
+  let shared = 0;
+  let added = 0;
+  let restored = 0;
+
+  for (const mine of device) {
+    const target = byId.get(mine.id) || byName.get(nameKey(mine.name));
+    if (!target) {
+      merged.push({ ...mine, log: { ...mine.log } });
+      added += 1;
+      continue;
+    }
+    shared += 1;
+    const raw = rawLogs.get(target.id) || {};
+    for (const [day, mark] of Object.entries(mine.log)) {
+      const stored = raw[day];
+      if (dayMark(stored) === null || (stored === true && mark !== 'done')) {
+        if (target.log[day] !== mark) restored += 1;
+        target.log[day] = mark;
+      }
+    }
+  }
+
+  if (!shared) return null;
+
+  const habits = normalizeHabits(merged);
+  if (habitsEqual(habits, folder)) return { habits: null, added: 0, restored: 0 };
+  return { habits, added, restored };
+}
+
+/** One line per change, in words, for the sync log. */
+export function describeHabitChange(before, after) {
+  const was = normalizeHabits(before);
+  const now = normalizeHabits(after);
+  const lines = [];
+  const symbol = mark => (mark === 'done' ? '✓' : mark === 'missed' ? '✕' : '•');
+
+  const wasById = new Map(was.map(habit => [habit.id, habit]));
+  const nowById = new Map(now.map(habit => [habit.id, habit]));
+
+  for (const habit of now) {
+    const old = wasById.get(habit.id);
+    if (!old) {
+      lines.push(`added "${habit.name}"`);
+      continue;
+    }
+    if (old.name !== habit.name) lines.push(`renamed "${old.name}" to "${habit.name}"`);
+    const days = new Set([...Object.keys(old.log), ...Object.keys(habit.log)]);
+    for (const day of [...days].sort()) {
+      if (old.log[day] !== habit.log[day]) {
+        lines.push(`"${habit.name}" ${day}: ${symbol(old.log[day])} -> ${symbol(habit.log[day])}`);
+      }
+    }
+  }
+  for (const habit of was) {
+    if (!nowById.has(habit.id)) lines.push(`removed "${habit.name}"`);
+  }
+  return lines;
+}
+
+/** For the diagnostics report: each habit's ✓ and ✕ counts and last mark. */
+export function summariseHabits(habits) {
+  return normalizeHabits(habits).map(habit => {
+    const days = Object.keys(habit.log);
+    return {
+      name: habit.name,
+      done: days.filter(day => habit.log[day] === 'done').length,
+      missed: days.filter(day => habit.log[day] === 'missed').length,
+      last: days.length ? days[days.length - 1] : null
+    };
+  });
 }

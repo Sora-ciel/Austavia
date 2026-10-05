@@ -83,6 +83,7 @@
   // Sync writes down what it decided, so a loop can be read back instead of
   // guessed at. See utils/syncLog.js.
   import { logSync, describeDifference, getSyncLog, persistNow } from './utils/syncLog.js';
+  import { mayTakeSave, saveTarget } from './utils/saveScheduling.js';
   import { stalledLocks, anyHeld } from './utils/syncLocks.js';
   import { buildDiagnostics, formatDiagnostics } from './utils/diagnostics.js';
   // How long a typing save waits, and the ceiling that stops it waiting for
@@ -117,7 +118,7 @@
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
   import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
-  import { normalizeHabits, habitsEqual, habitsToAdopt } from './utils/habitStore.js';
+  import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -1513,44 +1514,56 @@
   }
 
   // The tracker used to keep one list in localStorage, shared by every folder
-  // and stuck on one device. This moves it into the folder that is open the
-  // first time a build with syncing habits runs, and only if that folder has
-  // none -- a folder with habits has either been used here already or has come
-  // down from another device, and either way the leftover is the older story.
+  // and stuck on one device. When a folder has finished opening, that list is
+  // merged into it -- the habits the folder lacks added, the days it lacks
+  // filled in, a ✕ the first move turned into a tick put back. See
+  // mergeDeviceHabits in utils/habitStore.js, and the request it answers:
+  // "we should keep if a habit was already being kept and the day it was
+  // before the syncs, instead of wiping it out" (2026-10-05).
   //
-  // The old key is left where it is and a flag is written beside it. Deleting
-  // somebody's only copy of months of ticking, to save a few hundred bytes, is
-  // not a trade worth making.
+  // Once per device: the flag holds the folder it went into. The old key is
+  // left where it is -- deleting somebody's only copy of months of ticking, to
+  // save a few hundred bytes, is not a trade worth making.
+  //
+  // It used to run from a reactive statement the moment a folder name was
+  // set, which at start-up is before the folder has been read: what it saved
+  // then was an empty folder. It runs from load() now, after the folder is on
+  // screen.
   const HABITS_KEY = 'habitTrackerData';
   const HABITS_ADOPTED_KEY = 'habitTrackerData:adopted';
-  let habitsAdoptionChecked = false;
+  const HABITS_MERGED_KEY = 'habitTrackerData:merged';
 
-  async function adoptDeviceHabits() {
-    habitsAdoptionChecked = true;
+  async function mergeOldDeviceHabits(folderName, storedHabits) {
     try {
-      if (typeof localStorage === 'undefined') return;
-      if (localStorage.getItem(HABITS_ADOPTED_KEY) === 'yes') return;
+      if (typeof localStorage === 'undefined' || !folderName) return;
+      if (localStorage.getItem(HABITS_MERGED_KEY)) return;
 
-      const stored = JSON.parse(localStorage.getItem(HABITS_KEY) || '[]');
-      const adopt = habitsToAdopt({ inFolder: modeSettings?.habit?.habits, onDevice: stored });
-      if (!adopt) {
-        // Nothing to move. Still marked, so every later folder is left alone
-        // rather than being given a copy of the same list.
-        if (Array.isArray(stored) && stored.length === 0) {
-          localStorage.setItem(HABITS_ADOPTED_KEY, 'yes');
-        }
+      const onDevice = JSON.parse(localStorage.getItem(HABITS_KEY) || '[]');
+      if (!Array.isArray(onDevice) || onDevice.length === 0) {
+        localStorage.setItem(HABITS_MERGED_KEY, '(nothing on this device)');
         return;
       }
 
-      localStorage.setItem(HABITS_ADOPTED_KEY, 'yes');
-      await handleModeSettingChange({ detail: { habit: { habits: adopt } } });
-    } catch (error) {
-      console.warn('Could not move the habits on this device into the folder:', error);
-    }
-  }
+      const result = mergeDeviceHabits({
+        inFolder: storedHabits,
+        onDevice,
+        // A list that already moved into a folder is not copied into every
+        // empty one after it.
+        intoEmpty: localStorage.getItem(HABITS_ADOPTED_KEY) !== 'yes'
+      });
+      if (!result) return; // not this folder's list: try the next one opened
 
-  $: if (!habitsAdoptionChecked && currentSaveName && modeSettings?.habit) {
-    adoptDeviceHabits();
+      localStorage.setItem(HABITS_MERGED_KEY, folderName);
+      localStorage.setItem(HABITS_ADOPTED_KEY, 'yes');
+      if (!result.habits) return; // the folder already had it all
+      logSync('habit', folderName, 'brought in the habits this device kept before they synced', {
+        added: result.added,
+        daysRestored: result.restored
+      });
+      await handleModeSettingChange({ detail: { habit: { habits: result.habits } } });
+    } catch (error) {
+      console.warn('Could not merge the habits kept on this device into the folder:', error);
+    }
   }
 
   $: if (musicLibraryLoaded && !musicLibraryMigrated && modeSettings?.playlist) {
@@ -2212,6 +2225,7 @@
         allFolders: blocksFollowThemeAll
       },
       blocks,
+      habits: modeSettings?.habit?.habits,
       themes: availableThemes,
       samples: sampleDrawnBlocks(),
       sync: {
@@ -3193,6 +3207,15 @@
   }
 
   async function persistAutosave(blocksToPersist, ordersToPersist = modeOrders, settingsToPersist = modeSettings, { immediate = false } = {}) {
+    // Not while a folder is opening: what is on screen then belongs to neither
+    // folder, and this used to write an empty one over "default" -- see
+    // mayTakeSave in utils/saveScheduling.js.
+    if (!mayTakeSave({ folderOpening })) {
+      logSync('skip', openingFolderName, 'not saved: the folder is still opening, and what is on screen is not it yet');
+      console.warn('A save was asked for while a folder was opening, and dropped.', new Error().stack);
+      return;
+    }
+
     // No folder open — a fresh install, or the last one was just deleted.
     // Adopt the default name so the first edit creates a folder instead of
     // being silently dropped.
@@ -3200,6 +3223,8 @@
     persistLastSaveName(currentSaveName);
 
     const payload = {
+      // The folder this was made in, written there whenever it runs.
+      folder: currentSaveName,
       blocks: blocksToPersist,
       orders: ordersToPersist,
       modeSettings: settingsToPersist
@@ -3291,13 +3316,14 @@
   }
 
   async function _runSave(payload) {
+    const folder = saveTarget(payload, currentSaveName);
     const verdict = saveVerdict({ applyingRemoteCopy, saveInFlight: _saveInFlight });
 
     if (verdict === 'discard') {
       // Not queued. This payload is the blocks as they were before the cloud
       // copy landed; running it afterwards is exactly how a folder ends up
       // reverted with a fresh timestamp on it.
-      logSync('skip', currentSaveName, 'a cloud copy is landing, so this save is stale');
+      logSync('skip', folder, 'a cloud copy is landing, so this save is stale');
       return;
     }
 
@@ -3314,7 +3340,7 @@
       // Merely opening a folder used to rewrite it, restamping modifiedAt and
       // making an untouched folder look newer than the cloud copy (and worth
       // re-uploading). Skip the write when nothing actually changed.
-      const existing = await loadBlocks(currentSaveName);
+      const existing = await loadBlocks(folder);
       if (existing) {
         const before = saveContentFingerprint(
           existing.blocks,
@@ -3323,14 +3349,14 @@
         );
         const after = saveContentFingerprint(payload.blocks, normalizedOrders, normalizedSettings);
         if (before === after) {
-          logSync('skip', currentSaveName, 'nothing changed, folder left alone');
+          logSync('skip', folder, 'nothing changed, folder left alone');
           return;
         }
         // The whole question, when two instances will not settle, is what one
         // of them thinks keeps changing. Naming the field answers it outright.
         logSync(
           'save',
-          currentSaveName,
+          folder,
           'content differs, writing and restamping modifiedAt',
           describeDifference(
             comparableSave(
@@ -3343,7 +3369,7 @@
         );
       }
 
-      await saveBlocks(currentSaveName, {
+      await saveBlocks(folder, {
         blocks: payload.blocks,
         modeOrders: normalizedOrders,
         modeSettings: normalizedSettings
@@ -4416,7 +4442,25 @@
     await pushHistory(blocks, modeOrders);
   }
 
+  // Set while load() is between clearing one folder and putting the next on
+  // screen. See mayTakeSave in utils/saveScheduling.js.
+  let folderOpening = false;
+  let openingFolderName = '';
+
   async function load(name, options = {}) {
+    // An edit still waiting out its debounce is written now, to its own
+    // folder, rather than left to fire in the middle of the switch.
+    if (_pendingSave) {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = null;
+      _firstQueuedAt = 0;
+      const waiting = _pendingSave;
+      _pendingSave = null;
+      await _runSave(waiting);
+    }
+
+    folderOpening = true;
+    openingFolderName = name;
     blocks = [];
     currentSaveName = "";
     focusedBlockId = null;
@@ -4446,6 +4490,8 @@
       }));
       modeOrders = ensureModeOrders(blocks, loadedOrders);
       modeSettings = normalizeModeSettings(loadedModeSettings);
+      // The folder is on screen: saves are its own again.
+      folderOpening = false;
 
       history = [];
       historyIndex = -1;
@@ -4454,10 +4500,16 @@
         autoSyncDirty = false;
       }
       clearBootLoadGuard();
+      // The habits as stored, not as normalised: a bare `true` from the
+      // builds in between has to be told from a ✓ to put a ✕ back.
+      await mergeOldDeviceHabits(name, loadedModeSettings?.habit?.habits);
     } catch (error) {
       console.error('Failed to load save file:', error);
+      folderOpening = false;
       clearBootLoadGuard();
       await openFallbackSave(name);
+    } finally {
+      folderOpening = false;
     }
   }
 
@@ -5161,6 +5213,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         force || perFile[fileName].attachmentFingerprint !== lastAutoSyncAttachmentFingerprintByFile[fileName]
     });
 
+    // The other half of "queued for upload": without it a log ends at the
+    // queue, and a folder that went up cannot be told from one that never did
+    // (2026-10-05).
+    for (const fileName of uploadedNames) logSync('upload', fileName, 'sent to the cloud');
+    for (const { fileName, error } of failures) {
+      logSync('error', fileName, 'upload failed', { error: String(error?.code || error?.message || error) });
+    }
+    for (const fileName of unsyncable) logSync('skip', fileName, 'not uploaded: the name cannot be used in the cloud');
+
     // Only what actually reached the cloud is remembered as sent. Recording a
     // folder that failed would leave it looking synced while its changes sat on
     // this device alone.
@@ -5534,6 +5595,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }
 
     if (detail.habit && typeof detail.habit === 'object') {
+      // Said in words in the sync log, so a tap that did not stick, or a
+      // habit that went missing, can be traced to the moment it happened.
+      for (const line of describeHabitChange(modeSettings?.habit?.habits, detail.habit.habits)) {
+        logSync('habit', currentSaveName, line);
+      }
       patch = { ...patch, habit: { ...patch.habit, ...detail.habit } };
     }
 
@@ -5862,6 +5928,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         modeOrders = ensureModeOrders(blocks, {});
       } else {
         startBootLoadGuard(guardedSave);
+        // The same gap as in load(): a folder name and no folder yet. Nothing
+        // is saved until it is on screen -- see mayTakeSave.
+        folderOpening = true;
+        openingFolderName = guardedSave;
         try {
           const initialData = await loadBlocks(guardedSave);
           const initialBlocks = Array.isArray(initialData)
@@ -5882,11 +5952,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           }));
           modeOrders = ensureModeOrders(blocks, initialOrders);
           modeSettings = normalizeModeSettings(initialModeSettings);
+          folderOpening = false;
           clearBootLoadGuard();
+          await mergeOldDeviceHabits(guardedSave, initialModeSettings?.habit?.habits);
         } catch (error) {
           console.error('Failed to load last opened save:', error);
+          folderOpening = false;
           clearBootLoadGuard();
           await openFallbackSave(guardedSave);
+        } finally {
+          folderOpening = false;
         }
       }
     }

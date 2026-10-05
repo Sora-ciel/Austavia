@@ -11,7 +11,7 @@
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createLongPress } from "../utils/longPress.js";
   import { onDestroy, createEventDispatcher } from "svelte";
-  import { habitsEqual } from "../utils/habitStore.js";
+  import { habitsEqual, withDayTapped } from "../utils/habitStore.js";
 
   export let modeLabels = {};
   export let activeMode = "default";
@@ -161,18 +161,11 @@
 
   onDestroy(() => press.cancel());
 
+  // Nothing, then ✓, then ✕, then nothing -- worked out in utils/habitStore.js,
+  // in the same terms the folder stores. It used to write "none" for the last
+  // step, which the store read as a tick, so a day could never be cleared.
   const toggleDay = (habitId, dayKey) => {
-    const updated = habits.map(habit => {
-      if (habit.id !== habitId) return habit;
-      const current = habit.log?.[dayKey] || "none";
-      const next =
-        current === "none" ? "done" : current === "done" ? "missed" : "none";
-      return {
-        ...habit,
-        log: { ...habit.log, [dayKey]: next }
-      };
-    });
-    saveHabits(updated);
+    saveHabits(withDayTapped(habits, habitId, dayKey));
   };
 
   onMount(() => {
