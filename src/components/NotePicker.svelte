@@ -502,9 +502,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    /* Ten pixels more than a title and one line, asked for on 2026-10-05:
-       room for a second line of what the note says. */
-    min-height: 62px;
+    /* Room for a title and four lines of what the note says, and a picture
+       large enough to make out -- asked for on 2026-10-05, "each note takes
+       more height at all times". Shorter writing is centred in it. */
+    min-height: 92px;
     text-align: left;
     font: inherit;
     color: var(--group-text, inherit);
@@ -544,25 +545,25 @@
     white-space: nowrap;
   }
 
-  /* Up to two lines of what follows the title, cut with an ellipsis. */
+  /* Up to four lines of what follows the title, cut with an ellipsis. */
   .picker-snippet {
     font-size: 0.8rem;
-    /* Tight enough that a title and two lines fit the 62px. */
+    /* Tight enough that a title and four lines fit the 92px. */
     line-height: 1.2;
     opacity: 0.7;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 4;
+    line-clamp: 4;
   }
 
   .picker-picture {
     flex: none;
-    width: 44px;
-    height: 44px;
+    width: 72px;
+    height: 72px;
     object-fit: cover;
-    border-radius: 7px;
+    border-radius: 8px;
   }
 
   /* A category: the folder's wallpaper and its dials behind it all
