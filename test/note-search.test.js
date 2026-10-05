@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { noteTitle, searchNotes, lastPicture, shelfView } from '../src/utils/noteSearch.js';
+import { noteTitle, searchNotes, lastPicture, shelfView, firstPicture } from '../src/utils/noteSearch.js';
 
 const note = (id, content) => ({ id, content });
 
@@ -78,7 +78,7 @@ describe('the search page', () => {
 // is in the folder", with "the last image put in the note, if there's one, on
 // the right".
 describe('what a note card is drawn with', () => {
-  it('the last picture in the note', () => {
+  it('lastPicture still finds the last picture in a note', () => {
     assert.equal(lastPicture('<p>a</p><img src="one.png"><p>b</p><img alt="x" src="two.png">'), 'two.png');
     assert.equal(lastPicture('<p>no pictures</p>'), null);
   });
@@ -171,5 +171,31 @@ describe('the shelf and grid', () => {
     const recentlyOpened = [{ folder: 'Work', id: 'w1' }, { folder: 'Gone', id: 'x' }, { folder: 'Notes', id: 'a' }];
     assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, recentlyOpened }).recent.map(n => n.id), ['w1', 'a']);
     assert.deepEqual(shelfView({ currentFolder: 'Notes', here, elsewhere, recentlyOpened, query: 'x' }).recent, []);
+  });
+});
+
+// Asked for on 2026-10-05: "the image that shows when searching notes ...
+// should be the first image of the folder, so that it will generally stay the
+// same and make it easier to recognise".
+describe("a folder's picture", () => {
+  it('is the first one in the folder: an image block, or a picture in a note, whichever comes first', () => {
+    assert.equal(firstPicture([
+      { type: 'text', content: '<p>no picture</p>' },
+      { type: 'image', src: 'photo.jpg' },
+      { type: 'text', content: '<img src="later.png">' }
+    ]), 'photo.jpg');
+    assert.equal(firstPicture([{ type: 'text', content: '<p>a</p><img src="first.png"><img src="second.png">' }]), 'first.png');
+    assert.equal(firstPicture([{ type: 'clock' }]), null);
+  });
+
+  it('is shown on every note of that folder', () => {
+    const result = searchNotes({
+      currentFolder: 'Notes',
+      here: [{ id: 'a', content: '<p>A</p><img src="own.png">' }, { id: 'b', content: '<p>B</p>' }],
+      herePicture: 'folder.png',
+      elsewhere: [{ folder: 'Work', notes: [{ id: 'w', content: '<p>W</p>' }], picture: 'work.png' }]
+    });
+    assert.deepEqual(result.here.map(n => n.picture), ['folder.png', 'folder.png']);
+    assert.equal(result.elsewhere[0].notes[0].picture, 'work.png');
   });
 });

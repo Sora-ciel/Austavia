@@ -350,7 +350,20 @@ export async function loadFolderNotes(name) {
   const db = await getDB();
   const payload = asPayloadWithTimestamp((await db.get(STORE_NAME, name)) || []);
   const notes = [];
+  // The folder's first picture -- an image block's, or the first in a note's
+  // writing -- shown on every one of its notes on the search page. A picture
+  // stored as a file is handed over as an object URL, not read into text.
+  let picture = null;
   for (const block of payload.blocks || []) {
+    if (!picture && block?.type === 'image') {
+      const ref = block.__fileRefs?.src;
+      if (typeof block.src === 'string' && block.src) {
+        picture = block.src;
+      } else if (ref?.key && ref.encoding === 'binary' && typeof URL !== 'undefined' && URL.createObjectURL) {
+        const blob = await db.get(FILE_STORE_NAME, ref.key);
+        if (blob) picture = URL.createObjectURL(blob);
+      }
+    }
     if (block?.type !== 'text' && block?.type !== 'cleantext') continue;
     let content = typeof block.content === 'string' ? block.content : '';
     const ref = block.__fileRefs?.content;
@@ -358,12 +371,13 @@ export async function loadFolderNotes(name) {
       const blob = await db.get(FILE_STORE_NAME, ref.key);
       if (blob) content = await blob.text();
     }
+    if (!picture) picture = (content.match(/<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/i) || [])[1] || null;
     notes.push({ id: block.id, content, bgColor: block.bgColor, textColor: block.textColor });
   }
   // The folder's wallpaper lives in its settings under Canvas mode's id --
   // the one wallpaper every mode but Birthday shows.
   const wallpaper = payload.modeSettings?.default;
-  return { notes, wallpaper: wallpaper && typeof wallpaper === 'object' ? wallpaper : null };
+  return { notes, wallpaper: wallpaper && typeof wallpaper === 'object' ? wallpaper : null, picture };
 }
 
 export async function deleteBlocks(name) {

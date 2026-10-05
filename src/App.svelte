@@ -3690,6 +3690,35 @@
     return Promise.all(names.map(async folder => ({ folder, ...(await loadFolderNotes(folder)) })));
   }
 
+  /**
+   * A note deleted from Single Note's search page that lives in another
+   * folder. That folder is not open, so there is no Undo for it: the folder as
+   * it was is kept first (Settings, Advanced, kept copies), then written back
+   * without the note -- an ordinary local save, which the next upload sends.
+   */
+  async function deleteNoteInFolder(event) {
+    const { folder, id } = event.detail || {};
+    if (!folder || !id || folder === currentSaveName || !savedList.includes(folder)) return;
+    try {
+      const current = await loadBlocks(folder);
+      const kept = (current?.blocks || []).filter(block => block.id !== id);
+      if (kept.length === (current?.blocks || []).length) return;
+      const next = {
+        blocks: kept,
+        modeOrders: ensureModeOrders(kept, current?.modeOrders),
+        modeSettings: normalizeModeSettings(current?.modeSettings)
+      };
+      await keepReplacedCopy(folder, current, next);
+      await saveBlocks(folder, next);
+      savedList = await listSavedBlocks();
+      logSync('save', folder, 'deleted a note from Single Note search', { noteId: id });
+      autoSyncDirty = true;
+    } catch (error) {
+      console.error('Could not delete the note from', folder, error);
+      await appAlert(`The note could not be deleted from "${folder}".`);
+    }
+  }
+
   /** A note picked in another folder: open that folder, then that note. */
   async function openNoteInFolder(event) {
     const { folder, id } = event.detail || {};
@@ -7011,6 +7040,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       openNoteId={singleNoteToOpen}
       loadOtherFolderNotes={listOtherFolderNotes}
       on:openNote={openNoteInFolder}
+      on:deleteNoteElsewhere={deleteNoteInFolder}
       {keyboardOpen}
       {taskAddDirection}
       {habits}

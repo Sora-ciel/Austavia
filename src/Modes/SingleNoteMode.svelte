@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import NotePicker from '../components/NotePicker.svelte';
-  import { noteTitle } from '../utils/noteSearch.js';
+  import { noteTitle, firstPicture } from '../utils/noteSearch.js';
   import { htmlToText } from '../utils/htmlToText.js';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import { surfaceColors, drawnSurface } from '../utils/modeSurface.js';
@@ -331,6 +331,15 @@
         ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
       );
     };
+  }
+
+  // A note deleted from the search page: this folder's goes the usual way, so
+  // Undo brings it back; another folder's is App's to take out of that folder.
+  function deleteFromSearch(event) {
+    const { folder, id } = event.detail || {};
+    if (!id) return;
+    if (!folder || folder === fileKey) deleteBlock(id);
+    else dispatch('deleteNoteElsewhere', { folder, id });
   }
 
   function pickNote(event) {
@@ -790,6 +799,8 @@
         loadElsewhere={loadOtherFolderNotes}
         hereWallpaper={singleNoteSettings}
         recentlyOpened={recentNotes(readLastOpen())}
+        herePicture={firstPicture(blocks)}
+        on:deleteNote={deleteFromSearch}
         {groupStyle}
         on:pick={pickNote}
         on:close={() => (pickerOpen = false)}

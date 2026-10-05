@@ -14,6 +14,8 @@
    */
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import { searchNotes, shelfView } from '../utils/noteSearch.js';
+  import { createLongPress } from '../utils/longPress.js';
+  import BlockContextMenu from './BlockContextMenu.svelte';
 
   /** This folder's notes, in the order the mode shows them. */
   export let notes = [];
@@ -30,6 +32,8 @@
   export let hereWallpaper = null;
   /** The notes last opened, newest first: [{ folder, id }]. See recentNotes. */
   export let recentlyOpened = [];
+  /** This folder's picture -- its first -- shown on each of its notes. */
+  export let herePicture = null;
 
   // Which way to show the page, kept on this device.
   const LAYOUT_KEY = 'singleNotePickerLayout';
@@ -52,9 +56,9 @@
   let elsewhere = [];
   let loadingElsewhere = true;
 
-  $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, elsewhere, query });
+  $: results = searchNotes({ currentFolder, here: notes, hereWallpaper, herePicture, elsewhere, query });
   $: nothingFound = !results.here.length && !results.elsewhere.length && !loadingElsewhere;
-  $: view = shelfView({ currentFolder, here: notes, hereWallpaper, elsewhere, query, folder: chosenFolder, recentlyOpened });
+  $: view = shelfView({ currentFolder, here: notes, hereWallpaper, herePicture, elsewhere, query, folder: chosenFolder, recentlyOpened });
   // A chosen folder that the list no longer has goes back to every folder.
   $: keepChosenFolder(view, loadingElsewhere);
   function keepChosenFolder(current, loading) {
@@ -85,6 +89,64 @@
 
   function pick(entry) {
     dispatch('pick', { folder: entry.folder, id: entry.id });
+  }
+
+  // ── A note's menu: right click, or a long press on a phone ──────────
+  // Asked for on 2026-10-05, "like we have in plenty of areas of our app",
+  // with the one thing in it for now: deleting the note.
+  let menu = null; // { x, y, entry }
+  let pressed = null;
+  let swallowClick = false;
+
+  const press = createLongPress({
+    onLongPress: point => {
+      if (pressed) menu = { x: point.x, y: point.y, entry: pressed };
+    }
+  });
+
+  function openMenu(event, entry) {
+    event.preventDefault();
+    menu = { x: event.clientX, y: event.clientY, entry };
+  }
+
+  function holdStart(event, entry) {
+    // A finger only: a mouse has its right button.
+    if (event.pointerType === 'mouse') return;
+    pressed = entry;
+    press.start({ x: event.clientX, y: event.clientY });
+  }
+
+  function holdMove(event) {
+    press.move({ x: event.clientX, y: event.clientY });
+  }
+
+  function holdEnd() {
+    swallowClick = press.finish();
+    pressed = null;
+  }
+
+  /** The tap that ends a long press opens the menu, not the note. */
+  function clicked(event, entry) {
+    if (swallowClick) {
+      swallowClick = false;
+      event.preventDefault();
+      return;
+    }
+    pick(entry);
+  }
+
+  function menuAction(event) {
+    const entry = menu?.entry;
+    menu = null;
+    if (event.detail !== 'delete' || !entry) return;
+    // Gone from this page straight away; Single Note or App deletes it from
+    // its folder.
+    if (entry.folder !== currentFolder) {
+      elsewhere = elsewhere.map(group => group.folder === entry.folder
+        ? { ...group, notes: (group.notes || []).filter(note => note.id !== entry.id) }
+        : group);
+    }
+    dispatch('deleteNote', { folder: entry.folder, id: entry.id });
   }
 
   function onKeydown(event) {
@@ -158,7 +220,12 @@
           <button
             class="tile"
             class:current={entry.folder === currentFolder && entry.id === currentNoteId}
-            on:click={() => pick(entry)}
+            on:click={event => clicked(event, entry)}
+            on:contextmenu={event => openMenu(event, entry)}
+            on:pointerdown={event => holdStart(event, entry)}
+            on:pointermove={holdMove}
+            on:pointerup={holdEnd}
+            on:pointercancel={() => press.cancel()}
           >
             <span class="tile-band" style={groupStyle(entry.wallpaper)}>
               <span class="picker-group-wall" aria-hidden="true"></span>
@@ -187,7 +254,12 @@
           <button
             class="tile"
             class:current={entry.folder === currentFolder && entry.id === currentNoteId}
-            on:click={() => pick(entry)}
+            on:click={event => clicked(event, entry)}
+            on:contextmenu={event => openMenu(event, entry)}
+            on:pointerdown={event => holdStart(event, entry)}
+            on:pointermove={holdMove}
+            on:pointerup={holdEnd}
+            on:pointercancel={() => press.cancel()}
           >
             <span class="tile-band" style={groupStyle(entry.wallpaper)}>
               <span class="picker-group-wall" aria-hidden="true"></span>
@@ -225,7 +297,12 @@
           <button
             class="picker-note"
             class:current={entry.id === currentNoteId}
-            on:click={() => pick(entry)}
+            on:click={event => clicked(event, entry)}
+            on:contextmenu={event => openMenu(event, entry)}
+            on:pointerdown={event => holdStart(event, entry)}
+            on:pointermove={holdMove}
+            on:pointerup={holdEnd}
+            on:pointercancel={() => press.cancel()}
           >
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
@@ -258,7 +335,12 @@
           <button
             class="picker-note"
             class:current={entry.id === currentNoteId}
-            on:click={() => pick(entry)}
+            on:click={event => clicked(event, entry)}
+            on:contextmenu={event => openMenu(event, entry)}
+            on:pointerdown={event => holdStart(event, entry)}
+            on:pointermove={holdMove}
+            on:pointerup={holdEnd}
+            on:pointercancel={() => press.cancel()}
           >
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
@@ -276,6 +358,16 @@
       <div class="picker-quiet">No note or folder has “{query}” in it.</div>
     {/if}
   </div>
+  {/if}
+
+  {#if menu}
+    <BlockContextMenu
+      x={menu.x}
+      y={menu.y}
+      items={[{ id: 'delete', label: 'Delete note', variant: 'danger' }]}
+      on:action={menuAction}
+      on:close={() => (menu = null)}
+    />
   {/if}
 </div>
 
@@ -509,8 +601,10 @@
     text-align: left;
     font: inherit;
     color: var(--group-text, inherit);
-    background: transparent;
-    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+    /* A soft plate of the page colour under each note, so its writing is not
+       read straight off the wallpaper and each note reads as its own box. */
+    background: color-mix(in srgb, var(--group-backdrop, var(--active-note-bg, #000000)) 62%, transparent);
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
     border-radius: 10px;
     padding: 4px 6px 4px 12px;
     cursor: pointer;
@@ -587,7 +681,7 @@
     /* A frame in the category's own writing colour, so where one folder ends
        and the next begins reads at a glance -- wallpaper or not. Asked for on
        2026-10-05: "make each difference of the category easier to see". */
-    border: 3px solid color-mix(in srgb, var(--group-text, currentColor) 50%, transparent);
+    border: 4px solid color-mix(in srgb, var(--group-text, currentColor) 60%, transparent);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
   }
 
@@ -611,15 +705,21 @@
     filter: var(--group-wall-filter, none);
   }
 
-  /* The folder's name, bold, with a rule under it between it and its notes. */
+  /* The folder's name on a solid bar across the top of its category, in the
+     reverse of its colours -- the writing colour behind, the page colour on
+     it -- so a category's start can't be missed. Asked for on 2026-10-05:
+     "it's a little hard to read still". */
   .picker-folder {
-    color: var(--group-text, inherit);
-    margin: 0 2px 5px;
-    padding-bottom: 6px;
+    margin: -8px -10px 6px;
+    padding: 6px 12px;
     font-size: 1.15rem;
     font-weight: 800;
     letter-spacing: 0.01em;
-    border-bottom: 2px solid color-mix(in srgb, var(--group-text, currentColor) 45%, transparent);
+    /* Named, not currentColor: on the heading currentColor is its own colour,
+       which is the page colour here, and the name vanished into the bar. */
+    background: var(--group-text, var(--active-note-text, var(--mode-text-color, #ffffff)));
+    color: var(--group-backdrop, var(--active-note-bg, var(--canvas-inner-bg, #000000)));
+    text-shadow: none;
   }
 
   .picker-separator {

@@ -176,6 +176,7 @@
       {loadOtherFolderNotes}
       fileKey={openFolder}
       on:openNote
+      on:deleteNoteElsewhere
       on:touchstart={onTouchStart}
       on:touchmove={onTouchMove}
       on:touchend={onTouchEnd}
