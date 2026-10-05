@@ -312,7 +312,7 @@
     /* A frame in the category's own writing colour, so where one folder ends
        and the next begins reads at a glance -- wallpaper or not. Asked for on
        2026-10-05: "make each difference of the category easier to see". */
-    border: 2px solid color-mix(in srgb, var(--group-text, currentColor) 45%, transparent);
+    border: 3px solid color-mix(in srgb, var(--group-text, currentColor) 50%, transparent);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
   }
 
@@ -339,12 +339,12 @@
   /* The folder's name, bold, with a rule under it between it and its notes. */
   .picker-folder {
     color: var(--group-text, inherit);
-    margin: 0 2px 4px;
-    padding-bottom: 5px;
-    font-size: 0.95rem;
+    margin: 0 2px 5px;
+    padding-bottom: 6px;
+    font-size: 1.15rem;
     font-weight: 800;
-    letter-spacing: 0.02em;
-    border-bottom: 1px solid color-mix(in srgb, var(--group-text, currentColor) 35%, transparent);
+    letter-spacing: 0.01em;
+    border-bottom: 2px solid color-mix(in srgb, var(--group-text, currentColor) 45%, transparent);
   }
 
   .picker-separator {
