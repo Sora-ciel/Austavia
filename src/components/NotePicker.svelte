@@ -371,20 +371,21 @@
 </div>
 
 <style>
-  /* Over the note, below the title row, and see-through: Single Note hides the
-     note underneath while this is open, so what shows behind is the page's
-     own background -- the theme's opacity and the wallpaper through it, as
-     the note has them (asked for on 2026-10-05). */
+  /* Over the note, below the title row, on the theme's own page colour -- no
+     wallpaper behind the categories. Decided on 2026-10-05, after a
+     see-through page had been tried: plain colour sets the categories apart,
+     and the page reads as a place to pick a note and leave, not to stay. The
+     writing is the theme's, which is made for that colour. */
   .note-picker {
-    --sb-thumb: var(--active-note-text, var(--mode-text-color, #ffffff));
-    --sb-track: transparent;
+    --sb-thumb: var(--mode-text-color, #ffffff);
+    --sb-track: var(--canvas-inner-bg, #000000);
     position: absolute;
     inset: 0;
     z-index: 5;
     display: flex;
     flex-direction: column;
-    background: transparent;
-    color: var(--active-note-text, var(--mode-text-color, #ffffff));
+    background: var(--canvas-inner-bg, #000000);
+    color: var(--mode-text-color, #ffffff);
   }
 
   .picker-head {
