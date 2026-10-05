@@ -28,7 +28,9 @@
 import { htmlToText } from './htmlToText.js';
 
 export const TITLE_LENGTH = 28;
-const SNIPPET_LENGTH = 90;
+// Two lines' worth on a wide card: the card holds a second line of what the
+// note says (asked for on 2026-10-05), and the page cuts it to fit.
+const SNIPPET_LENGTH = 180;
 
 /** A note's name: its first line, or "Note N" when it has none yet. */
 export function noteTitle(content, index = 0) {

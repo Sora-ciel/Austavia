@@ -303,30 +303,33 @@
   // cleaner". A folder with no wallpaper gets nothing, and the open folder
   // shows through.
   //
-  // Nothing in a category comes from the theme in use now: "the notes should
-  // be one of the only things that doesn't change no matter the theme you're
-  // using". Under the wallpaper is the folder's own colour -- the colour its
-  // notes carry, which is what it shows under its wallpaper -- not this
-  // theme's page colour, which tinted every wallpaper not drawn at full
-  // opacity (peach under Peach Sorbet). The folder's name takes its writing
-  // colour for the same reason.
-  function groupStyle(wallpaper, notes = []) {
-    const wall = backgroundLayerStyle(wallpaper, { isMobile: isMobileViewport });
-    if (!wall) return '';
-    const url = String(wall.image).replace(/"/g, '%22');
-    const first = (notes || []).find(note => note?.bgColor) || {};
-    const base = first.bgColor || '#000000';
-    const text = first.textColor || getReadableTextColor(base);
-    return (
-      `--group-backdrop: ${base}; --group-text: ${text};` +
-      ` --group-wall: url("${url}"); --group-wall-opacity: ${wall.opacity};` +
-      ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
-    );
-  }
-
-  function noteCardStyle(entry) {
-    const surface = surfaceColors({ bgColor: entry?.bgColor, textColor: entry?.textColor }, canvasTheme);
-    return `--card-text: ${surface.text};`;
+  // Colours are the theme in use now, for every category: its page colour
+  // under the wallpaper, its writing colour for the folder's name and notes.
+  // Only the wallpaper and its dials are the folder's own. Decided on
+  // 2026-10-05, after a version drawn in each folder's own colours had been
+  // tried: "we'll make all the categories follow the same theme we are using
+  // at the moment, but keep their background and settings".
+  //
+  // Remade whenever the screen's shape or the theme changes, so the page
+  // redraws: a function that stays the same is never asked again, and a
+  // window turned to a phone's shape kept showing the computer wallpapers.
+  //
+  // The writing on a category with a wallpaper is the theme's, on the theme's
+  // page colour. On one with none it sits on this note's own page, so it takes
+  // the page's writing colour (the picker's own) -- the theme's writing colour
+  // there was brown on navy, and unreadable.
+  $: groupStyle = groupStyleFor(isMobileViewport, canvasTheme, modeTextColor);
+  function groupStyleFor(isMobile, theme, text) {
+    return wallpaper => {
+      const wall = backgroundLayerStyle(wallpaper, { isMobile });
+      if (!wall) return '';
+      const url = String(wall.image).replace(/"/g, '%22');
+      return (
+        `--group-backdrop: ${theme.innerBg}; --group-text: ${text};` +
+        ` --group-wall: url("${url}"); --group-wall-opacity: ${wall.opacity};` +
+        ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
+      );
+    };
   }
 
   function pickNote(event) {
@@ -785,7 +788,6 @@
         currentNoteId={selectedNoteId}
         loadElsewhere={loadOtherFolderNotes}
         hereWallpaper={singleNoteSettings}
-        cardStyle={noteCardStyle}
         {groupStyle}
         on:pick={pickNote}
         on:close={() => (pickerOpen = false)}

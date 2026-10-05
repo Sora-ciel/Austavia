@@ -16,8 +16,6 @@
   export let currentNoteId = null;
   /** Every other folder's notes: async () => [{ folder, notes }]. */
   export let loadElsewhere = async () => [];
-  /** A card's writing colour from its note's: (entry) => css variables. */
-  export let cardStyle = () => '';
   /**
    * A category's background from its folder's wallpaper settings:
    * (wallpaper) => css variables. See groupStyle in SingleNoteMode.
@@ -91,14 +89,13 @@
          name, and its notes on top with no background of their own. Asked
          for on 2026-10-05: "easier to see and cleaner". -->
     {#if results.here.length}
-      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper, results.here)}>
+      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper)}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{currentFolder}</h3>
         {#each results.here as entry (entry.id)}
           <button
             class="picker-note"
             class:current={entry.id === currentNoteId}
-            style={cardStyle(entry)}
             on:click={() => pick(entry)}
           >
             <span class="picker-words">
@@ -125,14 +122,13 @@
 
     <!-- A folder with no notes, or none the search finds, is not listed. -->
     {#each results.elsewhere as group (group.folder)}
-      <section class="picker-folder-group" aria-label={group.folder} style={groupStyle(group.wallpaper, group.notes)}>
+      <section class="picker-folder-group" aria-label={group.folder} style={groupStyle(group.wallpaper)}>
         <span class="picker-group-wall" aria-hidden="true"></span>
         <h3 class="picker-folder">{group.folder}</h3>
         {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
           <button
             class="picker-note"
             class:current={entry.id === currentNoteId}
-            style={cardStyle(entry)}
             on:click={() => pick(entry)}
           >
             <span class="picker-words">
@@ -222,55 +218,66 @@
   }
 
   /* A note on its category: no background of its own, so the folder's
-     wallpaper behind the category shows through it; the note's own writing
-     colour (cardStyle) and a hairline of it. */
+     wallpaper behind the category shows through it; the category's writing
+     colour (the theme's, over a wallpaper) or the page's, and a hairline of
+     it. */
   .picker-note {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 52px;
+    /* Ten pixels more than a title and one line, asked for on 2026-10-05:
+       room for a second line of what the note says. */
+    min-height: 62px;
     text-align: left;
     font: inherit;
-    color: var(--card-text, inherit);
+    color: var(--group-text, inherit);
     background: transparent;
-    border: 1px solid color-mix(in srgb, var(--card-text, currentColor) 22%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
     border-radius: 10px;
-    padding: 6px 6px 6px 12px;
+    padding: 4px 6px 4px 12px;
     cursor: pointer;
   }
 
   .picker-note:hover,
   .picker-note:focus-visible {
-    border-color: color-mix(in srgb, var(--card-text, currentColor) 55%, transparent);
+    border-color: color-mix(in srgb, currentColor 55%, transparent);
     outline: none;
   }
 
   .picker-note.current {
-    border-color: var(--card-text, currentColor);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-text, currentColor) 45%, transparent);
+    border-color: currentColor;
+    box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
   }
 
+  /* Centred in the card when the note has too little to say to fill it. */
   .picker-words {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 2px;
   }
 
   .picker-title {
     font-weight: 600;
+    line-height: 1.25;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  /* Up to two lines of what follows the title, cut with an ellipsis. */
   .picker-snippet {
     font-size: 0.8rem;
+    /* Tight enough that a title and two lines fit the 62px. */
+    line-height: 1.2;
     opacity: 0.7;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
   .picker-picture {
@@ -281,9 +288,10 @@
     border-radius: 7px;
   }
 
-  /* A category: the folder's wallpaper behind it all (groupStyle) -- on the
-     theme's page colour, so nothing of the open folder shows through -- or,
-     for a folder with no wallpaper, nothing, and the open folder does. */
+  /* A category: the folder's wallpaper and its dials behind it all
+     (groupStyle), on the theme's page colour; for a folder with no wallpaper,
+     nothing, and the open folder shows through. Colours and the theme's text
+     glow are the theme in use, as everywhere else on the page. */
   .picker-folder-group {
     position: relative;
     isolation: isolate;
@@ -294,13 +302,6 @@
     padding: 6px 8px 8px;
     border-radius: 12px;
     background: var(--group-backdrop, transparent);
-    /* No theme glow inside a category. The theme's text shadow is a haze of
-       its own page colour round every line -- right on its own page, where it
-       keeps writing readable over a wallpaper, but here it laid a veil of the
-       open folder's theme between each note and its folder's wallpaper.
-       Reported on 2026-10-05: "it shouldn't be there, for each note to stand
-       out more". */
-    text-shadow: none;
   }
 
   .picker-group-wall {
