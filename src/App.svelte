@@ -6719,7 +6719,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <!-- A timer in use, reachable from any mode, just before the mini player
          (asked for on 2026-09-29) -- see utils/timerChip.js. On a phone it is
          a notification instead. -->
-    <TimerChip {blocks} themeStyle={overlayThemeStyle} />
+    <TimerChip
+      {blocks}
+      themeStyle={overlayThemeStyle}
+      notificationTheme={{ bg: activeTheme?.popupBg || rightTheme.panelBg, text: rightTheme.textColor, accent: leftTheme.buttonText }}
+    />
 
     <!-- Mini player: present in every mode so what's playing stays reachable
          without going back to Playlist mode. -->

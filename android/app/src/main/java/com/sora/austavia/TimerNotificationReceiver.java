@@ -23,7 +23,8 @@ public class TimerNotificationReceiver extends BroadcastReceiver {
             // In front, the app rings for itself and redraws this on its own.
             if (!TimerNotificationPlugin.appInFront) {
                 TimerNotifications.show(context, blockId, "ringing", 0,
-                    intent.getStringExtra(TimerNotifications.EXTRA_TITLE), "Time's up");
+                    intent.getStringExtra(TimerNotifications.EXTRA_TITLE), "Time's up", "Time's up",
+                    TimerNotificationPlugin.lastColors);
             }
             return;
         }

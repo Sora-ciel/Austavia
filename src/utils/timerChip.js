@@ -28,6 +28,7 @@
  * (clockDeviceStore.js) and hands it here.
  */
 import { timerState, timeLeft, timerReading } from './countdown.js';
+import { toAndroidColor } from './androidColor.js';
 
 const ORDER = { ringing: 0, running: 1, paused: 2 };
 
@@ -77,7 +78,7 @@ export function timerPlace({ nativeAndroid = false, width = Infinity } = {}) {
  * down to on its own -- so it stays right with the app asleep. `endsAt` is a
  * string because that is how it crosses to Java intact.
  */
-export function timerNotice(timers = [], devices = {}) {
+export function timerNotice(timers = [], devices = {}, theme = {}) {
   const shown = (timers || []).filter(entry => entry.phase !== 'stopped');
   const first = shown[0];
   if (!first) return null;
@@ -87,12 +88,22 @@ export function timerNotice(timers = [], devices = {}) {
     phase: first.phase,
     endsAt: String(endsAt),
     title: shown.length > 1 ? `Timer (+${shown.length - 1} more)` : 'Timer',
-    text: first.phase === 'ringing' ? "Time's up" : first.phase === 'paused' ? `Paused · ${timerReading(first.left)}` : ''
+    text: first.phase === 'ringing' ? "Time's up" : first.phase === 'paused' ? `Paused · ${timerReading(first.left)}` : '',
+    // What a paused timer shows in place of the countdown.
+    remaining: first.phase === 'paused' ? timerReading(first.left) : '',
+    // The theme's dialog colours, as the pop-up uses them -- see
+    // TimerNotifications.java. Empty when unreadable: the notification keeps
+    // its own colour for that part.
+    background: toAndroidColor(theme?.bg, { opaque: true }) || '',
+    textColor: toAndroidColor(theme?.text, { opaque: true }) || '',
+    accent: toAndroidColor(theme?.accent, { opaque: true }) || ''
   };
 }
 
-/** Two notices that would draw the same notification. */
+const NOTICE_KEYS = ['blockId', 'phase', 'endsAt', 'title', 'text', 'remaining', 'background', 'textColor', 'accent'];
+
+/** Two notices that would draw the same notification -- a theme change included. */
 export function sameNotice(a, b) {
   if (!a || !b) return a === b;
-  return a.blockId === b.blockId && a.phase === b.phase && a.endsAt === b.endsAt && a.title === b.title && a.text === b.text;
+  return NOTICE_KEYS.every(key => a[key] === b[key]);
 }

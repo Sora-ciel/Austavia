@@ -27,6 +27,8 @@
   export let blocks = [];
   /** The dialog palette App gives its other pop-ups. */
   export let themeStyle = '';
+  /** The same colours the Windows pop-up is drawn in: { bg, text, accent }. */
+  export let notificationTheme = {};
 
   const onDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
   const nativeAndroid = isNativeAndroid();
@@ -66,14 +68,14 @@
   // scratch -- one lost update must not leave the shade wrong for good (the
   // recompute rule in CLAUDE.md).
   let lastNotice;
-  $: notice = place === 'notification' ? timerNotice(timers, devices) : null;
+  $: notice = place === 'notification' ? timerNotice(timers, devices, notificationTheme) : null;
   $: if (place === 'notification' && !sameNotice(notice, lastNotice)) sendNotice(notice);
   function sendNotice(next) {
     lastNotice = next;
     if (next) showTimerNotification(next);
     else clearTimerNotification();
   }
-  const resend = () => { if (place === 'notification') sendNotice(timerNotice(timers, devices)); };
+  const resend = () => { if (place === 'notification') sendNotice(timerNotice(timers, devices, notificationTheme)); };
   const resendTimer = nativeAndroid ? setInterval(resend, 30000) : null;
   const onVisible = () => { if (document.visibilityState === 'visible') { now = Date.now(); resend(); } };
   if (nativeAndroid) {

@@ -80,7 +80,8 @@ describe('what the notification says', () => {
     const timer = startTimer(readTimer(null), T);
     const timers = activeTimers({ blocks: [clock('a')], devices: { a: { timer } }, now: T + MIN });
     assert.deepEqual(timerNotice(timers, { a: { timer } }), {
-      blockId: 'a', phase: 'running', endsAt: String(T + 5 * MIN), title: 'Timer', text: ''
+      blockId: 'a', phase: 'running', endsAt: String(T + 5 * MIN), title: 'Timer', text: '',
+      remaining: '', background: '', textColor: '', accent: ''
     });
   });
 
@@ -93,6 +94,7 @@ describe('what the notification says', () => {
     const notice = timerNotice(timers, devices);
     assert.equal(notice.blockId, 'b');
     assert.equal(notice.text, 'Paused · 3:00');
+    assert.equal(notice.remaining, '3:00', 'shown where the countdown would be');
     assert.equal(notice.title, 'Timer (+1 more)');
     assert.equal(notice.endsAt, '0');
   });
@@ -105,6 +107,19 @@ describe('what the notification says', () => {
 
   it('a stopped one kept in the toolbar panel is not in the shade', () => {
     assert.equal(timerNotice([{ blockId: 'a', phase: 'stopped', left: MIN }], {}), null);
+  });
+
+  // Asked for on 2026-10-05: "hopefully it follows the colour of the themes".
+  it("carries the theme's dialog colours, solid, for Android to paint with", () => {
+    const timer = startTimer(readTimer(null), T);
+    const timers = activeTimers({ blocks: [clock('a')], devices: { a: { timer } }, now: T + MIN });
+    const notice = timerNotice(timers, { a: { timer } }, { bg: 'rgba(12, 12, 14, 0.78)', text: '#ff5cc8', accent: '#fff' });
+    assert.deepEqual([notice.background, notice.textColor, notice.accent], ['#FF0C0C0E', '#FFFF5CC8', '#FFFFFFFF']);
+  });
+
+  it('a theme change redraws the notification', () => {
+    const a = { blockId: 'a', phase: 'running', endsAt: '5', title: 'Timer', text: '', background: '#FF000000' };
+    assert.ok(!sameNotice(a, { ...a, background: '#FF111111' }));
   });
 
   it('tells two notices that draw the same apart from two that do not', () => {

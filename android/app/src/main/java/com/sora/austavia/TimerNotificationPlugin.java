@@ -27,6 +27,8 @@ public class TimerNotificationPlugin extends Plugin {
     private static volatile TimerNotificationPlugin instance;
     /** Whether the app is on screen, so "Time's up" is only sounded when it is not. */
     static volatile boolean appInFront = false;
+    /** The theme's colours as last sent, for a "Time's up" posted with the app gone. */
+    static volatile TimerNotifications.Colors lastColors = TimerNotifications.Colors.NONE;
 
     @Override
     public void load() {
@@ -84,13 +86,21 @@ public class TimerNotificationPlugin extends Plugin {
         try {
             endsAt = Long.parseLong(call.getString("endsAt", "0"));
         } catch (NumberFormatException ignored) { }
+        TimerNotifications.Colors colors = new TimerNotifications.Colors(
+            TimerNotifications.parseColor(call.getString("background", "")),
+            TimerNotifications.parseColor(call.getString("textColor", "")),
+            TimerNotifications.parseColor(call.getString("accent", ""))
+        );
+        lastColors = colors;
         TimerNotifications.show(
             getContext(),
             call.getString("blockId", ""),
             call.getString("phase", "running"),
             endsAt,
             call.getString("title", "Timer"),
-            call.getString("text", "")
+            call.getString("text", ""),
+            call.getString("remaining", ""),
+            colors
         );
         call.resolve();
     }

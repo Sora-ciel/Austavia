@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The timer in the notification shade: the time on the left, the timer
+    pop-up's buttons on the right. Coloured from the app's theme at run time
+    (TimerNotifications.java), so the colours here are only what shows if
+    none arrive.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/timer_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="44dp"
+    android:background="#FF17171A"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingEnd="8dp">
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1">
+
+        <Chronometer
+            android:id="@+id/timer_clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/timer_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <ImageButton
+        android:id="@+id/timer_toggle"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="Pause or resume"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_media_pause" />
+
+    <TextView
+        android:id="@+id/timer_plus"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:contentDescription="One more minute"
+        android:gravity="center"
+        android:text="+1"
+        android:textColor="#FFFFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <ImageButton
+        android:id="@+id/timer_stop"
+        android:layout_width="38dp"
+        android:layout_height="38dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="Stop and set back to the start"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_timer_reset" />
+</LinearLayout>

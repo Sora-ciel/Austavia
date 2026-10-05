@@ -60,7 +60,10 @@ test('every layout we override still exists in Capacitor, so none is dead weight
   // dropped is doing nothing, and looks like it is doing something.
   const libraryLayouts = 'node_modules/@capacitor/android/capacitor/src/main/res/layout';
   const theirs = new Set(readdirSync(libraryLayouts));
-  const ourOverrides = readdirSync(OUR_LAYOUTS).filter((name) => name !== 'activity_main.xml');
+  // Layouts that are ours rather than overrides of Capacitor's: the activity,
+  // and the timer notification's own view (TimerNotifications.java).
+  const OUR_OWN = new Set(['activity_main.xml', 'notification_timer.xml']);
+  const ourOverrides = readdirSync(OUR_LAYOUTS).filter((name) => !OUR_OWN.has(name));
 
   for (const name of ourOverrides) {
     assert.ok(theirs.has(name), `${name} is not a Capacitor layout any more — it overrides nothing`);
