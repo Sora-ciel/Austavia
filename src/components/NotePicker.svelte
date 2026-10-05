@@ -678,9 +678,13 @@
     /* A frame in the category's own writing colour, so where one folder ends
        and the next begins reads at a glance -- wallpaper or not. Asked for on
        2026-10-05: "make each difference of the category easier to see". */
-    /* The toolbar's background, opacity and all, so the frames read as part
-       of the app's own chrome -- asked for on 2026-10-05. */
-    border: 4px solid var(--toolbar-bg, color-mix(in srgb, currentColor 60%, transparent));
+    /* The toolbar buttons' writing colour, round every category, this folder's
+       included. The toolbar's background was tried first, and on themes whose
+       toolbar is close to the page, or see-through, the frame all but
+       vanished -- on some categories and not others. Asked for on 2026-10-05:
+       "the colour of the text in the buttons of the controls ... on all the
+       categories, including the folder we are on". */
+    border: 4px solid var(--toolbar-button-text, currentColor);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
   }
 
