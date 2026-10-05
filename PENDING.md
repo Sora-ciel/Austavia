@@ -565,16 +565,34 @@ Still owed, in order:
    **new** signing secret, a new endpoint — plus deploying the functions to
    production, which is still blocked by `ARIAL_SMTP_PASS`. See section 5 and
    `POLAR.md`.
-4. **The portal's org slug.** `.env.staging` carries a *guessed*
+4. **Prove the money arrives -- before telling anyone they can pay.** Raised
+   2026-10-05: Polar could not say for certain that payouts will work for this
+   account, and nothing so far has tested it. The sandbox runs prove only our
+   side -- that a purchase, a cancellation and a refund change the plan
+   correctly. Sandbox money is not real and never reaches a bank, so they
+   cannot show the other half: Polar, as the seller, collecting the money and
+   paying it out. That half can fail on its own -- identity or bank checks on
+   the payout account, a review of the account after its first sales, a
+   minimum or waiting period before a payout, a country or bank it does not
+   pay out to -- and none of it involves the app, so it would only surface at
+   the first real sale.
+
+   So, straight after going live: **buy one month with your own card, keep it
+   (a refund pays nothing out, so it proves nothing), and wait until the money
+   is in the bank.** Note how long it took and what Polar asked for on the
+   way. It costs one month's price less fees, which come back. Check the
+   payout account is connected and verified in Polar's dashboard before that,
+   so the test is of the payout itself and not of a setup step left undone.
+5. **The portal's org slug.** `.env.staging` carries a *guessed*
    `VITE_POLAR_PORTAL_LINK` — `sandbox.polar.sh/austavia/portal`. It will 404
    until it is replaced with the real sandbox organisation slug, and the live
    one still has to be written into `checkout.js` before any real sale.
-5. **Delete the sandbox access token when the sandbox run is finished.** It
+6. **Delete the sandbox access token when the sandbox run is finished.** It
    was pasted into a chat on 2026-09-26, which is fine for a token scoped to a
    sandbox organisation holding nothing but test data — and is exactly why it
    should not outlive the testing. The production one never gets handled that
    way: set with `functions:secrets:set`, read by nothing but the function.
-6. **Birthday Mode's unlock** rewired onto `plan`.
+7. **Birthday Mode's unlock** rewired onto `plan`.
 
 What the subscriber sees is now built and unverified rather than missing: a
 plan panel above the storage bar showing what they are on, when it renews, that
