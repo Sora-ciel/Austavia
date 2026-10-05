@@ -93,8 +93,20 @@
     if (nativeAndroid) document.removeEventListener('visibilitychange', onVisible);
   });
 
+  // Where the panel goes: under the chip, right edges lined up. Fixed rather
+  // than hung off the chip, because the toolbar scrolls sideways on narrower
+  // windows and so clips anything below it -- the panel was there but
+  // invisible (2026-10-05). Worked out when it opens and on resize.
+  let panelSpot = '';
+  function placePanel() {
+    if (!chipRef || typeof window === 'undefined') return;
+    const rect = chipRef.getBoundingClientRect();
+    panelSpot = `top: ${Math.round(rect.bottom + 8)}px; right: ${Math.max(8, Math.round(window.innerWidth - rect.right))}px;`;
+  }
+
   function toggleOpen() {
     if (open) return closePanel();
+    placePanel();
     open = true;
     shown = timers.map(entry => entry.blockId);
   }
@@ -125,7 +137,7 @@
   }
 </script>
 
-<svelte:window bind:innerWidth={width} />
+<svelte:window bind:innerWidth={width} on:resize={() => open && placePanel()} />
 
 {#if first && place === 'toolbar'}
   <div class="timer-chip-wrap">
@@ -150,7 +162,7 @@
     {#if open}
       <div
         class="timer-panel"
-        style={themeStyle}
+        style="{themeStyle}; {panelSpot}"
         role="dialog"
         aria-label="Timers"
         use:clickOutside={{ onOutside: closePanel, ignore: () => [chipRef] }}
@@ -177,14 +189,26 @@
               {#if onDesktop}
                 <!-- The same switch as on the block: whether this timer opens
                      the always-on-top pop-up. -->
+                <!-- The block's own pop-up icon and its On/Off, so it is one
+                     button the size of the others -- "Pop-up on" wrapped onto
+                     several lines (2026-10-05). -->
                 <button
                   class="popup-switch"
                   class:off={devices[entry.blockId]?.timerPopup === false}
                   role="switch"
                   aria-checked={devices[entry.blockId]?.timerPopup !== false}
-                  title="Always-on-top pop-up for this timer"
+                  aria-label="Always-on-top pop-up"
+                  title={devices[entry.blockId]?.timerPopup === false
+                    ? 'Timer pop-up off: click to turn it on'
+                    : 'Timer pop-up on: click to turn it off'}
                   on:click={() => togglePopup(entry.blockId)}
-                >Pop-up {devices[entry.blockId]?.timerPopup === false ? 'off' : 'on'}</button>
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+                    <rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+                    <path d="M13 3h8v8M21 3l-8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>{devices[entry.blockId]?.timerPopup === false ? 'Off' : 'On'}</span>
+                </button>
               {/if}
             </span>
           </div>
@@ -253,14 +277,16 @@
     50% { opacity: 0.45; }
   }
 
-  /* Just under the chip, its right edges lined up: the dialog colours App
-     gives its other pop-ups. */
+  /* Just under the chip, its right edges lined up (panelSpot): the dialog
+     colours App gives its other pop-ups. */
   .timer-panel {
     --sb-track: var(--dlg-bg, #17171a);
     --sb-thumb: var(--dlg-btn-text, var(--dlg-text, #f0f0f0));
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    top: calc(var(--controls-height, 56px) + 8px);
+    right: 8px;
+    /* As wide as its rows, never wrapping a button onto a second line. */
+    width: max-content;
     z-index: 1400;
     display: flex;
     flex-direction: column;
@@ -299,8 +325,14 @@
     margin-left: auto;
   }
 
+  /* One height for every button in the row, words and icons alike. */
   .row-actions button {
+    box-sizing: border-box;
+    height: 26px;
+    white-space: nowrap;
     font: inherit;
+    /* After font, which would otherwise put the app's line height back. */
+    line-height: 1;
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--dlg-btn-text, var(--dlg-text, #fff));
@@ -324,8 +356,14 @@
     border-color: transparent;
   }
 
+  .row-actions button.popup-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+  }
+
   .popup-switch.off {
     opacity: 0.55;
-    text-decoration: line-through;
   }
 </style>
