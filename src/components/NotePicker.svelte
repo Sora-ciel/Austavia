@@ -16,11 +16,13 @@
   export let currentNoteId = null;
   /** Every other folder's notes: async () => [{ folder, notes }]. */
   export let loadElsewhere = async () => [];
-  /**
-   * A card's colours from its note's: (entry) => css variables. Single Note
-   * draws each card the way it draws that note, theme opacity included.
-   */
+  /** A card's writing colour from its note's: (entry) => css variables. */
   export let cardStyle = () => '';
+  /**
+   * A category's background from its folder's wallpaper settings:
+   * (wallpaper) => css variables. See groupStyle in SingleNoteMode.
+   */
+  export let groupStyle = () => '';
   /** This folder's wallpaper settings, for the cards of its own notes. */
   export let hereWallpaper = null;
 
@@ -51,40 +53,6 @@
       loadingElsewhere = false;
     }
   });
-
-  /**
-   * Lays a folder's wallpaper across all its cards at once. Each card's
-   * picture layer is given the size of the whole run of cards and moved back
-   * by the card's own position in it, so the card shows only its part -- a
-   * window onto one picture. Measured again whenever the group changes size
-   * or a search adds or removes a card.
-   */
-  function windowsOnto(group) {
-    const place = () => {
-      const cards = [...group.querySelectorAll(':scope > .picker-note')];
-      if (!cards.length) return;
-      const top = cards[0].offsetTop;
-      const bottom = cards[cards.length - 1].offsetTop + cards[cards.length - 1].offsetHeight;
-      const width = group.clientWidth;
-      for (const card of cards) {
-        card.style.setProperty('--wall-left', `${-card.offsetLeft}px`);
-        card.style.setProperty('--wall-top', `${top - card.offsetTop}px`);
-        card.style.setProperty('--wall-width', `${width}px`);
-        card.style.setProperty('--wall-height', `${bottom - top}px`);
-      }
-    };
-    const sized = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(place) : null;
-    sized?.observe(group);
-    const changed = new MutationObserver(place);
-    changed.observe(group, { childList: true });
-    place();
-    return {
-      destroy() {
-        sized?.disconnect();
-        changed.disconnect();
-      }
-    };
-  }
 
   function pick(entry) {
     dispatch('pick', { folder: entry.folder, id: entry.id });
@@ -119,12 +87,13 @@
   </div>
 
   <div class="picker-list">
-    <!-- Each folder's notes are one group, and its wallpaper is laid across the
-         whole group: every card is a window onto its part of the one picture
-         (use:windowsOnto), rather than each repeating it. Asked for on
-         2026-10-05. -->
+    <!-- Each folder is a category: its wallpaper behind the whole of it, its
+         name, and its notes on top with no background of their own. Asked
+         for on 2026-10-05: "easier to see and cleaner". -->
     {#if results.here.length}
-      <section class="picker-folder-group" aria-label="This folder" use:windowsOnto>
+      <section class="picker-folder-group" aria-label={currentFolder} style={groupStyle(hereWallpaper)}>
+        <span class="picker-group-wall" aria-hidden="true"></span>
+        <h3 class="picker-folder">{currentFolder}</h3>
         {#each results.here as entry (entry.id)}
           <button
             class="picker-note"
@@ -132,7 +101,6 @@
             style={cardStyle(entry)}
             on:click={() => pick(entry)}
           >
-            <span class="picker-wall" aria-hidden="true"></span>
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
@@ -155,11 +123,11 @@
       <div class="picker-quiet">Looking through the other folders…</div>
     {/if}
 
-    <!-- One heading per folder, its notes under it -- "it'll show easier for
-         people which note is where". A folder with none is not listed. -->
+    <!-- A folder with no notes, or none the search finds, is not listed. -->
     {#each results.elsewhere as group (group.folder)}
-      <h3 class="picker-folder">{group.folder}</h3>
-      <section class="picker-folder-group" aria-label={group.folder} use:windowsOnto>
+      <section class="picker-folder-group" aria-label={group.folder} style={groupStyle(group.wallpaper)}>
+        <span class="picker-group-wall" aria-hidden="true"></span>
+        <h3 class="picker-folder">{group.folder}</h3>
         {#each group.notes as entry (`${entry.folder}/${entry.id}`)}
           <button
             class="picker-note"
@@ -167,7 +135,6 @@
             style={cardStyle(entry)}
             on:click={() => pick(entry)}
           >
-            <span class="picker-wall" aria-hidden="true"></span>
             <span class="picker-words">
               <span class="picker-title">{entry.title}</span>
               {#if entry.snippet}<span class="picker-snippet">{entry.snippet}</span>{/if}
@@ -254,15 +221,10 @@
     gap: 4px;
   }
 
-  /* A card over its folder's wallpaper (cardStyle): the note's colour as it
-     sits behind that wallpaper in its own folder, so nothing of the open
-     folder shows through, then the wallpaper, then the writing. A folder with
-     no wallpaper gives its cards no background at all, and the open folder's
-     shows through. Asked for on 2026-10-05. */
+  /* A note on its category: no background of its own, so the folder's
+     wallpaper behind the category shows through it; the note's own writing
+     colour (cardStyle) and a hairline of it. */
   .picker-note {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -270,7 +232,7 @@
     text-align: left;
     font: inherit;
     color: var(--card-text, inherit);
-    background: var(--card-backdrop, transparent);
+    background: transparent;
     border: 1px solid color-mix(in srgb, var(--card-text, currentColor) 22%, transparent);
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
@@ -288,25 +250,6 @@
     border-color: var(--card-text, currentColor);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--card-text, currentColor) 45%, transparent);
   }
-
-  /* The folder's whole run of cards in size, moved back by this card's place
-     in it (windowsOnto) -- plus the blur's bleed on every side. */
-  .picker-wall {
-    position: absolute;
-    pointer-events: none;
-    z-index: -1;
-    left: calc(var(--wall-left, 0px) + var(--card-wall-bleed, 0px));
-    top: calc(var(--wall-top, 0px) + var(--card-wall-bleed, 0px));
-    width: calc(var(--wall-width, 100%) - 2 * var(--card-wall-bleed, 0px));
-    height: calc(var(--wall-height, 100%) - 2 * var(--card-wall-bleed, 0px));
-    background-image: var(--card-wall, none);
-    background-size: var(--card-wall-size, cover);
-    background-position: center;
-    background-repeat: no-repeat;
-    opacity: var(--card-wall-opacity, 1);
-    filter: var(--card-wall-filter, none);
-  }
-
 
   .picker-words {
     flex: 1;
@@ -339,16 +282,36 @@
     border-radius: 7px;
   }
 
-  /* Positioned, so a card's place in it can be measured from it. */
+  /* A category: the folder's wallpaper behind it all (groupStyle) -- on the
+     theme's page colour, so nothing of the open folder shows through -- or,
+     for a folder with no wallpaper, nothing, and the open folder does. */
   .picker-folder-group {
     position: relative;
+    isolation: isolate;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    padding: 6px 8px 8px;
+    border-radius: 12px;
+    background: var(--group-backdrop, transparent);
+  }
+
+  .picker-group-wall {
+    position: absolute;
+    z-index: -1;
+    inset: var(--group-wall-bleed, 0px);
+    pointer-events: none;
+    background-image: var(--group-wall, none);
+    background-size: var(--group-wall-size, cover);
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: var(--group-wall-opacity, 1);
+    filter: var(--group-wall-filter, none);
   }
 
   .picker-folder {
-    margin: 10px 2px 2px;
+    margin: 0 2px 2px;
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.03em;

@@ -295,23 +295,28 @@
   let pickerOpen = false;
   $: noteIndex = noteBlocks.findIndex(block => block.id === selectedNoteId);
 
-  // Each card on the search page, after its folder: with a wallpaper, the
-  // note's colour as that folder draws it behind its wallpaper -- solid, so
-  // nothing of the open folder shows through -- and the wallpaper over it
-  // (the phone one at a phone's shape), with that folder's opacity, blur and
-  // brightness; laid across all that folder's cards at once by NotePicker.
-  // With no wallpaper, no background at all: the open folder shows through.
-  // Asked for on 2026-10-05.
-  function noteCardStyle(entry) {
-    const surface = surfaceColors({ bgColor: entry?.bgColor, textColor: entry?.textColor }, canvasTheme);
-    const wall = backgroundLayerStyle(entry?.wallpaper, { isMobile: isMobileViewport });
-    if (!wall) return `--card-text: ${surface.text};`;
+  // The search page's categories, one per folder: that folder's wallpaper
+  // behind the whole category -- the phone one at a phone's shape, with that
+  // folder's opacity, blur and brightness -- on the theme's page colour, so
+  // nothing of the open folder shows through. A folder with no wallpaper gets
+  // nothing, and the open folder shows through. The notes sit on top with no
+  // background of their own, in their own writing colour. Asked for on
+  // 2026-10-05: "the whole category has the background of the folder behind
+  // the notes ... easier to see and cleaner".
+  function groupStyle(wallpaper) {
+    const wall = backgroundLayerStyle(wallpaper, { isMobile: isMobileViewport });
+    if (!wall) return '';
     const url = String(wall.image).replace(/"/g, '%22');
     return (
-      `--card-text: ${surface.text}; --card-backdrop: ${drawnSurface(surface.bg, canvasTheme.innerBg)};` +
-      ` --card-wall: url("${url}"); --card-wall-opacity: ${wall.opacity};` +
-      ` --card-wall-filter: ${wall.filter}; --card-wall-size: ${wall.size}; --card-wall-bleed: -${wall.bleed}px;`
+      `--group-backdrop: ${canvasTheme.innerBg};` +
+      ` --group-wall: url("${url}"); --group-wall-opacity: ${wall.opacity};` +
+      ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
     );
+  }
+
+  function noteCardStyle(entry) {
+    const surface = surfaceColors({ bgColor: entry?.bgColor, textColor: entry?.textColor }, canvasTheme);
+    return `--card-text: ${surface.text};`;
   }
 
   function pickNote(event) {
@@ -771,6 +776,7 @@
         loadElsewhere={loadOtherFolderNotes}
         hereWallpaper={singleNoteSettings}
         cardStyle={noteCardStyle}
+        {groupStyle}
         on:pick={pickNote}
         on:close={() => (pickerOpen = false)}
       />

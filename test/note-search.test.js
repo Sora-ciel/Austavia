@@ -104,4 +104,12 @@ describe("each card's folder", () => {
     assert.equal(result.here[0].wallpaper.backgroundImage, 'notes.jpg');
     assert.equal(result.elsewhere[0].notes[0].wallpaper, wall);
   });
+
+  // Then, the same day: "have the whole category have the background of the
+  // folder behind the notes, and the notes shown above without the background".
+  it("gives each other folder's category its wallpaper, to draw behind all its notes", () => {
+    const wall = { backgroundImage: 'work.jpg' };
+    const result = searchNotes({ elsewhere: [{ folder: 'Work', notes: [{ id: 'w', content: '<p>W</p>' }], wallpaper: wall }] });
+    assert.equal(result.elsewhere[0].wallpaper, wall);
+  });
 });

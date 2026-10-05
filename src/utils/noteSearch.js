@@ -87,7 +87,12 @@ export function searchNotes({ currentFolder = '', here = [], hereWallpaper = nul
   const inOthers = [...(elsewhere || [])]
     .filter(group => group && group.folder !== currentFolder)
     .sort((a, b) => String(a.folder).localeCompare(String(b.folder)))
-    .map(group => ({ folder: group.folder, notes: entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches).map(strip) }))
+    .map(group => ({
+      folder: group.folder,
+      // Drawn behind the whole category, its notes on top of it.
+      wallpaper: group.wallpaper || null,
+      notes: entriesOf(group.notes, group.folder, group.wallpaper || null).filter(matches).map(strip)
+    }))
     .filter(group => group.notes.length > 0);
 
   return { here: inThisFolder, elsewhere: inOthers };
