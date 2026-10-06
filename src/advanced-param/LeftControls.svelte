@@ -245,6 +245,36 @@
     dispatch("exportJSON");
   }
 
+  // The folder's name. Typing changes nothing until Enter or leaving the
+  // field, and then the folder is renamed -- not a second folder made under
+  // the new name, which is what writing straight into the open folder's name
+  // used to do. Escape puts the name back. Asked for on 2026-10-05.
+  let nameDraft = currentSaveName || '';
+  let editingName = false;
+  $: if (!editingName) nameDraft = currentSaveName || '';
+
+  function commitName(event) {
+    editingName = false;
+    const to = nameDraft.trim();
+    if (to && to !== currentSaveName) dispatch('renameFolder', { to });
+    nameDraft = currentSaveName || '';
+    // Written back by hand: when the draft returns to the value last drawn,
+    // Svelte sees no change and leaves whatever was typed in the field. A
+    // refused rename then still showed the refused name. The new name
+    // arrives through currentSaveName once the rename is done.
+    if (event?.currentTarget) event.currentTarget.value = nameDraft;
+  }
+
+  function onNameKey(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    } else if (event.key === 'Escape') {
+      nameDraft = currentSaveName || '';
+      event.currentTarget.blur();
+    }
+  }
+
   function importJSON(event) {
     dispatch("importJSON", event);
   }
@@ -1275,7 +1305,14 @@ onMount(() => {
     <button data-control="redo" on:click={() => dispatch('redo')}><ControlIcon name="redo" /> Redo</button>
   {:else if id === 'fileName'}
     <label data-control="fileName" class="file-name-field">
-      <input bind:value={currentSaveName} placeholder="File name" />
+      <input
+        value={nameDraft}
+        placeholder="File name"
+        on:focus={() => (editingName = true)}
+        on:input={(event) => (nameDraft = event.currentTarget.value)}
+        on:keydown={onNameKey}
+        on:blur={commitName}
+      />
     </label>
   {:else if id === 'columns'}
       <label data-control="columns" class="simple-columns-control mobile-only">

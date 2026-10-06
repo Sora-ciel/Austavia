@@ -49,8 +49,15 @@
     sweepStaleWallpapers,
     subscribeStorageUsage,
     subscribeAccountPlan,
-    subscribeSubscription
+    subscribeSubscription,
+    deleteRemoteFile
   } from './firebaseClient.js';
+  import ExportDialog from './components/ExportDialog.svelte';
+  import ImportDialog from './components/ImportDialog.svelte';
+  import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
+  import { embedCloudFiles } from './utils/cloudFiles.js';
+  import { deliverFile, isNativeAndroid as onAndroidApp } from './utils/fileDelivery.js';
+  import { PENDING_DELETES_KEY, readPending, withPending, settlePending, skipDownload, deletesToRun } from './utils/folderMoves.js';
   import { reconcileThemes } from './utils/themeSync.js';
   import {
     themeKey,
@@ -4013,17 +4020,6 @@
     }
   }
 
-  function saveScreenshot(blob, name) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
   function noteScreenshot(message) {
     screenshotNote = message;
     clearTimeout(screenshotNoteTimer);
@@ -4050,7 +4046,9 @@
     screenshotNote = '';
 
     const capture = captureScreenshotBlob();
-    const copying = copyScreenshotToClipboard(capture);
+    // Not in the Android app: what it copies never reaches other apps there,
+    // and the share sheet that follows does the job properly (2026-10-05).
+    const copying = onAndroidApp() ? Promise.resolve(false) : copyScreenshotToClipboard(capture);
 
     deliverScreenshot(capture, copying);
   }
@@ -4058,8 +4056,11 @@
   async function deliverScreenshot(capture, copying) {
     try {
       const blob = await capture;
-      saveScreenshot(blob, screenshotFileName({ saveName: currentSaveName, mode }));
-      noteScreenshot(deliveryMessage({ copied: await copying, downloaded: true }));
+      // A download on a computer; the system share sheet in the Android app,
+      // where a web download saved nothing -- see utils/fileDelivery.js.
+      const how = await deliverFile(blob, screenshotFileName({ saveName: currentSaveName, mode }), { title: 'Screenshot' });
+      if (how === 'downloaded') noteScreenshot(deliveryMessage({ copied: await copying, downloaded: true }));
+      else if (how === 'shared') noteScreenshot('Shared');
     } catch (error) {
       console.error('Screenshot failed', error);
       await copying.catch(() => {});
@@ -4966,7 +4967,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // workspace. Doing that because some *other* folder changed on another
     // device is a flash for no reason, so it's tracked separately.
     let openFileChanged = false;
+    // An old name a rename left behind is not a folder to receive.
+    const owedDeletes = readOwedDeletes();
     for (const [fileName, remoteMeta] of remoteEntries) {
+      if (skipDownload(fileName, owedDeletes)) continue;
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
       // compare two integers.
@@ -5292,6 +5296,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       syncFailureNotice = '';
     }
 
+    await payOwedDeletes(failures.length > 0);
+
     // A folder left behind is still owed an upload, so the next tick tries it
     // again instead of waiting for another edit to mark things dirty. Names the
     // database cannot use are not included: those will never succeed, and
@@ -5533,62 +5539,268 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }
   }
 
+  // ── Export, import, rename, duplicate ────────────────────────────
+  // Asked for on 2026-10-05. What a file holds and how a new folder is named
+  // are decided in utils/folderTransfer.js; a folder's pictures are made its
+  // own by utils/cloudFiles.js; the old name a rename leaves in the cloud is
+  // remembered by utils/folderMoves.js. This part does the reading and
+  // writing.
+  let exportDialogOpen = false;
+  let exportBusy = false;
+  let importState = null; // { file, fileName }
+  let importBusy = false;
+
   function exportJSON() {
-    const dataStr = JSON.stringify(
-      {
-        blocks,
-        modeOrders: ensureModeOrders(blocks, modeOrders),
-        modeSettings: normalizeModeSettings(modeSettings)
-      },
-      null,
-      2
-    );
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${currentSaveName || "codex-blocks"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportDialogOpen = true;
+  }
+
+  /** An edit still waiting out its debounce, written before a folder is read whole. */
+  async function flushWaitingSave() {
+    if (!_pendingSave) return;
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+    _firstQueuedAt = 0;
+    const waiting = _pendingSave;
+    _pendingSave = null;
+    await _runSave(waiting);
+  }
+
+  const withoutSessionFields = blockList => (blockList || []).map(block => {
+    const { _version, resolvedSrc, attachmentRequiresAuth, ...kept } = block || {};
+    return kept;
+  });
+
+  async function runExport(event) {
+    const { scope, settings, pictures, themes } = event.detail || {};
+    exportBusy = true;
+    try {
+      await flushWaitingSave();
+      const names = scope === 'all' ? [...savedList] : [currentSaveName].filter(Boolean);
+      const folders = [];
+      let failed = 0;
+      for (const name of names) {
+        let payload = await loadBlocks(name);
+        if (!payload) continue;
+        if (pictures) {
+          const embedded = await embedCloudFiles(payload);
+          payload = embedded.payload;
+          failed += embedded.failed;
+        }
+        folders.push({
+          name,
+          blocks: withoutSessionFields(payload.blocks),
+          modeOrders: payload.modeOrders,
+          modeSettings: payload.modeSettings
+        });
+      }
+      const file = buildExport({
+        folders,
+        include: { settings, themes },
+        themes: {
+          custom: customThemes.map(({ id, name, description, controlColors, blockTheme, previewBg }) =>
+            ({ id, name, description, controlColors, blockTheme, previewBg })),
+          selectedId: selectedThemeId
+        }
+      });
+      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+      await deliverFile(blob, `${scope === 'all' ? 'Austavia folders' : currentSaveName || 'Austavia'}.json`);
+      exportDialogOpen = false;
+      if (failed) {
+        await appAlert(`${failed} picture${failed === 1 ? '' : 's'} could not be fetched, and stay${failed === 1 ? 's' : ''} as a link in the file.`);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      await appAlert(`The export could not be made: ${error?.message || error}`);
+    } finally {
+      exportBusy = false;
+    }
   }
 
   async function importJSON(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async e => {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (Array.isArray(imported) || (imported && typeof imported === "object")) {
-          const importedBlocks = Array.isArray(imported)
-            ? imported
-            : Array.isArray(imported.blocks)
-            ? imported.blocks
-            : [];
-          const importedOrders = Array.isArray(imported)
-            ? {}
-            : imported.modeOrders;
-          const importedModeSettings = Array.isArray(imported)
-            ? null
-            : imported.modeSettings;
-          blocks = importedBlocks.map(b => ({
-            ...applyHistoryTriggers(b),
-            _version: 0
-          }));
-          modeOrders = ensureModeOrders(blocks, importedOrders);
-          modeSettings = normalizeModeSettings(importedModeSettings);
-          focusedBlockId = null;
-          history = [];
-          historyIndex = -1;
-          await pushHistory(blocks, modeOrders);
-          await appAlert("Imported successfully!");
-        } else await appAlert("Invalid file structure!");
-      } catch {
-        await appAlert("Invalid JSON file!");
+    const input = event?.target;
+    const chosen = input?.files?.[0];
+    if (!chosen) return;
+    const text = await chosen.text();
+    if (input) input.value = '';
+    const file = readExport(text, chosen.name);
+    if (file.error) {
+      await appAlert(file.error);
+      return;
+    }
+    importState = { file, fileName: chosen.name };
+  }
+
+  async function runImport(event) {
+    const choice = event.detail || {};
+    const plan = planImport({
+      file: importState?.file,
+      folders: choice.folders,
+      settings: choice.settings,
+      themes: choice.themes,
+      target: choice.target,
+      existingFolders: savedList,
+      currentFolder: currentSaveName,
+      existingThemeNames: availableThemes.map(theme => theme.name)
+    });
+    if (plan.error) {
+      await appAlert(plan.error);
+      return;
+    }
+
+    importBusy = true;
+    try {
+      await flushWaitingSave();
+      for (const write of plan.writes) {
+        const importedBlocks = withoutSessionFields(write.blocks);
+        if (write.replaces) {
+          // In place of the open folder -- kept first, so it can be put back
+          // from Settings, Advanced, kept copies.
+          const current = await loadBlocks(write.name);
+          const next = {
+            blocks: importedBlocks,
+            modeOrders: ensureModeOrders(importedBlocks, write.modeOrders),
+            modeSettings: normalizeModeSettings(write.modeSettings === undefined ? current?.modeSettings : write.modeSettings)
+          };
+          await keepReplacedCopy(write.name, current, next);
+          await saveBlocks(write.name, next);
+          logSync('save', write.name, 'replaced by an import');
+        } else {
+          await saveBlocks(write.name, {
+            blocks: importedBlocks,
+            modeOrders: ensureModeOrders(importedBlocks, write.modeOrders),
+            modeSettings: normalizeModeSettings(write.modeSettings)
+          });
+          logSync('save', write.name, 'made by an import');
+        }
       }
-    };
-    reader.readAsText(file);
-    event.target.value = "";
+
+      // Themes go in as the theme editor adds them: new ids, names no theme has.
+      const madeFrom = new Map();
+      for (const theme of plan.themes) {
+        const payload = normalizeThemePayload(theme);
+        const created = payload && createCustomThemePayload(payload);
+        if (!created) continue;
+        customThemes = [...customThemes, created];
+        madeFrom.set(theme.id, created);
+        pushThemeToCloud(created);
+      }
+      if (madeFrom.size) persistCustomThemes(customThemes);
+      const wanted = importState.file.themes?.selectedId;
+      if (choice.themes && choice.switchTheme && wanted) {
+        const target = madeFrom.get(wanted) || availableThemes.find(theme => theme.id === wanted);
+        if (target) applyThemePreset(target);
+      }
+
+      savedList = await listSavedBlocks();
+      autoSyncDirty = true;
+      importState = null;
+      if (plan.writes.length) await load(plan.writes[0].name);
+    } catch (error) {
+      console.error('Import failed:', error);
+      await appAlert(`The import could not be finished: ${error?.message || error}`);
+    } finally {
+      importBusy = false;
+    }
+  }
+
+  function readOwedDeletes() {
+    try {
+      return readPending(localStorage.getItem(PENDING_DELETES_KEY));
+    } catch {
+      return [];
+    }
+  }
+
+  function writeOwedDeletes(list) {
+    try {
+      localStorage.setItem(PENDING_DELETES_KEY, JSON.stringify(list));
+    } catch { /* tried again next time */ }
+  }
+
+  /**
+   * The open folder under a new name -- the same folder, not a second one.
+   * Asked for on 2026-10-05. Its pictures are fetched and kept with it first:
+   * the old name's cloud path is deleted once the folder is up under the new
+   * one, and links into it would break. Offline, that fetch fails, and the
+   * rename waits rather than risk them.
+   */
+  async function renameFolder(event) {
+    const to = String(event.detail?.to ?? '').trim();
+    const from = currentSaveName;
+    if (!to || to === from) return;
+
+    // Nothing saved under the old name yet: the first save takes the new one.
+    if (!from || !savedList.includes(from)) {
+      currentSaveName = to;
+      persistLastSaveName(to);
+      return;
+    }
+    if (savedList.includes(to)) {
+      await appAlert(`There is already a folder called "${to}".`);
+      return;
+    }
+
+    try {
+      await flushWaitingSave();
+      const current = await loadBlocks(from);
+      const { payload, failed } = await embedCloudFiles(current, { audio: true });
+      if (failed) {
+        await appAlert(`${failed} picture${failed === 1 ? '' : 's'} in this folder could not be fetched, so it was not renamed. Try again when online.`);
+        return;
+      }
+      await saveBlocks(to, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: payload.modeSettings });
+      await deleteBlocks(from);
+      writeOwedDeletes(withPending(readOwedDeletes(), from));
+      savedList = await listSavedBlocks();
+      persistLastSaveName(to);
+      logSync('save', to, `renamed from "${from}"`);
+      autoSyncDirty = true;
+      await load(to);
+    } catch (error) {
+      console.error('Rename failed:', error);
+      await appAlert(`The folder could not be renamed: ${error?.message || error}`);
+    }
+  }
+
+  /** A copy of a folder, named as an import would be: "Damn 1", "Damn 2". */
+  async function duplicateFolder(name) {
+    if (!savedList.includes(name)) return;
+    try {
+      if (name === currentSaveName) await flushWaitingSave();
+      const current = await loadBlocks(name);
+      const { payload, failed } = await embedCloudFiles(current, { audio: true });
+      if (failed) {
+        await appAlert(`${failed} picture${failed === 1 ? '' : 's'} could not be fetched, so the copy was not made. Try again when online.`);
+        return;
+      }
+      const copyName = uniqueName(name, savedList);
+      await saveBlocks(copyName, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: payload.modeSettings });
+      savedList = await listSavedBlocks();
+      logSync('save', copyName, `duplicated from "${name}"`);
+      autoSyncDirty = true;
+    } catch (error) {
+      console.error('Duplicate failed:', error);
+      await appAlert(`The folder could not be copied: ${error?.message || error}`);
+    }
+  }
+
+  /**
+   * Old names a rename left in the cloud, deleted once nothing is failing to
+   * upload -- so the renamed folder, pictures and all, is up first. Owed
+   * across restarts; see utils/folderMoves.js.
+   */
+  async function payOwedDeletes(uploadFailed) {
+    let owed = settlePending(readOwedDeletes(), savedList);
+    for (const name of deletesToRun({ pending: owed, localFolders: savedList, uploadFailed })) {
+      try {
+        await deleteRemoteFile(name);
+        owed = owed.filter(item => item !== name);
+        logSync('upload', name, 'old name deleted from the cloud after a rename');
+      } catch (error) {
+        logSync('error', name, 'could not delete the old name from the cloud', { error: String(error?.message || error) });
+      }
+    }
+    writeOwedDeletes(owed);
   }
 
   function setControlsHeight(value) {
@@ -6740,6 +6952,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   <div class="controls" bind:this={controlsRef} style={controlsStyle}>
     <LeftControls
       bind:currentSaveName
+      on:renameFolder={renameFolder}
       {mode}
       {simpleNoteColumnCount}
       {singleNoteSettings}
@@ -6964,6 +7177,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         {subscriptionRecord}
         {load}
         {deleteSave}
+        {duplicateFolder}
         {createNewFile}
         {controlColors}
         themes={availableThemes}
@@ -7096,6 +7310,32 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <!-- The always-on-top timer and alarm windows, on the Windows app only --
      see utils/clockPopups.js. -->
 <ClockPopupWindows {blocks} bind:open={popupLabelsOpen} />
+
+{#if exportDialogOpen}
+  <ExportDialog
+    currentFolder={currentSaveName}
+    folderCount={savedList.length}
+    themeCount={customThemes.length}
+    themeStyle={overlayThemeStyle}
+    busy={exportBusy}
+    on:export={runExport}
+    on:close={() => (exportDialogOpen = false)}
+  />
+{/if}
+
+{#if importState}
+  <ImportDialog
+    file={importState.file}
+    fileName={importState.fileName}
+    currentFolder={currentSaveName}
+    existingFolders={savedList}
+    existingThemeNames={availableThemes.map(theme => theme.name)}
+    themeStyle={overlayThemeStyle}
+    busy={importBusy}
+    on:import={runImport}
+    on:close={() => (importState = null)}
+  />
+{/if}
 
 {#if dialogState}
   <div class="app-dialog-overlay" role="presentation" style={overlayThemeStyle} on:click={handleDialogCancel}>

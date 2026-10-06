@@ -14,6 +14,8 @@
   export let subscriptionRecord = null;
   export let load;
   export let deleteSave;
+  /** A copy of a folder under the next free name -- see App's duplicateFolder. */
+  export let duplicateFolder = async () => {};
   export let createNewFile;
   export let controlColors = {};
   export let themes = [];
@@ -29,6 +31,51 @@
   export let blocksFollowThemeAll = false;
 
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import BlockContextMenu from '../components/BlockContextMenu.svelte';
+  import { createLongPress } from '../utils/longPress.js';
+
+  // A folder's menu: right click, or a long press on a phone -- asked for on
+  // 2026-10-05. Duplicate for now; Delete joins it with the bin (PENDING 0b),
+  // since a delete that reaches the cloud without one cannot be undone.
+  let folderMenu = null; // { x, y, name }
+  let heldFolder = null;
+  let swallowFolderClick = false;
+  const folderPress = createLongPress({
+    onLongPress: point => {
+      if (heldFolder) folderMenu = { x: point.x, y: point.y, name: heldFolder };
+    }
+  });
+
+  function openFolderMenu(event, name) {
+    event.preventDefault();
+    folderMenu = { x: event.clientX, y: event.clientY, name };
+  }
+
+  function folderHoldStart(event, name) {
+    if (event.pointerType === 'mouse') return;
+    heldFolder = name;
+    folderPress.start({ x: event.clientX, y: event.clientY });
+  }
+
+  function folderHoldEnd() {
+    swallowFolderClick = folderPress.finish();
+    heldFolder = null;
+  }
+
+  function folderClicked(event, name) {
+    if (swallowFolderClick) {
+      swallowFolderClick = false;
+      event.preventDefault();
+      return;
+    }
+    handleSelect(name);
+  }
+
+  function folderMenuAction(event) {
+    const name = folderMenu?.name;
+    folderMenu = null;
+    if (event.detail === 'duplicate' && name !== undefined) duplicateFolder(name);
+  }
   import { subscribeSyncLog, clearSyncLog, formatSyncLog } from '../utils/syncLog.js';
   import { describeStorageUsage, storageMessageFor } from '../utils/storageUsage.js';
   import { upgradeOffer, portalUrlFor } from '../utils/checkout.js';
@@ -690,13 +737,29 @@
                        row: nothing to read and nothing obvious to click, so the
                        one folder you might actually want to remove was the one
                        you could not see. -->
-                  <button on:click={() => handleSelect(name)}>{name || '(unnamed folder)'}</button>
+                  <button
+                    on:click={(event) => folderClicked(event, name)}
+                    on:contextmenu={(event) => openFolderMenu(event, name)}
+                    on:pointerdown={(event) => folderHoldStart(event, name)}
+                    on:pointermove={(event) => folderPress.move({ x: event.clientX, y: event.clientY })}
+                    on:pointerup={folderHoldEnd}
+                    on:pointercancel={() => folderPress.cancel()}
+                  >{name || '(unnamed folder)'}</button>
                   <button on:click={() => deleteSave(name)}>🗑</button>
                 </li>
               {/each}
             </ul>
           {:else}
             <p class="empty-state">No saved scenes yet.</p>
+          {/if}
+          {#if folderMenu}
+            <BlockContextMenu
+              x={folderMenu.x}
+              y={folderMenu.y}
+              items={[{ id: 'duplicate', label: 'Duplicate' }]}
+              on:action={folderMenuAction}
+              on:close={() => (folderMenu = null)}
+            />
           {/if}
         </div>
 
