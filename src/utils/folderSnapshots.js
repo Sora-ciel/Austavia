@@ -149,6 +149,22 @@ export function withSnapshot(list, snapshot, options = {}) {
   return kept;
 }
 
+/**
+ * Whether a save made on this device empties a folder that had something in it.
+ *
+ * Every folder lost so far has had the same signature in the log -- "blocks:
+ * N -> 0" -- and only the ones replaced by a cloud copy had a snapshot to come
+ * back from. The one on 2026-10-06 was emptied by a save on the device itself,
+ * so Advanced settings had nothing to offer. A save that leaves a folder empty
+ * now keeps what it had first. Ordinary edits are left to the undo history;
+ * keeping a copy of every keystroke would push the copies that matter out.
+ */
+export function emptiesFolder({ current, incoming } = {}) {
+  const before = Array.isArray(current?.blocks) ? current.blocks.length : 0;
+  const after = Array.isArray(incoming?.blocks) ? incoming.blocks.length : 0;
+  return before > 0 && after === 0;
+}
+
 /** What the list should say about a snapshot, without saying it in English. */
 export function describeSnapshot(snapshot) {
   return {

@@ -1,3 +1,5 @@
+import { uniqueName } from './folderTransfer.js';
+
 // When a typing save should actually be written.
 //
 // The old rule was a 300ms throttle wearing a debounce's name: the first
@@ -114,4 +116,21 @@ export function mayTakeSave({ folderOpening = false } = {}) {
 /** The folder a save is written to: the one it was made in. */
 export function saveTarget(payload, currentFolder = '') {
   return (payload && typeof payload.folder === 'string' && payload.folder) || currentFolder;
+}
+
+/**
+ * The name an edit is saved under when no folder is open.
+ *
+ * Reported on 2026-10-06: deleting the open folder emptied the screen and left
+ * no name, the save that followed adopted "default", and a real folder called
+ * "default" -- four blocks, nothing to do with the one deleted -- was written
+ * over with nothing. The same shape as the folder-opening case above, by
+ * another door.
+ *
+ * So a save with no folder takes a name no folder has: "default" while it is
+ * free, "default 1" when it is not. It can make a new folder; it can never
+ * land on one somebody already has.
+ */
+export function nameForUnnamedSave(existingFolders = []) {
+  return uniqueName('default', existingFolders);
 }

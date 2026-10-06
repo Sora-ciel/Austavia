@@ -7,7 +7,8 @@ import {
   nextSaveDelay,
   saveVerdict,
   mayTakeSave,
-  saveTarget
+  saveTarget,
+  nameForUnnamedSave
 } from '../src/utils/saveScheduling.js';
 
 const NOW = 1_000_000;
@@ -151,5 +152,20 @@ describe('saves while folders change', () => {
 
   it('a save that does not say where it was made goes to the open folder, as before', () => {
     assert.equal(saveTarget({ blocks: [] }, 'Work'), 'Work');
+  });
+});
+
+// Reported on 2026-10-06: deleting the open folder cleared a different one --
+// the save that followed had no folder name, took "default", and wrote nothing
+// over the real "default" folder. Not wanted, ever; see nameForUnnamedSave.
+describe('a save with no folder open', () => {
+  it('never lands on a folder that already exists, so deleting one folder cannot clear another', () => {
+    assert.equal(nameForUnnamedSave(['default', 'test']), 'default 1');
+    assert.equal(nameForUnnamedSave(['default', 'default 1']), 'default 2');
+  });
+
+  it('is called "default" on a fresh install, as before', () => {
+    assert.equal(nameForUnnamedSave([]), 'default');
+    assert.equal(nameForUnnamedSave(['test']), 'default');
   });
 });

@@ -91,7 +91,7 @@
   // Sync writes down what it decided, so a loop can be read back instead of
   // guessed at. See utils/syncLog.js.
   import { logSync, describeDifference, getSyncLog, persistNow } from './utils/syncLog.js';
-  import { mayTakeSave, saveTarget } from './utils/saveScheduling.js';
+  import { mayTakeSave, saveTarget, nameForUnnamedSave } from './utils/saveScheduling.js';
   import { stalledLocks, anyHeld } from './utils/syncLocks.js';
   import { buildDiagnostics, formatDiagnostics } from './utils/diagnostics.js';
   // How long a typing save waits, and the ceiling that stops it waiting for
@@ -137,7 +137,8 @@
   import {
     worthKeeping as folderSnapshotWorthKeeping,
     snapshotOf as folderSnapshotOf,
-    withSnapshot as withFolderSnapshot
+    withSnapshot as withFolderSnapshot,
+    emptiesFolder
   } from './utils/folderSnapshots.js';
   import {
     STORAGE_KEY as TYPE_SCALE_STORAGE_KEY,
@@ -907,10 +908,10 @@
    * download because the snapshot failed would be worse, and would leave the
    * folder in the one state nobody asked for.
    */
-  async function keepReplacedCopy(fileName, current, incoming) {
+  async function keepReplacedCopy(fileName, current, incoming, reason) {
     try {
       if (!folderSnapshotWorthKeeping({ current, incoming })) return;
-      const snapshot = folderSnapshotOf(current, { takenAt: Date.now() });
+      const snapshot = folderSnapshotOf(current, { takenAt: Date.now(), ...(reason ? { reason } : {}) });
       const kept = withFolderSnapshot(await listFolderSnapshots(fileName), snapshot);
       await putFolderSnapshots(fileName, kept);
       // Both sides, not just the one being kept.
@@ -922,7 +923,9 @@
       // than a note, even when it is the correct thing to have done.
       const incomingBlocks = Array.isArray(incoming?.blocks) ? incoming.blocks.length : 0;
       const lostBlocks = snapshot.blockCount > incomingBlocks;
-      logSync(lostBlocks ? 'error' : 'snapshot', fileName, lostBlocks
+      logSync(lostBlocks ? 'error' : 'snapshot', fileName, reason
+        ? `kept the copy first: ${reason}`
+        : lostBlocks
         ? 'the copy that arrived has fewer blocks than the one it replaced'
         : 'kept the copy this replaced', {
         blocks: snapshot.blockCount,
@@ -3225,9 +3228,10 @@
     }
 
     // No folder open — a fresh install, or the last one was just deleted.
-    // Adopt the default name so the first edit creates a folder instead of
-    // being silently dropped.
-    if (!currentSaveName) currentSaveName = 'default';
+    // Adopt a name so the first edit creates a folder instead of being
+    // silently dropped -- one no folder has, so it never lands on somebody's
+    // "default" (see nameForUnnamedSave).
+    if (!currentSaveName) currentSaveName = nameForUnnamedSave(savedList);
     persistLastSaveName(currentSaveName);
 
     const payload = {
@@ -3375,6 +3379,12 @@
             comparableSave(payload.blocks, normalizedOrders, normalizedSettings)
           )
         );
+      }
+
+      // Emptying a folder keeps what it had first, so Advanced settings has it
+      // to give back -- see emptiesFolder.
+      if (existing && emptiesFolder({ current: existing, incoming: payload })) {
+        await keepReplacedCopy(folder, existing, payload, 'emptied on this device');
       }
 
       await saveBlocks(folder, {
@@ -4586,6 +4596,20 @@
   async function deleteSave(name) {
     const deletingCurrent = currentSaveName === name;
     await deleteBlocks(name);
+
+    // Deleting the open folder opens another one in its place. Emptying the
+    // screen and leaving no name is what wrote nothing over "default" on
+    // 2026-10-06 -- see nameForUnnamedSave. Only with no folder left is the
+    // screen emptied, and then no folder is there to be written over.
+    if (deletingCurrent) {
+      const remaining = await listSavedBlocks();
+      if (remaining.length) {
+        savedList = remaining;
+        if (loadStoredLastSaveName() === name) persistLastSaveName('');
+        await load(remaining[0]);
+        return;
+      }
+    }
 
     if (deletingCurrent) {
       blocks = [];

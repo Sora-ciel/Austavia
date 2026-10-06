@@ -10,7 +10,8 @@ import {
   sameContent,
   snapshotOf,
   withSnapshot,
-  describeSnapshot
+  describeSnapshot,
+  emptiesFolder
 } from '../src/utils/folderSnapshots.js';
 
 // Named after the request, which followed a folder reverting to a version from
@@ -136,4 +137,19 @@ test('what the list needs is numbers, not a sentence', () => {
     'takenAt'
   ]);
   assert.equal(described.characterCount, 4);
+});
+
+// Reported on 2026-10-06: a folder of four blocks was emptied by a save on the
+// device, and Advanced settings had no copy to give back, because copies were
+// only kept when the cloud replaced a folder. Asked for: be able to go back.
+test('a save that empties a folder keeps what it had, so it can be restored', () => {
+  const four = { blocks: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }] };
+  assert.equal(emptiesFolder({ current: four, incoming: { blocks: [] } }), true);
+});
+
+test('ordinary edits do not keep a copy each -- the undo history has those', () => {
+  const two = { blocks: [{ id: 'a' }, { id: 'b' }] };
+  assert.equal(emptiesFolder({ current: two, incoming: { blocks: [{ id: 'a' }] } }), false);
+  assert.equal(emptiesFolder({ current: { blocks: [] }, incoming: { blocks: [] } }), false);
+  assert.equal(emptiesFolder({ current: null, incoming: { blocks: [] } }), false);
 });
