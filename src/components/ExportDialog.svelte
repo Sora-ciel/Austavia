@@ -3,12 +3,18 @@
    * What to put in an export. Asked for on 2026-10-05: "you can't export the
    * themes and mode settings along with the folder information ... also the
    * background images". The file itself is built in utils/folderTransfer.js.
+   *
+   * The theme in use and your custom themes are two choices, not one -- asked
+   * for on 2026-10-06 -- with the theme in use ticked and the custom ones not.
    */
   import { createEventDispatcher } from 'svelte';
+  import TransferOption from './TransferOption.svelte';
 
   export let currentFolder = '';
   export let folderCount = 1;
   export let themeCount = 0;
+  /** The name of the theme on screen. */
+  export let currentThemeName = '';
   /** The app's dialog colours. */
   export let themeStyle = '';
   export let busy = false;
@@ -18,10 +24,11 @@
   let scope = 'this';
   let settings = true;
   let pictures = true;
-  let themes = true;
+  let currentTheme = true;
+  let customThemes = false;
 
   function submit() {
-    dispatch('export', { scope, settings, pictures, themes });
+    dispatch('export', { scope, settings, pictures, currentTheme, customThemes: customThemes && themeCount > 0 });
   }
 </script>
 
@@ -29,18 +36,29 @@
   <div class="transfer-dialog" role="dialog" aria-modal="true" aria-label="Export" on:click|stopPropagation>
     <h3>Export</h3>
 
-    <fieldset>
-      <legend>Which folders</legend>
-      <label><input type="radio" bind:group={scope} value="this" /> This folder <span class="quiet">— {currentFolder || 'unnamed'}</span></label>
-      <label><input type="radio" bind:group={scope} value="all" /> All folders <span class="quiet">— {folderCount}</span></label>
-    </fieldset>
+    <section>
+      <h4>Which folders</h4>
+      <TransferOption kind="radio" checked={scope === 'this'} title="This folder" detail={currentFolder || 'Unnamed'} on:toggle={() => (scope = 'this')} />
+      <TransferOption kind="radio" checked={scope === 'all'} title="All folders" detail={`${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}`} on:toggle={() => (scope = 'all')} />
+    </section>
 
-    <fieldset>
-      <legend>With them</legend>
-      <label><input type="checkbox" bind:checked={settings} /> Folder settings <span class="quiet">— columns, habits, wallpaper and its dials</span></label>
-      <label><input type="checkbox" bind:checked={pictures} /> Pictures and wallpapers inside the file <span class="quiet">— bigger, but it shows them anywhere</span></label>
-      <label><input type="checkbox" bind:checked={themes} /> Your themes <span class="quiet">— {themeCount} custom, and the one in use</span></label>
-    </fieldset>
+    <section>
+      <h4>With them</h4>
+      <TransferOption checked={settings} title="Folder settings" detail="Columns, habits, wallpaper and its dials." on:toggle={() => (settings = !settings)} />
+      <TransferOption checked={pictures} title="Pictures inside the file" detail="Bigger, but it shows them anywhere." on:toggle={() => (pictures = !pictures)} />
+    </section>
+
+    <section>
+      <h4>Themes</h4>
+      <TransferOption checked={currentTheme} title="The theme you use" detail={currentThemeName || 'The one on screen now.'} on:toggle={() => (currentTheme = !currentTheme)} />
+      <TransferOption
+        checked={customThemes && themeCount > 0}
+        disabled={!themeCount}
+        title="Your custom themes"
+        detail={themeCount ? `${themeCount} ${themeCount === 1 ? 'theme' : 'themes'}.` : 'You have none yet.'}
+        on:toggle={() => (customThemes = !customThemes)}
+      />
+    </section>
 
     <div class="transfer-actions">
       <button type="button" class="transfer-btn" disabled={busy} on:click={() => dispatch('close')}>Cancel</button>
@@ -58,7 +76,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 16px;
     box-sizing: border-box;
     background: rgba(0, 0, 0, 0.55);
   }
@@ -66,11 +84,11 @@
   .transfer-dialog {
     width: 100%;
     max-width: 420px;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 32px);
     overflow-y: auto;
     box-sizing: border-box;
     padding: 18px;
-    border-radius: 12px;
+    border-radius: 14px;
     border: 1px solid var(--dlg-border, #333333);
     background: var(--dlg-bg, #17171a);
     color: var(--dlg-text, #f0f0f0);
@@ -80,37 +98,24 @@
   }
 
   h3 {
-    margin: 0 0 12px;
+    margin: 0 0 14px;
     font-size: 1.1rem;
   }
 
-  fieldset {
-    margin: 0 0 12px;
-    padding: 0;
-    border: none;
+  section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    margin: 0 0 14px;
   }
 
-  legend {
-    margin-bottom: 6px;
-    font-size: 0.8rem;
+  h4 {
+    margin: 0 0 2px;
+    font-size: 0.75rem;
     font-weight: 700;
-    opacity: 0.75;
-  }
-
-  label {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: 0.92rem;
-    cursor: pointer;
-  }
-
-  .quiet {
-    opacity: 0.65;
-    font-size: 0.82rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.7;
   }
 
   .transfer-actions {
@@ -121,9 +126,9 @@
   }
 
   .transfer-btn {
-    border: none;
+    border: 1px solid color-mix(in srgb, var(--dlg-text, #f0f0f0) 25%, transparent);
     border-radius: 8px;
-    padding: 8px 14px;
+    padding: 8px 16px;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -132,6 +137,7 @@
   }
 
   .transfer-btn.primary {
+    border-color: var(--dlg-btn-text, #f0f0f0);
     background: var(--dlg-btn-text, #f0f0f0);
     color: var(--dlg-bg, #17171a);
   }

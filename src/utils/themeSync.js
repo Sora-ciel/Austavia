@@ -30,6 +30,8 @@ export function isSyncableThemeId(themeId) {
 // added back on load and is a property of where a theme came from, not of the
 // theme, so syncing it would let one device tell another what its own themes
 // are called locally.
+import { THEME_EXTRA_FIELDS } from './themeExtras.js';
+
 const SYNCED_FIELDS = [
   'id',
   'name',
@@ -37,6 +39,9 @@ const SYNCED_FIELDS = [
   'controlColors',
   'blockTheme',
   'previewBg',
+  // Pop-up backing, player veil and the rest: without them a theme arrives
+  // on the next device looking different from how it left.
+  ...THEME_EXTRA_FIELDS,
   'createdAt',
   'updatedAt'
 ];

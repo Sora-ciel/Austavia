@@ -56,6 +56,7 @@
   import ImportDialog from './components/ImportDialog.svelte';
   import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
   import { embedCloudFiles } from './utils/cloudFiles.js';
+  import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
   import { deliverFile, isNativeAndroid as onAndroidApp } from './utils/fileDelivery.js';
   import { PENDING_DELETES_KEY, readPending, withPending, settlePending, skipDownload, deletesToRun } from './utils/folderMoves.js';
   import { reconcileThemes } from './utils/themeSync.js';
@@ -162,6 +163,8 @@
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
   const CUSTOM_THEMES_STORAGE_KEY = 'customThemes';
+  // The theme's pop-up backing, player veil and the rest -- see utils/themeExtras.js.
+  const THEME_EXTRAS_STORAGE_KEY = 'themeExtras';
 
   const BIRTHDAY_UNLOCK_STORAGE_KEY = 'birthdayModeAccess';
   const BIRTHDAY_MODE_PASSWORD = 'Birthday24H';
@@ -1375,26 +1378,14 @@
       // is newer; syncedAt is what tells this device it has seen a theme in
       // the cloud, which is the only thing separating a theme deleted on
       // another device from one made here and never uploaded.
-      const serializable = themes.map(({
-        id,
-        name,
-        description,
-        controlColors,
-        blockTheme,
-        previewBg,
-        createdAt,
-        updatedAt,
-        syncedAt
-      }) => ({
-        id,
-        name,
-        description,
-        controlColors,
-        blockTheme,
-        previewBg,
-        createdAt,
-        updatedAt,
-        syncedAt
+      const serializable = themes.map(theme => ({
+        id: theme.id,
+        name: theme.name,
+        description: theme.description,
+        ...lookOf(theme),
+        createdAt: theme.createdAt,
+        updatedAt: theme.updatedAt,
+        syncedAt: theme.syncedAt
       }));
       localStorage.setItem(
         CUSTOM_THEMES_STORAGE_KEY,
@@ -1440,7 +1431,8 @@
       description: (description || '').trim() || 'Custom theme',
       controlColors: normalizedColors,
       blockTheme: normalizedBlock,
-      previewBg: safePreviewBg
+      previewBg: safePreviewBg,
+      ...extrasOf(detail)
     };
   }
 
@@ -1466,6 +1458,7 @@
       controlColors: payload.controlColors,
       blockTheme: payload.blockTheme,
       previewBg: payload.previewBg,
+      ...extrasOf(payload),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       isCustom: true
@@ -1477,6 +1470,11 @@
   let selectedThemeId = 'default-dark';
   let customThemes = [];
   let currentThemePreviewBg = DEFAULT_PREVIEW_BG;
+  // What the theme on screen has besides its colours -- kept here rather than
+  // read off the theme in the list, because editing any colour makes the
+  // theme on screen an unsaved one with no entry in the list, and these used
+  // to vanish with it. See utils/themeExtras.js.
+  let themeExtras = {};
   let showAdvancedCssPage = false;
 
   $: availableThemes = [...STYLE_PRESETS, ...customThemes];
@@ -1485,8 +1483,8 @@
   // original pair.
   $: activeTheme = availableThemes.find(theme => theme.id === selectedThemeId) || null;
   $: newBlockColors = {
-    bgColor: activeTheme?.blockDefaults?.bgColor || '#000000',
-    textColor: activeTheme?.blockDefaults?.textColor || '#ffffff'
+    bgColor: themeExtras.blockDefaults?.bgColor || '#000000',
+    textColor: themeExtras.blockDefaults?.textColor || '#ffffff'
   };
   // ── Music player ──────────────────────────────────────────────────
   // Lives here rather than inside Playlist mode: switching modes unmounts the
@@ -2352,16 +2350,48 @@
     selectedThemeId = preset.id;
     currentThemePreviewBg = preset.previewBg ?? DEFAULT_PREVIEW_BG;
 
-    hatoThemeId.set(
-      typeof preset.id === 'string' && preset.id.startsWith(HATO_ID_PREFIX)
-        ? preset.id
-        : null
-    );
+    themeExtras = extrasOf(preset);
+    showBuddyIcons(preset.id);
 
     if (persistSelection) {
       persistControlColors(nextControlColors);
       persistBlockTheme(nextBlockTheme, preset.id);
+      persistThemeExtras(themeExtras);
     }
+  }
+
+  // Mr.Lee's characters on the toolbar: a theme's own setting now, so a copy
+  // keeps them. The id prefix is how the originals said so before.
+  function showBuddyIcons(id = selectedThemeId) {
+    const byId = typeof id === 'string' && id.startsWith(HATO_ID_PREFIX);
+    hatoThemeId.set(themeExtras.buddyIcons || byId ? (id || 'custom') : null);
+  }
+
+  function persistThemeExtras(extras) {
+    try {
+      localStorage.setItem(THEME_EXTRAS_STORAGE_KEY, JSON.stringify(extras || {}));
+    } catch { /* the theme in the list still has them */ }
+  }
+
+  function loadStoredThemeExtras() {
+    try {
+      return extrasOf(JSON.parse(localStorage.getItem(THEME_EXTRAS_STORAGE_KEY) || '{}'));
+    } catch {
+      return {};
+    }
+  }
+
+  // An unsaved theme -- any colour edited -- keeps its extras across a reload.
+  $: if (selectedThemeId === CUSTOM_THEME_ID) persistThemeExtras(themeExtras);
+
+  function handleThemeExtraChange(event) {
+    const { key, value } = event.detail || {};
+    if (!key) return;
+    themeExtras = withExtras({}, { ...themeExtras, [key]: value });
+    selectedThemeId = CUSTOM_THEME_ID;
+    persistBlockTheme(blockTheme, CUSTOM_THEME_ID);
+    persistThemeExtras(themeExtras);
+    showBuddyIcons(CUSTOM_THEME_ID);
   }
 
   function handleControlColorChange(event) {
@@ -2374,9 +2404,9 @@
       [key]: value
     };
 
-    if (target === 'left' && key === 'panelBg') {
-      nextSectionTheme.inputBg = value;
-    }
+    // The input background used to follow the panel's, when the editor had no
+    // field for it; it has its own now, and see-through themes set the two
+    // differently (2026-10-06).
 
     controlColors = {
       ...controlColors,
@@ -2514,11 +2544,11 @@
     if (!payload) return;
 
     const existing = customThemes[index];
-    const updatedTheme = {
+    const updatedTheme = withExtras({
       ...existing,
       ...payload,
       updatedAt: Date.now()
-    };
+    }, payload);
 
     customThemes = [
       ...customThemes.slice(0, index),
@@ -2609,6 +2639,11 @@
       }
     }
 
+    if (selectedThemeId === CUSTOM_THEME_ID) {
+      themeExtras = loadStoredThemeExtras();
+      showBuddyIcons(CUSTOM_THEME_ID);
+    }
+
     const activeTheme =
       combinedThemes.find(theme => theme.id === selectedThemeId) || null;
     if (activeTheme) {
@@ -2678,7 +2713,7 @@
     `--sb-thumb: color-mix(in srgb, ${appTextColor} 40%, transparent)`,
     // What pop-ups sit on, for a theme that says: the panels a toolbar button
     // opens read it before their own colour. See utils/outlineTheme.js.
-    ...(activeTheme?.popupBg ? [`--app-popup-bg: ${activeTheme.popupBg}`] : [])
+    ...(themeExtras.popupBg ? [`--app-popup-bg: ${themeExtras.popupBg}`] : [])
   ].join('; ');
 
   function handleThemeSelect(event) {
@@ -2785,7 +2820,7 @@
   // mode but Birthday (see hasWallpaper in modeRegistry.js). The name is from
   // when Single Note had one of its own, which is now deleted -- see
   // normalizeModeSettings.
-  $: singleNoteSettings = withThemeBackground(modeSettings.default, activeTheme);
+  $: singleNoteSettings = withThemeBackground(modeSettings.default, themeExtras);
   // Canvas keeps whatever the folder itself set, and nothing else. A theme
   // supplying a wallpaper is a Single Note arrangement; having one appear over
   // the board the moment somebody changed theme would be a surprise rather
@@ -2983,7 +3018,7 @@
     // one. The toolbar's own colour unless the theme names one -- a
     // see-through theme's toolbar is clear, which left the cover bare behind
     // the buttons. See playerVeil in utils/outlineTheme.js.
-    ` --player-veil: ${activeTheme?.playerVeil || leftTheme.panelBg};`;
+    ` --player-veil: ${themeExtras.playerVeil || leftTheme.panelBg};`;
   // Dialogs and the sync banner render outside .app, so they can't inherit its
   // theme vars — hand them the right-panel palette directly.
   $: rightTheme = controlColors.right || CONTROL_COLOR_DEFAULTS.right;
@@ -2992,7 +3027,7 @@
   // handed the theme's dialog colours through local storage, which they share
   // with this window -- see utils/clockPopups.js.
   let popupLabelsOpen = new Set();
-  $: sharePopupTheme(activeTheme?.popupBg || rightTheme.panelBg, rightTheme.textColor, leftTheme.buttonText, rightTheme.borderColor);
+  $: sharePopupTheme(themeExtras.popupBg || rightTheme.panelBg, rightTheme.textColor, leftTheme.buttonText, rightTheme.borderColor);
   function sharePopupTheme(bg, text, accent, border) {
     try {
       localStorage.setItem(POPUP_THEME_KEY, JSON.stringify({ bg, text, accent, border }));
@@ -3001,7 +3036,7 @@
   $: overlayThemeStyle =
     // A theme's popupBg, when it has one, is what a dialog sits on -- see
     // utils/outlineTheme.js. Otherwise the settings panel's own colour.
-    `--dlg-bg: ${activeTheme?.popupBg || rightTheme.panelBg}; --dlg-text: ${rightTheme.textColor};` +
+    `--dlg-bg: ${themeExtras.popupBg || rightTheme.panelBg}; --dlg-text: ${rightTheme.textColor};` +
     ` --dlg-border: ${rightTheme.borderColor}; --dlg-btn-bg: ${rightTheme.buttonBg};` +
     ` --dlg-btn-text: ${rightTheme.buttonText};`;
   // Modes used to derive their own readable text colour from the canvas
@@ -3010,7 +3045,7 @@
   // derived one only when a theme doesn't state one.
   $: canvasTheme = {
     ...(controlColors.canvas || CONTROL_COLOR_DEFAULTS.canvas),
-    textColor: activeTheme?.blockDefaults?.textColor || ''
+    textColor: themeExtras.blockDefaults?.textColor || ''
   };
   let Pc = window.innerWidth > MOBILE_BREAKPOINT;
   let birthdayUnlockExpiry = loadBirthdayUnlockExpiry();
@@ -5595,7 +5630,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   });
 
   async function runExport(event) {
-    const { scope, settings, pictures, themes } = event.detail || {};
+    const { scope, settings, pictures, currentTheme, customThemes: withCustomThemes } = event.detail || {};
     exportBusy = true;
     try {
       await flushWaitingSave();
@@ -5619,11 +5654,18 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       }
       const file = buildExport({
         folders,
-        include: { settings, themes },
+        include: { settings, currentTheme, customThemes: withCustomThemes },
         themes: {
-          custom: customThemes.map(({ id, name, description, controlColors, blockTheme, previewBg }) =>
-            ({ id, name, description, controlColors, blockTheme, previewBg })),
-          selectedId: selectedThemeId
+          custom: customThemes.map(theme => ({ id: theme.id, name: theme.name, description: theme.description, ...lookOf(theme) })),
+          selectedId: selectedThemeId,
+          // The theme on screen as it is -- even unsaved -- so it can be made
+          // again where it has never been.
+          current: {
+            id: selectedThemeId,
+            name: activeTheme?.name || 'Imported theme',
+            description: activeTheme?.description || '',
+            ...lookOf({ controlColors, blockTheme, previewBg: currentThemePreviewBg, ...themeExtras })
+          }
         }
       });
       const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
@@ -5661,10 +5703,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       folders: choice.folders,
       settings: choice.settings,
       themes: choice.themes,
+      currentTheme: choice.currentTheme,
       target: choice.target,
       existingFolders: savedList,
       currentFolder: currentSaveName,
-      existingThemeNames: availableThemes.map(theme => theme.name)
+      existingThemes: availableThemes,
+      officialThemeIds: STYLE_PRESETS.map(theme => theme.id)
     });
     if (plan.error) {
       await appAlert(plan.error);
@@ -5709,9 +5753,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         pushThemeToCloud(created);
       }
       if (madeFrom.size) persistCustomThemes(customThemes);
-      const wanted = importState.file.themes?.selectedId;
-      if (choice.themes && choice.switchTheme && wanted) {
-        const target = madeFrom.get(wanted) || availableThemes.find(theme => theme.id === wanted);
+      const switchTo = plan.switchTo;
+      if (switchTo) {
+        const target = switchTo.source === 'added'
+          ? madeFrom.get(switchTo.id)
+          : availableThemes.find(theme => theme.id === switchTo.id);
         if (target) applyThemePreset(target);
       }
 
@@ -7007,7 +7053,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <TimerChip
       {blocks}
       themeStyle={overlayThemeStyle}
-      notificationTheme={{ bg: activeTheme?.popupBg || rightTheme.panelBg, text: rightTheme.textColor, accent: leftTheme.buttonText }}
+      notificationTheme={{ bg: themeExtras.popupBg || rightTheme.panelBg, text: rightTheme.textColor, accent: leftTheme.buttonText }}
     />
 
     <!-- Mini player: present in every mode so what's playing stays reachable
@@ -7340,6 +7386,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     currentFolder={currentSaveName}
     folderCount={savedList.length}
     themeCount={customThemes.length}
+    currentThemeName={activeTheme?.name || 'Your unsaved theme'}
     themeStyle={overlayThemeStyle}
     busy={exportBusy}
     on:export={runExport}
@@ -7353,7 +7400,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     fileName={importState.fileName}
     currentFolder={currentSaveName}
     existingFolders={savedList}
-    existingThemeNames={availableThemes.map(theme => theme.name)}
+    existingThemes={availableThemes}
+    officialThemeIds={STYLE_PRESETS.map(theme => theme.id)}
     themeStyle={overlayThemeStyle}
     busy={importBusy}
     on:import={runImport}
@@ -7407,12 +7455,14 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     {controlColors}
     {blockTheme}
     previewBg={currentThemePreviewBg}
+    {themeExtras}
     themes={availableThemes}
     {selectedThemeId}
     on:close={() => (showAdvancedCssPage = false)}
     on:updateControlColor={handleControlColorChange}
     on:updateBlockTheme={handleBlockThemeChange}
     on:updatePreviewBg={handlePreviewBgChange}
+    on:updateThemeExtra={handleThemeExtraChange}
     on:saveTheme={handleAdvancedThemeSave}
     on:updateTheme={handleAdvancedThemeUpdate}
     on:deleteTheme={handleAdvancedThemeDelete}

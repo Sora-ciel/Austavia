@@ -7,18 +7,28 @@
     normalizeControlColors,
     normalizeBlockTheme
   } from '../utils/themeDefaults.js';
+  import { extrasOf } from '../utils/themeExtras.js';
+  import ColorField from './ColorField.svelte';
 
   const dispatch = createEventDispatcher();
 
   export let controlColors = CONTROL_COLOR_DEFAULTS;
   export let blockTheme = BLOCK_THEME_DEFAULTS;
   export let previewBg = DEFAULT_PREVIEW_BG;
+  /**
+   * The theme's pop-up backing, player veil, new-block colours, wallpaper and
+   * toolbar characters -- see utils/themeExtras.js. Here so that every official
+   * theme can be made again in this page, which was asked for on 2026-10-06.
+   */
+  export let themeExtras = {};
   export let themes = [];
   export let selectedThemeId = '';
 
   let workingControlColors = normalizeControlColors(controlColors);
   let workingBlockTheme = normalizeBlockTheme(blockTheme);
   let localPreviewBg = previewBg || DEFAULT_PREVIEW_BG;
+  let workingExtras = extrasOf(themeExtras);
+  let lastExtrasRef = themeExtras;
   let themeName = '';
   let themeDescription = '';
   let error = '';
@@ -48,6 +58,11 @@
     lastBlockThemeRef = blockTheme;
   }
 
+  $: if (themeExtras !== lastExtrasRef) {
+    workingExtras = extrasOf(themeExtras);
+    lastExtrasRef = themeExtras;
+  }
+
   $: if (previewBg !== lastPreviewBg && typeof previewBg === 'string') {
     localPreviewBg = previewBg || DEFAULT_PREVIEW_BG;
     lastPreviewBg = previewBg;
@@ -57,6 +72,7 @@
     workingControlColors = normalizeControlColors(controlColors);
     workingBlockTheme = normalizeBlockTheme(blockTheme);
     localPreviewBg = previewBg || DEFAULT_PREVIEW_BG;
+    workingExtras = extrasOf(themeExtras);
   }
 
   function startNewTheme() {
@@ -78,6 +94,7 @@
     );
     workingBlockTheme = normalizeBlockTheme(theme.blockTheme || BLOCK_THEME_DEFAULTS);
     localPreviewBg = theme.previewBg || DEFAULT_PREVIEW_BG;
+    workingExtras = extrasOf(theme);
     themeName = theme.name || '';
     themeDescription = theme.description || '';
     editingThemeId = theme.id || null;
@@ -104,7 +121,8 @@
       description: themeDescription.trim(),
       controlColors: workingControlColors,
       blockTheme: workingBlockTheme,
-      previewBg: localPreviewBg
+      previewBg: localPreviewBg,
+      ...workingExtras
     });
   }
 
@@ -119,7 +137,10 @@
       description: theme.description || '',
       controlColors: theme.controlColors,
       blockTheme: theme.blockTheme,
-      previewBg: theme.previewBg
+      previewBg: theme.previewBg,
+      // Everything else it has, so a copy of an official theme is the same
+      // theme -- see utils/themeExtras.js.
+      ...extrasOf(theme)
     });
   }
 
@@ -148,7 +169,7 @@
       key: 'left',
       label: 'Left controls',
       description: 'Customize the toolbar shown on the left side of the canvas.',
-      fields: controlFieldMap
+      fields: [...controlFieldMap, { key: 'inputBg', label: 'Input background' }]
     },
     {
       key: 'right',
@@ -221,7 +242,8 @@
       fields: [
         { key: 'bodyFont', label: 'Body font family' },
         { key: 'accentColor', label: 'Accent color' },
-        { key: 'accentText', label: 'Accent text color' }
+        { key: 'accentText', label: 'Accent text color' },
+        { key: 'textShadow', label: 'Text shadow', type: 'textarea' }
       ]
     },
     {
@@ -444,6 +466,15 @@
     dispatch('updateBlockTheme', { key, value });
   }
 
+  function updateExtra(key, value) {
+    workingExtras = extrasOf({ ...workingExtras, [key]: value });
+    dispatch('updateThemeExtra', { key, value: workingExtras[key] });
+  }
+
+  function updateExtraPart(key, part, value) {
+    updateExtra(key, { ...(workingExtras[key] || {}), [part]: value });
+  }
+
   function handlePreviewChange(value) {
     localPreviewBg = value || DEFAULT_PREVIEW_BG;
     dispatch('updatePreviewBg', { value: localPreviewBg });
@@ -462,7 +493,8 @@
       description: themeDescription.trim(),
       controlColors: workingControlColors,
       blockTheme: workingBlockTheme,
-      previewBg: localPreviewBg
+      previewBg: localPreviewBg,
+      ...workingExtras
     };
 
     if (editingExisting && editingThemeId) {
@@ -731,6 +763,19 @@
     text-align: right;
   }
 
+  .check-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .check-row input {
+    width: 16px;
+    height: 16px;
+    accent-color: currentColor;
+  }
+
   .color-helper {
     font-size: 0.75rem;
     opacity: 0.6;
@@ -945,18 +990,77 @@
             <h4>{section.label}</h4>
             <p>{section.description}</p>
             {#each section.fields as field}
-              <label>
-                <span>{field.label}</span>
-                <input
-                  type="color"
-                  value={workingControlColors[section.key]?.[field.key] || CONTROL_COLOR_DEFAULTS[section.key]?.[field.key]}
-                  on:input={(event) =>
-                    updateControlColor(section.key, field.key, event.target.value)}
-                />
-              </label>
+              <ColorField
+                label={field.label}
+                value={workingControlColors[section.key]?.[field.key] || CONTROL_COLOR_DEFAULTS[section.key]?.[field.key] || ''}
+                on:change={(event) => updateControlColor(section.key, field.key, event.detail)}
+              />
             {/each}
           </div>
         {/each}
+
+        <div class="field-list">
+          <h4>Pop-ups, player and new blocks</h4>
+          <p>What pop-ups and lists sit on, the veil over the mini player's cover, and the colours a new block starts in. Empty means the panel's own colour.</p>
+          <ColorField
+            label="Pop-up background"
+            optional
+            value={workingExtras.popupBg || ''}
+            fallback={workingControlColors.right?.panelBg}
+            on:change={(event) => updateExtra('popupBg', event.detail)}
+          />
+          <ColorField
+            label="Player veil"
+            optional
+            value={workingExtras.playerVeil || ''}
+            fallback={workingControlColors.left?.panelBg}
+            on:change={(event) => updateExtra('playerVeil', event.detail)}
+          />
+          <ColorField
+            label="New block background"
+            optional
+            value={workingExtras.blockDefaults?.bgColor || ''}
+            on:change={(event) => updateExtraPart('blockDefaults', 'bgColor', event.detail)}
+          />
+          <ColorField
+            label="New block text"
+            optional
+            value={workingExtras.blockDefaults?.textColor || ''}
+            fallback="#ffffff"
+            on:change={(event) => updateExtraPart('blockDefaults', 'textColor', event.detail)}
+          />
+        </div>
+
+        <div class="field-list">
+          <h4>Theme wallpaper</h4>
+          <p>A picture the theme brings to any folder without one of its own, and the characters that replace some toolbar icons.</p>
+          <label>
+            <span>Wallpaper on a computer</span>
+            <input
+              type="text"
+              placeholder="none"
+              value={workingExtras.singleBackground?.desktop || ''}
+              on:change={(event) => updateExtraPart('singleBackground', 'desktop', event.target.value.trim())}
+            />
+          </label>
+          <label>
+            <span>Wallpaper on a phone</span>
+            <input
+              type="text"
+              placeholder="the computer one"
+              value={workingExtras.singleBackground?.mobile || ''}
+              on:change={(event) => updateExtraPart('singleBackground', 'mobile', event.target.value.trim())}
+            />
+          </label>
+          <label class="check-row">
+            <input
+              type="checkbox"
+              checked={Boolean(workingExtras.buddyIcons)}
+              on:change={(event) => updateExtra('buddyIcons', event.target.checked)}
+            />
+            <span>Mr.Lee characters on the toolbar</span>
+          </label>
+        </div>
       </div>
 
       <div class="section-card block-card">

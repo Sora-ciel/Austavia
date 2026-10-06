@@ -115,7 +115,10 @@ function mrLeePreset({ id, name, description, wallpaper, sky, accent, spark, ink
     singleBackground: {
       desktop: `${BG_ROOT}${wallpaper}.webp`,
       mobile: `${BG_ROOT}${wallpaper}-mobile.webp`
-    }
+    },
+    // The characters in place of toolbar icons -- a setting of the theme, so
+    // a copy of it keeps them. See utils/themeExtras.js.
+    buddyIcons: true
   };
 }
 

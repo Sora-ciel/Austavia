@@ -103,7 +103,56 @@ describe('importing', () => {
   });
 
   it("adds the file's themes under names no theme has, or none when they are not wanted", () => {
-    assert.deepEqual(planImport({ file, existingThemeNames: ['Mine'] }).themes.map(t => t.name), ['Mine 1']);
-    assert.deepEqual(planImport({ file, themes: false }).themes, []);
+    assert.deepEqual(planImport({ file, existingThemes: [{ id: 'other', name: 'Mine', previewBg: '#111111' }] }).themes.map(t => t.name), ['Mine 1']);
+    assert.deepEqual(planImport({ file, themes: false, currentTheme: false }).themes, []);
+  });
+
+  it('does not add a theme twice when one exactly like it is already here', () => {
+    const plan = planImport({ file, existingThemes: [{ id: 'mine-here', name: 'Mine' }] });
+    assert.deepEqual(plan.themes, []);
+    assert.deepEqual(plan.switchTo, { source: 'existing', id: 'mine-here' });
+  });
+});
+
+// Asked for on 2026-10-06: "you couldn't independently choose to export just
+// your custom themes without exporting your actual theme or vice versa. They
+// should be independent, and the default should be the theme you use checked
+// and the custom ones unchecked." The defaults are in ExportDialog.svelte.
+describe('the theme in use and your custom themes, chosen separately', () => {
+  const current = { id: 'custom', name: 'Glass', previewBg: '#101010', popupBg: 'rgba(0, 0, 0, 0.78)' };
+  const themes = { custom: [{ id: 'a', name: 'Mine' }], selectedId: 'custom', current };
+
+  it('exports the theme you use without your custom themes', () => {
+    const out = buildExport({ folders: [], include: { currentTheme: true }, themes });
+    assert.equal('custom' in out.themes, false);
+    assert.equal(out.themes.selectedId, 'custom');
+    assert.deepEqual(out.themes.current, current);
+  });
+
+  it('exports your custom themes without the theme you use', () => {
+    const out = buildExport({ folders: [], include: { customThemes: true }, themes });
+    assert.deepEqual(out.themes.custom, themes.custom);
+    assert.equal('selectedId' in out.themes, false);
+    assert.equal('current' in out.themes, false);
+  });
+
+  it('an official theme in use is switched to by its id, and nothing is added', () => {
+    const file = readExport(JSON.stringify(buildExport({ folders: [], include: { currentTheme: true }, themes: { selectedId: 'lime-wire', current: { id: 'lime-wire', name: 'Lime Wire' } } })));
+    const plan = planImport({ file, officialThemeIds: ['lime-wire'] });
+    assert.deepEqual(plan.switchTo, { source: 'official', id: 'lime-wire' });
+    assert.deepEqual(plan.themes, []);
+  });
+
+  it('a theme in use that is nowhere here is made from the file, whole, and switched to', () => {
+    const file = readExport(JSON.stringify(buildExport({ folders: [], include: { currentTheme: true }, themes })));
+    const plan = planImport({ file, officialThemeIds: ['lime-wire'], existingThemes: [] });
+    assert.equal(plan.themes.length, 1);
+    assert.equal(plan.themes[0].popupBg, 'rgba(0, 0, 0, 0.78)');
+    assert.deepEqual(plan.switchTo, { source: 'added', id: 'custom' });
+  });
+
+  it('does not switch theme unless asked', () => {
+    const file = readExport(JSON.stringify(buildExport({ folders: [], include: { currentTheme: true }, themes })));
+    assert.equal(planImport({ file, currentTheme: false }).switchTo, null);
   });
 });

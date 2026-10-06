@@ -8,13 +8,16 @@
    */
   import { createEventDispatcher } from 'svelte';
   import { planImport } from '../utils/folderTransfer.js';
+  import TransferOption from './TransferOption.svelte';
 
   /** readExport's answer for the file. */
   export let file = { folders: [], themes: null };
   export let fileName = '';
   export let currentFolder = '';
   export let existingFolders = [];
-  export let existingThemeNames = [];
+  /** Every theme here, official and custom. */
+  export let existingThemes = [];
+  export let officialThemeIds = [];
   export let themeStyle = '';
   export let busy = false;
 
@@ -23,11 +26,12 @@
   let chosen = new Set((file.folders || []).map(folder => folder.name));
   let settings = true;
   let themes = true;
-  let switchTheme = false;
+  let currentTheme = false;
   let target = 'new';
 
   $: hasSettings = (file.folders || []).some(folder => folder.modeSettings);
-  $: themeCount = file.themes?.custom?.length || 0;
+  $: customCount = file.themes?.custom?.length || 0;
+  $: fileThemeName = themeNameInFile(file);
   $: canReplace = chosen.size === 1 && Boolean(currentFolder);
   $: if (!canReplace && target === 'replace') target = 'new';
   $: plan = planImport({
@@ -35,15 +39,27 @@
     folders: [...chosen],
     settings,
     themes,
+    currentTheme,
     target,
     existingFolders,
     currentFolder,
-    existingThemeNames
+    existingThemes,
+    officialThemeIds
   });
   $: namesAfter = new Map(target === 'new' && !plan.error
     ? (file.folders || []).filter(f => chosen.has(f.name)).map((f, i) => [f.name, plan.writes[i]?.name])
     : []);
-  $: nothingChosen = !chosen.size && !(themes && themeCount);
+  $: customAdded = plan.error ? 0 : plan.themes.filter(theme => (file.themes?.custom || []).some(c => c.id === theme.id)).length;
+  $: nothingChosen = !chosen.size && !(themes && customAdded) && !(currentTheme && fileThemeName);
+
+  function themeNameInFile(f) {
+    const id = f.themes?.selectedId;
+    if (!id && !f.themes?.current) return '';
+    return f.themes?.current?.name
+      || (f.themes?.custom || []).find(theme => theme.id === id)?.name
+      || existingThemes.find(theme => theme.id === id)?.name
+      || '';
+  }
 
   function toggle(name) {
     const next = new Set(chosen);
@@ -52,53 +68,68 @@
     chosen = next;
   }
 
+  function folderDetail(folder) {
+    const count = `${folder.blocks.length} ${folder.blocks.length === 1 ? 'block' : 'blocks'}`;
+    const after = namesAfter.get(folder.name);
+    return chosen.has(folder.name) && after && after !== folder.name ? `${count} · will be called “${after}”` : count;
+  }
+
+  function customDetail() {
+    const same = customCount - customAdded;
+    if (!same) return `${customCount}, added beside yours.`;
+    if (!customAdded) return `You already have ${customCount === 1 ? 'it' : 'all of them'}.`;
+    return `${customAdded} new, added beside yours; ${same} you already have.`;
+  }
+
   function submit() {
-    dispatch('import', { folders: [...chosen], settings, themes, switchTheme, target });
+    dispatch('import', { folders: [...chosen], settings, themes, currentTheme, target });
   }
 </script>
 
 <div class="transfer-overlay" role="presentation" style={themeStyle} on:click={() => !busy && dispatch('close')}>
   <div class="transfer-dialog" role="dialog" aria-modal="true" aria-label="Import" on:click|stopPropagation>
-    <h3>Import <span class="quiet">— {fileName}</span></h3>
+    <h3>Import</h3>
+    <p class="file-name">{fileName}</p>
 
     {#if (file.folders || []).length}
-      <fieldset>
-        <legend>Folders in the file</legend>
+      <section>
+        <h4>Folders in the file</h4>
         {#each file.folders as folder (folder.name)}
-          <label>
-            <input type="checkbox" checked={chosen.has(folder.name)} on:change={() => toggle(folder.name)} />
-            {folder.name}
-            <span class="quiet">— {folder.blocks.length} {folder.blocks.length === 1 ? 'block' : 'blocks'}{#if chosen.has(folder.name) && namesAfter.get(folder.name) && namesAfter.get(folder.name) !== folder.name}, will be called “{namesAfter.get(folder.name)}”{/if}</span>
-          </label>
+          <TransferOption checked={chosen.has(folder.name)} title={folder.name} detail={folderDetail(folder, namesAfter, chosen)} on:toggle={() => toggle(folder.name)} />
         {/each}
-      </fieldset>
+      </section>
     {/if}
 
-    <fieldset>
-      <legend>With them</legend>
-      {#if hasSettings}
-        <label><input type="checkbox" bind:checked={settings} /> Folder settings <span class="quiet">— columns, habits, wallpaper and its dials</span></label>
-      {/if}
-      {#if themeCount}
-        <label><input type="checkbox" bind:checked={themes} /> Themes <span class="quiet">— {themeCount}, added beside yours</span></label>
-        {#if themes}
-          <label class="indent"><input type="checkbox" bind:checked={switchTheme} /> Switch to the theme it was using</label>
+    {#if hasSettings || customCount || fileThemeName}
+      <section>
+        <h4>With them</h4>
+        {#if hasSettings}
+          <TransferOption checked={settings} title="Folder settings" detail="Columns, habits, wallpaper and its dials." on:toggle={() => (settings = !settings)} />
         {/if}
-      {/if}
-      {#if !hasSettings && !themeCount}
-        <span class="quiet">Only the folders' contents are in this file.</span>
-      {/if}
-    </fieldset>
+        {#if customCount}
+          <TransferOption checked={themes} title="Custom themes" detail={customDetail(customAdded, customCount)} on:toggle={() => (themes = !themes)} />
+        {/if}
+        {#if fileThemeName}
+          <TransferOption checked={currentTheme} title="Switch to the theme it was using" detail={fileThemeName} on:toggle={() => (currentTheme = !currentTheme)} />
+        {/if}
+      </section>
+    {:else}
+      <p class="quiet">Only the folders' contents are in this file.</p>
+    {/if}
 
     {#if chosen.size}
-      <fieldset>
-        <legend>Where</legend>
-        <label><input type="radio" bind:group={target} value="new" /> Into new folders</label>
-        <label class:disabled={!canReplace}>
-          <input type="radio" bind:group={target} value="replace" disabled={!canReplace} />
-          In place of “{currentFolder}” <span class="quiet">— a copy of it is kept first{!canReplace ? '; choose one folder' : ''}</span>
-        </label>
-      </fieldset>
+      <section>
+        <h4>Where</h4>
+        <TransferOption kind="radio" checked={target === 'new'} title="Into new folders" on:toggle={() => (target = 'new')} />
+        <TransferOption
+          kind="radio"
+          checked={target === 'replace'}
+          disabled={!canReplace}
+          title={`In place of “${currentFolder}”`}
+          detail={canReplace ? 'A copy of it is kept first.' : 'Choose one folder for this.'}
+          on:toggle={() => (target = 'replace')}
+        />
+      </section>
     {/if}
 
     {#if plan.error && chosen.size}
@@ -113,6 +144,7 @@
 </div>
 
 <style>
+  /* The app's dialog, in its colours (themeStyle sets --dlg-*). */
   .transfer-overlay {
     position: fixed;
     inset: 0;
@@ -120,7 +152,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 16px;
     box-sizing: border-box;
     background: rgba(0, 0, 0, 0.55);
   }
@@ -128,11 +160,11 @@
   .transfer-dialog {
     width: 100%;
     max-width: 440px;
-    max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 32px);
     overflow-y: auto;
     box-sizing: border-box;
     padding: 18px;
-    border-radius: 12px;
+    border-radius: 14px;
     border: 1px solid var(--dlg-border, #333333);
     background: var(--dlg-bg, #17171a);
     color: var(--dlg-text, #f0f0f0);
@@ -142,55 +174,38 @@
   }
 
   h3 {
-    margin: 0 0 12px;
+    margin: 0;
     font-size: 1.1rem;
+  }
+
+  .file-name {
+    margin: 2px 0 14px;
+    font-size: 0.8rem;
+    opacity: 0.65;
     overflow-wrap: anywhere;
   }
 
-  fieldset {
-    margin: 0 0 12px;
-    padding: 0;
-    border: none;
+  section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
+    margin: 0 0 14px;
   }
 
-  legend {
-    margin-bottom: 6px;
-    font-size: 0.8rem;
+  h4 {
+    margin: 0 0 2px;
+    font-size: 0.75rem;
     font-weight: 700;
-    opacity: 0.75;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.7;
   }
 
-  label {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    font-size: 0.92rem;
-    cursor: pointer;
-    overflow-wrap: anywhere;
-  }
-
-  label.indent {
-    padding-left: 24px;
-  }
-
-  label.disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .quiet {
-    opacity: 0.65;
-    font-size: 0.82rem;
-    font-weight: 400;
-  }
-
+  .quiet,
   .problem {
-    margin: 0 0 10px;
+    margin: 0 0 14px;
     font-size: 0.85rem;
-    opacity: 0.85;
+    opacity: 0.75;
   }
 
   .transfer-actions {
@@ -201,9 +216,9 @@
   }
 
   .transfer-btn {
-    border: none;
+    border: 1px solid color-mix(in srgb, var(--dlg-text, #f0f0f0) 25%, transparent);
     border-radius: 8px;
-    padding: 8px 14px;
+    padding: 8px 16px;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -212,6 +227,7 @@
   }
 
   .transfer-btn.primary {
+    border-color: var(--dlg-btn-text, #f0f0f0);
     background: var(--dlg-btn-text, #f0f0f0);
     color: var(--dlg-bg, #17171a);
   }

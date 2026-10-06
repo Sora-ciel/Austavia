@@ -20,13 +20,23 @@
  * ## The file
  *
  * `{ format: 'austavia-export', version: 2, exportedAt, folders: [{ name,
- * blocks, modeOrders, modeSettings? }], themes?: { custom: [...], selectedId } }`.
+ * blocks, modeOrders, modeSettings? }], themes?: { custom?: [...], selectedId?,
+ * current? } }`. `custom` is your own themes; `selectedId` and `current` are
+ * the theme in use -- its id, and everything it looks like, so it can be made
+ * again on a device that has never had it.
+ *
+ * The two are chosen separately (asked for on 2026-10-06: "you couldn't
+ * independently choose to export just your custom themes without exporting
+ * your actual theme or vice versa"), the theme in use ticked and the custom
+ * ones not.
  * A file from before this -- `{ blocks, modeOrders, modeSettings }` or a bare
  * array of blocks -- still imports, as one folder named after the file.
  *
  * Pure: what the app does with it (reading files, saving folders, adding
  * themes) is App's.
  */
+
+import { lookOf } from './themeExtras.js';
 
 export const EXPORT_FORMAT = 'austavia-export';
 export const EXPORT_VERSION = 2;
@@ -59,9 +69,9 @@ export function nameFromFile(fileName = '') {
 
 /**
  * The file to save. `include.settings` keeps each folder's settings (columns,
- * habits, wallpaper and its dials); `include.themes` adds the custom themes
- * and which theme was in use. Pictures are already inside `folders` when they
- * were asked for -- App fetches them first.
+ * habits, wallpaper and its dials); `include.currentTheme` the theme in use;
+ * `include.customThemes` your own themes. Pictures are already inside
+ * `folders` when they were asked for -- App fetches them first.
  */
 export function buildExport({ folders = [], include = {}, themes = null, now = Date.now() } = {}) {
   const file = {
@@ -78,11 +88,15 @@ export function buildExport({ folders = [], include = {}, themes = null, now = D
       return out;
     })
   };
-  if (include.themes && themes) {
-    file.themes = {
-      custom: Array.isArray(themes.custom) ? themes.custom : [],
-      selectedId: themes.selectedId ?? null
-    };
+  const withCustom = include.customThemes ?? include.themes;
+  const withCurrent = include.currentTheme ?? include.themes;
+  if (themes && (withCustom || withCurrent)) {
+    file.themes = {};
+    if (withCustom) file.themes.custom = Array.isArray(themes.custom) ? themes.custom : [];
+    if (withCurrent) {
+      file.themes.selectedId = themes.selectedId ?? null;
+      if (themes.current) file.themes.current = themes.current;
+    }
   }
   return file;
 }
@@ -114,7 +128,8 @@ export function readExport(text, fileName = '') {
     const themes = data.themes && typeof data.themes === 'object'
       ? {
           custom: Array.isArray(data.themes.custom) ? data.themes.custom.filter(t => t && typeof t === 'object') : [],
-          selectedId: data.themes.selectedId ?? null
+          selectedId: data.themes.selectedId ?? null,
+          current: data.themes.current && typeof data.themes.current === 'object' ? data.themes.current : null
         }
       : null;
     if (!folders.length && !themes) return { error: 'This file has nothing in it to import.' };
@@ -138,20 +153,27 @@ export function readExport(text, fileName = '') {
  * - `target`: `'new'` (the default) puts each in a folder of its own, named
  *   by `uniqueName`; `'replace'` writes the one chosen folder over the open
  *   folder, and needs exactly one.
- * - `themes`: add the file's custom themes, each under a name no theme has.
+ * - `themes`: add the file's custom themes, each under a name no theme has
+ *   -- except one that looks exactly like a theme already here, which is the
+ *   same theme and is not added twice.
+ * - `currentTheme`: switch to the theme the file was using: an official one
+ *   by its id, one already here, or one made from the file.
  *
  * Returns `{ writes: [{ name, blocks, modeOrders, modeSettings, replaces }],
- * themes: [...] }`, or `{ error }`.
+ * themes: [...], switchTo: { source: 'official' | 'existing' | 'added', id }
+ * | null }`, or `{ error }`. For `'added'`, `id` is the theme's id in the file.
  */
 export function planImport({
   file,
   folders = null,
   settings = true,
   themes = true,
+  currentTheme = true,
   target = 'new',
   existingFolders = [],
   currentFolder = '',
-  existingThemeNames = []
+  existingThemes = [],
+  officialThemeIds = []
 } = {}) {
   if (!file || file.error) return { error: file?.error || 'Nothing to import.' };
   const chosen = (file.folders || []).filter(folder => !folders || folders.includes(folder.name));
@@ -183,14 +205,55 @@ export function planImport({
     });
   }
 
-  const themeNames = [...existingThemeNames];
-  const addedThemes = themes && file.themes
-    ? file.themes.custom.map(theme => {
-        const name = uniqueName(theme.name, themeNames, 'Imported theme');
-        themeNames.push(name);
-        return { ...theme, name };
-      })
-    : [];
+  const themeNames = existingThemes.map(theme => theme?.name).filter(Boolean);
+  const looks = new Map(existingThemes.map(theme => [sameLookKey(theme), theme.id]));
+  const addedThemes = [];
+  const alreadyHere = new Map(); // id in the file -> id of the same theme here
 
-  return { writes, themes: addedThemes };
+  const take = theme => {
+    const here = looks.get(sameLookKey(theme));
+    if (here !== undefined) {
+      alreadyHere.set(theme.id, here);
+      return;
+    }
+    const name = uniqueName(theme.name, themeNames, 'Imported theme');
+    themeNames.push(name);
+    addedThemes.push({ ...theme, name });
+    looks.set(sameLookKey(theme), theme.id);
+  };
+
+  if (themes) (file.themes?.custom || []).forEach(take);
+
+  let switchTo = null;
+  const wanted = file.themes?.selectedId ?? null;
+  const current = file.themes?.current || null;
+  if (currentTheme && (wanted || current)) {
+    if (wanted && officialThemeIds.includes(wanted)) {
+      switchTo = { source: 'official', id: wanted };
+    } else {
+      const fromFile = (file.themes?.custom || []).find(theme => theme.id === wanted)
+        || (current ? { ...current, id: current.id ?? wanted } : null);
+      if (fromFile) {
+        if (!addedThemes.some(theme => theme.id === fromFile.id) && !alreadyHere.has(fromFile.id)) take(fromFile);
+        switchTo = alreadyHere.has(fromFile.id)
+          ? { source: 'existing', id: alreadyHere.get(fromFile.id) }
+          : { source: 'added', id: fromFile.id };
+      }
+    }
+  }
+
+  return { writes, themes: addedThemes, switchTo };
+}
+
+/** Two themes look the same when everything they paint with is the same. */
+function sameLookKey(theme) {
+  return stableJson(lookOf(theme));
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
