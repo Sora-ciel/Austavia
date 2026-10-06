@@ -78,6 +78,43 @@ Two standing checks worth doing at the same time:
   moved* still gives the size it did: the stored number changed meaning and is
   converted on read, not reset.
 
+## 0b. A bin for deleted folders, and deletes that sync
+
+Asked for on 2026-10-05: "we should have a bin, cloud and local, and from the
+client we should be able to retrieve folders we deleted in the last 15 days,
+or delete them from the cloud for ever". Agreed to build **after** the
+export/import, rename and duplicate work, and to give the folder menu its
+**Delete** only once the bin exists -- a cloud delete without one is final.
+
+**Found while looking: deleting a folder does not sync at all today.** The 🗑
+in the folder list (`deleteSave`) removes the local copy only; nothing calls
+`deleteRemoteFile`. The cloud copy stays, and the next pull downloads it again
+(it is in the remote index and not local, which `shouldTakeCloudCopy` reads as
+a folder to receive). Other devices never learn of the delete.
+
+The plan, in three parts, easiest first:
+
+1. **Local bin.** A delete moves the folder into an IndexedDB store with
+   `deletedAt`, beside the kept copies (`folder-snapshots` is the model). A
+   Bin page lists it with Restore and Delete for ever; anything past 15 days
+   is emptied at launch -- recomputed from `deletedAt`, not scheduled.
+2. **Cloud bin.** The folder moves to `sync/{ns}/users/{uid}/trash/{fileId}`
+   with `deletedAt` instead of being erased, its attachments left in place so
+   Restore brings the pictures back. Delete for ever is `deleteRemoteFile`. A
+   daily scheduled function empties anything past 15 days, absolute from
+   `deletedAt` (the recompute rule), so it happens with no device open. Needs
+   rules for `trash` (owner-only) with emulator tests, and a functions deploy.
+3. **Telling other devices -- the hard part.** The index keeps a tombstone
+   (`index/{fileId}: { deletedAt }`); a pull that meets one moves the local
+   copy to the bin instead of uploading it back. This is the sync core
+   (`runPull`, `shouldTakeCloudCopy`), so it wants tests for two devices
+   deleting, one offline, and a delete followed by a restore. A rename is the
+   same mechanism: a new folder plus a tombstone on the old name.
+
+Estimated two or three sessions, most of the risk in part 3.
+
+---
+
 ## 0a. Music that keeps playing with the app closed (Android)
 
 Asked for on 2026-09-28: "when removing the app from the opened apps on
