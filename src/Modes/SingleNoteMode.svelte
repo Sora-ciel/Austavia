@@ -319,6 +319,11 @@
   // page colour. On one with none it sits on this note's own page, so it takes
   // the page's writing colour (the picker's own) -- the theme's writing colour
   // there was brown on navy, and unreadable.
+  // On the search page a wallpaper shows at this share of its own opacity: the
+  // theme's colour comes through more, so the notes -- and their pictures --
+  // stand out, while each folder keeps its feel. Asked for on 2026-10-05; the
+  // folder's own setting is untouched everywhere else.
+  const SEARCH_WALLPAPER_DIM = 0.6;
   $: groupStyle = groupStyleFor(isMobileViewport, canvasTheme, modeTextColor);
   function groupStyleFor(isMobile, theme, text) {
     return wallpaper => {
@@ -327,7 +332,7 @@
       const url = String(wall.image).replace(/"/g, '%22');
       return (
         `--group-backdrop: ${theme.innerBg}; --group-text: ${text};` +
-        ` --group-wall: url("${url}"); --group-wall-opacity: ${wall.opacity};` +
+        ` --group-wall: url("${url}"); --group-wall-opacity: ${Math.round(wall.opacity * SEARCH_WALLPAPER_DIM * 100) / 100};` +
         ` --group-wall-filter: ${wall.filter}; --group-wall-size: ${wall.size}; --group-wall-bleed: -${wall.bleed}px;`
       );
     };
