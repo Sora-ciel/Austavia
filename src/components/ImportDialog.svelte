@@ -9,6 +9,7 @@
   import { createEventDispatcher } from 'svelte';
   import { planImport } from '../utils/folderTransfer.js';
   import TransferOption from './TransferOption.svelte';
+  import { describeMusic } from '../utils/musicTransfer.js';
 
   /** readExport's answer for the file. */
   export let file = { folders: [], themes: null };
@@ -18,6 +19,8 @@
   /** Every theme here, official and custom. */
   export let existingThemes = [];
   export let officialThemeIds = [];
+  /** The music the file carries, when it is a zip with some. */
+  export let music = null;
   export let themeStyle = '';
   export let busy = false;
 
@@ -27,6 +30,7 @@
   let settings = true;
   let themes = true;
   let currentTheme = false;
+  let withMusic = true;
   let target = 'new';
 
   $: hasSettings = (file.folders || []).some(folder => folder.modeSettings);
@@ -46,11 +50,14 @@
     existingThemes,
     officialThemeIds
   });
-  $: namesAfter = new Map(target === 'new' && !plan.error
-    ? (file.folders || []).filter(f => chosen.has(f.name)).map((f, i) => [f.name, plan.writes[i]?.name])
-    : []);
+  // The names each "Where" gives, shown under it before it is chosen --
+  // asked for on 2026-10-06.
+  $: newNames = chosen.size
+    ? planImport({ file, folders: [...chosen], settings, themes: false, currentTheme: false, target: 'new', existingFolders }).writes?.map(write => write.name) || []
+    : [];
+  $: musicCount = music?.tracks?.length || 0;
   $: customAdded = plan.error ? 0 : plan.themes.filter(theme => (file.themes?.custom || []).some(c => c.id === theme.id)).length;
-  $: nothingChosen = !chosen.size && !(themes && customAdded) && !(currentTheme && fileThemeName);
+  $: nothingChosen = !chosen.size && !(themes && customAdded) && !(currentTheme && fileThemeName) && !(withMusic && musicCount);
 
   function themeNameInFile(f) {
     const id = f.themes?.selectedId;
@@ -69,9 +76,12 @@
   }
 
   function folderDetail(folder) {
-    const count = `${folder.blocks.length} ${folder.blocks.length === 1 ? 'block' : 'blocks'}`;
-    const after = namesAfter.get(folder.name);
-    return chosen.has(folder.name) && after && after !== folder.name ? `${count} · will be called “${after}”` : count;
+    return `${folder.blocks.length} ${folder.blocks.length === 1 ? 'block' : 'blocks'}`;
+  }
+
+  function quoted(names) {
+    const shown = names.slice(0, 3).map(name => `“${name}”`).join(', ');
+    return names.length > 3 ? `${shown} and ${names.length - 3} more` : shown;
   }
 
   function customDetail() {
@@ -82,7 +92,7 @@
   }
 
   function submit() {
-    dispatch('import', { folders: [...chosen], settings, themes, currentTheme, target });
+    dispatch('import', { folders: [...chosen], settings, themes, currentTheme, music: withMusic && musicCount > 0, target });
   }
 </script>
 
@@ -95,7 +105,7 @@
       <section>
         <h4>Folders in the file</h4>
         {#each file.folders as folder (folder.name)}
-          <TransferOption checked={chosen.has(folder.name)} title={folder.name} detail={folderDetail(folder, namesAfter, chosen)} on:toggle={() => toggle(folder.name)} />
+          <TransferOption checked={chosen.has(folder.name)} title={folder.name} detail={folderDetail(folder)} on:toggle={() => toggle(folder.name)} />
         {/each}
       </section>
     {/if}
@@ -113,20 +123,33 @@
           <TransferOption checked={currentTheme} title="Switch to the theme it was using" detail={fileThemeName} on:toggle={() => (currentTheme = !currentTheme)} />
         {/if}
       </section>
-    {:else}
+    {:else if (file.folders || []).length}
       <p class="quiet">Only the folders' contents are in this file.</p>
+    {/if}
+
+    {#if musicCount}
+      <section>
+        <h4>Music</h4>
+        <TransferOption checked={withMusic} title="Music for Playlist mode" detail={`${describeMusic(music)}, added to yours.`} on:toggle={() => (withMusic = !withMusic)} />
+      </section>
     {/if}
 
     {#if chosen.size}
       <section>
         <h4>Where</h4>
-        <TransferOption kind="radio" checked={target === 'new'} title="Into new folders" on:toggle={() => (target = 'new')} />
+        <TransferOption
+          kind="radio"
+          checked={target === 'new'}
+          title={chosen.size === 1 ? 'Into a new folder' : 'Into new folders'}
+          detail={newNames.length ? `Called ${quoted(newNames)}.` : ''}
+          on:toggle={() => (target = 'new')}
+        />
         <TransferOption
           kind="radio"
           checked={target === 'replace'}
           disabled={!canReplace}
           title={`In place of “${currentFolder}”`}
-          detail={canReplace ? 'A copy of it is kept first.' : 'Choose one folder for this.'}
+          detail={canReplace ? `Keeps the name “${currentFolder}”; a copy of what it holds now is kept first.` : 'Choose one folder for this.'}
           on:toggle={() => (target = 'replace')}
         />
       </section>

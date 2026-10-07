@@ -21,11 +21,16 @@
     deleteBlocks,
     listSavedBlocks,
     loadMusicTrack,
+    saveMusicTrack,
+    saveMusicCover,
     saveMusicLibrary,
     loadMusicLibrary,
     loadSaveMeta,
     loadAllSaveMeta,
     listFolderSnapshots,
+    listBinEntries,
+    putBinEntry,
+    deleteBinEntry,
     putFolderSnapshots,
     deleteFolderSnapshot,
     describeLocalStorage
@@ -54,6 +59,8 @@
   } from './firebaseClient.js';
   import ExportDialog from './components/ExportDialog.svelte';
   import ImportDialog from './components/ImportDialog.svelte';
+  import BinDialog from './components/BinDialog.svelte';
+  import { binEntryOf, sortBin, restoreName, heldInBin, cloudDeletesAfterEmptying } from './utils/folderBin.js';
   import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
   import { embedCloudFiles } from './utils/cloudFiles.js';
   import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
@@ -109,7 +116,8 @@
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
   import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings } from './utils/modeBackground.js';
-  import { ensureMusicCover } from './utils/musicCovers.js';
+  import { ensureMusicCover, forgetCoverlessTrack } from './utils/musicCovers.js';
+  import { FOLDERS_ENTRY, packMusic, readMusicManifest, unpackMusic, mergeMusicLibrary } from './utils/musicTransfer.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
   import {
     stepShuffle,
@@ -4630,7 +4638,21 @@
 
   async function deleteSave(name) {
     const deletingCurrent = currentSaveName === name;
+
+    // Into the bin first, whole; if that cannot be done, nothing is deleted.
+    // See utils/folderBin.js.
+    try {
+      if (deletingCurrent) await flushWaitingSave();
+      const payload = await loadBlocks(name);
+      if (payload) await putBinEntry(binEntryOf(name, payload));
+    } catch (error) {
+      console.error('Could not move the folder to the bin:', error);
+      await appAlert(`"${name}" was not deleted: it could not be put in the bin (${error?.message || error}).`);
+      return;
+    }
     await deleteBlocks(name);
+    logSync('save', name, 'moved to the bin');
+    refreshBin();
 
     // Deleting the open folder opens another one in its place. Emptying the
     // screen and leaving no name is what wrote nothing over "default" on
@@ -5028,8 +5050,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     let openFileChanged = false;
     // An old name a rename left behind is not a folder to receive.
     const owedDeletes = readOwedDeletes();
+    // Nor is one in the bin: deleted here, so not to be downloaded back.
+    const binned = await refreshBin();
     for (const [fileName, remoteMeta] of remoteEntries) {
       if (skipDownload(fileName, owedDeletes)) continue;
+      if (heldInBin(fileName, binned, savedList)) continue;
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
       // compare two integers.
@@ -5630,7 +5655,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   });
 
   async function runExport(event) {
-    const { scope, settings, pictures, currentTheme, customThemes: withCustomThemes } = event.detail || {};
+    const { scope, settings, pictures, currentTheme, customThemes: withCustomThemes, music } = event.detail || {};
     exportBusy = true;
     try {
       await flushWaitingSave();
@@ -5668,8 +5693,19 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           }
         }
       });
-      const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
-      await deliverFile(blob, `${scope === 'all' ? 'Austavia folders' : currentSaveName || 'Austavia'}.json`);
+      const baseName = scope === 'all' ? 'Austavia folders' : currentSaveName || 'Austavia';
+      if (music) {
+        // With the music, the file is a zip: the folders as they would have
+        // been, beside the audio -- see utils/musicTransfer.js.
+        const { default: JSZip } = await import('jszip');
+        const zip = new JSZip();
+        zip.file(FOLDERS_ENTRY, JSON.stringify(file, null, 2));
+        await packMusic(zip, musicLibrary, { loadTrack: loadMusicTrack, loadCover: ensureMusicCover });
+        await deliverFile(await zip.generateAsync({ type: 'blob' }), `${baseName}.zip`);
+      } else {
+        const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+        await deliverFile(blob, `${baseName}.json`);
+      }
       exportDialogOpen = false;
       if (failed) {
         await appAlert(`${failed} picture${failed === 1 ? '' : 's'} could not be fetched, and stay${failed === 1 ? 's' : ''} as a link in the file.`);
@@ -5686,9 +5722,30 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     const input = event?.target;
     const chosen = input?.files?.[0];
     if (!chosen) return;
-    const text = await chosen.text();
     if (input) input.value = '';
-    const file = readExport(text, chosen.name);
+
+    // A zip is an export with music, or Playlist mode's own music file.
+    if (/\.zip$/i.test(chosen.name) || /zip/.test(chosen.type)) {
+      try {
+        const { default: JSZip } = await import('jszip');
+        const zip = await JSZip.loadAsync(chosen);
+        const foldersEntry = zip.file(FOLDERS_ENTRY);
+        const file = foldersEntry
+          ? readExport(await foldersEntry.async('string'), chosen.name)
+          : { folders: [], themes: null, legacy: false };
+        const music = await readMusicManifest(zip);
+        if (file.error || (!file.folders.length && !file.themes && !music?.tracks.length)) {
+          await appAlert(file.error || 'This file has nothing in it to import.');
+          return;
+        }
+        importState = { file, fileName: chosen.name, zip, music };
+      } catch (error) {
+        await appAlert(`This zip could not be read: ${error?.message || error}`);
+      }
+      return;
+    }
+
+    const file = readExport(await chosen.text(), chosen.name);
     if (file.error) {
       await appAlert(file.error);
       return;
@@ -5753,6 +5810,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         pushThemeToCloud(created);
       }
       if (madeFrom.size) persistCustomThemes(customThemes);
+      if (choice.music && importState.music && importState.zip) {
+        const imported = await unpackMusic(importState.zip, importState.music, {
+          saveTrack: saveMusicTrack,
+          saveCover: saveMusicCover,
+          onTrack: forgetCoverlessTrack
+        });
+        await handleLibraryChange(mergeMusicLibrary(musicLibrary, importState.music, imported));
+      }
+
       const switchTo = plan.switchTo;
       if (switchTo) {
         const target = switchTo.source === 'added'
@@ -5830,6 +5896,77 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       console.error('Rename failed:', error);
       await appAlert(`The folder could not be renamed: ${error?.message || error}`);
     }
+  }
+
+  // ── The bin ───────────────────────────────────────────────────────
+  // Deleted folders, kept on this device for 15 days -- asked for on
+  // 2026-10-06. The rules are utils/folderBin.js; this reads and writes.
+  let binEntries = [];
+  let binOpen = false;
+  let binBusy = false;
+
+  /**
+   * What is in the bin now, with anything past its 15 days emptied -- worked
+   * out from when each was deleted, every time, rather than scheduled. An
+   * emptied folder's cloud copy is owed a delete, paid by the upload tick.
+   */
+  async function refreshBin() {
+    try {
+      const { kept, expired } = sortBin(await listBinEntries());
+      for (const entry of expired) await deleteBinEntry(entry.id);
+      oweCloudDeletes(cloudDeletesAfterEmptying(expired, kept, savedList));
+      binEntries = kept;
+    } catch (error) {
+      console.warn('Could not read the bin:', error);
+    }
+    return binEntries;
+  }
+
+  function oweCloudDeletes(names) {
+    if (!names.length) return;
+    let owed = readOwedDeletes();
+    for (const name of names) owed = withPending(owed, name);
+    writeOwedDeletes(owed);
+  }
+
+  async function openBin() {
+    await refreshBin();
+    binOpen = true;
+  }
+
+  async function restoreFromBin(event) {
+    const entry = event.detail;
+    if (!entry?.payload) return;
+    binBusy = true;
+    try {
+      const name = restoreName(entry, savedList);
+      const { blocks: keptBlocks = [], modeOrders: keptOrders, modeSettings: keptSettings } = entry.payload;
+      await saveBlocks(name, { blocks: keptBlocks, modeOrders: keptOrders, modeSettings: keptSettings });
+      await deleteBinEntry(entry.id);
+      savedList = await listSavedBlocks();
+      logSync('save', name, name === entry.name ? 'restored from the bin' : `restored from the bin as "${name}"`);
+      autoSyncDirty = true;
+      await refreshBin();
+      binOpen = false;
+      await load(name);
+    } catch (error) {
+      console.error('Restore failed:', error);
+      await appAlert(`The folder could not be restored: ${error?.message || error}`);
+    } finally {
+      binBusy = false;
+    }
+  }
+
+  async function forgetFromBin(event) {
+    const entry = event.detail;
+    if (!entry) return;
+    const sure = await appConfirm(`Delete "${entry.name}" for ever? It cannot be brought back, and its copy in the cloud is deleted too.`);
+    if (!sure) return;
+    await deleteBinEntry(entry.id);
+    const { kept } = sortBin(await listBinEntries());
+    oweCloudDeletes(cloudDeletesAfterEmptying([entry], kept, savedList));
+    logSync('save', entry.name, 'deleted for ever from the bin');
+    await refreshBin();
   }
 
   /** A copy of a folder, named as an import would be: "Damn 1", "Damn 2". */
@@ -6222,6 +6359,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     savedList = await listSavedBlocks();
     const storedLastSave = loadStoredLastSaveName();
+    refreshBin();
     const safeModeFromShift = await detectShiftSafeModeDuringStartup();
     const safeModeActive = safeModeFromShift;
     let shouldClearLastSavePointer = false;
@@ -7248,6 +7386,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         {load}
         {deleteSave}
         {duplicateFolder}
+        binCount={binEntries.length}
+        {openBin}
         {createNewFile}
         {controlColors}
         themes={availableThemes}
@@ -7387,10 +7527,22 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     folderCount={savedList.length}
     themeCount={customThemes.length}
     currentThemeName={activeTheme?.name || 'Your unsaved theme'}
+    {musicLibrary}
     themeStyle={overlayThemeStyle}
     busy={exportBusy}
     on:export={runExport}
     on:close={() => (exportDialogOpen = false)}
+  />
+{/if}
+
+{#if binOpen}
+  <BinDialog
+    entries={binEntries}
+    themeStyle={overlayThemeStyle}
+    busy={binBusy}
+    on:restore={restoreFromBin}
+    on:forget={forgetFromBin}
+    on:close={() => (binOpen = false)}
   />
 {/if}
 
@@ -7402,6 +7554,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     existingFolders={savedList}
     existingThemes={availableThemes}
     officialThemeIds={STYLE_PRESETS.map(theme => theme.id)}
+    music={importState.music}
     themeStyle={overlayThemeStyle}
     busy={importBusy}
     on:import={runImport}

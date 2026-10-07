@@ -16,14 +16,18 @@ const MUSIC_LIBRARY_KEY = 'library:index';
 // Device-local and never uploaded, on purpose: a snapshot is what *this*
 // device was holding, which is precisely what no other device has.
 const SNAPSHOT_STORE_NAME = 'folder-snapshots';
+// Deleted folders, kept 15 days so they can be restored -- see
+// utils/folderBin.js. Keyed by entry id, since one name can be deleted twice.
+const BIN_STORE_NAME = 'folder-bin';
 // Bumped from 2: this DB name/origin was previously shared with an unrelated
 // project that left an IndexedDB at version 5 on some machines, and IndexedDB
 // refuses to open at a lower version than what already exists there
 // (VersionError). The upgrade callback below is idempotent (only creates
 // stores if missing), so raising this is safe and doesn't touch existing data.
-// Bumped to 8 for the folder-snapshots store. The upgrade only creates stores
-// that are missing, so raising it adds the store and touches nothing else.
-const DB_VERSION = 8;
+// Bumped to 8 for the folder-snapshots store, and to 9 for the folder bin. The
+// upgrade only creates stores that are missing, so raising it adds the store
+// and touches nothing else.
+const DB_VERSION = 9;
 const FILE_FIELDS = ['content', 'src', 'trackUrl', 'title', 'tasks'];
 
 function asPayloadWithTimestamp(payload, updatedAt = Date.now()) {
@@ -68,6 +72,9 @@ export async function getDB() {
       }
       if (!db.objectStoreNames.contains(SNAPSHOT_STORE_NAME)) {
         db.createObjectStore(SNAPSHOT_STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(BIN_STORE_NAME)) {
+        db.createObjectStore(BIN_STORE_NAME);
       }
     }
   });
@@ -383,6 +390,24 @@ export async function listFolderSnapshots(name) {
   const db = await getDB();
   const stored = await db.get(SNAPSHOT_STORE_NAME, name);
   return Array.isArray(stored) ? stored : [];
+}
+
+// ── The bin (device-local) ────────────────────────────────────────
+// What goes in and when it is emptied is utils/folderBin.js.
+
+export async function listBinEntries() {
+  const db = await getDB();
+  return (await db.getAll(BIN_STORE_NAME)).filter(entry => entry && entry.id);
+}
+
+export async function putBinEntry(entry) {
+  const db = await getDB();
+  await db.put(BIN_STORE_NAME, entry, entry.id);
+}
+
+export async function deleteBinEntry(id) {
+  const db = await getDB();
+  await db.delete(BIN_STORE_NAME, id);
 }
 
 /** Writes the whole list back, which is what the trimming rules produce. */

@@ -1263,7 +1263,7 @@ onMount(() => {
 
     <input
       type="file"
-      accept="application/json"
+      accept="application/json,.json,application/zip,.zip"
       on:change={importJSON}
       bind:this={fileInputRef}
       style="display: none"
@@ -1298,7 +1298,7 @@ onMount(() => {
   {:else if id === 'export'}
     <button data-control="export" on:click={exportJSON}><ControlIcon name="export" /> Export</button>
   {:else if id === 'import'}
-    <button data-control="import" on:click={triggerFileInput}><ControlIcon name="import" /> Import JSON</button>
+    <button data-control="import" on:click={triggerFileInput}><ControlIcon name="import" /> Import</button>
   {:else if id === 'undo'}
     <button data-control="undo" on:click={() => dispatch('undo')}><ControlIcon name="undo" /> Undo</button>
   {:else if id === 'redo'}

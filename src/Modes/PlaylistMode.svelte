@@ -5,6 +5,8 @@
   import PlayerIcon from '../components/PlayerIcons.svelte';
   import ScrollingText from '../components/ScrollingText.svelte';
   import { ensureMusicCover, forgetCoverlessTrack } from '../utils/musicCovers.js';
+  import { packMusic, readMusicManifest, unpackMusic, mergeMusicLibrary } from '../utils/musicTransfer.js';
+  import { deliverFile } from '../utils/fileDelivery.js';
   import { tracksWithPendingWork } from '../utils/playlistMerge.js';
   import {
     readAudioTags,
@@ -1030,36 +1032,17 @@
   }
 
   // ── Moving music between devices ──────────────────────────────────
+  // The packing is utils/musicTransfer.js, shared with the toolbar's Export
+  // and Import -- a zip made by either opens in either.
   async function exportLibrary() {
     busyMessage = 'Packing your music…';
     try {
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
-      const manifest = [];
-
-      for (const track of tracks) {
-        const blob = await loadMusicTrack(track.id);
-        if (!blob) continue;
-        // Keep the real container extension — defaulting everything to .mp3
-        // renamed flac/m4a files on the way out and broke them on import.
-        const extension = extensionOf(track.fileName) || 'mp3';
-        const fileName = track.fileName || `${track.title || track.id}.${extension}`;
-        zip.file(`audio/${track.id}__${fileName}`, blob);
-        const cover = await ensureMusicCover(track.id);
-        if (cover) zip.file(`covers/${track.id}`, cover);
-        manifest.push({ ...track, fileName });
-      }
-      zip.file('library.json', JSON.stringify({ tracks: manifest, playlists }, null, 2));
-
+      await packMusic(zip, { tracks, playlists }, { loadTrack: loadMusicTrack, loadCover: ensureMusicCover });
       const archive = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(archive);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'austavia-music.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // The share sheet on the phone, where a web download saved nothing.
+      await deliverFile(archive, 'austavia-music.zip', { title: 'Music' });
     } catch (error) {
       console.error('Music export failed:', error);
       dispatch('notify', `Could not export music: ${error?.message || error}`);
@@ -1074,27 +1057,14 @@
     try {
       const { default: JSZip } = await import('jszip');
       const zip = await JSZip.loadAsync(file);
-      const manifestFile = zip.file('library.json');
-      const manifest = manifestFile
-        ? JSON.parse(await manifestFile.async('string'))
-        : { tracks: [], playlists: [] };
-
-      const byId = new Map(tracks.map(t => [t.id, t]));
-      for (const track of manifest.tracks || []) {
-        const entry = zip.file(new RegExp(`^audio/${track.id}__`))[0];
-        if (!entry) continue;
-        await saveMusicTrack(track.id, await entry.async('blob'));
-        forgetCoverlessTrack(track.id);
-        const coverEntry = zip.file(`covers/${track.id}`);
-        if (coverEntry) await saveMusicCover(track.id, await coverEntry.async('blob'));
-        byId.set(track.id, { ...(byId.get(track.id) || {}), ...track });
-      }
-
-      const playlistById = new Map(playlists.map(p => [p.id, p]));
-      for (const p of manifest.playlists || []) playlistById.set(p.id, p);
-
+      const manifest = (await readMusicManifest(zip)) || { tracks: [], playlists: [] };
+      const imported = await unpackMusic(zip, manifest, {
+        saveTrack: saveMusicTrack,
+        saveCover: saveMusicCover,
+        onTrack: forgetCoverlessTrack
+      });
       coverUrls = {};
-      updateLibrary({ ...library, tracks: [...byId.values()], playlists: [...playlistById.values()] });
+      updateLibrary({ ...library, ...mergeMusicLibrary({ tracks, playlists }, manifest, imported) });
       await refreshAvailability();
     } catch (error) {
       console.error('Music import failed:', error);

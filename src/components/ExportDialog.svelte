@@ -9,12 +9,15 @@
    */
   import { createEventDispatcher } from 'svelte';
   import TransferOption from './TransferOption.svelte';
+  import { describeMusic } from '../utils/musicTransfer.js';
 
   export let currentFolder = '';
   export let folderCount = 1;
   export let themeCount = 0;
   /** The name of the theme on screen. */
   export let currentThemeName = '';
+  /** Playlist mode's library -- asked for on 2026-10-06. */
+  export let musicLibrary = { tracks: [], playlists: [] };
   /** The app's dialog colours. */
   export let themeStyle = '';
   export let busy = false;
@@ -26,9 +29,13 @@
   let pictures = true;
   let currentTheme = true;
   let customThemes = false;
+  // Off by default: audio is large, and it makes the file a zip.
+  let music = false;
+
+  $: trackCount = musicLibrary?.tracks?.length || 0;
 
   function submit() {
-    dispatch('export', { scope, settings, pictures, currentTheme, customThemes: customThemes && themeCount > 0 });
+    dispatch('export', { scope, settings, pictures, currentTheme, customThemes: customThemes && themeCount > 0, music: music && trackCount > 0 });
   }
 </script>
 
@@ -57,6 +64,17 @@
         title="Your custom themes"
         detail={themeCount ? `${themeCount} ${themeCount === 1 ? 'theme' : 'themes'}.` : 'You have none yet.'}
         on:toggle={() => (customThemes = !customThemes)}
+      />
+    </section>
+
+    <section>
+      <h4>Music</h4>
+      <TransferOption
+        checked={music && trackCount > 0}
+        disabled={!trackCount}
+        title="Your music from Playlist mode"
+        detail={trackCount ? `${describeMusic(musicLibrary)}. The file becomes a .zip, as big as the audio.` : 'Nothing in Playlist mode yet.'}
+        on:toggle={() => (music = !music)}
       />
     </section>
 

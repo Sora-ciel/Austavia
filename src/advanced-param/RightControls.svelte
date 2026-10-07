@@ -16,6 +16,9 @@
   export let deleteSave;
   /** A copy of a folder under the next free name -- see App's duplicateFolder. */
   export let duplicateFolder = async () => {};
+  /** How many folders are in the bin, and opening it -- see App's bin. */
+  export let binCount = 0;
+  export let openBin = () => {};
   export let createNewFile;
   export let controlColors = {};
   export let themes = [];
@@ -35,8 +38,8 @@
   import { createLongPress } from '../utils/longPress.js';
 
   // A folder's menu: right click, or a long press on a phone -- asked for on
-  // 2026-10-05. Duplicate for now; Delete joins it with the bin (PENDING 0b),
-  // since a delete that reaches the cloud without one cannot be undone.
+  // 2026-10-05. Duplicate, and Delete now that a deleted folder goes to the
+  // bin and can be restored for 15 days (2026-10-06).
   let folderMenu = null; // { x, y, name }
   let heldFolder = null;
   let swallowFolderClick = false;
@@ -74,7 +77,9 @@
   function folderMenuAction(event) {
     const name = folderMenu?.name;
     folderMenu = null;
-    if (event.detail === 'duplicate' && name !== undefined) duplicateFolder(name);
+    if (name === undefined) return;
+    if (event.detail === 'duplicate') duplicateFolder(name);
+    else if (event.detail === 'delete') deleteSave(name);
   }
   import { subscribeSyncLog, clearSyncLog, formatSyncLog } from '../utils/syncLog.js';
   import { describeStorageUsage, storageMessageFor } from '../utils/storageUsage.js';
@@ -745,18 +750,21 @@
                     on:pointerup={folderHoldEnd}
                     on:pointercancel={() => folderPress.cancel()}
                   >{name || '(unnamed folder)'}</button>
-                  <button on:click={() => deleteSave(name)}>🗑</button>
+                  <button title="Move to the bin" on:click={() => deleteSave(name)}>🗑</button>
                 </li>
               {/each}
             </ul>
           {:else}
             <p class="empty-state">No saved scenes yet.</p>
           {/if}
+          <button class="create-theme-btn" type="button" on:click={openBin}>
+            🗑 Bin{binCount ? ` (${binCount})` : ''}
+          </button>
           {#if folderMenu}
             <BlockContextMenu
               x={folderMenu.x}
               y={folderMenu.y}
-              items={[{ id: 'duplicate', label: 'Duplicate' }]}
+              items={[{ id: 'duplicate', label: 'Duplicate' }, { id: 'delete', label: 'Delete' }]}
               on:action={folderMenuAction}
               on:close={() => (folderMenu = null)}
             />

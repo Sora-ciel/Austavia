@@ -23,6 +23,8 @@ list below with what was observed.
 | next | **Deleting the open folder** opens another folder in its place, and no other folder is touched. On 2026-10-06 in staging, deleting an imported folder while it was open wrote nothing over "default" (4 blocks -> 0), because the save that followed had no folder name and took "default". And **a save that empties a folder keeps a copy first**: clear a folder, then Settings, Advanced -- its copy should be listed and restore. The deleted folder still comes back from the cloud on the next pull; that is 0b. |
 | next | **A copy of an official theme is the same theme.** Duplicate a see-through theme (Lime Wire, say) in the theme editor: the list that opens from Modes, dialogs and the mini player's veil should look exactly as they did, and new blocks start in the same colours. The editor now has the pop-up background, player veil, new block colours, the theme's wallpaper and Mr.Lee's toolbar characters, and every colour has an opacity slider -- a see-through panel no longer turns opaque when touched. The input background is its own colour now rather than following the left panel's. These travel through sync and exports too. |
 | next | **Export: the theme you use and your custom themes are two choices**, the first ticked and the second not. On import, "Switch to the theme it was using" makes that theme if this device does not have it, and a custom theme you already have is not added a second time. Both dialogs restyled: every choice is a themed row with its explanation underneath. |
+| next | **The bin.** Deleting a folder -- the 🗑, or Delete in the folder menu (right click / long press) -- moves it to Settings, Saved Files, **Bin**, where it stays 15 days with Restore and Delete for ever. Restore brings it back under its name, or "Damn 1" if the name was taken since, and opens it. While it is in the bin the cloud copy is not downloaded back (the deleted folder no longer reappears on the next pull). Delete for ever, or 15 days passing, deletes the cloud copy too, on the next upload. Other devices still keep their own copy -- PENDING 0b part 3. The local database goes to version 9: an older build will not open it afterwards. |
+| next | **Music in Export and Import.** Export has "Your music from Playlist mode" (off by default); with it the file is a .zip holding the folders and the audio. Import takes .json or .zip -- including a music file from Playlist mode's own export -- and adds the tracks and playlists to yours. Playlist mode's export now opens the share sheet on the phone. Import also shows, under "Into a new folder" and "In place of", the name each will give. |
 | next | **Screenshots on the phone** open the share sheet -- Photos, Files, a messaging app -- instead of a download that saved nothing and a copy that reached nothing. On a computer they still download and copy. |
 | 0.8.661 | **The timer in the notification shade, counting down.** Start a timer on the phone and leave the app: a notification sits with the others (not under "Silent") with the time counting down, in the theme's colours, and the pop-up's buttons -- pause/resume, +1, loop-arrow stop -- each changing the timer in the app. Paused, it shows what is left; at the end, "Time's up" with sound if the app is in the background. Change theme and the notification follows. |
 | 0.8.661 | **Single Note's one-line header.** The note's name, its count, Words, Characters and the picture button on one line, on a computer and on a phone (the picture button an icon only on a phone). Pressing the name opens the search page in the mode's colours: this folder's notes, a line, then other folders'. Typing finds notes by any word in them; picking one in another folder opens that folder on that note, still in Single Note. |
@@ -93,7 +95,8 @@ or delete them from the cloud for ever". Agreed to build **after** the
 export/import, rename and duplicate work, and to give the folder menu its
 **Delete** only once the bin exists -- a cloud delete without one is final.
 
-**Found while looking: deleting a folder does not sync at all today.** The 🗑
+**Found while looking: deleting a folder did not sync at all.** (Still true
+for other devices; this one now keeps it in the bin -- see part 1.) The 🗑
 in the folder list (`deleteSave`) removes the local copy only; nothing calls
 `deleteRemoteFile`. The cloud copy stays, and the next pull downloads it again
 (it is in the remote index and not local, which `shouldTakeCloudCopy` reads as
@@ -101,10 +104,13 @@ a folder to receive). Other devices never learn of the delete.
 
 The plan, in three parts, easiest first:
 
-1. **Local bin.** A delete moves the folder into an IndexedDB store with
-   `deletedAt`, beside the kept copies (`folder-snapshots` is the model). A
-   Bin page lists it with Restore and Delete for ever; anything past 15 days
-   is emptied at launch -- recomputed from `deletedAt`, not scheduled.
+1. **Local bin -- done 2026-10-06** (`utils/folderBin.js`, store
+   `folder-bin`, DB v9). A delete moves the folder there; Settings, Saved
+   Files, Bin restores it or deletes it for ever; anything past 15 days is
+   emptied whenever the bin is read (launch, every pull, opening it). A
+   folder in the bin is skipped by the pull, so it no longer comes straight
+   back; emptying it owes a cloud delete through the rename's owed-deletes
+   list. The folder menu has Delete now.
 2. **Cloud bin.** The folder moves to `sync/{ns}/users/{uid}/trash/{fileId}`
    with `deletedAt` instead of being erased, its attachments left in place so
    Restore brings the pictures back. Delete for ever is `deleteRemoteFile`. A
