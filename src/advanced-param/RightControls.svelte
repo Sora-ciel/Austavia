@@ -34,6 +34,7 @@
   export let blocksFollowThemeAll = false;
 
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
+  import { solidColor } from "../utils/cssColor.js";
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { createLongPress } from '../utils/longPress.js';
 
@@ -157,6 +158,8 @@
 
   $: rightCssVars = Object.entries({
     "--right-panel-bg": rightTheme.panelBg,
+    // The panel colour with its transparency taken off -- see solidColor.
+    "--right-panel-solid": solidColor(rightTheme.panelBg, "#222222"),
     "--right-text-color": rightTheme.textColor,
     "--right-button-bg": rightTheme.buttonBg,
     "--right-button-text": rightTheme.buttonText,
@@ -483,9 +486,12 @@
     border-color: var(--right-button-text, #ffffff);
   }
 
+  /* The two colours swap -- the writing's becomes the fill, the panel's the
+     writing -- and the panel's at full opacity, so a see-through theme keeps
+     its writing visible instead of clear on a filled button. */
   .create-theme-btn:hover {
     background: var(--right-button-text, #ffffff);
-    color: var(--right-panel-bg, #222222);
+    color: var(--right-panel-solid, var(--right-panel-bg, #222222));
   }
 
   .tab-section {

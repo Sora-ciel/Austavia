@@ -79,6 +79,33 @@ export function heldInBin(name, entries = [], localFolders = []) {
 }
 
 /**
+ * Whether a cloud folder is one this device does not want back: in the bin,
+ * or an old name a rename left behind. Asked on every path that downloads --
+ * the launch as much as the pull. Reported on 2026-10-06: deleted folders
+ * came back, because the launch fetched every cloud folder this device did not
+ * have and only the pull had been taught about the bin.
+ */
+export function leaveInCloud(name, { bin = [], owedDeletes = [], localFolders = [] } = {}) {
+  if (localFolders.includes(name)) return false;
+  return owedDeletes.includes(name) || heldInBin(name, bin, localFolders);
+}
+
+/**
+ * The bin's copy of a folder the cloud has a newer one of -- edited on another
+ * device after it was deleted here -- or `null`. The newer copy goes into the
+ * bin, not back among the folders: "when they come back they come back in the
+ * bin, not outside of it" (2026-10-06). Restore then gives the latest.
+ */
+export function binCopyBehind(name, entries = [], remoteModifiedAt = 0) {
+  const newest = (entries || [])
+    .filter(entry => entry?.name === name)
+    .sort((a, b) => Number(b.deletedAt) - Number(a.deletedAt))[0];
+  if (!newest) return null;
+  const kept = Number(newest.payload?.modifiedAt || newest.payload?.updatedAt || 0);
+  return Number(remoteModifiedAt) > kept ? newest : null;
+}
+
+/**
  * Names whose cloud copy may now be deleted: emptied from the bin, with no
  * other copy of that name still in it and no folder of that name here.
  */

@@ -11,7 +11,7 @@ import { SEE_THROUGH_PRESETS, LIME_WIRE_PRESET } from '../src/utils/outlineTheme
 import { EXTRA_PRESETS } from '../src/utils/extraThemes.js';
 import { HATO_PRESETS } from '../src/utils/hatoTheme.js';
 import { themeForSync, themeFromSync } from '../src/utils/themeSync.js';
-import { parseCssColor, formatCssColor } from '../src/utils/cssColor.js';
+import { parseCssColor, formatCssColor, solidColor } from '../src/utils/cssColor.js';
 
 const official = [...EXTRA_PRESETS, ...HATO_PRESETS, ...SEE_THROUGH_PRESETS];
 
@@ -73,5 +73,20 @@ describe('a colour in the editor keeps how see-through it is', () => {
   it('leaves gradients and variables to the text field', () => {
     assert.equal(parseCssColor('linear-gradient(red, blue)'), null);
     assert.equal(parseCssColor('var(--bg)'), null);
+  });
+});
+
+// Reported on 2026-10-06: on see-through themes a pressed button such as Bin
+// swapped its writing to the panel colour, which is clear -- so the writing
+// vanished. It now swaps to the panel colour at full opacity.
+describe('writing on a button filled with the text colour', () => {
+  it('takes the panel colour at full opacity, so a see-through theme can still read it', () => {
+    assert.equal(solidColor('#0c120000'), '#0c1200');
+    assert.equal(solidColor('rgba(12, 18, 0, 0.78)'), '#0c1200');
+    assert.equal(solidColor('#222222'), '#222222');
+  });
+
+  it('leaves what is not a plain colour to the fallback', () => {
+    assert.equal(solidColor('linear-gradient(red, blue)', '#17171a'), '#17171a');
   });
 });

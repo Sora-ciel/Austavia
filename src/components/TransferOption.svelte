@@ -106,7 +106,7 @@
     top: 0.5px;
     width: 4px;
     height: 8px;
-    border: solid var(--dlg-bg, #17171a);
+    border: solid var(--dlg-bg-solid, var(--dlg-bg, #17171a));
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
@@ -116,7 +116,7 @@
     position: absolute;
     inset: 3px;
     border-radius: 50%;
-    background: var(--dlg-bg, #17171a);
+    background: var(--dlg-bg-solid, var(--dlg-bg, #17171a));
   }
 
   .words {

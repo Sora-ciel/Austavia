@@ -37,7 +37,7 @@
               <span class="detail">{entry.blockCount} {entry.blockCount === 1 ? 'block' : 'blocks'} · {when(entry)}</span>
             </div>
             <div class="row-actions">
-              <button type="button" class="transfer-btn primary" disabled={busy} on:click={() => dispatch('restore', entry)}>Restore</button>
+              <button type="button" class="transfer-btn" disabled={busy} on:click={() => dispatch('restore', entry)}>Restore</button>
               <button type="button" class="transfer-btn" disabled={busy} on:click={() => dispatch('forget', entry)}>Delete for ever</button>
             </div>
           </li>
@@ -157,11 +157,6 @@
     color: var(--dlg-btn-text, #f0f0f0);
   }
 
-  .transfer-btn.primary {
-    border-color: var(--dlg-btn-text, #f0f0f0);
-    background: var(--dlg-btn-text, #f0f0f0);
-    color: var(--dlg-bg, #17171a);
-  }
 
   .transfer-btn:disabled {
     opacity: 0.6;

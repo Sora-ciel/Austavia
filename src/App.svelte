@@ -60,12 +60,13 @@
   import ExportDialog from './components/ExportDialog.svelte';
   import ImportDialog from './components/ImportDialog.svelte';
   import BinDialog from './components/BinDialog.svelte';
-  import { binEntryOf, sortBin, restoreName, heldInBin, cloudDeletesAfterEmptying } from './utils/folderBin.js';
+  import { binEntryOf, sortBin, restoreName, leaveInCloud, binCopyBehind, cloudDeletesAfterEmptying } from './utils/folderBin.js';
   import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
   import { embedCloudFiles } from './utils/cloudFiles.js';
   import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
+  import { solidColor } from './utils/cssColor.js';
   import { deliverFile, isNativeAndroid as onAndroidApp } from './utils/fileDelivery.js';
-  import { PENDING_DELETES_KEY, readPending, withPending, settlePending, skipDownload, deletesToRun } from './utils/folderMoves.js';
+  import { PENDING_DELETES_KEY, readPending, withPending, settlePending, deletesToRun } from './utils/folderMoves.js';
   import { reconcileThemes } from './utils/themeSync.js';
   import {
     themeKey,
@@ -3045,6 +3046,7 @@
     // A theme's popupBg, when it has one, is what a dialog sits on -- see
     // utils/outlineTheme.js. Otherwise the settings panel's own colour.
     `--dlg-bg: ${themeExtras.popupBg || rightTheme.panelBg}; --dlg-text: ${rightTheme.textColor};` +
+    ` --dlg-bg-solid: ${solidColor(themeExtras.popupBg || rightTheme.panelBg, '#17171a')};` +
     ` --dlg-border: ${rightTheme.borderColor}; --dlg-btn-bg: ${rightTheme.buttonBg};` +
     ` --dlg-btn-text: ${rightTheme.buttonText};`;
   // Modes used to derive their own readable text colour from the canvas
@@ -5053,8 +5055,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // Nor is one in the bin: deleted here, so not to be downloaded back.
     const binned = await refreshBin();
     for (const [fileName, remoteMeta] of remoteEntries) {
-      if (skipDownload(fileName, owedDeletes)) continue;
-      if (heldInBin(fileName, binned, savedList)) continue;
+      if (leaveInCloud(fileName, { bin: binned, owedDeletes, localFolders: savedList })) {
+        await updateBinnedCopy(fileName, binned, Number(remoteMeta?.modifiedAt || remoteMeta?.updatedAt || 0));
+        continue;
+      }
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
       // compare two integers.
@@ -5559,7 +5563,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       // this device's, and a device that is current fetches nothing at all.
       const localMeta = await loadAllSaveMeta();
       const behind = [];
+      // Not a folder in the bin, nor an old name a rename left: this is the
+      // path that brought deleted folders back at every launch (2026-10-06).
+      const binned = await refreshBin();
+      const owedDeletes = readOwedDeletes();
       for (const remoteName of remoteNames) {
+        if (leaveInCloud(remoteName, { bin: binned, owedDeletes, localFolders: localNames })) {
+          await updateBinnedCopy(remoteName, binned, Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0));
+          continue;
+        }
         const mine = localMeta[remoteName];
         const remoteAt = Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0);
         const localAt = Number(mine?.modifiedAt || mine?.updatedAt || 0);
@@ -5914,19 +5926,53 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     try {
       const { kept, expired } = sortBin(await listBinEntries());
       for (const entry of expired) await deleteBinEntry(entry.id);
-      oweCloudDeletes(cloudDeletesAfterEmptying(expired, kept, savedList));
       binEntries = kept;
+      await deleteFromCloudNow(cloudDeletesAfterEmptying(expired, kept, savedList));
     } catch (error) {
       console.warn('Could not read the bin:', error);
     }
     return binEntries;
   }
 
-  function oweCloudDeletes(names) {
+  /**
+   * The cloud copy of folders the bin has let go of -- deleted for ever, or
+   * past their 15 days -- deleted now, not left for later. Only then: moving a
+   * folder into the bin leaves the cloud alone, so Restore has something to
+   * come back to. Remembered first, so one that fails offline is tried again
+   * by the upload tick (payOwedDeletes).
+   */
+  async function deleteFromCloudNow(names) {
     if (!names.length) return;
     let owed = readOwedDeletes();
     for (const name of names) owed = withPending(owed, name);
     writeOwedDeletes(owed);
+    if (!firebaseReady || !authUser) return;
+
+    for (const name of names) {
+      try {
+        await deleteRemoteFile(name);
+        writeOwedDeletes(readOwedDeletes().filter(item => item !== name));
+        logSync('upload', name, 'deleted from the cloud: it left the bin');
+      } catch (error) {
+        logSync('error', name, 'could not delete it from the cloud yet; it will be tried again', { error: String(error?.message || error) });
+      }
+    }
+  }
+
+  /** A newer cloud copy of a folder in the bin goes into the bin -- see binCopyBehind. */
+  async function updateBinnedCopy(name, entries, remoteModifiedAt) {
+    const entry = binCopyBehind(name, entries, remoteModifiedAt);
+    if (!entry) return;
+    try {
+      const remotePayload = await loadRemoteFile(name);
+      if (!remotePayload) return;
+      const blocksIn = Array.isArray(remotePayload.blocks) ? remotePayload.blocks.length : 0;
+      await putBinEntry({ ...entry, payload: remotePayload, blockCount: blocksIn });
+      logSync('download', name, 'a newer cloud copy went into the bin, not back among the folders');
+      binEntries = binEntries.map(item => (item.id === entry.id ? { ...entry, payload: remotePayload, blockCount: blocksIn } : item));
+    } catch (error) {
+      console.warn('Could not update the bin from the cloud:', error);
+    }
   }
 
   async function openBin() {
@@ -5964,7 +6010,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     if (!sure) return;
     await deleteBinEntry(entry.id);
     const { kept } = sortBin(await listBinEntries());
-    oweCloudDeletes(cloudDeletesAfterEmptying([entry], kept, savedList));
+    await deleteFromCloudNow(cloudDeletesAfterEmptying([entry], kept, savedList));
     logSync('save', entry.name, 'deleted for ever from the bin');
     await refreshBin();
   }

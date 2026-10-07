@@ -252,7 +252,7 @@
   .transfer-btn.primary {
     border-color: var(--dlg-btn-text, #f0f0f0);
     background: var(--dlg-btn-text, #f0f0f0);
-    color: var(--dlg-bg, #17171a);
+    color: var(--dlg-bg-solid, var(--dlg-bg, #17171a));
   }
 
   .transfer-btn:disabled {

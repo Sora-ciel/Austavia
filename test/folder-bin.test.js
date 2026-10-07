@@ -12,6 +12,8 @@ import {
   daysLeft,
   restoreName,
   heldInBin,
+  leaveInCloud,
+  binCopyBehind,
   cloudDeletesAfterEmptying
 } from '../src/utils/folderBin.js';
 
@@ -68,5 +70,37 @@ describe('the bin and the cloud', () => {
     const again = binEntryOf('Damn', { blocks: [] }, NOW + 1);
     assert.deepEqual(cloudDeletesAfterEmptying([entry], [again], []), [], 'deleted twice, one copy still in the bin');
     assert.deepEqual(cloudDeletesAfterEmptying([entry], [], ['Damn']), [], 'a folder of that name is here now');
+  });
+});
+
+// Reported on 2026-10-06: deleted folders came back to the device anyway. The
+// launch downloaded every cloud folder the device did not have, and only the
+// pull had been told about the bin. Every path that downloads asks this.
+describe('what is not downloaded back', () => {
+  const entry = binEntryOf('Damn', { blocks: [] }, NOW);
+
+  it('a folder in the bin, or an old name a rename left, stays in the cloud', () => {
+    assert.equal(leaveInCloud('Damn', { bin: [entry] }), true);
+    assert.equal(leaveInCloud('Old name', { owedDeletes: ['Old name'] }), true);
+    assert.equal(leaveInCloud('Work', { bin: [entry], owedDeletes: ['Old name'] }), false);
+  });
+
+  it('a folder of that name here now syncs as any other', () => {
+    assert.equal(leaveInCloud('Damn', { bin: [entry], localFolders: ['Damn'] }), false);
+  });
+});
+
+// Said on 2026-10-06: "it's not bad that bin folders come back -- it's just
+// that when they come back, they come back in the bin, not outside of it."
+describe('a folder in the bin that changed elsewhere', () => {
+  const entry = binEntryOf('Damn', { blocks: [], modifiedAt: NOW - DAY }, NOW);
+
+  it('a newer cloud copy replaces the one in the bin, and stays in the bin', () => {
+    assert.equal(binCopyBehind('Damn', [entry], NOW), entry);
+  });
+
+  it('an older or equal one changes nothing', () => {
+    assert.equal(binCopyBehind('Damn', [entry], NOW - DAY), null);
+    assert.equal(binCopyBehind('Work', [entry], NOW), null);
   });
 });

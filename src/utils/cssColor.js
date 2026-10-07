@@ -57,3 +57,16 @@ export function formatCssColor(hex, alpha = 1, form = 'hex') {
   }
   return `${parsed.hex}${hex2(a * 255)}`;
 }
+
+/**
+ * A colour at full opacity: what writing takes when a button is filled with
+ * the text colour and the writing swaps to the panel's. On a see-through theme
+ * the panel colour is clear, and swapped onto writing it made the writing
+ * disappear on the Bin button and the dialogs' main buttons (2026-10-06). The
+ * colour stays the theme's; only its transparency goes. Anything that is not a
+ * plain colour comes back as `fallback`.
+ */
+export function solidColor(value, fallback = '') {
+  const parsed = parseCssColor(value);
+  return parsed ? parsed.hex : (fallback || String(value ?? ''));
+}
