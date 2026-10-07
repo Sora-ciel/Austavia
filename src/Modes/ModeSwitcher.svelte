@@ -6,7 +6,6 @@
   import HabitTrackerMode from './HabitTrackerMode.svelte';
   import TaskMode from './TaskMode.svelte';
   import PlaylistMode from './PlaylistMode.svelte';
-  import BirthdayMode from './BirthdayMode.svelte';
 
   export let mode; // 'default' or 'simple'
   // Which folder is open. Canvas mode uses it to know when to go back to the
@@ -161,8 +160,6 @@
       on:toggleShuffle
       on:notify
     />
-  {:else if mode === 'birthday'}
-    <BirthdayMode />
   {:else}
     <SingleNoteMode
       {blocks}

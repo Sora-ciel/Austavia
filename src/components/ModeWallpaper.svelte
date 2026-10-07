@@ -3,7 +3,7 @@
    * The folder's wallpaper, for a mode that has no place of its own to hold
    * one -- Simple Note, Habit Tracker and Task.
    *
-   * Asked for on 2026-09-27: "make other modes (apart from Birthday) have as
+   * Asked for on 2026-09-27: "make other modes have as
    * background the background Canvas mode uses -- the same background and
    * settings as the image background in Canvas mode." The picture and its
    * settings are Canvas's; see modeRegistry.js for which modes have one.

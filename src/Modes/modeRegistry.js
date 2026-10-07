@@ -7,8 +7,8 @@ export const MODE_DEFINITIONS = {
   default: {
     id: 'default',
     label: 'Canvas',
-    // Clock asked for on 2026-09-27, for every mode except Task, Playlist and
-    // Birthday. It lands here and in Simple Note because those are the two that
+    // Clock asked for on 2026-09-27, for every mode except Task and Playlist.
+    // It lands here and in Simple Note because those are the two that
     // hold blocks; Single Note is one piece of writing and Habit Tracker is a
     // list of habits, and neither has anywhere to put a block.
     addBlockTypes: ['text', 'image', 'music', 'embed', 'clock'],
@@ -52,25 +52,18 @@ export const MODE_DEFINITIONS = {
     addBlockTypes: [],
     showRightControls: true,
     settings: { wallpaper: true }
-  },
-  birthday: {
-    id: 'birthday',
-    label: 'Birthday',
-    addBlockTypes: [],
-    showRightControls: false,
-    requiresUnlock: true
   }
 };
 
-export const MODE_ORDER = ['default', 'simple', 'single', 'habit', 'task', 'playlist', 'birthday'];
+export const MODE_ORDER = ['default', 'simple', 'single', 'habit', 'task', 'playlist'];
 
 /**
  * Whether a mode draws the folder's wallpaper.
  *
- * Every mode but Birthday, and all of them the same picture with the same
- * settings: Canvas's. Asked for on 2026-09-27 -- "make other modes (apart from
- * Birthday) have as background the background Canvas mode uses ... the same
- * background and settings as the image background in Canvas mode." Single Note
+ * Every mode, and all of them the same picture with the same settings:
+ * Canvas's. Asked for on 2026-09-27 -- "make other modes have as background
+ * the background Canvas mode uses ... the same background and settings as the
+ * image background in Canvas mode." Single Note
  * and Playlist used to share a wallpaper of their own; there is now one per
  * folder, chosen from any of these modes.
  */
@@ -82,14 +75,6 @@ export function getModeDefinition(mode) {
   return MODE_DEFINITIONS[mode] || MODE_DEFINITIONS.single;
 }
 
-export function getModeOptions({ birthdayModeUnlocked = false } = {}) {
-  return MODE_ORDER.map((id) => {
-    const def = MODE_DEFINITIONS[id];
-    const locked = def.requiresUnlock && !birthdayModeUnlocked;
-    return {
-      id,
-      label: locked ? `${def.label} 🔒` : def.label,
-      locked
-    };
-  });
+export function getModeOptions() {
+  return MODE_ORDER.map((id) => ({ id, label: MODE_DEFINITIONS[id].label, locked: false }));
 }

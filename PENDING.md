@@ -87,6 +87,24 @@ Two standing checks worth doing at the same time:
   moved* still gives the size it did: the stored number changed meaning and is
   converted on read, not reset.
 
+## Parked: Birthday mode
+
+Taken out of the app and out of the public repo's current code on 2026-10-06
+("something I might work on later, but I don't want people on GitHub to fall
+on it"). The code as it was -- the mode, its 24-hour password lock in the mode
+list, its win background -- is on the branch `birthday-mode` of the **private**
+repo `Sora-ciel/austavia-birthday-mode` (local remote name `birthday`).
+
+To bring it back: `git fetch birthday` and take
+`src/Modes/BirthdayMode.svelte`, `src/assets/birthdayWinBgDataUri.js` and the
+removal commit's other hunks back (reverting that commit is the shortest way).
+Folders kept their `modeOrders.birthday` -- `ensureModeOrders` keeps keys it
+does not know -- so nothing needs migrating. It is still in the public repo's
+history before that commit, password included; the password should change if
+the lock ever matters.
+
+---
+
 ## 0b. A bin for deleted folders, and deletes that sync
 
 Asked for on 2026-10-05: "we should have a bin, cloud and local, and from the

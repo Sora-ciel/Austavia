@@ -1,7 +1,7 @@
 // What a clock block says, and when it next has to say something different.
 //
 // Asked for on 2026-09-27: "a clock block that can be on all our modes apart
-// from Task, Playlist and Birthday." It lands in Canvas and Simple Note, the
+// from Task and Playlist." It lands in Canvas and Simple Note, the
 // two modes that hold blocks.
 //
 // Two things here are easy to get quietly wrong. The time has to be the one the

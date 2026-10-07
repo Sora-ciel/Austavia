@@ -4,7 +4,7 @@
  * ## What was asked for
  *
  * "It would be great to add a clock block that can be on all our modes apart
- * from Task, Playlist and Birthday." — 2026-09-27.
+ * from Task and Playlist." — 2026-09-27.
  *
  * ## Local time, built by hand
  *

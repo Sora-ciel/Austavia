@@ -14,8 +14,6 @@
   export let singleNoteSettings = {};
   export let canvasBackgroundSettings = {};
   export let colors = {};
-  export let birthdayModeUnlocked = false;
-  export let birthdayUnlockMessage = '';
   /**
    * Asked before a background is applied: a background is kept inside the
    * folder, and one too large stops the whole folder syncing. App answers,
@@ -41,9 +39,8 @@
   let mobileQuickActionsRef;
   let showModeLadder = false;
   let showAddBlockMenu = false;
-  let birthdayPassword = '';
 
-  $: modeOptions = getModeOptions({ birthdayModeUnlocked });
+  $: modeOptions = getModeOptions();
   $: activeModeDefinition = getModeDefinition(mode);
 
   const defaultColors = {
@@ -77,7 +74,7 @@
 
 
   $: isSimpleNoteMode = Boolean(activeModeDefinition?.settings?.simpleColumns);
-  // Every mode but Birthday draws the folder's one wallpaper, kept in Canvas's
+  // Every mode draws the folder's one wallpaper, kept in Canvas's
   // settings -- see hasWallpaper in modeRegistry.js. The others read it with a
   // theme's own wallpaper filled in where the folder has none, which Canvas
   // deliberately does not; that is the only difference between them.
@@ -296,14 +293,8 @@
   }
 
   function selectMode(nextMode) {
-    if (nextMode === 'birthday' && !birthdayModeUnlocked) return;
     dispatch("setMode", nextMode);
     showModeLadder = false;
-  }
-
-  function unlockBirthdayMode() {
-    dispatch('unlockBirthdayMode', { password: birthdayPassword });
-    birthdayPassword = '';
   }
 
   // "moveUp" moves a block earlier in the mode's order and "moveDown" later.
@@ -663,37 +654,6 @@ onMount(() => {
     padding: 8px 10px;
   }
 
-  .birthday-unlock {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    border-top: 1px solid var(--left-border-color, #333333);
-    margin-top: 4px;
-    padding-top: 8px;
-  }
-
-  .birthday-unlock-row {
-    display: flex;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .birthday-unlock-row input {
-    flex: 1 1 auto;
-    min-width: 0;
-    width: auto;
-  }
-
-  .birthday-unlock-row button {
-    flex: 0 0 auto;
-    width: auto;
-    white-space: nowrap;
-    padding-inline: 10px;
-  }
-
-  .birthday-unlock small {
-    opacity: 0.85;
-  }
 
   .left-controls-wrapper button {
     background: var(--left-button-bg, #333333);
@@ -1141,18 +1101,6 @@ onMount(() => {
                 {option.label}
               </button>
             {/each}
-            {#if !birthdayModeUnlocked}
-              <div class="birthday-unlock">
-                <small>Unlock birthday mode for 24 hours.</small>
-                <div class="birthday-unlock-row">
-                  <input type="password" bind:value={birthdayPassword} placeholder="Password" />
-                  <button on:click={unlockBirthdayMode}>Unlock</button>
-                </div>
-                {#if birthdayUnlockMessage}
-                  <small>{birthdayUnlockMessage}</small>
-                {/if}
-              </div>
-            {/if}
           </div>
         {/if}
       </div>
@@ -1197,18 +1145,6 @@ onMount(() => {
               {option.label}
             </button>
           {/each}
-          {#if !birthdayModeUnlocked}
-            <div class="birthday-unlock">
-              <small>Unlock birthday mode for 24 hours.</small>
-              <div class="birthday-unlock-row">
-                <input type="password" bind:value={birthdayPassword} placeholder="Password" />
-                <button on:click={unlockBirthdayMode}>Unlock</button>
-              </div>
-              {#if birthdayUnlockMessage}
-                <small>{birthdayUnlockMessage}</small>
-              {/if}
-            </div>
-          {/if}
         </div>
       {/if}
     </div>

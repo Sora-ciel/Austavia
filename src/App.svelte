@@ -175,9 +175,6 @@
   // The theme's pop-up backing, player veil and the rest -- see utils/themeExtras.js.
   const THEME_EXTRAS_STORAGE_KEY = 'themeExtras';
 
-  const BIRTHDAY_UNLOCK_STORAGE_KEY = 'birthdayModeAccess';
-  const BIRTHDAY_MODE_PASSWORD = 'Birthday24H';
-  const BIRTHDAY_MODE_DURATION_MS = 24 * 60 * 60 * 1000;
   const MOBILE_BREAKPOINT = 1024;
 
   const MEDIA_HEADER_HEIGHT = 30;
@@ -519,7 +516,7 @@
     // devices. It lives here rather than behind its own sync because here it
     // already is one -- see utils/habitStore.js.
     habit: { habits: [] },
-    // The folder's one wallpaper, drawn by every mode but Birthday, under
+    // The folder's one wallpaper, drawn by every mode, under
     // Canvas mode's own id -- see hasWallpaper in modeRegistry.js. Single Note
     // had one of its own under `single`; it is no longer kept at all, so a
     // folder that still carries one loses it on its next save.
@@ -1352,32 +1349,6 @@
     }
   }
 
-
-  function loadBirthdayUnlockExpiry() {
-    if (typeof localStorage === 'undefined') return 0;
-    try {
-      const raw = localStorage.getItem(BIRTHDAY_UNLOCK_STORAGE_KEY);
-      if (!raw) return 0;
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) return 0;
-      return parsed;
-    } catch (error) {
-      return 0;
-    }
-  }
-
-  function persistBirthdayUnlockExpiry(expiresAt) {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      if (expiresAt > Date.now()) {
-        localStorage.setItem(BIRTHDAY_UNLOCK_STORAGE_KEY, String(expiresAt));
-      } else {
-        localStorage.removeItem(BIRTHDAY_UNLOCK_STORAGE_KEY);
-      }
-    } catch (error) {
-      /* ignore persistence failures */
-    }
-  }
 
   function persistCustomThemes(themes) {
     if (typeof localStorage === 'undefined') return;
@@ -2826,7 +2797,7 @@
   // be open when the theme was picked — and it leaves saves untouched, so
   // dropping the theme takes the background with it.
   // One wallpaper per folder: Canvas's picture and settings, drawn by every
-  // mode but Birthday (see hasWallpaper in modeRegistry.js). The name is from
+  // mode (see hasWallpaper in modeRegistry.js). The name is from
   // when Single Note had one of its own, which is now deleted -- see
   // normalizeModeSettings.
   $: singleNoteSettings = withThemeBackground(modeSettings.default, themeExtras);
@@ -3058,8 +3029,6 @@
     textColor: themeExtras.blockDefaults?.textColor || ''
   };
   let Pc = window.innerWidth > MOBILE_BREAKPOINT;
-  let birthdayUnlockExpiry = loadBirthdayUnlockExpiry();
-  let birthdayUnlockMessage = "";
   let deferredLastSaveName = '';
   let deferredLastSaveReason = '';
   let deferredLastSaveTimer = null;
@@ -3112,7 +3081,6 @@
   let lastAutoSyncFingerprintByFile = {};
   let lastAutoSyncAttachmentFingerprintByFile = {};
   let lastRemoteSyncFingerprint = '';
-  $: birthdayModeUnlocked = birthdayUnlockExpiry > Date.now();
 
   function rememberCloudSyncForFile(fileName, syncedAt = Date.now()) {
     cloudSyncMemoryByFile = {
@@ -6087,7 +6055,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       patch = { ...patch, task: { ...patch.task, addDirection: detail.taskAddDirection } };
     }
 
-    // The folder's wallpaper -- every mode's but Birthday's -- which arrives
+    // The folder's wallpaper -- every mode's -- which arrives
     // under Canvas mode's own id.
     if (detail.default && typeof detail.default === 'object') {
       patch = { ...patch, default: { ...patch.default, ...detail.default } };
@@ -6200,24 +6168,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   }
 
 
-  function unlockBirthdayMode(passwordAttempt) {
-    if ((passwordAttempt || '').trim() !== BIRTHDAY_MODE_PASSWORD) {
-      birthdayUnlockMessage = 'Incorrect password.';
-      return;
-    }
-
-    birthdayUnlockExpiry = Date.now() + BIRTHDAY_MODE_DURATION_MS;
-    persistBirthdayUnlockExpiry(birthdayUnlockExpiry);
-    birthdayUnlockMessage = 'Birthday mode unlocked for 24 hours.';
-  }
-
-  $: if (!birthdayModeUnlocked && mode === "birthday") {
-    mode = getDefaultModeForViewport();
-  }
-
   function setMode(nextMode) {
     if (!KNOWN_MODES.includes(nextMode)) return;
-    if (nextMode === "birthday" && !birthdayModeUnlocked) return;
     if (nextMode === mode) return;
     mode = nextMode;
     persistLastMode(nextMode);
@@ -6476,16 +6428,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         }
       }
     }
-    if (birthdayUnlockExpiry <= Date.now()) {
-      birthdayUnlockExpiry = 0;
-      persistBirthdayUnlockExpiry(0);
-      if (mode === "birthday") mode = getDefaultModeForViewport();
-    }
-
     // Reopen in whatever mode was last used, rather than always falling back
-    // to the viewport default. Birthday mode is skipped — it's password-gated.
+    // to the viewport default -- unless that mode no longer exists.
     const storedMode = loadLastMode();
-    if (storedMode && KNOWN_MODES.includes(storedMode) && storedMode !== 'birthday') {
+    if (storedMode && KNOWN_MODES.includes(storedMode)) {
       mode = storedMode;
     }
 
@@ -7216,15 +7162,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {savedList}
       {focusedBlockId}
       colors={controlColors.left}
-      {birthdayModeUnlocked}
-      {birthdayUnlockMessage}
       {mayUseBackground}
       on:addBlock={(e) => addBlock(e.detail)}
       on:clear={clear}
       on:exportJSON={exportJSON}
       on:importJSON={(e) => importJSON(e.detail)}
       on:setMode={(e) => setMode(e.detail)}
-      on:unlockBirthdayMode={(e) => unlockBirthdayMode(e.detail?.password)}
       on:undo={undo}
       on:redo={redo}
       on:moveUp={moveFocusedBlockUp}

@@ -368,7 +368,7 @@ export async function loadFolderNotes(name) {
     notes.push({ id: block.id, content, bgColor: block.bgColor, textColor: block.textColor });
   }
   // The folder's wallpaper lives in its settings under Canvas mode's id --
-  // the one wallpaper every mode but Birthday shows.
+  // the one wallpaper every mode shows.
   const wallpaper = payload.modeSettings?.default;
   return { notes, wallpaper: wallpaper && typeof wallpaper === 'object' ? wallpaper : null };
 }
