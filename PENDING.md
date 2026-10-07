@@ -140,7 +140,29 @@ The plan, in three parts, easiest first:
    deleting, one offline, and a delete followed by a restore. A rename is the
    same mechanism: a new folder plus a tombstone on the old name.
 
-Estimated two or three sessions, most of the risk in part 3.
+**Parts 2 and 3, as settled on 2026-10-06** (one design, built together):
+
+- The index entry of a folder says one of three things: **live**; **in the
+  bin** (`binnedAt`, the folder and its pictures stay in `files/` and Storage);
+  **deleted for ever** (`deletedAt`, a tombstone -- `files/` and the pictures
+  removed, the index entry kept).
+- Every device compares each entry with what it holds, absolutely, on every
+  pull and at launch (`utils/cloudBin.js`): a bin mark moves its copy into its
+  bin (or fetches it into the bin, so the bin is shared); a tombstone deletes
+  a copy older than it (a kept copy goes to Advanced first); a live entry newer
+  than a local bin entry means it was restored elsewhere, so it leaves the bin;
+  a live entry older than a local bin entry is marked binned (a delete made
+  offline).
+- Moving to the bin writes `binnedAt`; Restore is an ordinary upload, which
+  rewrites the entry without it; Delete for ever, 15 days, and a rename's old
+  name write the tombstone.
+- **The rules refuse a folder written over a tombstone unless it is newer than
+  the delete.** That is what stops an old build -- which knows none of this --
+  from uploading a deleted folder back.
+- A scheduled function empties bin marks past 15 days with no device open, and
+  forgets tombstones after 180 days. `enforceSyncQuota` records 0 bytes for a
+  tombstone and does not charge a bin mark as a write.
+- Rollout: rules and functions to staging, two signed-in tabs, then production.
 
 ---
 
