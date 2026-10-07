@@ -99,9 +99,7 @@ To bring it back: `git fetch birthday` and take
 `src/Modes/BirthdayMode.svelte`, `src/assets/birthdayWinBgDataUri.js` and the
 removal commit's other hunks back (reverting that commit is the shortest way).
 Folders kept their `modeOrders.birthday` -- `ensureModeOrders` keeps keys it
-does not know -- so nothing needs migrating. It is still in the public repo's
-history before that commit, password included; the password should change if
-the lock ever matters.
+does not know -- so nothing needs migrating.
 
 ---
 
