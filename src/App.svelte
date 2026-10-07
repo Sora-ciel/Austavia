@@ -55,12 +55,14 @@
     subscribeStorageUsage,
     subscribeAccountPlan,
     subscribeSubscription,
-    deleteRemoteFile
+    deleteRemoteFile,
+    binRemoteFile
   } from './firebaseClient.js';
   import ExportDialog from './components/ExportDialog.svelte';
   import ImportDialog from './components/ImportDialog.svelte';
   import BinDialog from './components/BinDialog.svelte';
-  import { binEntryOf, sortBin, restoreName, leaveInCloud, binCopyBehind, cloudDeletesAfterEmptying } from './utils/folderBin.js';
+  import { binEntryOf, sortBin, restoreName, leaveInCloud, cloudDeletesAfterEmptying } from './utils/folderBin.js';
+  import { cloudBinAction, newestBinEntry, stampOf, syncFingerprint } from './utils/cloudBin.js';
   import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
   import { embedCloudFiles } from './utils/cloudFiles.js';
   import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
@@ -4606,23 +4608,44 @@
       : null;
   }
 
+  /** The 🗑 and the folder menu's Delete: into the bin, and the cloud told. */
   async function deleteSave(name) {
-    const deletingCurrent = currentSaveName === name;
+    await moveFolderToBin(name, { tellCloud: true });
+  }
 
-    // Into the bin first, whole; if that cannot be done, nothing is deleted.
-    // See utils/folderBin.js.
+  /**
+   * A folder into the bin, whole; if that cannot be done, nothing is deleted.
+   * `tellCloud` marks it binned in the cloud too, so every device moves its
+   * copy into its own bin -- not wanted when the mark came from the cloud in
+   * the first place. A mark that fails to send is sent by a later pull, which
+   * notices the cloud is live and older than this delete (utils/cloudBin.js).
+   */
+  async function moveFolderToBin(name, { deletedAt = Date.now(), tellCloud = true, why = 'moved to the bin' } = {}) {
     try {
-      if (deletingCurrent) await flushWaitingSave();
+      if (currentSaveName === name) await flushWaitingSave();
       const payload = await loadBlocks(name);
-      if (payload) await putBinEntry(binEntryOf(name, payload));
+      if (payload) await putBinEntry(binEntryOf(name, payload, deletedAt));
     } catch (error) {
       console.error('Could not move the folder to the bin:', error);
-      await appAlert(`"${name}" was not deleted: it could not be put in the bin (${error?.message || error}).`);
-      return;
+      if (tellCloud) await appAlert(`"${name}" was not deleted: it could not be put in the bin (${error?.message || error}).`);
+      return false;
     }
+    await removeLocalFolder(name);
+    logSync('save', name, why);
+    await refreshBin();
+
+    if (tellCloud && firebaseReady && authUser) {
+      binRemoteFile(name, deletedAt).catch(error =>
+        logSync('error', name, 'could not mark it binned in the cloud yet; a later sync will', { error: String(error?.message || error) })
+      );
+    }
+    return true;
+  }
+
+  /** Takes a folder off this device, opening another if it was the open one. */
+  async function removeLocalFolder(name) {
+    const deletingCurrent = currentSaveName === name;
     await deleteBlocks(name);
-    logSync('save', name, 'moved to the bin');
-    refreshBin();
 
     // Deleting the open folder opens another one in its place. Emptying the
     // screen and leaving no name is what wrote nothing over "default" on
@@ -4638,25 +4661,69 @@
       }
     }
 
-    if (deletingCurrent) {
-      blocks = [];
-      currentSaveName = "";
-      persistLastSaveName("");
-    }
-
-    modeOrders = ensureModeOrders(blocks, modeOrders);
-    if (focusedBlockId && !blocks.some(b => b.id === focusedBlockId)) {
-      focusedBlockId = null;
-    }
     savedList = await listSavedBlocks();
-
-    if (!deletingCurrent && loadStoredLastSaveName() === name) {
-      persistLastSaveName(currentSaveName);
+    if (!deletingCurrent) {
+      if (loadStoredLastSaveName() === name) persistLastSaveName(currentSaveName);
+      return;
     }
 
+    blocks = [];
+    currentSaveName = "";
+    persistLastSaveName("");
+    modeOrders = ensureModeOrders(blocks, modeOrders);
+    focusedBlockId = null;
     history = [];
     historyIndex = -1;
     await pushHistory(blocks, modeOrders);
+  }
+
+  /**
+   * One folder, held against what the cloud's index says of it -- the bin
+   * across devices (utils/cloudBin.js). Returns 'normal' when the ordinary
+   * sync should go on with it, anything else when it has been dealt with.
+   */
+  async function applyCloudBin(name, entry, binned, localFolders) {
+    const localStamp = localFolders.includes(name) ? stampOf(await loadSaveMeta(name)) : null;
+    const binEntry = newestBinEntry(binned, name);
+    const action = cloudBinAction({ entry, localStamp, binEntry });
+    if (action === 'normal' || action === 'none') return action;
+
+    try {
+      if (action === 'bin-local') {
+        await moveFolderToBin(name, { deletedAt: Number(entry.binnedAt), tellCloud: false, why: 'moved to the bin on another device' });
+      } else if (action === 'fetch-into-bin' || action === 'refresh-bin') {
+        const remotePayload = await loadRemoteFile(name);
+        if (remotePayload) {
+          const kept = action === 'refresh-bin'
+            ? { ...binEntry, payload: remotePayload, blockCount: (remotePayload.blocks || []).length }
+            : binEntryOf(name, remotePayload, Number(entry.binnedAt));
+          await putBinEntry(kept);
+          logSync('download', name, action === 'refresh-bin' ? 'a newer copy of a folder in the bin, kept in the bin' : 'in the bin on another device, so in the bin here too');
+        }
+      } else if (action === 'delete-local') {
+        // Deleted for ever elsewhere. A kept copy goes to Advanced settings
+        // first, so a delete nobody here asked for can still be undone.
+        const payload = await loadBlocks(name);
+        await keepReplacedCopy(name, payload, { blocks: [] }, 'deleted for ever on another device');
+        await removeLocalFolder(name);
+        logSync('save', name, 'deleted for ever on another device, so deleted here');
+      } else if (action === 'drop-bin-entry') {
+        for (const item of binned.filter(item => item.name === name)) await deleteBinEntry(item.id);
+        logSync('save', name, 'deleted for ever on another device, so gone from the bin here');
+      } else if (action === 'unbin-local') {
+        for (const item of binned.filter(item => item.name === name)) await deleteBinEntry(item.id);
+        logSync('download', name, 'restored on another device, so out of the bin here');
+        await refreshBin();
+        return 'normal'; // the ordinary sync now downloads it
+      } else if (action === 'mark-binned') {
+        await binRemoteFile(name, Number(binEntry.deletedAt));
+        logSync('upload', name, 'told the cloud it is in the bin');
+      }
+    } catch (error) {
+      logSync('error', name, `the bin could not be brought in line (${action}); the next sync will try again`, { error: String(error?.message || error) });
+    }
+    await refreshBin();
+    return action;
   }
 
   async function signInGoogle() {
@@ -5006,10 +5073,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   async function runPull(options = {}) {
     const remoteIndex = options.remoteIndex || await loadRemoteIndex();
     const remoteEntries = Object.entries(remoteIndex || {});
-    const remoteFingerprint = remoteEntries
-      .map(([fileName, meta]) => `${fileName}:${Number(meta?.modifiedAt || meta?.updatedAt || 0)}`)
-      .sort()
-      .join('|');
+    // Bin marks, tombstones and this device's own bin count as changes too --
+    // see syncFingerprint.
+    const binned = await refreshBin();
+    const remoteFingerprint = syncFingerprint(remoteIndex, binned);
 
     if (remoteFingerprint === lastRemoteSyncFingerprint) return false;
 
@@ -5020,13 +5087,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     let openFileChanged = false;
     // An old name a rename left behind is not a folder to receive.
     const owedDeletes = readOwedDeletes();
-    // Nor is one in the bin: deleted here, so not to be downloaded back.
-    const binned = await refreshBin();
     for (const [fileName, remoteMeta] of remoteEntries) {
-      if (leaveInCloud(fileName, { bin: binned, owedDeletes, localFolders: savedList })) {
-        await updateBinnedCopy(fileName, binned, Number(remoteMeta?.modifiedAt || remoteMeta?.updatedAt || 0));
-        continue;
-      }
+      if (leaveInCloud(fileName, { owedDeletes, localFolders: savedList })) continue;
+      // In the bin, here or elsewhere, or deleted for ever: the bin decides.
+      if (await applyCloudBin(fileName, remoteMeta, binEntries, savedList) !== 'normal') continue;
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
       // compare two integers.
@@ -5533,13 +5597,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       const behind = [];
       // Not a folder in the bin, nor an old name a rename left: this is the
       // path that brought deleted folders back at every launch (2026-10-06).
-      const binned = await refreshBin();
+      await refreshBin();
       const owedDeletes = readOwedDeletes();
       for (const remoteName of remoteNames) {
-        if (leaveInCloud(remoteName, { bin: binned, owedDeletes, localFolders: localNames })) {
-          await updateBinnedCopy(remoteName, binned, Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0));
-          continue;
-        }
+        if (leaveInCloud(remoteName, { owedDeletes, localFolders: localNames })) continue;
+        if (await applyCloudBin(remoteName, remoteIndex[remoteName], binEntries, await listSavedBlocks()) !== 'normal') continue;
         const mine = localMeta[remoteName];
         const remoteAt = Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0);
         const localAt = Number(mine?.modifiedAt || mine?.updatedAt || 0);
@@ -5924,22 +5986,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       } catch (error) {
         logSync('error', name, 'could not delete it from the cloud yet; it will be tried again', { error: String(error?.message || error) });
       }
-    }
-  }
-
-  /** A newer cloud copy of a folder in the bin goes into the bin -- see binCopyBehind. */
-  async function updateBinnedCopy(name, entries, remoteModifiedAt) {
-    const entry = binCopyBehind(name, entries, remoteModifiedAt);
-    if (!entry) return;
-    try {
-      const remotePayload = await loadRemoteFile(name);
-      if (!remotePayload) return;
-      const blocksIn = Array.isArray(remotePayload.blocks) ? remotePayload.blocks.length : 0;
-      await putBinEntry({ ...entry, payload: remotePayload, blockCount: blocksIn });
-      logSync('download', name, 'a newer cloud copy went into the bin, not back among the folders');
-      binEntries = binEntries.map(item => (item.id === entry.id ? { ...entry, payload: remotePayload, blockCount: blocksIn } : item));
-    } catch (error) {
-      console.warn('Could not update the bin from the cloud:', error);
     }
   }
 

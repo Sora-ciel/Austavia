@@ -532,15 +532,45 @@ async function deleteStorageFolder(ctx, path) {
   ]);
 }
 
+/**
+ * Marks a folder as in the bin, in the cloud: its index entry gains
+ * `binnedAt`, and the folder and its pictures stay where they are so any
+ * device can restore it. Restoring is an ordinary upload, which rewrites the
+ * entry without the mark. See utils/cloudBin.js.
+ *
+ * Does nothing for a folder the cloud does not have, or has deleted for ever.
+ */
+export async function binRemoteFile(fileId, binnedAt = Date.now()) {
+  if (!isFirebaseConfigured() || !isSyncableFileId(fileId)) return null;
+  const ctx = await getFirebaseContext();
+  const user = requireUser(ctx.auth.currentUser);
+  const entryRef = ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`));
+  const snapshot = await ctx.dbApi.get(entryRef);
+  if (!snapshot.exists() || Number(snapshot.val()?.deletedAt) > 0) return null;
+  await ctx.dbApi.update(entryRef, { binnedAt: Number(binnedAt) });
+  return { fileId, binnedAt };
+}
+
+/**
+ * Deletes a folder from the cloud for ever. The folder and its pictures go;
+ * its index entry is kept as a tombstone (`deletedAt`), so that a device still
+ * holding an old copy learns it was deleted instead of uploading it back --
+ * and the rules refuse that upload anyway unless the copy is newer than the
+ * delete. See utils/cloudBin.js.
+ */
 export async function deleteRemoteFile(fileId) {
   if (!isFirebaseConfigured()) return null;
   const ctx = await getFirebaseContext();
   const user = requireUser(ctx.auth.currentUser);
 
-  await Promise.all([
-    ctx.dbApi.remove(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `files/${fileId}`))),
-    ctx.dbApi.remove(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`)))
-  ]);
+  // The tombstone first: from that moment no device takes the folder for one
+  // the cloud lacks, even if removing the rest is interrupted.
+  const deletedAt = Date.now();
+  await ctx.dbApi.set(
+    ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`)),
+    { fileId, updatedAt: deletedAt, deletedAt }
+  );
+  await ctx.dbApi.remove(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `files/${fileId}`)));
 
   // The note's images and other attachments used to be left behind here,
   // costing storage forever and keeping content that the user believes they

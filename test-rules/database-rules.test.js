@@ -19,7 +19,7 @@ import {
   assertFails,
   assertSucceeds
 } from '@firebase/rules-unit-testing';
-import { ref, set, get, remove } from 'firebase/database';
+import { ref, set, get, remove, update } from 'firebase/database';
 
 // Must match the --project passed to emulators:exec in package.json. A
 // `demo-` prefix tells the CLI this project is emulator-only, so nothing here
@@ -490,5 +490,57 @@ describe('admin-only surfaces', () => {
     await seed((adminDb) => set(ref(adminDb, `admins/${ALICE}`), true));
 
     await assertFails(set(ref(db(ALICE), 'monitoring/config/somethingElse'), 1));
+  });
+});
+
+// The bin across devices (PENDING 0b, utils/cloudBin.js). Asked for on
+// 2026-10-06: a folder deleted for ever must not come back from a device
+// that still had it -- including one running a build that has never heard of
+// tombstones, which is why this is a rule and not only client code.
+describe('a folder deleted for ever', () => {
+  const DELETED_AT = 1800000000000;
+
+  async function tombstone() {
+    await reset();
+    await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT, deletedAt: DELETED_AT }));
+  }
+
+  it('cannot be uploaded back from an older copy', async () => {
+    await tombstone();
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000, blocks: [] }));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000 }));
+  });
+
+  it('cannot be uploaded back by a build that sends no modifiedAt at all', async () => {
+    await tombstone();
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT + 5000, blocks: [] }));
+  });
+
+  it('can be made again later under the same name', async () => {
+    await tombstone();
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000, blocks: [] }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000 }));
+  });
+
+  it('a client can write the tombstone itself', async () => {
+    await reset();
+    await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT, deletedAt: DELETED_AT }));
+    await assertSucceeds(remove(ref(db(ALICE), `${userPath(ALICE)}/files/f1`)));
+  });
+});
+
+describe('a folder in the bin', () => {
+  it('can be marked binned, and unmarked by an ordinary upload', async () => {
+    await reset();
+    await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
+    await assertSucceeds(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { binnedAt: 2 }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 3, modifiedAt: 3 }));
+  });
+
+  it('refuses a mark that is not a time', async () => {
+    await reset();
+    await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
+    await assertFails(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { binnedAt: 'soon' }));
   });
 });

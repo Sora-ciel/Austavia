@@ -91,21 +91,6 @@ export function leaveInCloud(name, { bin = [], owedDeletes = [], localFolders = 
 }
 
 /**
- * The bin's copy of a folder the cloud has a newer one of -- edited on another
- * device after it was deleted here -- or `null`. The newer copy goes into the
- * bin, not back among the folders: "when they come back they come back in the
- * bin, not outside of it" (2026-10-06). Restore then gives the latest.
- */
-export function binCopyBehind(name, entries = [], remoteModifiedAt = 0) {
-  const newest = (entries || [])
-    .filter(entry => entry?.name === name)
-    .sort((a, b) => Number(b.deletedAt) - Number(a.deletedAt))[0];
-  if (!newest) return null;
-  const kept = Number(newest.payload?.modifiedAt || newest.payload?.updatedAt || 0);
-  return Number(remoteModifiedAt) > kept ? newest : null;
-}
-
-/**
  * Names whose cloud copy may now be deleted: emptied from the bin, with no
  * other copy of that name still in it and no folder of that name here.
  */

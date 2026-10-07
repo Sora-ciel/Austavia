@@ -13,7 +13,6 @@ import {
   restoreName,
   heldInBin,
   leaveInCloud,
-  binCopyBehind,
   cloudDeletesAfterEmptying
 } from '../src/utils/folderBin.js';
 
@@ -90,17 +89,3 @@ describe('what is not downloaded back', () => {
   });
 });
 
-// Said on 2026-10-06: "it's not bad that bin folders come back -- it's just
-// that when they come back, they come back in the bin, not outside of it."
-describe('a folder in the bin that changed elsewhere', () => {
-  const entry = binEntryOf('Damn', { blocks: [], modifiedAt: NOW - DAY }, NOW);
-
-  it('a newer cloud copy replaces the one in the bin, and stays in the bin', () => {
-    assert.equal(binCopyBehind('Damn', [entry], NOW), entry);
-  });
-
-  it('an older or equal one changes nothing', () => {
-    assert.equal(binCopyBehind('Damn', [entry], NOW - DAY), null);
-    assert.equal(binCopyBehind('Work', [entry], NOW), null);
-  });
-});

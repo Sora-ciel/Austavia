@@ -6,6 +6,8 @@ const { onObjectFinalized, onObjectDeleted } = require('firebase-functions/v2/st
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
+const { getStorage } = require('firebase-admin/storage');
+const { sweepIndex, indexWriteKind } = require('./cloudBin');
 const { LATEST_SCHEMA_VERSION, MIN_SUPPORTED_SCHEMA_VERSION, migrateFilePayload } = require('./migrations');
 const { DAILY_BYTE_LIMIT } = require('./limits');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
@@ -56,13 +58,21 @@ exports.enforceSyncQuota = onValueWritten(
     const { ns, uid, fileId } = event.params;
     logger.info('enforceSyncQuota-start', { ns, uid, fileId, afterExists: event.data.after.exists() });
 
-    if (!event.data.after.exists()) {
+    const kind = indexWriteKind(
+      event.data.before.exists() ? event.data.before.val() : null,
+      event.data.after.exists() ? event.data.after.val() : null
+    );
+    if (kind === 'removed' || kind === 'tombstone') {
       // Nothing to charge for a delete -- but the folder's stored size goes
       // with it, or an account would carry the weight of folders it no longer
-      // has and never get that room back.
+      // has and never get that room back. A tombstone (deleted for ever, see
+      // cloudBin.js) is a delete that leaves a marker behind.
       await recordNoteBytes(getDatabase(), uid, fileId, 0);
       return;
     }
+    // Moving a folder to the bin only marks its entry; the folder was not
+    // written, so today's bandwidth is not charged for it again.
+    if (kind === 'bin-mark') return;
 
     // Stamped here rather than from its own trigger: this one already fires on
     // every sync write, and a save is the definition of active worth having.
@@ -231,6 +241,51 @@ exports.reconcileStorageUsage = onSchedule(
 // The numbers are cheap to recompute; the history is not. Nothing can
 // reconstruct what a month looked like after the fact, which is why this is
 // worth running from the day there is nothing to see.
+// The bin's 15 days, kept with no device open (PENDING 0b, cloudBin.js): a
+// folder binned that long is deleted for ever -- its index entry becomes a
+// tombstone, its data and pictures go -- and tombstones that have stood long
+// enough are forgotten. Absolute from each entry's own times, so a late or
+// repeated run does the same thing.
+//
+// Accounts are found through noteSizes, which is small, rather than by
+// reading the users node, which holds every folder of every account.
+exports.emptyCloudBins = onSchedule(
+  {
+    schedule: 'every day 04:00',
+    region: 'us-central1',
+    maxInstances: SCHEDULED_MAX_INSTANCES
+  },
+  async () => {
+    const db = getDatabase();
+    const bucket = getStorage().bucket();
+    const now = Date.now();
+    const uids = Object.keys((await db.ref('noteSizes').get()).val() || {});
+    let emptied = 0;
+    let forgotten = 0;
+
+    for (const uid of uids) {
+      const userPath = `sync/${SYNC_NAMESPACE}/users/${uid}`;
+      const { empty, forget } = sweepIndex((await db.ref(`${userPath}/index`).get()).val() || {}, now);
+
+      for (const fileId of empty) {
+        await db.ref(`${userPath}/index/${fileId}`).set({ fileId, updatedAt: now, deletedAt: now });
+        await db.ref(`${userPath}/files/${fileId}`).remove();
+        try {
+          await bucket.deleteFiles({ prefix: `users/${uid}/attachments/${fileId}/` });
+        } catch (error) {
+          logger.warn('empty-bin-attachments-failed', { uid, fileId, message: error.message });
+        }
+        emptied += 1;
+      }
+      for (const fileId of forget) {
+        await db.ref(`${userPath}/index/${fileId}`).remove();
+        forgotten += 1;
+      }
+    }
+    logger.info('empty-cloud-bins', { accounts: uids.length, emptied, forgotten });
+  }
+);
+
 exports.rollUpStats = onSchedule(
   {
     schedule: 'every day 00:15',
