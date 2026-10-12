@@ -8,6 +8,16 @@ import {
   payloadCarriesDataUrl
 } from './utils/syncRules.js';
 import { attachmentKey } from './utils/attachmentIdentity.js';
+// Which way Google sign-in goes; the Linux desktop app signs in in a window of
+// its own. See utils/desktopSignIn.js.
+import {
+  signInMethod,
+  signInRequest,
+  readSignInAnswer,
+  randomCode,
+  authSetup,
+  SIGN_IN_EVENT
+} from './utils/desktopSignIn.js';
 // What may be written to themes/, and which of two copies of one theme wins.
 // See utils/themeSync.js.
 import {
@@ -134,6 +144,16 @@ function loadFirebaseModules() {
   return firebaseModulesPromise;
 }
 
+// initializeAuth may only be called once per app; a second call (a hot reload
+// in development) gets the instance that already exists.
+function initializeAuthOnce(auth, firebaseApp) {
+  try {
+    return auth.initializeAuth(firebaseApp, { persistence: auth.browserLocalPersistence });
+  } catch {
+    return auth.getAuth(firebaseApp);
+  }
+}
+
 async function getFirebaseContext() {
   if (!isFirebaseConfigured()) return null;
   if (!firebaseContextPromise) {
@@ -141,7 +161,13 @@ async function getFirebaseContext() {
       const firebaseApp = app.getApps().length
         ? app.getApp()
         : app.initializeApp(firebaseConfig);
-      const firebaseAuth = auth.getAuth(firebaseApp);
+      // On the Linux app, without Firebase's popup and redirect helper: it
+      // waits at start-up for something a tauri:// page never gives it, and
+      // every sign-in then waits behind it. See authSetup in
+      // utils/desktopSignIn.js.
+      const firebaseAuth = authSetup(currentSignInMethod()) === 'without-popup-helper'
+        ? initializeAuthOnce(auth, firebaseApp)
+        : auth.getAuth(firebaseApp);
       auth.setPersistence(firebaseAuth, auth.browserLocalPersistence).catch(() => {});
       const firebaseDb = database.getDatabase(firebaseApp);
       const firebaseStorage = storage.getStorage(firebaseApp);
@@ -367,12 +393,79 @@ export function onAuthStateChange(callback) {
   };
 }
 
+function currentSignInMethod() {
+  return signInMethod({
+    isCapacitorNative: Capacitor.isNativePlatform(),
+    isTauri: typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__),
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : ''
+  });
+}
+
+// The sign-in window currently open, if any. Pressing sign in again while it
+// is open opens a fresh one (the old is replaced), and the wait follows it.
+let pendingWindowSignIn = null;
+
+async function signInWithGoogleInWindow(ctx) {
+  const [{ invoke }, { listen }] = await Promise.all([
+    import('@tauri-apps/api/core'),
+    import('@tauri-apps/api/event')
+  ]);
+  const state = randomCode();
+  const nonce = randomCode();
+  const { url, redirect } = signInRequest({
+    clientId: googleWebClientId,
+    authDomain: firebaseConfig.authDomain,
+    state,
+    nonce
+  });
+
+  // A previous wait belongs to a window that is being replaced; let it go
+  // quietly rather than report it as a failure.
+  pendingWindowSignIn?.supersede();
+
+  let settle;
+  const answer = new Promise((resolve, reject) => { settle = { resolve, reject }; });
+  let superseded = false;
+  const unlisten = await listen(SIGN_IN_EVENT, (event) => {
+    const payload = event.payload || {};
+    if (payload.cancelled) settle.reject(new Error('The sign-in window was closed.'));
+    else settle.resolve(payload.url);
+  });
+  const mine = { supersede: () => { superseded = true; unlisten(); } };
+  pendingWindowSignIn = mine;
+
+  try {
+    await invoke('open_sign_in_window', { url, redirect });
+    const address = await answer;
+    const idToken = readSignInAnswer(address, { state, nonce });
+    const credential = ctx.authApi.GoogleAuthProvider.credential(idToken);
+    // A hang here once looked like nothing at all happening (see authSetup in
+    // utils/desktopSignIn.js); a message is better than silence.
+    const signInResult = await Promise.race([
+      ctx.authApi.signInWithCredential(ctx.auth, credential),
+      new Promise((_, reject) => setTimeout(
+        () => reject(new Error('Firebase did not answer the sign-in within 30 seconds.')), 30000))
+    ]);
+    return signInResult.user;
+  } catch (error) {
+    if (superseded) return new Promise(() => {});
+    throw error;
+  } finally {
+    if (!superseded) unlisten();
+    if (pendingWindowSignIn === mine) pendingWindowSignIn = null;
+  }
+}
+
 export async function signInWithGoogle() {
   const ctx = await getFirebaseContext();
   if (!ctx) throw new Error('Firebase is not configured.');
 
-  if (Capacitor.isNativePlatform()) {
+  const method = currentSignInMethod();
+  if (method === 'native') {
     return signInWithGoogleNative(ctx);
+  }
+  if (method === 'window') {
+    return signInWithGoogleInWindow(ctx);
   }
 
   const provider = new ctx.authApi.GoogleAuthProvider();

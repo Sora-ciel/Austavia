@@ -1,5 +1,7 @@
 <script>
   import { onMount, onDestroy, tick, setContext } from 'svelte';
+  import { playableAudio } from './utils/mp4Faststart.js';
+  import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
   import RightControls from './advanced-param/RightControls.svelte';
   import LeftControls from './advanced-param/LeftControls.svelte';
   import AdvancedCssPage from './advanced-param/AdvancedCssPage.svelte';
@@ -1729,8 +1731,13 @@
       await appAlert("That track's audio isn't on this device yet. Import it from a music export.");
       return;
     }
-    if (nowPlayingUrl) URL.revokeObjectURL(nowPlayingUrl);
-    nowPlayingUrl = URL.createObjectURL(blob);
+    // An m4a with its index at the end plays silent on Linux; see
+    // utils/mp4Faststart.js. The stored track is not changed.
+    // On Linux, from the app's local server rather than a blob, or the
+    // timeline cannot go backwards; see utils/audioAddress.js.
+    const address = await addressForAudio(await playableAudio(blob));
+    releaseAudioAddress(nowPlayingUrl);
+    nowPlayingUrl = address;
     nowPlayingId = trackId;
     musicPosition = 0;
     musicDuration = 0;
@@ -1776,7 +1783,7 @@
     isPlaying = false;
     nowPlayingId = null;
     if (nowPlayingUrl) {
-      URL.revokeObjectURL(nowPlayingUrl);
+      releaseAudioAddress(nowPlayingUrl);
       nowPlayingUrl = '';
     }
     playerExpanded = false;
@@ -2073,9 +2080,10 @@
     if (!track) return;
     const blob = await loadMusicTrack(saved.trackId);
     if (!blob) return;
+    const address = await addressForAudio(await playableAudio(blob));
 
-    if (nowPlayingUrl) URL.revokeObjectURL(nowPlayingUrl);
-    nowPlayingUrl = URL.createObjectURL(blob);
+    releaseAudioAddress(nowPlayingUrl);
+    nowPlayingUrl = address;
     nowPlayingId = saved.trackId;
     musicQueue = Array.isArray(saved.queue) && saved.queue.length ? saved.queue : [saved.trackId];
     resumeSeekTo = Number(saved.position) || 0;

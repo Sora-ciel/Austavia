@@ -1,3 +1,7 @@
+mod audio_server;
+mod local_http;
+mod sign_in_window;
+
 // `dragDropEnabled: false` in tauri.conf.json, and why, since JSON cannot say
 // so itself and the next person to read that file will find a bare `false`.
 //
@@ -50,11 +54,46 @@ fn keep_playing_while_minimised() {
 #[cfg(not(target_os = "windows"))]
 fn keep_playing_while_minimised() {}
 
+/// Let KDE draw the title bar, so the window looks like every other one.
+///
+/// On Wayland a GTK window draws its own title bar. Under KDE that came out as
+/// a light imitation of Breeze with GNOME-style buttons, whatever the desktop's
+/// colours, title bar theme or icons — changing the GTK theme in System
+/// Settings did not touch it (seen 2026-10-09, asked for as "the window title
+/// bar should follow how Linux works"). Through XWayland the window is
+/// decorated by KWin itself, exactly as KDE's own windows are.
+///
+/// Only under KDE: GNOME draws no title bars for anybody, so there the GTK one
+/// is the native one. `AUSTAVIA_WAYLAND=1` keeps native Wayland for anyone who
+/// prefers it, and a GDK_BACKEND that is not plain `wayland` (the session
+/// default) was set by hand and is left alone.
+#[cfg(target_os = "linux")]
+fn let_kde_draw_the_title_bar() {
+  let on_kde = std::env::var("XDG_CURRENT_DESKTOP")
+    .map(|desktop| desktop.split(':').any(|part| part.eq_ignore_ascii_case("KDE")))
+    .unwrap_or(false);
+  let opted_out = std::env::var_os("AUSTAVIA_WAYLAND").is_some();
+  let backend_by_hand = std::env::var("GDK_BACKEND")
+    .map(|backend| !backend.is_empty() && backend != "wayland")
+    .unwrap_or(false);
+  if on_kde && !opted_out && !backend_by_hand {
+    std::env::set_var("GDK_BACKEND", "x11");
+  }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn let_kde_draw_the_title_bar() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   keep_playing_while_minimised();
+  let_kde_draw_the_title_bar();
 
   tauri::Builder::default()
+    .invoke_handler(tauri::generate_handler![
+      sign_in_window::open_sign_in_window,
+      audio_server::serve_audio
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(

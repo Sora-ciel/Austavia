@@ -9,6 +9,38 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Next, in order (set 2026-10-12)
+
+The order agreed for the run-up to launch. Each line points at the section
+that holds the detail; cross a line off in the same commit that finishes it.
+
+1. **Start the slow, outside things now**, because they run on the calendar
+   rather than on code: Polar live and the payout proven with a real month
+   (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout
+   verification first; the INPI filing (classes 9, 42); the accountant
+   question in `POLAR.md`.
+2. **The sync error after a first sign-in** (3b) -- a data-safety question,
+   so it goes before anything cosmetic.
+3. **Check the cloud bin is deployed** (0b): rules and functions to staging,
+   two tabs, then production -- confirm it happened rather than assume.
+4. **The phone notification's cover zoomed in** (3c).
+5. **Linux**: the first sign-in press failing, then the frame rate -- measured
+   before changed (3b).
+6. **A starter folder for newcomers, made from Sora's own drawings.** Artists'
+   work cannot be shipped; Sora's own art can, and is the brand anyway. Opens
+   on first launch instead of an empty canvas; the pictures are bundled with
+   the app and covered in `ASSETS-LICENSE.md`.
+7. **A landing page**: moving visuals of real boards, downloads per platform,
+   an email waitlist.
+8. **Clear section 0 on Windows and Android**, then a release.
+
+After launch: music playing with the app closed (0a), pictures by reference
+(2), the editor's layout (1a), asking Polar what it thinks (6, item 2), real
+alarms (4). Marketing runs alongside all of it from now:
+`Austavia-chat-handoff.md`.
+
+---
+
 ## 0. To check on a device after the next release
 
 Things that are built and shipped but that nobody has confirmed. Cross one off
@@ -17,6 +49,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Signing in on the Linux app (.deb), in a window of its own.** Sign in with Google opens a small "Sign in with Google" window on Google's own page, with the account picker; choosing an account closes it and the main window is signed in and syncing. Closing it without finishing says the window was closed; pressing sign in again while it is open replaces it with a fresh one. Built 2026-10-09 (utils/desktopSignIn.js, src-tauri/src/sign_in_window.rs), after the first version, through the system browser, was asked to be in the app instead. A whole sign-in was traced on the user's account: Google accepted the window and returned a good token, and then Firebase hung, because `getAuth()` never finishes starting in the Linux app (its popup helper waits for ever on a tauri:// page) and a sign-in waits for start-up. The Linux app now uses `initializeAuth()` without that helper -- measured ready in 1ms in the real app, against never -- but a sign-in with the fix has not been done yet. If it ever hangs again it now says "Firebase did not answer the sign-in within 30 seconds" rather than nothing. The Windows app must still use its popup. And under KDE the window has KDE's own title bar (dark Breeze, KDE's buttons, the lotus) because it runs through XWayland; checked on 2026-10-09, but it is worth noticing whether typing, scrolling and pictures feel any different. `AUSTAVIA_WAYLAND=1` puts it back on Wayland. |
 | next | **Export and import.** Export asks: this folder or all, with settings, with pictures inside the file, with themes. Import shows what the file holds and goes into a new folder by default -- "Damn", or "Damn 1" / "Damn 2" when the name is taken -- or in place of the open folder (a kept copy first). A file exported before this still imports, named after the file. On the phone, export opens the share sheet. |
 | next | **Renaming a folder** by editing its name: on Enter or leaving the field the same folder takes the new name, no second folder appears, pictures still show, and on the other device after a sync the new name arrives. The old name should disappear from the cloud on the next upload (the sync log says "old name deleted from the cloud after a rename"); on a second device the old name's local copy stays until the bin work (PENDING 0b). A taken name is refused. |
 | next | **The folder menu**: right click on a computer, long press on the phone, in Settings' folder list -- Duplicate makes "Damn 1" with its own pictures. |
@@ -370,6 +403,42 @@ speculatively — wait for a report that says so.
   itself is native and has nothing to do with that API. The diagnostic found it
   in one round after three wrong guesses; `describeNotification` in
   `diagnostics.js` is what to reach for next time rather than a fourth guess.
+
+## 3b. The Linux app, owed
+
+- **Lower frame rate and late scrolling than on Windows**, with folders open
+  (reported 2026-10-09 on the .deb, KDE Wayland, an Acer Nitro AN515-57 with
+  Intel + NVIDIA graphics). Nothing measured yet. Suspects, in the order worth
+  trying: the app runs through XWayland on KDE for the native title bar
+  (compare with `AUSTAVIA_WAYLAND=1`); WebKitGTK compositing on the NVIDIA /
+  hybrid setup (`WEBKIT_DISABLE_DMABUF_RENDERER=1`,
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1` to compare, and which GPU it renders on);
+  and WebKitGTK simply being slower than WebView2 at the canvas's blur,
+  transparency and large pictures. Measure before changing anything: frames
+  per second while scrolling a heavy folder, under each setting.
+- **The first sign-in press failed at once; the second worked** (2026-10-09,
+  first sign-in after the fix that made Firebase start without its popup
+  helper). The message was not recorded. Signing out and in again afterwards
+  worked every time. Suspect the first press racing Firebase's start-up or the
+  event listener; get the message next time it happens.
+- **Right after that first sign-in the sync log said "cybersec started editing
+  without checking the cloud first"** (error). This device had never been
+  signed in, so its first pull and the first edit may have crossed. Worth
+  reading against the startup gate before calling it harmless.
+
+## 3c. The phone notification's cover, zoomed in
+
+Reported 2026-10-12: on some tracks the cover in the notification is zoomed
+in, and pulling the shade further down -- the expanded player with the
+transport controls -- shows the whole picture instead. Seen on "akkiro - let
+go [Lyrics/ Amv] | biteki exclusive". Likely cause, unverified: that cover is
+not square (a 16:9 video thumbnail, as most tracks taken from videos have),
+and the compact notification crops artwork to a square while the expanded
+player shows it whole. The artwork is sent untouched since 0.8.645
+(`MediaNotificationService`). Check the cover's real size first
+(`describeNotification` in the diagnostics reports `lastArtworkWidth/Height`),
+then decide between sending a square version made from the whole picture
+(padded, not cropped) and leaving it to the system.
 
 ## 4. Loose ends
 

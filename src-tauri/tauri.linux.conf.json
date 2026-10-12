@@ -1,0 +1,7 @@
+{
+  "mainBinaryName": "austavia",
+  "bundle": {
+    "shortDescription": "Austavia notes",
+    "longDescription": "Austavia, a block-based note app."
+  }
+}
