@@ -73,3 +73,29 @@ export function shouldTakeCloudCopy({
 export function receivedFromCloud(remotePayload) {
   return Number(remotePayload?.updatedAt || 0);
 }
+
+/**
+ * Whether the folder was edited here while its cloud copy was downloading.
+ *
+ * ## Why
+ *
+ * After a first sign-in on the Linux app, the sync log said "started editing
+ * without checking the cloud first" (2026-10-09): coming back to the app, the
+ * check of the cloud took longer than the 8 seconds the workspace is held
+ * read-only for, so editing was let go while the pull was still running.
+ *
+ * The pull decides whether a folder owes the cloud anything *before* it
+ * downloads. Anything typed after that decision and before the download lands
+ * was overwritten -- and the copy kept first is read from disk, so a change
+ * still waiting out its save delay was not even in that.
+ *
+ * So the question is asked again at the last moment, absolutely: the stamp on
+ * disk now against the one the decision was made on, and whether a save for
+ * this folder is waiting. If either says it was edited, the edit stays and the
+ * next sync decides again -- it is unsent work, which already wins over a newer
+ * cloud copy.
+ */
+export function editedDuringDownload({ updatedAtBefore, updatedAtNow, pendingSaveFolder = null, folder } = {}) {
+  if (pendingSaveFolder != null && pendingSaveFolder === folder) return true;
+  return Number(updatedAtNow || 0) !== Number(updatedAtBefore || 0);
+}

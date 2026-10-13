@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { owesUpload, shouldTakeCloudCopy, receivedFromCloud } from '../src/utils/syncOwing.js';
+import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload } from '../src/utils/syncOwing.js';
 
 // The refusal itself was asked for and is load-bearing: work done here and not
 // yet sent must not be thrown away for a copy that merely carries a later
@@ -100,4 +100,25 @@ test('a payload with no stamp records zero rather than NaN', () => {
   assert.equal(receivedFromCloud(null), 0);
   assert.equal(receivedFromCloud(), 0);
   assert.equal(owesUpload({ lastSent: 0, localUpdatedAt: 0 }), false);
+});
+
+// Found after a first sign-in on the Linux app logged "started editing without
+// checking the cloud first": editing is let go after 8 seconds while a slow
+// pull is still downloading, and what was typed in that window was overwritten
+// by the copy that landed. Writing must never be lost to a download it raced.
+
+test('typing saved while the cloud copy downloaded keeps the cloud copy out', () => {
+  assert.equal(editedDuringDownload({ updatedAtBefore: 100, updatedAtNow: 250, folder: 'notes' }), true);
+});
+
+test('typing still waiting out its save delay counts too', () => {
+  assert.equal(editedDuringDownload({ updatedAtBefore: 100, updatedAtNow: 100, pendingSaveFolder: 'notes', folder: 'notes' }), true);
+});
+
+test('a save waiting for another folder does not hold this one back', () => {
+  assert.equal(editedDuringDownload({ updatedAtBefore: 100, updatedAtNow: 100, pendingSaveFolder: 'other', folder: 'notes' }), false);
+});
+
+test('a folder nobody touched during the download takes the cloud copy as before', () => {
+  assert.equal(editedDuringDownload({ updatedAtBefore: 100, updatedAtNow: 100, folder: 'notes' }), false);
 });

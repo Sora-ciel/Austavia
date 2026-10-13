@@ -1255,6 +1255,7 @@
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <div class="tiptap-wrap" class:tiptap-inline={variant === 'inline'} bind:this={wrapEl} on:scroll={onScroll}
+  data-history-key={historyKey || undefined}
   on:wheel|passive={releasePlace} on:touchstart|passive={releasePlace} on:pointerdown={releasePlace} on:keydown={releasePlace}
   on:click={() => editor?.commands.focus(null, { scrollIntoView: false })}>
   <div class="tiptap-mount" bind:this={element}></div>

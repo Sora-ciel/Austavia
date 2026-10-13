@@ -1,4 +1,5 @@
 mod audio_server;
+mod external_links;
 mod local_http;
 mod sign_in_window;
 
@@ -92,7 +93,8 @@ pub fn run() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
       sign_in_window::open_sign_in_window,
-      audio_server::serve_audio
+      audio_server::serve_audio,
+      external_links::open_in_browser
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

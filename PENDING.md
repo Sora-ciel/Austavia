@@ -19,8 +19,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout
    verification first; the INPI filing (classes 9, 42); the accountant
    question in `POLAR.md`.
-2. **The sync error after a first sign-in** (3b) -- a data-safety question,
-   so it goes before anything cosmetic.
 3. **Check the cloud bin is deployed** (0b): rules and functions to staging,
    two tabs, then production -- confirm it happened rather than assume.
 4. **The phone notification's cover zoomed in** (3c).
@@ -49,6 +47,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |
 | next | **Signing in on the Linux app (.deb), in a window of its own.** Sign in with Google opens a small "Sign in with Google" window on Google's own page, with the account picker; choosing an account closes it and the main window is signed in and syncing. Closing it without finishing says the window was closed; pressing sign in again while it is open replaces it with a fresh one. Built 2026-10-09 (utils/desktopSignIn.js, src-tauri/src/sign_in_window.rs), after the first version, through the system browser, was asked to be in the app instead. A whole sign-in was traced on the user's account: Google accepted the window and returned a good token, and then Firebase hung, because `getAuth()` never finishes starting in the Linux app (its popup helper waits for ever on a tauri:// page) and a sign-in waits for start-up. The Linux app now uses `initializeAuth()` without that helper -- measured ready in 1ms in the real app, against never -- but a sign-in with the fix has not been done yet. If it ever hangs again it now says "Firebase did not answer the sign-in within 30 seconds" rather than nothing. The Windows app must still use its popup. And under KDE the window has KDE's own title bar (dark Breeze, KDE's buttons, the lotus) because it runs through XWayland; checked on 2026-10-09, but it is worth noticing whether typing, scrolling and pictures feel any different. `AUSTAVIA_WAYLAND=1` puts it back on Wayland. |
 | next | **Export and import.** Export asks: this folder or all, with settings, with pictures inside the file, with themes. Import shows what the file holds and goes into a new folder by default -- "Damn", or "Damn 1" / "Damn 2" when the name is taken -- or in place of the open folder (a kept copy first). A file exported before this still imports, named after the file. On the phone, export opens the share sheet. |
 | next | **Renaming a folder** by editing its name: on Enter or leaving the field the same folder takes the new name, no second folder appears, pictures still show, and on the other device after a sync the new name arrives. The old name should disappear from the cloud on the next upload (the sync log says "old name deleted from the cloud after a rename"); on a second device the old name's local copy stays until the bin work (PENDING 0b). A taken name is refused. |
@@ -421,10 +420,15 @@ speculatively — wait for a report that says so.
   helper). The message was not recorded. Signing out and in again afterwards
   worked every time. Suspect the first press racing Firebase's start-up or the
   event listener; get the message next time it happens.
-- **Right after that first sign-in the sync log said "cybersec started editing
-  without checking the cloud first"** (error). This device had never been
-  signed in, so its first pull and the first edit may have crossed. Worth
-  reading against the startup gate before calling it harmless.
+- **The sync-log error after the first sign-in -- explained, fixed 2026-10-12,
+  not yet seen.** "Started editing without checking the cloud first" came from
+  the resume check: coming back to the app, a pull took longer than the 8s the
+  workspace is held read-only, so editing was let go while it still ran. The
+  pull decided "nothing unsent here" *before* downloading, so anything typed in
+  that window was overwritten when the copy landed. The pull now asks again
+  just before writing (`editedDuringDownload` in `utils/syncOwing.js`): edited
+  meanwhile, or a save waiting for that folder, and the edit stays. See
+  section 0 for how to see it working.
 
 ## 3c. The phone notification's cover, zoomed in
 
@@ -441,6 +445,15 @@ then decide between sending a square version made from the whole picture
 (padded, not cropped) and leaving it to the system.
 
 ## 4. Loose ends
+
+- **Ctrl+Z after typing and then recolouring a block** undoes the typing
+  first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the
+  caret is in a note with nothing of its own to undo, or left behind in a block
+  that is no longer focused (`utils/undoShortcut.js`) -- which is what was
+  reported. But with typing in the note's history, the note's undo still wins,
+  whichever change was newer. Doing it properly means timestamping both
+  histories and undoing the newer one; the Undo button has the opposite
+  version of the same question.
 
 - **The mouse pointer reappears while typing, in the desktop app.** It should
   hide on the first keystroke and stay hidden until the mouse moves. The likely
@@ -763,10 +776,13 @@ account and being taken off it again.
 
 Three things noticed while building it, none blocking:
 
-- **The upgrade button opens an ordinary link.** That is right on the web and
-  in the Android app, where Capacitor hands an outside URL to the system
-  browser. What it does in the Tauri desktop build is unverified — it may
-  navigate the app window instead of opening a browser.
+- **The upgrade button on the desktop app -- fixed 2026-10-12.** It was an
+  ordinary `target="_blank"` link: on Linux it did nothing at all, on Windows
+  it opened the checkout in a bare popup with no address bar. Both desktop
+  builds now hand Polar's checkout and portal to the system browser
+  (`utils/externalLinks.js`, `open_in_browser` in src-tauri, which only opens
+  https pages on polar.sh). Checked in the Linux app: polar.sh opened in the
+  browser, another site was refused. Not yet seen on Windows.
 - **An event with no uid is recorded as unmatched even when we would have
   ignored it anyway.** `applyPolarEvent` looks for the account before it asks
   whether the event means anything, so a stray `order.created` that carries no

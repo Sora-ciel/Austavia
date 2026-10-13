@@ -85,6 +85,8 @@
   import { subscribeSyncLog, clearSyncLog, formatSyncLog } from '../utils/syncLog.js';
   import { describeStorageUsage, storageMessageFor } from '../utils/storageUsage.js';
   import { upgradeOffer, portalUrlFor } from '../utils/checkout.js';
+  // Payment pages go to the system browser on the desktop app; see the file.
+  import { openPaymentLink } from '../utils/externalLinks.js';
   import { subscriptionView } from '../utils/subscriptionStatus.js';
 
   // Sync writes down what it decided; this is where you read it. There is no
@@ -813,7 +815,7 @@
                 <p class="plan-detail">{plan.detail}</p>
 
                 {#if plan.action === 'upgrade' && offer.show}
-                  <a class="plan-action" href={offer.url} target="_blank" rel="noopener noreferrer">
+                  <a class="plan-action" href={offer.url} target="_blank" rel="noopener noreferrer" on:click={(e) => openPaymentLink(e, offer.url)}>
                     Upgrade to Pro
                   </a>
                 {:else if plan.action === 'manage' && portal}
@@ -821,7 +823,7 @@
                        live behind this one link, at Polar. Anything less and
                        leaving means emailing a person, which is both a support
                        queue and, in the EU, not allowed. -->
-                  <a class="plan-action" href={portal} target="_blank" rel="noopener noreferrer">
+                  <a class="plan-action" href={portal} target="_blank" rel="noopener noreferrer" on:click={(e) => openPaymentLink(e, portal)}>
                     Manage subscription
                   </a>
                 {/if}

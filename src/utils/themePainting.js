@@ -122,3 +122,50 @@ export function paintStale(blocks, colors) {
   });
   return touched ? next : blocks;
 }
+
+/**
+ * Every block off the theme's colours: the switch is off.
+ *
+ * ## What was asked for
+ *
+ * "When removing all folders wide themes, the blocks don't go back to their
+ * chosen colors" (2026-10-12, seen on the Linux app and in a browser).
+ *
+ * Turning a switch off only ever restored the folder that was open. Any other
+ * folder saved while it was on kept its paint, and nothing looked again when
+ * it was opened later: measured, a folder saved painted black over its own red
+ * opened black with both switches off. So this is the mirror of `paintStale`:
+ * it runs whenever the blocks change with the switch off, and answers from the
+ * block itself, so a folder opened a month later is put right the same way.
+ *
+ *   still wearing the theme's paint  → back to its own colour
+ *   recoloured since it was painted  → that colour is the user's; it stays
+ *   painted by an older build        → back to its own colour, as before
+ *   never painted                    → untouched
+ *
+ * Either way the record of painting goes, so the block is plain again.
+ */
+export function unpaintAll(blocks) {
+  let touched = false;
+  const next = (blocks || []).map((block) => {
+    if (block._baseBgColor === undefined && block._themedBgColor === undefined
+      && block._baseTextColor === undefined && block._themedTextColor === undefined) {
+      return block;
+    }
+    touched = true;
+    const plain = { ...block };
+    // A block painted by a build from before `_themedBgColor` existed cannot
+    // tell paint from a choice; it is put back, as turning the switch off
+    // always did.
+    if (wearsItsPaint(block) || block._themedBgColor === undefined) {
+      if (block._baseBgColor !== undefined) plain.bgColor = block._baseBgColor;
+      if (block._baseTextColor !== undefined) plain.textColor = block._baseTextColor;
+    }
+    delete plain._baseBgColor;
+    delete plain._baseTextColor;
+    delete plain._themedBgColor;
+    delete plain._themedTextColor;
+    return plain;
+  });
+  return touched ? next : blocks;
+}

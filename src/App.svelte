@@ -1,6 +1,8 @@
 <script>
   import { onMount, onDestroy, tick, setContext } from 'svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
+  import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
+  import { canUndoText, canRedoText } from './utils/textHistory.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
   import RightControls from './advanced-param/RightControls.svelte';
   import LeftControls from './advanced-param/LeftControls.svelte';
@@ -76,7 +78,8 @@
     themeKey,
     needsFullRepaint,
     paintAll,
-    paintStale
+    paintStale,
+    unpaintAll
   } from './utils/themePainting.js';
   import {
     CONTROL_COLOR_DEFAULTS,
@@ -147,7 +150,7 @@
     shouldCheckOnReturn,
     GATE_TIMEOUT_MS
   } from './utils/startupGate.js';
-  import { owesUpload, shouldTakeCloudCopy, receivedFromCloud } from './utils/syncOwing.js';
+  import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload } from './utils/syncOwing.js';
   import {
     worthKeeping as folderSnapshotWorthKeeping,
     snapshotOf as folderSnapshotOf,
@@ -2262,6 +2265,11 @@
   let lastPaintedTheme = null;
   $: repaintForTheme(blocksFollowTheme, newBlockColors);
   $: if (blocksFollowTheme && blocks.length) paintStaleBlocksWithTheme(newBlockColors);
+  // And the mirror of it with the switch off: a folder saved while it was on
+  // still wears the paint, and only the folder open at the time was ever put
+  // back. Answered from the blocks, so it holds for a folder opened any time
+  // later. See unpaintAll.
+  $: if (!blocksFollowTheme && !folderOpening && blocks.length) restoreBlockColors();
 
   // The theme moved, or the switch has just come on: everything follows.
   function repaintForTheme(on, colors) {
@@ -2295,21 +2303,8 @@
   }
 
   function restoreBlockColors() {
-    let touched = false;
-    const next = blocks.map(block => {
-      if (block._baseBgColor === undefined) return block;
-      touched = true;
-      const restored = {
-        ...block,
-        bgColor: block._baseBgColor,
-        textColor: block._baseTextColor
-        // No new _version: blocks follow their colours live.
-      };
-      delete restored._baseBgColor;
-      delete restored._baseTextColor;
-      return restored;
-    });
-    if (!touched) return;
+    const next = unpaintAll(blocks);
+    if (next === blocks) return;
     blocks = next;
     pushHistory(blocks, modeOrders);
   }
@@ -2318,8 +2313,15 @@
   // blocks painted, since that setting still applies.
   async function toggleBlocksFollowTheme() {
     const next = !(modeSettings.blocksFollowTheme === true);
-    if (next) paintBlocksWithTheme(newBlockColors);
-    else if (!blocksFollowThemeAll) restoreBlockColors();
+    // Turning on: the setting first, then the paint. Painted while the
+    // setting still read off, the pass that unpaints a folder with the switch
+    // off would take the paint straight back off.
+    if (next) {
+      await handleModeSettingChange({ detail: { blocksFollowTheme: next } });
+      paintBlocksWithTheme(newBlockColors);
+      return;
+    }
+    if (!blocksFollowThemeAll) restoreBlockColors();
     await handleModeSettingChange({ detail: { blocksFollowTheme: next } });
   }
 
@@ -3565,14 +3567,6 @@
     toggleFullscreen();
   }
 
-  // Anywhere text is being edited, undo belongs to that editor.
-  function isTextEntry(node) {
-    if (!node || node.nodeType !== 1) return false;
-    if (node.isContentEditable) return true;
-    const tag = node.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA';
-  }
-
   function handleUndoRedoShortcut(event) {
     const key = event.key?.toLowerCase();
     const hasCommand = event.ctrlKey || event.metaKey;
@@ -3585,8 +3579,24 @@
     // with it, and why redo appeared to work for an instant before the two
     // histories disagreed and it snapped back.
     //
-    // While the caret is in text, this one stands aside.
-    if (isTextEntry(event.target) || isTextEntry(document.activeElement)) return;
+    // While the caret is in text, this one stands aside -- but only text that
+    // is really being written in. Focus left behind in a block that is no
+    // longer the focused one is released, and the workspace is undone, as the
+    // Undo button would. See utils/undoShortcut.js.
+    const active = document.activeElement;
+    const writing = isTextEntry(active) ? active : isTextEntry(event.target) ? event.target : null;
+    const historyKey = writing?.closest?.('[data-history-key]')?.getAttribute('data-history-key') || null;
+    const target = undoTarget({
+      activeIsText: Boolean(writing),
+      activeBlockId: writing?.closest?.('[data-block-id]')?.getAttribute('data-block-id') ?? null,
+      focusedBlockId,
+      textCanStep: historyKey ? (event.shiftKey ? canRedoText(historyKey) : canUndoText(historyKey)) : null
+    });
+    if (target === 'text') return;
+    if (target === 'release') writing.blur();
+    // The note's own handler would otherwise take this keystroke too, and
+    // claim it with nothing to undo.
+    if (target === 'release' || target === 'pass') event.stopPropagation();
 
     event.preventDefault();
 
@@ -5142,6 +5152,25 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       })) {
         const remotePayload = await loadRemoteFile(fileName);
         if (!remotePayload) continue;
+        // Asked again now the download has landed: editing may have been let
+        // go while it ran (a resume check that outlasted the hold), and what
+        // was typed since must not be overwritten. See editedDuringDownload.
+        if (localMeta) {
+          const latestMeta = await loadSaveMeta(fileName);
+          if (editedDuringDownload({
+            updatedAtBefore: localMeta?.updatedAt,
+            updatedAtNow: latestMeta?.updatedAt,
+            pendingSaveFolder: _pendingSave?.folder ?? null,
+            folder: fileName
+          })) {
+            logSync('skip', fileName, 'edited here while the cloud copy was downloading; the edit stays and the next sync decides again', {
+              remoteModifiedAt,
+              localUpdatedAtBefore: Number(localMeta?.updatedAt || 0),
+              localUpdatedAtNow: Number(latestMeta?.updatedAt || 0)
+            });
+            continue;
+          }
+        }
         logSync('download', fileName, 'cloud copy is newer, taking it', {
           remoteModifiedAt,
           localModifiedAt,
@@ -6279,7 +6308,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // the app starting and the person seeing their notes.
     recordLaunch();
     window.addEventListener("resize", handleWindowResize);
-    window.addEventListener("keydown", handleUndoRedoShortcut);
+    // Capture: the decision has to be made before the note's own handler
+    // sees the key, since it claims every Ctrl+Z it receives.
+    window.addEventListener("keydown", handleUndoRedoShortcut, true);
     window.addEventListener("keydown", handleFullscreenShortcut);
     window.addEventListener("paste", handlePaste);
     // Backgrounding the app is the moment most likely to be followed by the
@@ -6527,7 +6558,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
   onDestroy(() => {
     window.removeEventListener("resize", handleWindowResize);
-    window.removeEventListener("keydown", handleUndoRedoShortcut);
+    window.removeEventListener("keydown", handleUndoRedoShortcut, true);
     window.removeEventListener("keydown", handleFullscreenShortcut);
     window.removeEventListener("paste", handlePaste);
     document.removeEventListener("visibilitychange", handleVisibilityForMusic);

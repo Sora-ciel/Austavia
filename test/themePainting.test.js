@@ -6,7 +6,8 @@ import {
   needsFullRepaint,
   needsPaint,
   paintAll,
-  paintStale
+  paintStale,
+  unpaintAll
 } from '../src/utils/themePainting.js';
 
 const THEME = { bgColor: '#101014', textColor: '#ffffff' };
@@ -145,4 +146,44 @@ test('nothing throws on an empty or missing block list', () => {
   // `next === blocks` check at the call site still skips the write
   assert.equal(paintStale(null, THEME), null);
   assert.equal(paintAll(undefined, THEME), undefined);
+});
+
+// Asked for 2026-10-12: "when removing all folders wide themes, the blocks
+// don't go back to their chosen colors." Turning the switch off only ever
+// restored the open folder; a folder saved painted opened painted for good.
+// unpaintAll is what runs whenever the blocks change with the switch off.
+
+const OWN = { bgColor: '#ff0000', textColor: '#ffffff' };
+
+test('a folder saved painted goes back to its own colours when opened with the switch off', () => {
+  const savedPainted = paintAll([{ id: 'a', ...OWN }], THEME);
+  const [block] = unpaintAll(savedPainted);
+  assert.equal(block.bgColor, OWN.bgColor);
+  assert.equal(block.textColor, OWN.textColor);
+});
+
+test('it comes back plain, with no record of having been painted', () => {
+  const [block] = unpaintAll(paintAll([{ id: 'a', ...OWN }], THEME));
+  for (const key of ['_baseBgColor', '_baseTextColor', '_themedBgColor', '_themedTextColor']) {
+    assert.equal(block[key], undefined, key);
+  }
+});
+
+test('a colour picked while the theme was on is the user\'s, and stays', () => {
+  const [painted] = paintAll([{ id: 'a', ...OWN }], THEME);
+  const picked = { ...painted, bgColor: '#00ff00' };
+  const [block] = unpaintAll([picked]);
+  assert.equal(block.bgColor, '#00ff00');
+  assert.equal(block._baseBgColor, undefined);
+});
+
+test('a block painted by an older build, with no record of the paint, is put back as before', () => {
+  const legacy = { id: 'a', bgColor: THEME.bgColor, textColor: THEME.textColor, _baseBgColor: '#ff0000', _baseTextColor: '#ffffff' };
+  const [block] = unpaintAll([legacy]);
+  assert.equal(block.bgColor, '#ff0000');
+});
+
+test('a folder that was never painted is left exactly as it is', () => {
+  const blocks = [{ id: 'a', ...OWN }];
+  assert.equal(unpaintAll(blocks), blocks);
 });
