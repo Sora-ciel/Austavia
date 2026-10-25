@@ -4554,23 +4554,16 @@
   }
 
   async function deleteSave(name) {
-    const deletingCurrent = currentSaveName === name;
     await deleteBlocks(name);
-
-    if (deletingCurrent) {
-      blocks = [];
-      currentSaveName = "";
-      persistLastSaveName("");
-    }
-
+    if (currentSaveName === name) blocks = [];
     modeOrders = ensureModeOrders(blocks, modeOrders);
     if (focusedBlockId && !blocks.some(b => b.id === focusedBlockId)) {
       focusedBlockId = null;
     }
     savedList = await listSavedBlocks();
 
-    if (!deletingCurrent && loadStoredLastSaveName() === name) {
-      persistLastSaveName(currentSaveName);
+    if (loadStoredLastSaveName() === name) {
+      persistLastSaveName(currentSaveName === name ? "" : currentSaveName);
     }
 
     history = [];
