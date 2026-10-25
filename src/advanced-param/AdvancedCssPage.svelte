@@ -487,6 +487,11 @@
     align-items: center;
     padding: clamp(12px, 3vh, 36px) clamp(16px, 4vw, 48px);
     z-index: 1200;
+    user-select: text;
+  }
+
+  .overlay * {
+    user-select: text;
   }
 
   .panel {
