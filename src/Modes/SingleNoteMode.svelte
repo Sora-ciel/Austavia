@@ -175,8 +175,11 @@
   onMount(() => {
     updateViewport();
     window.addEventListener('resize', updateViewport);
+    // Some phones report the new shape only once the rotation has finished.
+    window.addEventListener('orientationchange', updateViewport);
     return () => {
       window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
       clearTimeout(scrollbarIdleTimer);
     };
   });

@@ -6,6 +6,8 @@
 
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { usesPortraitBackground } from '../src/utils/modeBackground.js';
 
 import { MODE_ORDER, hasWallpaper } from '../src/Modes/modeRegistry.js';
 
@@ -17,4 +19,33 @@ it('gives every mode the folder wallpaper', () => {
 
 it('has no wallpaper for a mode it does not know', () => {
   assert.equal(hasWallpaper('nonsense'), false);
+});
+
+// Reported 2026-10-26: "a lot of the modes using the bg don't seem to change it
+// when you put the phone on landscape ... we need to fix it on all modes."
+//
+// Simple Note, Habit Tracker and Task mode draw through ModeWallpaper, which
+// chose the phone image by `innerWidth <= 1024` -- a phone on its side is
+// still under 1024px wide, so it kept the upright picture. Canvas, Playlist
+// and Single Note already chose by the screen's shape. Every wallpaper now
+// chooses by shape, and looks again when the phone turns.
+
+const WALLPAPER_DRAWERS = [
+  'components/ModeWallpaper.svelte',
+  'Modes/CanvasMode.svelte',
+  'Modes/PlaylistMode.svelte',
+  'Modes/SingleNoteMode.svelte'
+];
+
+it('a phone turned on its side shows the landscape wallpaper', () => {
+  assert.equal(usesPortraitBackground({ width: 390, height: 844 }), true);
+  assert.equal(usesPortraitBackground({ width: 844, height: 390 }), false);
+});
+
+it('every mode picks its wallpaper by the screen shape, and looks again when the phone turns', () => {
+  for (const path of WALLPAPER_DRAWERS) {
+    const source = readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+    assert.match(source, /usesPortraitBackground/, `${path} chooses by shape`);
+    assert.match(source, /addEventListener\(['"]orientationchange['"]/, `${path} re-measures on rotation`);
+  }
 });

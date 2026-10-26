@@ -14,12 +14,6 @@ phone is several times worse for anything about layout or serialising.
 The order agreed for the run-up to launch. Each line points at the section
 that holds the detail; cross a line off in the same commit that finishes it.
 
-**Now, asked 2026-10-26** (second round), one commit each:
-
-- H. **Wallpapers when a phone is turned sideways**: many modes that use the
-  background do not switch to the landscape picture; every mode should use
-  the portrait and landscape backgrounds the way the ones that do already do.
-
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout
@@ -52,6 +46,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Wallpapers follow the phone turning, in every mode.** With a folder that has both a tall and a wide picture, turn the phone sideways in Simple Note, Habit Tracker and Task mode: the wide picture should appear, and the tall one again when it is turned back -- as Canvas, Single Note and Playlist already did. They used to choose by a width of 1024px, which a phone on its side is still under. Seen in a browser 2026-10-26 by resizing; still to see on the phone. |
 | next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
 | next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |

@@ -15,16 +15,31 @@
    */
   import { onMount, onDestroy } from 'svelte';
   import ModeBackground from './ModeBackground.svelte';
+  import { usesPortraitBackground } from '../utils/modeBackground.js';
 
   export let settings = {};
 
-  // The same breakpoint the other modes use to pick the phone picture.
-  let isMobile = typeof window !== 'undefined' && window.innerWidth <= 1024;
-  const measure = () => { isMobile = window.innerWidth <= 1024; };
+  // The tall picture when the screen is taller than it is wide, the wide one
+  // otherwise -- the rule Canvas, Single Note and Playlist already use
+  // (usesPortraitBackground). This used a width of 1024px instead, and a phone
+  // turned sideways is still under that, so Simple Note, Habit Tracker and
+  // Task kept the tall picture in landscape (reported 2026-10-26).
+  const portrait = () =>
+    typeof window !== 'undefined' &&
+    usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
+  let isMobile = portrait();
+  const measure = () => { isMobile = portrait(); };
 
-  onMount(() => window.addEventListener('resize', measure));
+  onMount(() => {
+    window.addEventListener('resize', measure);
+    // Some phones report the new size only after the rotation has finished.
+    window.addEventListener('orientationchange', measure);
+  });
   onDestroy(() => {
-    if (typeof window !== 'undefined') window.removeEventListener('resize', measure);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    }
   });
 </script>
 
