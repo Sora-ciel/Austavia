@@ -14,6 +14,19 @@ phone is several times worse for anything about layout or serialising.
 The order agreed for the run-up to launch. Each line points at the section
 that holds the detail; cross a line off in the same commit that finishes it.
 
+**Now, asked 2026-10-25**, each its own commit:
+
+- a. **A checkbox in every editor** -- a working to-do item that can go
+  anywhere text is written.
+- b. **Renaming a habit**, including from the long-press pop-up on the phone.
+- c. **Task mode: tasks with a time to do** -- an objective with an amount of
+  time attached.
+- d. **Task mode: the Done list stays open or closed** across restarts, per
+  device.
+- e. **Task mode: one line instead of two above the list**, and less height
+  than one line takes now; and on see-through themes, see-through
+  backgrounds there.
+
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout
@@ -21,7 +34,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
    question in `POLAR.md`.
 3. **Check the cloud bin is deployed** (0b): rules and functions to staging,
    two tabs, then production -- confirm it happened rather than assume.
-4. **The phone notification's cover zoomed in** (3c).
 5. **Linux**: the first sign-in press failing, then the frame rate -- measured
    before changed (3b).
 6. **A starter folder for newcomers, made from Sora's own drawings.** Artists'
@@ -432,17 +444,25 @@ speculatively — wait for a report that says so.
 
 ## 3c. The phone notification's cover, zoomed in
 
-Reported 2026-10-12: on some tracks the cover in the notification is zoomed
-in, and pulling the shade further down -- the expanded player with the
-transport controls -- shows the whole picture instead. Seen on "akkiro - let
-go [Lyrics/ Amv] | biteki exclusive". Likely cause, unverified: that cover is
-not square (a 16:9 video thumbnail, as most tracks taken from videos have),
-and the compact notification crops artwork to a square while the expanded
-player shows it whole. The artwork is sent untouched since 0.8.645
-(`MediaNotificationService`). Check the cover's real size first
-(`describeNotification` in the diagnostics reports `lastArtworkWidth/Height`),
-then decide between sending a square version made from the whole picture
-(padded, not cropped) and leaving it to the system.
+Reported 2026-10-12 on "akkiro - let go": with the shade partly pulled down the
+cover looks zoomed in; pulled fully down it shows whole. Sora wants the least
+zoom possible with **no bands and no stretching** -- not the whole picture
+fitted inside a square.
+
+Known: 1,948 of 1,949 covers in the library are not square (1,523 are 1280x720
+video thumbnails, 425 are 640x720). Android fills its media card with the
+artwork and crops what does not fit; the card is short and wide when the shade
+is partly down and taller when fully down, so a 16:9 cover loses its top and
+bottom in the first and fits in the second. That alone is the least zoom
+possible without bands, and the app cannot change the card's shape.
+
+Tried and reverted the same day: sending a square made of the whole picture
+with blurred bands (`squareLayout`). It removed the crop by adding exactly the
+bands that were not wanted.
+
+Next: two screenshots, shade partly and fully down, to measure whether Android
+crops *more* than the short card needs (say to a square first, then to the
+card). Only that would be the app's to fix.
 
 ## 4. Loose ends
 
@@ -626,6 +646,32 @@ counting the same thing.
 All of it can be exercised on staging without filling anything: put the
 staging account's `plan` on `tiny` (1 MB, which exists for this) and one
 photograph is enough.
+
+## 7. Readable for a programmer
+
+Asked 2026-10-13: "I can't read the code anymore 'cause it isn't mine
+anymore" -- `App.svelte` alone is about 7,700 lines and the modes 1,400 to
+2,000 each. Nobody reads a codebase that size top to bottom; a newcomer to a
+team gets a map, people to ask, small changes to review and one area at a
+time. These are that, for one person working with an assistant:
+
+1. **A map** -- one page, "how Austavia works": the big pieces, where notes
+   and music live (device, cloud), how sync decides, what happens when
+   somebody pays, each part linking to the files it lives in. The biggest
+   single help; to be written as a page Sora opens in a browser.
+2. **One fix, one commit.** A commit that mixes four changes cannot be read;
+   one that does one thing, with a body that says why, can. In force from
+   2026-10-25.
+3. **Reading sessions on request** -- "walk me through the Ctrl+Z fix": the
+   real code, one feature, in plain words.
+4. **The tests as the way in.** 98 test files, most written as sentences of
+   what the app does; reading them says what the app does without reading
+   how. The `src/utils/` modules are where the decisions live, short and
+   commented. The map should point at both.
+5. **`App.svelte` split, slowly.** Hard for anyone at this size. Not one big
+   refactor -- that is how working code breaks -- but each time a feature in
+   it is touched, its deciding part moves to a module (the rule above) and
+   its markup to a component, so the file shrinks as work happens.
 
 ## 5. Not code
 
