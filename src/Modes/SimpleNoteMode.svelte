@@ -837,11 +837,15 @@
   border-radius: 14px;
 }
 
+/* A tint of the writing over whatever is behind, not the block's own colour
+   solid: the block fades with the theme's dial, and a solid field stayed a
+   patch on see-through themes (reported 2026-10-26, the field a task's name is
+   typed in). On a solid theme it reads the same as before. */
 input[type="text"] {
   width: 100%;
   border-radius: 6px;
-  border: none;
-  background: var(--bg-color);
+  border: 1px solid color-mix(in srgb, var(--text-color) 22%, transparent);
+  background: color-mix(in srgb, var(--text-color) 8%, transparent);
   color: var(--text-color);
   font-size: 1rem;
   margin-top: 8px;
@@ -902,9 +906,9 @@ input[type="text"] {
 }
 
 .task-add-row button {
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--text-color) 22%, transparent);
   border-radius: 6px;
-  background: var(--bg-color);
+  background: color-mix(in srgb, var(--text-color) 10%, transparent);
   color: var(--text-color);
   padding: 6px 10px;
   cursor: pointer;

@@ -16,8 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-26** (second round), one commit each:
 
-- G. **Simple Note on see-through themes**: the field where a task's name is
-  typed is not see-through like the rest.
 - H. **Wallpapers when a phone is turned sideways**: many modes that use the
   background do not switch to the landscape picture; every mode should use
   the portrait and landscape backgrounds the way the ones that do already do.
