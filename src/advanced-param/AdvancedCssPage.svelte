@@ -193,7 +193,9 @@
     'accentColor',
     'accentText',
     'mediaButtonBg',
-    'mediaButtonText'
+    'mediaButtonText',
+    'selectionBg',
+    'selectionText'
   ]);
 
   const blockFieldGroups = [
@@ -244,6 +246,18 @@
         { key: 'accentColor', label: 'Accent color' },
         { key: 'accentText', label: 'Accent text color' },
         { key: 'textShadow', label: 'Text shadow', type: 'textarea' }
+      ]
+    },
+    {
+      // Asked 2026-10-26: "we should have a place to change the colors it does
+      // when selecting". Empty means the default: the highlight takes the
+      // writing's colour, the letters its background, and no shadow.
+      title: 'Selecting text',
+      description: 'How words look while they are selected. Leave empty for the theme’s own colours, reversed.',
+      fields: [
+        { key: 'selectionBg', label: 'Selection background' },
+        { key: 'selectionText', label: 'Selection text' },
+        { key: 'selectionShadow', label: 'Selection shadow', type: 'textarea' }
       ]
     },
     {

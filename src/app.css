@@ -203,8 +203,14 @@ b {
    are not those: Playlist mode wears its music block's colour rather than the
    mode's, and says so. */
 ::selection {
-  background: var(--selection-bg, var(--region-ink));
-  color: var(--selection-text, var(--region-paper));
+  background: var(--block-selection-bg, var(--selection-bg, var(--region-ink)));
+  color: var(--block-selection-text, var(--selection-text, var(--region-paper)));
+  /* No shadow on a highlight unless a theme asks for one. A see-through theme
+     shadows its writing to keep it readable over a wallpaper, and inside a
+     highlight -- where the colours are reversed -- that shadow came out as a
+     smudge around the selected words (reported 2026-10-26, Single Note).
+     A custom theme can still have one: Selection shadow, in the theme editor. */
+  text-shadow: var(--block-selection-shadow, none);
 }
 
 

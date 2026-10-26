@@ -14,6 +14,23 @@ phone is several times worse for anything about layout or serialising.
 The order agreed for the run-up to launch. Each line points at the section
 that holds the detail; cross a line off in the same commit that finishes it.
 
+**Now, asked 2026-10-26** (second round), one commit each:
+
+- E. **Objectives: seconds**, in a time goal (and what is typed for it); and
+  **a sound and a pop-up when one finishes**, reusing the timer's, on every
+  device.
+- F. **Task mode lists, UI/UX:**
+  - the list backgrounds see-through like other modes (Single Note);
+  - reordering: decide above/below by the middle of the task under the
+    finger, and show one thick line in the text's colour exactly in the gap
+    where it will land -- between two tasks, or under the last one;
+  - the drag handle lined up with the round check beside it.
+- G. **Simple Note on see-through themes**: the field where a task's name is
+  typed is not see-through like the rest.
+- H. **Wallpapers when a phone is turned sideways**: many modes that use the
+  background do not switch to the landscape picture; every mode should use
+  the portrait and landscape backgrounds the way the ones that do already do.
+
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout

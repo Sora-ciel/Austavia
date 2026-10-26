@@ -2670,6 +2670,10 @@
   // header and the writing alike.
   $: blockThemeCssVars = [
     ...Object.entries(blockTheme || {})
+      // The selection settings are optional: left empty they must not be
+      // declared at all, so ::selection falls back to the theme's own colours
+      // (an empty custom property would win over the fallback and draw nothing).
+      .filter(([key, value]) => !(key.startsWith('selection') && (value == null || String(value).trim() === '')))
       .map(([key, value]) => {
         const css = key.endsWith('Opacity') ? `${value}%` : value;
         return `--block-${toCssVarName(key)}: ${css}`;
