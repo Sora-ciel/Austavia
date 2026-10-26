@@ -9,7 +9,9 @@
   // light text and could put it on a light background.
   import { getReadableTextColor } from "../utils/readableColor.js";
   import { recentDays, daysToShow } from "../utils/habitDays.js";
-  import { createLongPress } from "../utils/longPress.js";
+  import { createListReorder } from "../utils/listReorder.js";
+  import { moveToSlot } from "../utils/dropPlacement.js";
+  import { habitStreaks } from "../utils/habitStreaks.js";
   import { onDestroy, createEventDispatcher } from "svelte";
   import { habitsEqual, withDayTapped, withHabitRenamed } from "../utils/habitStore.js";
 
@@ -151,52 +153,43 @@
     node.select();
   }
 
-  // ── Holding a habit down ─────────────────────────────────────────
+  // ── Holding a habit down, and moving it ─────────────────────────
   // Asked for: "on mobile the thing to close the habit should probably be a
   // pop-up, like after a long press on the line of our habit — so that you can
-  // remove the delete button that shows itself at all time." Which is the right
-  // trade on a phone: the delete was holding a permanent slot in a row one line
-  // tall, for something wanted about once in the life of a habit.
+  // remove the delete button that shows itself at all time." And on 2026-10-26,
+  // drag to reorder, with Task mode's drop line.
   //
-  // The deciding is in utils/longPress.js, including the two parts that are not
-  // a timer: a finger that moves is scrolling, and the tap that ends a long
-  // press must not also mark a day.
+  // Both are the shared gestures in utils/listReorder.js, the ones Task mode
+  // uses: on a phone, hold a habit to pick it up and slide it, or hold and let
+  // go without moving for its menu; on a computer, drag it by its handle. The
+  // click that ends a hold is swallowed there, so it does not also mark a day.
   let menuFor = null;
-  let pressedId = null;
-  let swallowNextClick = false;
+  let draggingId = null;
+  let dropLine = null;
 
-  const press = createLongPress({
-    onLongPress: () => { menuFor = pressedId; }
+  const reorder = createListReorder({
+    listOf: () => document.querySelector(".habit-grid"),
+    itemsIn: list => [...list.querySelectorAll(":scope > .habit-row")],
+    idOf: element => element.dataset.habitId,
+    onPick: id => { draggingId = id; },
+    onLine: line => { dropLine = line ? { y: line.y } : null; },
+    onDrop: (id, groupIds, slot) => {
+      const group = groupIds.map(gid => habits.find(h => h.id === gid)).filter(Boolean);
+      const next = moveToSlot(habits, id, group, slot);
+      if (next !== habits) saveHabits(next);
+    },
+    onHeld: id => { menuFor = id; }
   });
 
-  const pointFrom = event => ({ x: event.clientX ?? 0, y: event.clientY ?? 0 });
-
-  function holdStart(habitId, event) {
-    // Only a finger. A mouse has the Delete button beside it, and holding a
-    // mouse button down is not how anybody asks for a menu.
-    if (event.pointerType === "mouse") return;
-    pressedId = habitId;
-    press.start(pointFrom(event));
-  }
-
-  function holdMove(event) {
-    press.move(pointFrom(event));
-  }
-
-  function holdEnd() {
-    swallowNextClick = press.finish();
-  }
-
   /** The click that follows a long press, eaten before it marks a day. */
-  function guardClick(event) {
-    if (!swallowNextClick) return false;
-    swallowNextClick = false;
-    event.preventDefault();
-    event.stopPropagation();
-    return true;
-  }
+  const guardClick = event => reorder.swallowClick(event);
 
-  onDestroy(() => press.cancel());
+  onDestroy(() => reorder.destroy());
+
+  // Streaks, worked out from each habit's days whenever they change -- see
+  // utils/habitStreaks.js. A value rather than a call in the template, so the
+  // row redraws when a day is ticked (test/templateReactivity.test.js).
+  $: streaks = Object.fromEntries(habits.map(habit => [habit.id, habitStreaks(habit, { today })]));
 
   // Nothing, then ✓, then ✕, then nothing -- worked out in utils/habitStore.js,
   // in the same terms the folder stores. It used to write "none" for the last
@@ -284,6 +277,29 @@
   .habit-grid {
     display: grid;
     gap: 12px;
+    /* The drop line is placed from the top of the list. */
+    position: relative;
+  }
+
+  .habit-row.dragging {
+    opacity: 0.55;
+  }
+
+  .habit-row .drag-handle {
+    align-self: stretch;
+    font-size: 1rem;
+    letter-spacing: -0.2em;
+  }
+
+  /* Days in a row, under the name -- utils/habitStreaks.js. */
+  .habit-streak {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    white-space: nowrap;
+  }
+
+  .habit-streak.quiet {
+    opacity: 0.6;
   }
 
   .habit-row {
@@ -293,7 +309,8 @@
     background: var(--block-header-bg, color-mix(in srgb, var(--mode-text-color, #ffffff) 6%, transparent));
     box-shadow: var(--block-shadow, none);
     display: grid;
-    grid-template-columns: minmax(140px, 200px) 1fr auto;
+    /* The handle, the name, the days, the buttons. */
+    grid-template-columns: auto minmax(140px, 200px) 1fr auto;
     gap: 12px;
     align-items: center;
   }
@@ -310,10 +327,11 @@
 
   .calendar {
     display: grid;
-    /* 56 rather than 70: a fortnight of 70px squares does not fit beside the
-       name on a normal window, so the row wrapped onto a second line of
-       squares and one habit came out 264px tall. */
-    grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    /* The past days share the width evenly and today, the last square, gets
+       half as much again. Agreed 2026-10-26: "today stands out -- a bigger
+       square for today, the past days smaller", because most visits are to
+       tick today. --past-days is set on the element from how many are shown. */
+    grid-template-columns: repeat(var(--past-days, 6), minmax(0, 1fr)) minmax(0, 1.5fr);
     gap: 6px;
   }
 
@@ -353,6 +371,17 @@
     font-weight: 600;
   }
 
+  /* Today: found at a glance, and the easiest square to hit. */
+  .day-button.is-today {
+    border-width: 2px;
+    border-color: var(--block-focus-outline, color-mix(in srgb, var(--mode-text-color, #ffffff) 60%, transparent));
+    font-weight: 700;
+  }
+
+  .day-button.is-today .day-status {
+    font-size: 1.35rem;
+  }
+
   /* ── A phone ────────────────────────────────────────────────────
      Asked for: "one habit just takes around the height of two lines, and the
      days to press are small enough to see the last 7 days -- right now it's
@@ -377,10 +406,13 @@
       font-size: 1.25rem;
     }
 
-    /* The standing instruction is the same for every habit and is only worth
-       one sentence at the top; repeating it under each one was a whole line
-       per habit. */
-    .habit-name span {
+    /* Only the flame and the number fit beside a week on a phone. */
+    .habit-streak {
+      font-size: 0.7rem;
+    }
+
+    .habit-streak .streak-words,
+    .habit-streak.quiet {
       display: none;
     }
 
@@ -434,10 +466,9 @@
     }
 
     .calendar {
-      /* Seven equal columns, never wrapping. auto-fit with a minimum is what
-         made them wrap -- it hands out as many columns as fit and pushes the
-         rest onto another line, which is the opposite of what a week wants. */
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      /* Never wrapping: the columns are fixed by the rule above (the past
+         days, then today wider), not handed out by auto-fit, which is what made
+         them wrap onto a second line. */
       gap: 3px;
     }
 
@@ -480,11 +511,6 @@
       text-decoration: line-through;
     }
 
-    /* Today is worth finding at a glance, now that it is the last square
-       rather than the first. */
-    .day-button.is-today {
-      border-color: var(--block-focus-outline, color-mix(in srgb, var(--mode-text-color, #ffffff) 55%, transparent));
-    }
 
     /* A cross rather than the word, because the word is wider than the name
        column it would be taking the space from. */
@@ -624,17 +650,28 @@
     <div class="empty-state">No habits yet. Add one to start tracking.</div>
   {:else}
     <div class="habit-grid">
-      {#each habits as habit}
+      {#if dropLine}
+        <div class="drop-line" aria-hidden="true" style="top: {dropLine.y}px"></div>
+      {/if}
+      {#each habits as habit (habit.id)}
         <!-- svelte-ignore a11y-no-static-element-interactions -->
         <div
           class="habit-row"
           class:menu-open={menuFor === habit.id}
-          on:pointerdown={event => holdStart(habit.id, event)}
-          on:pointermove={holdMove}
-          on:pointerup={holdEnd}
-          on:pointercancel={() => press.cancel()}
+          class:dragging={draggingId === habit.id}
+          data-habit-id={habit.id}
+          on:pointerdown={event => reorder.itemDown(event, habit.id)}
           on:contextmenu={event => { if (compact) event.preventDefault(); }}
         >
+          {#if !compact}
+            <button
+              type="button"
+              class="drag-handle"
+              aria-label="Move {habit.name}"
+              title="Drag to move"
+              on:pointerdown={event => reorder.handleDown(event, habit.id)}
+            >⋮⋮</button>
+          {/if}
           <div class="habit-name" title={habit.name}>
             {#if renamingId === habit.id}
               <!-- Its own touches stay its own: a hold here is selecting text,
@@ -653,9 +690,15 @@
               <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
               <strong on:dblclick={() => startRename(habit)}>{habit.name}</strong>
             {/if}
-            <span>Tap a day to mark ✓ or ✕.</span>
+            {#if streaks[habit.id]?.current > 0}
+              <span class="habit-streak" title="Days in a row{streaks[habit.id].best > streaks[habit.id].current ? `; best ${streaks[habit.id].best}` : ''}">
+                🔥 {streaks[habit.id].current}<span class="streak-words">{' '}{streaks[habit.id].current === 1 ? 'day' : 'days'}{#if streaks[habit.id].best > streaks[habit.id].current} · best {streaks[habit.id].best}{/if}</span>
+              </span>
+            {:else if streaks[habit.id]?.best > 0}
+              <span class="habit-streak quiet">Best: {streaks[habit.id].best} {streaks[habit.id].best === 1 ? 'day' : 'days'}</span>
+            {/if}
           </div>
-          <div class="calendar">
+          <div class="calendar" style="--past-days: {Math.max(0, days.length - 1)}">
             {#each days as day}
               <button
                 class="day-button {habit.log?.[day.key] ?? 'none'}"

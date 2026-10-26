@@ -108,10 +108,6 @@ Steps, each landing on its own:
 Each built from the parts above, and any new part added as a shared one --
 e.g. the Task-mode drop line, the objective editor, the alarm banner.
 
-2. **Streaks** beside the name: current and best. Absolute, recomputed from
-   the log each time, never kept as a counter.
-3. **Today stands out**: a larger square for today, the past days smaller.
-4. **Drag to reorder**, with `dropPlacement.js` and Task mode's drop line.
 5. **Colour or emoji per habit**, from the theme's colours or tints of them.
 6. **Habits that are not daily** (3 a week; Mon/Wed/Fri) and
 9. **a skipped day**, together: both change what "missed" means, so the streak
