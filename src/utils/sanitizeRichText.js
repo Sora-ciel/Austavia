@@ -93,7 +93,11 @@ export function sanitizeRichText(html) {
         }
         // Shown, not used: what is read here is a copy of the writing, and a
         // tick made on it would go nowhere. Ticking happens in the editor.
-        child.setAttribute('disabled', '');
+        // Marked rather than disabled, which greys the box out; app.css makes
+        // a marked box ignore clicks and draws it like the real one.
+        child.setAttribute('data-readonly', '');
+        child.setAttribute('tabindex', '-1');
+        child.setAttribute('aria-readonly', 'true');
       }
 
       if (child.tagName === 'A') {

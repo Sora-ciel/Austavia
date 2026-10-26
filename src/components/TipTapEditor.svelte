@@ -1215,36 +1215,8 @@
   :global(.tiptap-inner ul, .tiptap-inner ol) { padding-left: 1.4em; margin: 0.3em 0; }
   :global(.tiptap-inner li) { margin: 0.15em 0; }
 
-  /* Checkboxes -- matched as items of a checkbox list, because that is what
-     the editor draws: its <li> carries data-checked but not data-type. The box takes the writing's colour (accent-color: currentColor)
-     so it belongs to whatever theme it sits in, per CLAUDE.md; a ticked line
-     fades and is struck through, the way a done task reads everywhere else. */
-  :global(.tiptap-inner ul[data-type="taskList"]) { list-style: none; padding-left: 0.15em; }
-  :global(.tiptap-inner ul[data-type="taskList"] > li) {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.45em;
-  }
-  :global(.tiptap-inner ul[data-type="taskList"] > li > label) {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    height: 1.4em;
-    user-select: none;
-  }
-  :global(.tiptap-inner ul[data-type="taskList"] > li > label > input) {
-    accent-color: currentColor;
-    width: 1em;
-    height: 1em;
-    margin: 0;
-    cursor: pointer;
-  }
-  :global(.tiptap-inner ul[data-type="taskList"] > li > div) { flex: 1; min-width: 0; }
-  :global(.tiptap-inner ul[data-type="taskList"] > li > div > *:first-child) { margin-top: 0; }
-  :global(.tiptap-inner ul[data-type="taskList"] > li[data-checked="true"] > div) {
-    opacity: 0.55;
-    text-decoration: line-through;
-  }
+  /* Checkboxes are styled once, for the editor and every read-only copy of
+     written text alike, in app.css. */
 
   /* These three were white, which is a colour that belongs to no theme and was
      invisible on half of them. currentColor is the writing's own colour

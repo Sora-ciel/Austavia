@@ -16,8 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-26** (after trying objective tasks), three commits:
 
-- B. **A checkbox in a task's text** shows a bullet before it and its words on
-  the next line once the task is no longer being edited.
 - C. **Editing a task's text**: clicking anywhere outside ends the editing;
   the double-click that starts it also puts the caret where it landed,
   rather than needing another click.
