@@ -1,0 +1,21 @@
+{
+  "productName": "Austavia Staging",
+  "mainBinaryName": "austavia-staging",
+  "identifier": "com.sora.austavia.staging",
+  "build": {
+    "beforeBuildCommand": "npm test && npm run build:staging"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Austavia Staging",
+        "dragDropEnabled": false,
+        "maximized": true,
+        "width": 800,
+        "height": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}

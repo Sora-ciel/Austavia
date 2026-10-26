@@ -29,6 +29,40 @@ Nothing in the app polls GitHub for a new version — there is no updater in
 `src/`, `src-tauri/` or `tauri.conf.json` — so a prerelease cannot arrive on
 somebody's device on its own.
 
+## A staging pre-release
+
+Asked for on 2026-10-26: "a pre-release for staging, and package the deb and
+apk too for staging, so that I have the staging one for pre-releases and can
+test the devices' versions." A test release, as above, whose web app and apps
+all point at **`arial-staging`** -- a separate Firebase project, so nothing a
+pre-release does can reach a real note (see the staging note in `CLAUDE.md`).
+
+| | Staging pre-release |
+| --- | --- |
+| Version | a test build's: 0.8.661 → 0.8.662 |
+| Rules and functions | to **staging** only, if they changed |
+| The web app | staging's own site, `firebase deploy --only hosting --project staging` after `npm run build:staging` |
+| The apps | `./build_tauri.sh --staging`, `./build_apk.sh --staging` |
+| GitHub | `--prerelease`, title says *staging*, never `Latest` |
+| Production | **not touched** -- not its site, rules or functions |
+
+The staging apps are **separate apps**, not a setting: "Austavia Staging",
+`com.sora.austavia.staging`, its own binary (`austavia-staging`) and its own
+local storage. They install beside the real Austavia and can neither replace
+it nor see its folders. That is also why going back is free here: the
+`versionCode` rule below applies to each app on its own.
+
+**Signing in on the staging phone app** needs the staging project to know it:
+an Android app `com.sora.austavia.staging` in arial-staging's Firebase
+console, with the release key's SHA-1, its `google-services.json` saved as
+`android/app/google-services.staging.json` (gitignored), and
+`VITE_GOOGLE_WEB_CLIENT_ID` in `.env.staging` set to arial-staging's web
+client. Without them the APK still builds -- loudly -- and everything but
+signing in can be tried.
+
+Once a pre-release has proved itself on staging, the same commit goes out as a
+full release with the steps below, pointed at production.
+
 ## The version
 
 **One step at a time, whatever the size of the release.** 0.8.50 → 0.8.51. The

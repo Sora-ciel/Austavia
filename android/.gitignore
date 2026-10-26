@@ -69,6 +69,7 @@ keystore.properties
 # are bound to the package name and signing fingerprint, but publishing them is
 # a decision to take deliberately rather than by omission.
 google-services.json
+google-services.staging.json
 
 # Freeline
 freeline.py

@@ -7,16 +7,27 @@ if (hasKeystoreProperties) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// A staging build -- ./build_apk.sh --staging, which passes -Pstaging -- is
+// the app pointed at the arial-staging project, for trying a pre-release on a
+// phone (asked 2026-10-26). It is a different app to Android: its own package,
+// its own name, its own storage, so it installs beside the real Austavia and
+// can never replace it or touch its folders.
+def staging = project.hasProperty('staging')
+
 android {
     namespace "com.sora.austavia"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.sora.austavia"
+        applicationId staging ? "com.sora.austavia.staging" : "com.sora.austavia"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 48
         versionName "0.8.661"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // The name under the icon, here rather than in strings.xml so the
+        // staging build can say which one it is.
+        resValue "string", "app_name", staging ? "Austavia Staging" : "Austavia"
+        resValue "string", "title_activity_main", staging ? "Austavia Staging" : "Austavia"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -78,8 +89,17 @@ apply from: 'capacitor.build.gradle'
 //
 // A debug build may go without it. A release must not: it is the one that
 // reaches somebody else's phone.
+//
+// A staging build signs in through the staging project's own Android app,
+// whose google-services file build_apk.sh --staging swaps in from
+// google-services.staging.json. Without one it is built anyway, loudly: it is
+// a build for the person testing it, and the rest of it is worth trying even
+// before sign-in is set up -- but it says so.
 def servicesJSON = file('google-services.json')
-if (servicesJSON.exists() && servicesJSON.length() > 0) {
+if (staging && !file('google-services.staging.json').exists()) {
+    println "STAGING BUILD WITHOUT google-services.staging.json: Google Sign-In will not work in it. " +
+        "Add an Android app com.sora.austavia.staging to the arial-staging Firebase project and save its file as android/app/google-services.staging.json."
+} else if (servicesJSON.exists() && servicesJSON.length() > 0) {
     apply plugin: 'com.google.gms.google-services'
 } else {
     gradle.taskGraph.whenReady { graph ->

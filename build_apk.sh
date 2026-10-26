@@ -16,8 +16,30 @@ cd "$(dirname "$0")"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 
-npm run build
+# --staging: "Austavia Staging", pointed at the arial-staging project, for
+# trying a pre-release on a phone (asked 2026-10-26). A separate app to Android
+# (com.sora.austavia.staging, see app/build.gradle), so it installs beside the
+# real one. Built from .env.staging, after the tests.
+staging=""
+if [ "${1:-}" = "--staging" ]; then staging=1; fi
+
+if [ -n "$staging" ]; then
+  npm test
+  npm run build:staging
+else
+  npm run build
+fi
 npx cap sync android
+
+# The staging app signs in through the staging project's own google-services
+# file, swapped in for the build and put back after, like local.properties.
+services=android/app/google-services.json
+services_backup=""
+if [ -n "$staging" ] && [ -f android/app/google-services.staging.json ]; then
+  services_backup="$(mktemp)"
+  cp "$services" "$services_backup"
+  cp android/app/google-services.staging.json "$services"
+fi
 
 # android/local.properties names the Windows SDK (E:/Android/Sdk), and Gradle
 # trusts it over ANDROID_HOME. The Windows build needs it as it is, so the
@@ -29,6 +51,10 @@ if [ -f "$props" ]; then
   cp "$props" "$backup"
 fi
 restore() {
+  if [ -n "$services_backup" ]; then
+    cp "$services_backup" "$services"
+    rm -f "$services_backup"
+  fi
   if [ -n "$backup" ]; then
     cp "$backup" "$props"
     rm -f "$backup"
@@ -39,7 +65,11 @@ restore() {
 trap restore EXIT
 echo "sdk.dir=$ANDROID_HOME" > "$props"
 
-(cd android && ./gradlew assembleRelease)
+if [ -n "$staging" ]; then
+  (cd android && ./gradlew assembleRelease -Pstaging)
+else
+  (cd android && ./gradlew assembleRelease)
+fi
 
 echo
 echo "APK at android/app/build/outputs/apk/release/app-release.apk"

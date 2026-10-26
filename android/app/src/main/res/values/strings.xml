@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Austavia</string>
-    <string name="title_activity_main">Austavia</string>
+    <!-- app_name and title_activity_main are set in app/build.gradle (resValue),
+         so the staging build can carry its own name. -->
     <string name="package_name">com.sora.austavia</string>
     <string name="custom_url_scheme">com.sora.austavia</string>
 </resources>
