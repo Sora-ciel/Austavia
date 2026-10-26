@@ -14,12 +14,6 @@ phone is several times worse for anything about layout or serialising.
 The order agreed for the run-up to launch. Each line points at the section
 that holds the detail; cross a line off in the same commit that finishes it.
 
-**Now, asked 2026-10-26** (after trying objective tasks), three commits:
-
-- C. **Editing a task's text**: clicking anywhere outside ends the editing;
-  the double-click that starts it also puts the caret where it landed,
-  rather than needing another click.
-
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout

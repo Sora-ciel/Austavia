@@ -3,7 +3,7 @@
   // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
   // in modeRegistry.js.
   export let backgroundSettings = {};
-  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
   import { getReadableTextColor } from '../utils/readableColor.js';
   import ColorField from '../components/ColorField.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
@@ -405,7 +405,33 @@
   let editingTaskId = null;
   let editText = '';
 
-  function startEditTask(task) { editingTaskId = task.id; editText = task.text; }
+  // Asked 2026-10-26: the double-click that opens a task for editing should
+  // also put the caret where it landed, and clicking anywhere outside should
+  // end the editing. The editor used to open with no focus, which is both:
+  // a second click to type, and an editor that could not lose a focus it never
+  // had. So it is focused at the click (focusAt), and a press outside the task
+  // being edited ends it directly, not via a blur that WebKit may not send.
+  let taskEditorRef = null;
+
+  async function startEditTask(task, event) {
+    editingTaskId = task.id;
+    editText = task.text;
+    const x = event?.clientX;
+    const y = event?.clientY;
+    await tick();
+    taskEditorRef?.focusAt(x, y);
+  }
+
+  function endEditOnOutsidePress(event) {
+    if (!editingTaskId) return;
+    if (event.target?.closest?.('.task-editor')) return;
+    commitEditTask();
+  }
+
+  onMount(() => {
+    window.addEventListener('pointerdown', endEditOnOutsidePress, true);
+    return () => window.removeEventListener('pointerdown', endEditOnOutsidePress, true);
+  });
 
   function commitEditTask() {
     if (!editingTaskId) return;
@@ -1029,6 +1055,7 @@
                           on:keydown|stopPropagation={handleEditKeydown}
                         >
                           <TipTapEditor
+                            bind:this={taskEditorRef}
                             content={editText}
                             emit="html"
                             variant="inline"
@@ -1041,7 +1068,7 @@
                         <span
                           class="task-text"
                           title="Double-click to edit"
-                          on:dblclick|stopPropagation={() => startEditTask(task)}
+                          on:dblclick|stopPropagation={(e) => startEditTask(task, e)}
                           on:click|stopPropagation
                         >{@html renderTaskText(task.text)}</span>
                       {/if}
@@ -1121,6 +1148,7 @@
                             on:keydown|stopPropagation={handleEditKeydown}
                           >
                             <TipTapEditor
+                              bind:this={taskEditorRef}
                               content={editText}
                               emit="html"
                               variant="inline"
@@ -1133,7 +1161,7 @@
                           <span
                             class="task-text done-text"
                             title="Double-click to edit"
-                            on:dblclick|stopPropagation={() => startEditTask(task)}
+                            on:dblclick|stopPropagation={(e) => startEditTask(task, e)}
                             on:click|stopPropagation
                           >{@html renderTaskText(task.text)}</span>
                         {/if}

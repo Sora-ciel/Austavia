@@ -201,6 +201,24 @@
    * worked out where to insert from `document.activeElement` would already be
    * looking at the wrong thing by the time it ran.
    */
+  /**
+   * Focus the writing with the caret at a point on screen -- where a click
+   * landed -- or at the end when that point is not in the writing.
+   *
+   * For a caller that swaps a read-only copy for this editor on a click:
+   * without it the editor opened with no caret and no focus, so it took a
+   * second click to start typing, and since it never had focus it could not
+   * lose it either (reported 2026-10-26 on Task mode).
+   */
+  export function focusAt(x, y) {
+    if (!editor || editor.isDestroyed) return;
+    const hit = Number.isFinite(x) && Number.isFinite(y)
+      ? editor.view.posAtCoords({ left: x, top: y })
+      : null;
+    if (hit) editor.chain().focus(null, { scrollIntoView: false }).setTextSelection(hit.pos).run();
+    else editor.commands.focus('end', { scrollIntoView: false });
+  }
+
   export function insertPicture(src) {
     if (!editor || editor.isDestroyed) return false;
     if (typeof src !== 'string' || !src.startsWith('data:image/')) return false;
