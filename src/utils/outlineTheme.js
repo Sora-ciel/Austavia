@@ -241,6 +241,13 @@ export const INDIGO_GILT_GLASS_PRESET = seeThroughPreset({
  * Redline's #ff5c5c has white mixed in, which on a black page reads as soft
  * and over a photo reads as salmon; this is a pure red at full brightness
  * with a little blue (#ff2b45), and a stronger glow behind it.
+ *
+ * And its blocks are not clear. Asked later that day: "a dark and more opaque
+ * colour on the background of blocks, because it's still slightly not easy
+ * to read". A red that bright over a busy picture needs something dark
+ * behind the writing, so blocks sit on its near-black backing at 70% and
+ * their headers at 80% -- the wallpaper still shows, dimmed. The toolbar
+ * stays clear, as the rest of the family's does.
  */
 export const REDLINE_GLASS_PRESET = seeThroughPreset({
   id: 'redline-glass',
@@ -248,6 +255,8 @@ export const REDLINE_GLASS_PRESET = seeThroughPreset({
   description: 'Redline, see-through: red hairline edges and the warning-light glow over the wallpaper, with black pop-ups.',
   ink: '#ff2b45',
   backing: '#0a0607',
+  surfaceOpacity: 70,
+  headerOpacity: 80,
   controlColors: {
     left: { textColor: '#ffe4e4' },
     right: { textColor: '#ffe4e4' }

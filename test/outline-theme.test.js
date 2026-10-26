@@ -192,11 +192,9 @@ describe('Indigo Gilt', () => {
 
 // Asked for on 2026-10-26: "add a see-through version of Redline".
 describe('Redline Glass', () => {
-  it("is Redline's lettering and glow with its black surfaces taken away", () => {
+  it("is Redline's lettering and glow over the wallpaper", () => {
     const { blockTheme } = REDLINE_GLASS_PRESET;
     assert.match(blockTheme.headerFont, /Chakra Petch/);
-    assert.equal(blockTheme.bgOpacity, 0);
-    assert.equal(blockTheme.headerOpacity, 0);
     assert.match(blockTheme.shadow, /0 0 18px rgba\(255, /, 'keeps the warning-light glow');
   });
 
@@ -209,6 +207,15 @@ describe('Redline Glass', () => {
     const glass = rgb(REDLINE_GLASS_PRESET.blockTheme.headerText);
     assert.equal(glass[0], 255, 'full brightness');
     assert.ok(saturation(glass) > saturation(redline) + 0.15, 'clearly more saturated');
+  });
+
+  // Asked the same day: "a dark and more opaque colour on the background of
+  // blocks, because it's still slightly not easy to read".
+  it('puts a dark, mostly opaque backing behind the writing, with the wallpaper still showing', () => {
+    const { bgOpacity, headerOpacity } = REDLINE_GLASS_PRESET.blockTheme;
+    assert.ok(bgOpacity >= 60 && bgOpacity < 100, `block ${bgOpacity}`);
+    assert.ok(headerOpacity >= bgOpacity && headerOpacity < 100, `header ${headerOpacity}`);
+    assert.equal(REDLINE_GLASS_PRESET.blockDefaults.bgColor, '#0a0607');
   });
   it('is listed with the see-through family', () => {
     assert.ok(SEE_THROUGH_PRESETS.some(theme => theme.id === 'redline-glass' && theme.family === 'see-through'));
