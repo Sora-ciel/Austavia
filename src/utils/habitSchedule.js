@@ -25,6 +25,8 @@
  * somebody's schedule on the strength of a field this build cannot read.
  */
 
+import { canonical, withUnknown } from './keepUnknown.js';
+
 export const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 /** The schedule as stored, or undefined for every day. */
@@ -36,12 +38,12 @@ export function normalizeSchedule(value) {
       .filter(day => Number.isInteger(day) && day >= 0 && day <= 6))]
       .sort((a, b) => a - b);
     if (days.length === 0 || days.length === 7) return undefined;
-    return { kind: 'days', days };
+    return withUnknown({ kind: 'days', days }, value, ['kind', 'days']);
   }
   if (value.kind === 'weekly') {
     const times = Math.round(Number(value.times));
     if (!Number.isFinite(times) || times < 1 || times >= 7) return undefined;
-    return { kind: 'weekly', times };
+    return withUnknown({ kind: 'weekly', times }, value, ['kind', 'times']);
   }
   if (typeof value.kind === 'string' && value.kind && value.kind !== 'daily') {
     // From a newer build: kept, canonically, and not read.
@@ -50,15 +52,6 @@ export function normalizeSchedule(value) {
   return undefined;
 }
 
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const key of Object.keys(value).sort()) out[key] = canonical(value[key]);
-    return out;
-  }
-  return value;
-}
 
 /** Whether a day is one the habit is meant for. A weekly habit's are all. */
 export function isDue(schedule, date) {

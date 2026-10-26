@@ -328,7 +328,7 @@
     },
 
     renderHTML() {
-      return ['span', { 'data-inline-separator': '', class: 'tiptap-inline-sep' }];
+      return ['span', { 'data-inline-separator': '', 'data-austavia-node': 'inlineSeparator', 'data-austavia-inline': '', class: 'tiptap-inline-sep' }];
     },
 
     // Drawn by hand because its width is a measurement, not a length.
@@ -373,6 +373,103 @@
         markdown: {
           serialize(state) {
             state.write('---');
+          }
+        }
+      };
+    }
+  });
+
+  // ── What a newer Austavia wrote ────────────────────────────────────
+  // Asked 2026-10-26: "make something so that new details are still kept even
+  // though a certain version doesn't know what it means yet ... it's an app
+  // that will be used by clients all over the world."
+  //
+  // The editor rebuilds a note from the parts it knows, and drops the rest --
+  // so a note opened and saved on a phone a version behind lost whatever the
+  // newer version had put in it. From here on, every part of a note Austavia
+  // adds carries `data-austavia-node="<name>"` (and `data-austavia-inline` if
+  // it sits in a line), and a part this build does not know by that name is
+  // kept whole: shown as a small marker, carried untouched, written back
+  // exactly as it came. test/keptNodes.test.js holds every part to the rule.
+  //
+  // Parts this build knows by name are parsed by their own rules instead.
+  const MARKED_HERE = new Set(['inlineSeparator']);
+  const unknownHere = el => (MARKED_HERE.has(el.getAttribute('data-austavia-node')) ? false : null);
+
+  function htmlNode(html, fallbackTag) {
+    if (typeof document === 'undefined' || !html) return [fallbackTag, {}];
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    return template.content.firstElementChild || [fallbackTag, {}];
+  }
+
+  function keptView(inline) {
+    return ({ node }) => {
+      const dom = document.createElement(inline ? 'span' : 'div');
+      dom.className = inline ? 'tiptap-kept tiptap-kept-inline' : 'tiptap-kept';
+      dom.contentEditable = 'false';
+      dom.title = 'Made in a newer version of Austavia. Kept as it is; update to see it.';
+      dom.textContent = inline ? '◆' : '◆ Made in a newer version of Austavia — kept as it is';
+      dom.dataset.keptName = node.attrs.name || '';
+      return { dom, ignoreMutation: () => true };
+    };
+  }
+
+  const keptAttributes = () => ({
+    html: { default: '', parseHTML: el => el.outerHTML, renderHTML: () => ({}) },
+    name: { default: '', parseHTML: el => el.getAttribute('data-austavia-node') || '', renderHTML: () => ({}) }
+  });
+
+  const KeptBlock = TipTapNode.create({
+    name: 'keptBlock',
+    group: 'block',
+    atom: true,
+    selectable: true,
+    addAttributes: keptAttributes,
+    // Above every other rule, so a newer part written as a <p> or a <div> is
+    // not mistaken for a paragraph; and declining the parts this build knows.
+    parseHTML() {
+      return [{ tag: '[data-austavia-node]:not([data-austavia-inline])', priority: 1000, getAttrs: unknownHere }];
+    },
+    renderHTML({ node }) {
+      return htmlNode(node.attrs.html, 'div');
+    },
+    addNodeView() {
+      return keptView(false);
+    },
+    addStorage() {
+      return {
+        markdown: {
+          serialize(state, node) {
+            state.write(node.attrs.html);
+            state.closeBlock(node);
+          }
+        }
+      };
+    }
+  });
+
+  const KeptInline = TipTapNode.create({
+    name: 'keptInline',
+    group: 'inline',
+    inline: true,
+    atom: true,
+    selectable: true,
+    addAttributes: keptAttributes,
+    parseHTML() {
+      return [{ tag: '[data-austavia-node][data-austavia-inline]', priority: 1000, getAttrs: unknownHere }];
+    },
+    renderHTML({ node }) {
+      return htmlNode(node.attrs.html, 'span');
+    },
+    addNodeView() {
+      return keptView(true);
+    },
+    addStorage() {
+      return {
+        markdown: {
+          serialize(state, node) {
+            state.write(node.attrs.html);
           }
         }
       };
@@ -773,6 +870,8 @@
         // full-width line. allowBase64 so pasted data: URLs render too.
         ResizableImage.configure({ inline: true, allowBase64: true }),
         InlineSeparator,
+        KeptBlock,
+        KeptInline,
         AggregateMarkdown,
         Placeholder.configure({ placeholder }),
       ],

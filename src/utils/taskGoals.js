@@ -59,7 +59,11 @@
  * can wake for it without anything having to be written first.
  */
 
+import { canonical, withUnknown } from './keepUnknown.js';
+
 export const GOAL_KINDS = Object.freeze(['time', 'count']);
+/** The fields of a goal this build reads; anything else is a newer build's. */
+const GOAL_FIELDS = ['kind', 'target', 'targetSeconds', 'progress', 'daily', 'day', 'runningSince', 'finishedAt'];
 const SECOND = 1000;
 const MAX_TARGET = 100000;
 const MAX_SECONDS = MAX_TARGET * 60;
@@ -123,7 +127,24 @@ export function normalizeGoal(raw) {
     finishedAt: finiteAtLeast(raw.finishedAt, 1)
   };
   if (isTime) goal.targetSeconds = targetSeconds;
-  return goal;
+  // What a newer build added to a goal rides along, unread -- see
+  // utils/keepUnknown.js (asked 2026-10-26).
+  return withUnknown(goal, raw, GOAL_FIELDS);
+}
+
+/**
+ * A goal as it should be stored: normalised when this build knows its kind,
+ * and otherwise kept exactly as it came. A goal of a kind only a newer build
+ * knows is somebody's objective all the same; this build cannot count it, but
+ * it must not delete it.
+ */
+export function keptGoal(raw) {
+  const goal = normalizeGoal(raw);
+  if (goal) return goal;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.kind === 'string' && raw.kind) {
+    return canonical(raw);
+  }
+  return null;
 }
 
 /**

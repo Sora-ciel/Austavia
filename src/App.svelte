@@ -146,6 +146,7 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
+  import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits } from './utils/habitGoals.js';
   import {
     startupGate,
@@ -509,81 +510,17 @@
   // listening session back up where it stopped.
   const MUSIC_RESUME_KEY = 'musicResume';
   const FALLBACK_SAVE_NAME = 'Fallback';
-  const DEFAULT_MODE_SETTINGS = {
-    simple: {
-      columnCount: 2
-    },
-    task: {
-      addDirection: 'above'
-    },
-    // When on, every block is repainted in the active theme's colours; each
-    // block keeps its own colours stashed so switching back restores them.
-    blocksFollowTheme: false,
-    // Track metadata and playlists sync with the folder; the audio itself
-    // stays on each device (see storage.js) and moves via export/import.
-    playlist: { tracks: [], playlists: [] },
-    // Asked for on 2026-09-26: one habit list per folder, shared between
-    // devices. It lives here rather than behind its own sync because here it
-    // already is one -- see utils/habitStore.js.
-    habit: { habits: [] },
-    // The folder's one wallpaper, drawn by every mode, under
-    // Canvas mode's own id -- see hasWallpaper in modeRegistry.js. Single Note
-    // had one of its own under `single`; it is no longer kept at all, so a
-    // folder that still carries one loses it on its next save.
-    default: { ...BACKGROUND_DEFAULTS }
-  };
 
   function readStoredBackground(value) {
     if (typeof value !== 'string' || isHatoBackground(value)) return '';
     return value;
   }
 
+  // What a folder's mode settings are, worked out in utils/modeSettings.js,
+  // where a test can reach it. The wallpaper rule (readStoredBackground) is
+  // this app's and is handed in.
   function normalizeModeSettings(settings) {
-    const incomingSimple = settings?.simple || {};
-    const incomingTask = settings?.task || {};
-    return {
-      ...DEFAULT_MODE_SETTINGS,
-      simple: {
-        ...DEFAULT_MODE_SETTINGS.simple,
-        ...incomingSimple,
-        columnCount: Math.max(1, Number.parseInt(incomingSimple.columnCount, 10) || DEFAULT_MODE_SETTINGS.simple.columnCount)
-      },
-      task: {
-        ...DEFAULT_MODE_SETTINGS.task,
-        ...incomingTask,
-        addDirection: incomingTask.addDirection === 'below' ? 'below' : 'above'
-      },
-      blocksFollowTheme: settings?.blocksFollowTheme === true,
-      playlist: {
-        tracks: Array.isArray(settings?.playlist?.tracks) ? settings.playlist.tracks : [],
-        playlists: Array.isArray(settings?.playlist?.playlists) ? settings.playlist.playlists : []
-      },
-      // Normalised on the way in as well as out, so a folder written by an
-      // older build, a newer one, or by hand is the same shape by the time
-      // anything reads it -- and so that a round trip through the cloud is
-      // byte-identical and does not read as an edit.
-      habit: { habits: normalizeHabits(settings?.habit?.habits) },
-      // The wallpaper goes through the shared normaliser, so the awkward parts
-      // — the pre-0.8.35 opacity stored as a 0-1 fraction, all the clamping —
-      // are written once. Single Note's old `single` is deliberately not
-      // carried: asked on 2026-09-27 for it to be "actually deleted", so it is
-      // dropped here and gone from the folder, locally and in the cloud, at
-      // the next save. Its uploaded picture goes with sweepWallpapersFor.
-      //
-      // readStoredBackground is handed in rather than known about. A theme's
-      // own wallpaper is layered on at render time and must never reach a
-      // save: an earlier build of the Hato theme wrote its path in, and a
-      // stored copy outranks the theme, survives switching away from it, and
-      // becomes a dead image reference the day that theme is removed. That is
-      // this app's rule, though, not the normaliser's.
-      // The note-picture dials are carried over from `single` first, so
-      // dropping it takes only the old wallpaper -- see
-      // carryNotePictureSettings.
-      default: normalizeBackgroundSettings(
-        carryNotePictureSettings(settings?.default, settings?.single),
-        { keepImage: readStoredBackground }
-      )
-    };
+    return normalizeModeSettingsFrom(settings, { keepImage: readStoredBackground });
   }
 
   function loadStoredCustomThemes() {

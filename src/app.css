@@ -564,3 +564,24 @@ ul[data-type="taskList"] > li[data-checked="true"] > div {
 }
 .drag-handle:hover { opacity: 0.6; }
 .drag-handle:active { cursor: grabbing; opacity: 0.8; }
+
+/* A part of a note made by a newer Austavia, kept as it is (TipTapEditor's
+   KeptBlock and KeptInline). Drawn in the writing's own colour, faint, so it
+   reads as "something is here" without pretending to be what it is. */
+.tiptap-kept {
+  display: block;
+  margin: 4px 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px dashed color-mix(in srgb, currentColor 40%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  font-size: 0.8em;
+  opacity: 0.75;
+  user-select: none;
+}
+
+.tiptap-kept-inline {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 0 4px;
+}

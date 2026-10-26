@@ -23,7 +23,7 @@
  * an empty day it was due is a missed one, the same as for any habit.
  */
 
-import { normalizeGoal, settleTask, dayKey } from './taskGoals.js';
+import { normalizeGoal, keptGoal, settleTask, dayKey } from './taskGoals.js';
 import { normalizeHabits, dayMark } from './habitStore.js';
 
 /** A habit on the day of `now`, in the shape the objective functions take. */
@@ -32,7 +32,9 @@ export function habitTask(habit, now = Date.now()) {
     id: habit?.id,
     text: habit?.name,
     done: dayMark(habit?.log?.[dayKey(now)]) === 'done',
-    goal: habit?.goal ? { ...habit.goal, daily: true } : undefined
+    // Daily by what a habit is -- for a goal this build can read. One it
+    // cannot is handed on exactly as it is.
+    goal: habit?.goal ? (normalizeGoal(habit.goal) ? { ...habit.goal, daily: true } : habit.goal) : undefined
   };
 }
 
@@ -42,6 +44,10 @@ export function fromHabitTask(habit, task) {
   const after = normalizeGoal(task?.goal);
   const next = { ...habit };
   if (after) next.goal = { ...after, daily: true };
+  // A goal of a kind only a newer build knows: this one cannot act on it, and
+  // must not take its silence for "no goal" (utils/keepUnknown.js). Only an
+  // answer with no goal at all -- removeGoal -- removes it.
+  else if (task?.goal) next.goal = keptGoal(task.goal) ?? habit.goal;
   else delete next.goal;
   // A goal reached is a day done -- the day it was reached, which for a timer
   // that ran past midnight unseen is not necessarily today.

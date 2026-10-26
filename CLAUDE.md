@@ -193,6 +193,39 @@ which is the moment to ask whether it is content. The one known exception is
 the Playlist library's imported tracks, never uploaded for their size -- see
 PENDING 2a.
 
+## An older version keeps what it does not understand
+
+Asked 2026-10-26: "make something so that new details are still kept even
+though a certain version doesn't know what it means yet ... so that in no
+situation we'll have this little problem again. It's an app that will be used
+by clients all over the world."
+
+Somebody's phone is always a version behind their computer, and both save the
+same folder. So whatever cleans up stored data rebuilds what it knows and
+**adds back everything it does not** -- `withUnknown` in
+`utils/keepUnknown.js`. Never rebuild an object from a list of known fields
+alone; that is how a version a step behind deleted every newer habit detail
+the first time it saved.
+
+- **Data**: habits, their days and schedules, objectives, mode settings (a
+  whole mode included) all keep unknown fields and unknown kinds. Something
+  of a kind this build cannot read is carried untouched and treated as
+  absent, never "corrected" -- the same rule as recomputing above.
+- **Notes**: every part of a note Austavia adds is written with
+  `data-austavia-node="<name>"` (and `data-austavia-inline` if it sits in a
+  line), and listed in `MARKED_HERE` in TipTapEditor.svelte. A version that
+  does not know the name keeps the part whole and shows a small marker.
+- **Removing something on purpose** is still possible, and is a decision:
+  name the field as known and drop it, with the reason beside it (Single
+  Note's old wallpaper, in `utils/modeSettings.js`).
+
+`test/keepUnknown.test.js` passes a newer version's folder through every
+store. A new kind of stored data gets a case there.
+
+This protects from this version on. Versions already installed before it do
+not have it, which is why a release that adds stored fields should say to
+update every device.
+
 ## What is still owed is written down, not remembered
 
 [`PENDING.md`](PENDING.md) is the list. It exists because the same list was

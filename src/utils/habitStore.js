@@ -37,7 +37,8 @@
  */
 
 import { normalizeSchedule } from './habitSchedule.js';
-import { normalizeGoal } from './taskGoals.js';
+import { keptGoal } from './taskGoals.js';
+import { withUnknown, canonical } from './keepUnknown.js';
 
 /** A day, as `habitDays.js` writes it. Anything else is not a day. */
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -92,16 +93,24 @@ export function dayMark(value) {
 
 /**
  * A mark this build does not know -- written by a newer one -- that is kept
- * rather than dropped. Before skipped existed, a build that met one deleted it
- * on its next save; from here on a later mark survives an older build, drawn
- * as no mark but never thrown away.
+ * rather than dropped, whatever shape it has: a word, a number, or a whole
+ * object (an amount and a note, say). Before skipped existed, a build that met
+ * one deleted it on its next save; from here on a later mark survives an older
+ * build, drawn as no mark but never thrown away (utils/keepUnknown.js).
+ *
+ * Except the words earlier builds wrote for a cleared day, which are no mark,
+ * and `false` and empty values, which never meant anything.
  */
-const FOREIGN_MARK = /^[a-z][a-z-]{0,23}$/;
-// Words that meant "no mark" in earlier builds, which wrote them for a
-// cleared day; they are no mark, not a mark from the future.
-const NO_MARK = new Set(['none', 'clear', 'cleared', 'empty']);
-const keptMark = value => dayMark(value) ??
-  (typeof value === 'string' && FOREIGN_MARK.test(value) && !NO_MARK.has(value) ? value : null);
+const NO_MARK = new Set(['none', 'clear', 'cleared', 'empty', '']);
+const keptMark = value => {
+  const known = dayMark(value);
+  if (known) return known;
+  if (value === null || value === undefined || value === false) return null;
+  if (typeof value === 'string') return NO_MARK.has(value.trim().toLowerCase()) ? null : value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'object') return Object.keys(value).length ? canonical(value) : null;
+  return null;
+};
 
 /** The marks, keyed by day, in a fixed order and with nothing else in them. */
 function normalizeLog(log) {
@@ -119,43 +128,8 @@ function normalizeLog(log) {
   return out;
 }
 
-/** What a habit is made of, and nothing a build reads besides. */
+/** What a habit is made of, as far as this build reads it. */
 const KNOWN_FIELDS = new Set(['id', 'name', 'log', 'schedule', 'goal']);
-/** How big a field this build does not know may be, and still be kept. */
-const MAX_FOREIGN_FIELD = 4000;
-
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const key of Object.keys(value).sort()) out[key] = canonical(value[key]);
-    return out;
-  }
-  return value;
-}
-
-/**
- * The fields of a habit this build does not know, kept as they came.
- *
- * Until 2026-10-26 a habit was rebuilt from its id, name and days alone, so
- * any build meeting something newer -- a schedule, a colour -- deleted it on
- * its next save, and a phone not yet updated undid the computer's work. Kept,
- * in a fixed order so two devices still write the same bytes, and only when
- * small: this is a payload every device downloads.
- */
-function foreignFields(habit) {
-  const out = {};
-  for (const key of Object.keys(habit).sort()) {
-    if (KNOWN_FIELDS.has(key) || key.startsWith('_')) continue;
-    const value = habit[key];
-    if (value === undefined || typeof value === 'function') continue;
-    let size = 0;
-    try { size = JSON.stringify(value)?.length ?? 0; } catch { continue; }
-    if (size === 0 || size > MAX_FOREIGN_FIELD) continue;
-    out[key] = canonical(value);
-  }
-  return out;
-}
 
 /**
  * A habit list that can be trusted, whatever it arrived as.
@@ -185,10 +159,14 @@ export function normalizeHabits(value) {
     const schedule = normalizeSchedule(habit.schedule);
     if (schedule) kept.schedule = schedule;
     // An amount or a time a day: a Task-mode objective, always daily
-    // (habitGoals.js).
-    const goal = normalizeGoal(habit.goal);
-    if (goal) kept.goal = { ...goal, daily: true };
-    out.push({ ...kept, ...foreignFields(habit) });
+    // (habitGoals.js). One of a kind this build does not know is kept as it
+    // came rather than dropped (normalizeGoal hands it back untouched).
+    const goal = keptGoal(habit.goal);
+    if (goal) kept.goal = goal.kind === 'time' || goal.kind === 'count' ? { ...goal, daily: true } : goal;
+    // And whatever else a newer build wrote: see utils/keepUnknown.js. Until
+    // 2026-10-26 a habit was rebuilt from its id, name and days alone, so a
+    // phone a version behind deleted anything newer on its next save.
+    out.push(withUnknown(kept, habit, KNOWN_FIELDS));
   });
 
   return out;
