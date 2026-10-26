@@ -524,3 +524,43 @@ ul[data-type="taskList"] > li[data-checked="true"] > div {
   opacity: 0.55;
   text-decoration: line-through;
 }
+
+/* Where a dragged item will land, in every list that can be reordered --
+   Task mode and the habit tracker (utils/listReorder.js). Asked 2026-10-26:
+   "a big line that is right in the middle of them ... the colour of the
+   text". A bar is read as writing is, so it takes the text colour of the list
+   it is drawn in. The list must be position: relative; the line's top is set
+   inline. */
+.drop-line {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 99px;
+  background: currentColor;
+  pointer-events: none;
+  z-index: 3;
+  list-style: none;
+}
+
+/* The handle a list item is dragged by on a computer (a phone holds the item
+   instead) -- utils/listReorder.js. Drawn in the writing's colour, faint until
+   it is used. A list adds only how it lines up with its own rows. */
+.drag-handle {
+  flex-shrink: 0;
+  width: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.3;
+}
+.drag-handle:hover { opacity: 0.6; }
+.drag-handle:active { cursor: grabbing; opacity: 0.8; }

@@ -14,7 +14,8 @@
   import { readDoneExpanded, writeDoneExpanded, readLastGoal, writeLastGoal } from '../utils/taskModeView.js';
   import { drawnSurface } from '../utils/modeSurface.js';
   // Where a dragged task lands, and where its line goes -- see the file.
-  import { dropSlot, dropLineY, moveToSlot } from '../utils/dropPlacement.js';
+  import { moveToSlot } from '../utils/dropPlacement.js';
+  import { createListReorder } from '../utils/listReorder.js';
   // Objective tasks -- a goal of time or of times; see utils/taskGoals.js.
   import TaskGoalLine from '../components/TaskGoalLine.svelte';
   import TaskGoalEditor from '../components/TaskGoalEditor.svelte';
@@ -104,8 +105,7 @@
       vv.removeEventListener('resize', updateViewportH);
       vv.removeEventListener('scroll', updateViewportH);
     }
-    cancelLongPress();
-    removeDragListeners();
+    reorder.destroy();
   });
 
   const defaultCanvasColors = { outerBg: '#000000', innerBg: '#000000' };
@@ -297,115 +297,31 @@
   }
 
   // ── Reordering ────────────────────────────────────────────────────
+  // The gestures -- the handle on a computer, press-and-hold on a phone, a
+  // hold let go without moving opening the task's menu -- are the shared ones
+  // in utils/listReorder.js, which the habit tracker uses too. Asked
+  // 2026-10-26: decide above/below by the middle of a task, and show one thick
+  // line in the text's colour right in the middle of the gap it will land in
+  // (dropPlacement.js). Each list is its own: a task moves among its own kind.
   let draggingTaskId = null;
-  // The slot the dragged task will land in, among the tasks of its own list
-  // (dropGroup, in order, without it), and where that slot's line is drawn in
-  // that list (dropLine: which list, and how far down). See dropPlacement.js.
-  let dropGroup = [];
-  let dropSlotIndex = null;
   let dropLine = null;
-  const DROP_GAP = 6;
 
-  // Desktop: drag via the dedicated handle.
-  function startDrag(e, taskId) {
-    e.preventDefault();
-    beginDrag(taskId, { x: e.clientX, y: e.clientY });
-  }
-
-  // Mobile: press-and-hold a task to pick it up, then slide to reorder (the
-  // handle is hidden on small screens). Moving before the hold completes is
-  // treated as a normal scroll and cancels the pickup.
-  let lpTimer = null;
-  let lpStartX = 0, lpStartY = 0;
-
-  function onItemPointerDown(e, taskId) {
-    if (e.pointerType === 'mouse') return;                 // desktop uses handle
-    if (e.target.closest('button, input, a')) return;      // don't hijack taps
-    lpStartX = e.clientX; lpStartY = e.clientY;
-    clearTimeout(lpTimer);
-    lpTimer = setTimeout(() => beginDrag(taskId, { held: true, x: lpStartX, y: lpStartY }), 420);
-    window.addEventListener('pointermove', onLongPressMaybeCancel);
-    window.addEventListener('pointerup', cancelLongPress);
-    window.addEventListener('pointercancel', cancelLongPress);
-  }
-
-  function onLongPressMaybeCancel(e) {
-    if (draggingTaskId) return; // already picked up
-    if (Math.abs(e.clientX - lpStartX) > 8 || Math.abs(e.clientY - lpStartY) > 8)
-      cancelLongPress();
-  }
-
-  function cancelLongPress() {
-    clearTimeout(lpTimer); lpTimer = null;
-    window.removeEventListener('pointermove', onLongPressMaybeCancel);
-    window.removeEventListener('pointerup', cancelLongPress);
-    window.removeEventListener('pointercancel', cancelLongPress);
-  }
-
-  // A hold that is let go without moving is not a reorder: on a phone it is
-  // how a task's menu is asked for (there is no right-click there).
-  let heldByTouch = false;
-  let dragMoved = false;
-  let dragStartX = 0, dragStartY = 0;
-
-  function beginDrag(taskId, { held = false, x = 0, y = 0 } = {}) {
-    cancelLongPress();
-    draggingTaskId = taskId;
-    heldByTouch = held;
-    dragMoved = false;
-    dragStartX = x; dragStartY = y;
-    if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
-    window.addEventListener('pointermove', onDragMove);
-    window.addEventListener('pointerup', endDrag);
-    window.addEventListener('pointercancel', endDrag);
-    // Block list scrolling while a task is held (touch).
-    document.addEventListener('touchmove', preventTouchScroll, { passive: false });
-  }
-
-  function preventTouchScroll(e) { e.preventDefault(); }
-
-  function removeDragListeners() {
-    window.removeEventListener('pointermove', onDragMove);
-    window.removeEventListener('pointerup', endDrag);
-    window.removeEventListener('pointercancel', endDrag);
-    document.removeEventListener('touchmove', preventTouchScroll);
-  }
-
-  // Asked 2026-10-26: decide above/below by the middle of a task, and show one
-  // thick line, in the text's colour, right in the middle of the gap it will
-  // land in -- or under the last task. The slot comes from the middles of the
-  // tasks in the dragged task's own list, so a gap between two tasks is a
-  // place too, not nothing (dropPlacement.js).
-  function onDragMove(e) {
-    if (!draggingTaskId) return;
-    if (Math.abs(e.clientX - dragStartX) > 8 || Math.abs(e.clientY - dragStartY) > 8) dragMoved = true;
-    const listEl = document.querySelector(`.task-item[data-task-id="${CSS.escape(draggingTaskId)}"]`)?.closest('.task-list');
-    if (!listEl) { dropSlotIndex = null; dropLine = null; return; }
-    const listTop = listEl.getBoundingClientRect().top;
-    const items = [...listEl.querySelectorAll(':scope > .task-item')].filter(li => li.dataset.taskId !== draggingTaskId);
-    const rects = items.map(li => {
-      const r = li.getBoundingClientRect();
-      return { top: r.top - listTop, bottom: r.bottom - listTop };
-    });
-    dropGroup = items.map(li => li.dataset.taskId);
-    dropSlotIndex = dropSlot(rects, e.clientY - listTop);
-    const y = dropLineY(rects, dropSlotIndex, DROP_GAP);
-    const dragged = tasks.find(t => t.id === draggingTaskId);
-    dropLine = y === null ? null : { done: dragged?.done === true, y };
-  }
-
-  function endDrag() {
-    removeDragListeners();
-    const heldId = heldByTouch && !dragMoved ? draggingTaskId : null;
-    if (draggingTaskId && dragMoved && dropSlotIndex !== null) {
-      const group = dropGroup.map(id => tasks.find(t => t.id === id)).filter(Boolean);
-      const next = moveToSlot(tasks, draggingTaskId, group, dropSlotIndex);
+  const reorder = createListReorder({
+    listOf: id => document.querySelector(`.task-item[data-task-id="${CSS.escape(id)}"]`)?.closest('.task-list'),
+    itemsIn: list => [...list.querySelectorAll(':scope > .task-item')],
+    idOf: element => element.dataset.taskId,
+    onPick: id => { draggingTaskId = id; },
+    onLine: line => {
+      const dragged = line && tasks.find(t => t.id === line.id);
+      dropLine = line ? { done: dragged?.done === true, y: line.y } : null;
+    },
+    onDrop: (id, groupIds, slot) => {
+      const group = groupIds.map(gid => tasks.find(t => t.id === gid)).filter(Boolean);
+      const next = moveToSlot(tasks, id, group, slot);
       if (next !== tasks) updateTasks(next);
-    }
-    draggingTaskId = null; dropSlotIndex = null; dropLine = null; dropGroup = [];
-    heldByTouch = false;
-    if (heldId) openGoalMenu(heldId, dragStartX, dragStartY);
-  }
+    },
+    onHeld: (id, point) => openGoalMenu(id, point.x, point.y)
+  });
 
 
   // ── Inline edit ──────────────────────────────────────────────────
@@ -720,39 +636,16 @@
   .task-item.dragging { opacity: 0.35; }
   /* Where a dragged task will land: one thick line in the text's colour, in
      the middle of the gap (dropPlacement.js says where). */
-  .drop-line {
-    position: absolute;
-    left: 4px;
-    right: 4px;
-    height: 4px;
-    transform: translateY(-50%);
-    border-radius: 99px;
-    background: var(--text, var(--mode-text-color, currentColor));
-    pointer-events: none;
-    z-index: 3;
-  }
 
   /* Lined up with the round check beside it (asked 2026-10-26): the same 36px
      box and the same 4px from the top as .task-row gives the check, so their
      middles are one line. */
   .drag-handle {
-    flex-shrink: 0;
-    width: 24px;
     height: 36px;
     margin-top: 4px;
-    padding: 0;
-    border: none;
-    background: none;
-    cursor: grab;
-    touch-action: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text, var(--mode-text-color, inherit));
-    opacity: 0.3;
     align-self: flex-start;
+    color: var(--text, var(--mode-text-color, inherit));
   }
-  .drag-handle:active { cursor: grabbing; opacity: 0.7; }
 
   .task-row {
     display: flex;
@@ -1050,12 +943,12 @@
                   class="task-item"
                   class:dragging={draggingTaskId === task.id}
                   data-task-id={task.id}
-                  on:pointerdown={(e) => onItemPointerDown(e, task.id)}
+                  on:pointerdown={(e) => reorder.itemDown(e, task.id)}
                 >
                   <button
                     class="drag-handle"
                     aria-label="Drag to reorder"
-                    on:pointerdown={e => startDrag(e, task.id)}
+                    on:pointerdown={e => reorder.handleDown(e, task.id)}
                   >
                     <svg viewBox="0 0 10 16" width="9" height="14" fill="currentColor">
                       <circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/>
@@ -1140,12 +1033,12 @@
                     class="task-item"
                     class:dragging={draggingTaskId === task.id}
                     data-task-id={task.id}
-                    on:pointerdown={(e) => onItemPointerDown(e, task.id)}
+                    on:pointerdown={(e) => reorder.itemDown(e, task.id)}
                   >
                     <button
                       class="drag-handle"
                       aria-label="Drag to reorder"
-                      on:pointerdown={e => startDrag(e, task.id)}
+                      on:pointerdown={e => reorder.handleDown(e, task.id)}
                     >
                       <svg viewBox="0 0 10 16" width="9" height="14" fill="currentColor">
                         <circle cx="2" cy="2" r="1.4"/><circle cx="8" cy="2" r="1.4"/>
