@@ -14,7 +14,8 @@ import {
   SEE_THROUGH_PRESETS,
   SEE_THROUGH_CORE,
   SEE_THROUGH_EXPERIMENTS,
-  INDIGO_GILT_GLASS_PRESET
+  INDIGO_GILT_GLASS_PRESET,
+  REDLINE_GLASS_PRESET
 } from '../src/utils/outlineTheme.js';
 import { BLOCK_THEME_DEFAULTS } from '../src/utils/themeDefaults.js';
 import { EXTRA_PRESETS, INDIGO_GILT_PRESET } from '../src/utils/extraThemes.js';
@@ -157,9 +158,14 @@ describe('the see-through family', () => {
   });
 
   // Seven ordinary themes live in App.svelte; with the ones in
-  // extraThemes.js that is as many as the see-through family.
+  // extraThemes.js that is as many as the see-through family was on
+  // 2026-09-27, when the two were matched on purpose. A see-through twin of an
+  // ordinary theme asked for since then is on top of that, not a reason to
+  // add an ordinary one: Redline Glass (2026-10-26).
+  const LATER_TWINS = ['redline-glass'];
   it('are matched by as many ordinary themes', () => {
-    assert.equal(7 + EXTRA_PRESETS.length, SEE_THROUGH_PRESETS.length);
+    const matched = SEE_THROUGH_PRESETS.filter(theme => !LATER_TWINS.includes(theme.id));
+    assert.equal(7 + EXTRA_PRESETS.length, matched.length);
   });
 
   it('never share an id with an ordinary theme', () => {
@@ -181,6 +187,21 @@ describe('Indigo Gilt', () => {
     const { bgOpacity, headerOpacity } = INDIGO_GILT_GLASS_PRESET.blockTheme;
     assert.ok(bgOpacity > 0 && bgOpacity < 100, `surface ${bgOpacity}`);
     assert.ok(headerOpacity > 0 && headerOpacity < 100, `header ${headerOpacity}`);
+  });
+});
+
+// Asked for on 2026-10-26: "add a see-through version of Redline".
+describe('Redline Glass', () => {
+  it("is Redline's red and lettering with its black surfaces taken away", () => {
+    const { blockTheme } = REDLINE_GLASS_PRESET;
+    assert.equal(blockTheme.headerText, '#ff5c5c');
+    assert.match(blockTheme.headerFont, /Chakra Petch/);
+    assert.equal(blockTheme.bgOpacity, 0);
+    assert.equal(blockTheme.headerOpacity, 0);
+    assert.match(blockTheme.shadow, /255, 45, 45/, 'keeps the warning-light glow');
+  });
+  it('is listed with the see-through family', () => {
+    assert.ok(SEE_THROUGH_PRESETS.some(theme => theme.id === 'redline-glass' && theme.family === 'see-through'));
   });
 });
 

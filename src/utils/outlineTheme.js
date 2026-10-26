@@ -229,6 +229,38 @@ export const INDIGO_GILT_GLASS_PRESET = seeThroughPreset({
 });
 
 /*
+ * Redline, see-through -- asked for on 2026-10-26, "add a see-through version
+ * of Redline". Its red writing, hairline edges, Chakra Petch headers and the
+ * warning-light glow are kept; the black surfaces are what is taken away, on
+ * the family's own levels (all clear, pop-ups backed), so the wallpaper shows
+ * through the way it does in Amber Wire. The glow stays: on a picture it is
+ * what keeps the edges findable, as the black did before.
+ */
+export const REDLINE_GLASS_PRESET = seeThroughPreset({
+  id: 'redline-glass',
+  name: 'Redline Glass',
+  description: 'Redline, see-through: red hairline edges and the warning-light glow over the wallpaper, with black pop-ups.',
+  ink: '#ff5c5c',
+  backing: '#0a0607',
+  controlColors: {
+    left: { textColor: '#ffe4e4' },
+    right: { textColor: '#ffe4e4' }
+  },
+  blockTheme: {
+    borderColor: 'rgba(255, 92, 92, 0.6)',
+    borderWidth: '1px',
+    borderRadius: '10px',
+    shadow: '0 0 0 1px rgba(10, 6, 7, 0.35), 0 0 16px rgba(255, 45, 45, 0.28)',
+    focusOutline: '#ff2d2d',
+    focusShadow: '0 0 0 2px rgba(255, 45, 45, 0.4), 0 0 14px rgba(255, 45, 45, 0.55)',
+    headerFont: "'Chakra Petch', 'Segoe UI', sans-serif",
+    headerLetterSpacing: '0.14em',
+    accentColor: '#ff2d2d',
+    accentText: '#100303'
+  }
+});
+
+/*
  * Experiments with levels the family had not tried -- asked for the same day:
  * "even see-throughs with different levels of opacity on things we haven't
  * yet tested. I will check them and keep the good ideas." Each changes one
@@ -294,5 +326,6 @@ export const SEE_THROUGH_CORE = [
 export const SEE_THROUGH_PRESETS = [
   ...SEE_THROUGH_CORE,
   INDIGO_GILT_GLASS_PRESET,
+  REDLINE_GLASS_PRESET,
   ...SEE_THROUGH_EXPERIMENTS
 ].map(theme => ({ ...theme, family: 'see-through' }));
