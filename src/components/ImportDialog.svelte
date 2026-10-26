@@ -7,6 +7,7 @@
    * answer as it will be, names included.
    */
   import { createEventDispatcher } from 'svelte';
+  import AppDialog from './AppDialog.svelte';
   import { planImport } from '../utils/folderTransfer.js';
   import TransferOption from './TransferOption.svelte';
   import { describeMusic } from '../utils/musicTransfer.js';
@@ -96,9 +97,7 @@
   }
 </script>
 
-<div class="transfer-overlay" role="presentation" style={themeStyle} on:click={() => !busy && dispatch('close')}>
-  <div class="transfer-dialog" role="dialog" aria-modal="true" aria-label="Import" on:click|stopPropagation>
-    <h3>Import</h3>
+<AppDialog title="Import" width={440} {busy} {themeStyle} on:close={() => dispatch('close')}>
     <p class="file-name">{fileName}</p>
 
     {#if (file.folders || []).length}
@@ -159,47 +158,16 @@
       <p class="problem">{plan.error}</p>
     {/if}
 
-    <div class="transfer-actions">
-      <button type="button" class="transfer-btn" disabled={busy} on:click={() => dispatch('close')}>Cancel</button>
-      <button type="button" class="transfer-btn primary" disabled={busy || nothingChosen || (plan.error && chosen.size)} on:click={submit}>{busy ? 'Importing…' : 'Import'}</button>
+    <div class="dialog-actions">
+      <button type="button" class="dialog-btn" disabled={busy} on:click={() => dispatch('close')}>Cancel</button>
+      <button type="button" class="dialog-btn primary" disabled={busy || nothingChosen || (plan.error && chosen.size)} on:click={submit}>{busy ? 'Importing…' : 'Import'}</button>
     </div>
-  </div>
-</div>
+</AppDialog>
 
 <style>
   /* The app's dialog, in its colours (themeStyle sets --dlg-*). */
-  .transfer-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 3000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    box-sizing: border-box;
-    background: rgba(0, 0, 0, 0.55);
-  }
 
-  .transfer-dialog {
-    width: 100%;
-    max-width: 440px;
-    max-height: calc(100dvh - 32px);
-    overflow-y: auto;
-    box-sizing: border-box;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid var(--dlg-border, #333333);
-    background: var(--dlg-bg, #17171a);
-    color: var(--dlg-text, #f0f0f0);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
-    --sb-track: var(--dlg-bg, #17171a);
-    --sb-thumb: var(--dlg-text, #f0f0f0);
-  }
 
-  h3 {
-    margin: 0;
-    font-size: 1.1rem;
-  }
 
   .file-name {
     margin: 2px 0 14px;
@@ -231,32 +199,7 @@
     opacity: 0.75;
   }
 
-  .transfer-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 4px;
-  }
 
-  .transfer-btn {
-    border: 1px solid color-mix(in srgb, var(--dlg-text, #f0f0f0) 25%, transparent);
-    border-radius: 8px;
-    padding: 8px 16px;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    background: var(--dlg-btn-bg, #2a2a2a);
-    color: var(--dlg-btn-text, #f0f0f0);
-  }
 
-  .transfer-btn.primary {
-    border-color: var(--dlg-btn-text, #f0f0f0);
-    background: var(--dlg-btn-text, #f0f0f0);
-    color: var(--dlg-bg-solid, var(--dlg-bg, #17171a));
-  }
 
-  .transfer-btn:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
 </style>
