@@ -18,9 +18,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 - c. **Task mode: tasks with a time to do** -- an objective with an amount of
   time attached.
-- e. **Task mode: one line instead of two above the list**, and less height
-  than one line takes now; and on see-through themes, see-through
-  backgrounds there.
 
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month

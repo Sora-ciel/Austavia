@@ -12,6 +12,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   // Open or closed, remembered on this device -- see the file.
   import { readDoneExpanded, writeDoneExpanded } from '../utils/taskModeView.js';
+  import { drawnSurface } from '../utils/modeSurface.js';
 
   // Same renderer tiptap-markdown uses, so a task reads the way the same
   // markdown would anywhere else in the app. html:false leaves raw tags
@@ -126,6 +127,12 @@
   // fallback here would win over the theme, which is why an untouched list used
   // to ignore it entirely; leaving the variable undefined lets the CSS fall
   // through to --canvas-inner-bg / --mode-text-color instead.
+  // The mode's own surface fades toward the theme's mode background as the
+  // theme's dial goes down, never toward see-through -- the rule Single Note
+  // and Playlist share (utils/modeSurface.js). The cards on it fade toward
+  // see-through, like blocks on the canvas; see the styles.
+  $: taskSurfaceVar = `--task-surface: ${drawnSurface(taskBlock?.bgColor || canvasTheme.innerBg, canvasTheme.innerBg)};`;
+
   $: taskColorVars = [
     taskBlock?.bgColor ? `--bg: ${taskBlock.bgColor};` : '',
     taskBlock?.textColor ? `--text: ${taskBlock.textColor};` : ''
@@ -374,25 +381,31 @@
     flex-direction: column;
     width: 100%;
     height: calc(var(--tm-h, 100dvh) - var(--controls-height, 56px));
-    background: var(--bg, var(--canvas-inner-bg, #000));
+    background: var(--task-surface, var(--bg, var(--canvas-inner-bg, #000)));
     color: var(--text, var(--mode-text-color, #fff));
     box-sizing: border-box;
     font-family: var(--block-body-font, inherit);
   }
 
   /* ── Header ─────────────────────────────────────────────────────── */
+  /* One line, asked 2026-10-25: "the two lines above turn into one line and
+     use less height than one line". The list tabs on the left, the open
+     list's name, colours and Delete on the rest of the row. */
   .task-header {
     flex-shrink: 0;
-    padding: 10px 12px 0;
+    padding: 6px 12px 0;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 8px;
   }
 
   .task-tabs-row {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -404,9 +417,9 @@
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--tab-text, var(--mode-text-color, #fff)) 30%, transparent);
     background: var(--tab-bg, transparent);
     color: var(--tab-text, var(--mode-text-color, inherit));
-    padding: 7px 14px;
+    padding: 3px 10px;
     border-radius: 999px;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     cursor: pointer;
     white-space: nowrap;
     font-family: var(--block-header-font, inherit);
@@ -427,9 +440,9 @@
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 25%, transparent);
     background: transparent;
     color: var(--text, var(--mode-text-color, inherit));
-    padding: 7px 12px;
+    padding: 3px 10px;
     border-radius: 999px;
-    font-size: 0.82rem;
+    font-size: 0.72rem;
     cursor: pointer;
     opacity: 0.65;
     transition: opacity 0.15s;
@@ -437,20 +450,22 @@
   .new-list-btn:hover { opacity: 1; }
 
   .task-title-row {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .task-title-row input {
     flex: 1 1 auto;
     min-width: 0;
-    padding: 7px 11px;
-    border-radius: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 30%, transparent);
-    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, var(--bg, var(--canvas-inner-bg, #000)));
+    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, transparent);
     color: var(--text, var(--mode-text-color, inherit));
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-family: var(--block-body-font, inherit);
     box-sizing: border-box;
   }
@@ -460,9 +475,9 @@
     border: var(--block-border-width, 1px) solid rgba(255,80,80,.45);
     background: transparent;
     color: rgba(255,110,110,.85);
-    padding: 7px 11px;
-    border-radius: 10px;
-    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 0.74rem;
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.15s;
@@ -495,7 +510,9 @@
   .task-section {
     border-radius: 14px;
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 13%, transparent);
-    background: var(--bg, var(--canvas-inner-bg, rgba(255,255,255,.04)));
+    /* Asked 2026-10-25: on see-through themes, see-through. A card on the
+       mode is a block on a canvas, so it takes the theme's dial the same way. */
+    background: color-mix(in srgb, var(--bg, var(--canvas-inner-bg, #000)) var(--block-bg-opacity, 100%), transparent);
     padding: 12px 12px 8px;
     display: flex;
     flex-direction: column;
@@ -671,7 +688,7 @@
     flex: 1;
     min-width: 0;
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 30%, transparent);
-    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, var(--bg, var(--canvas-inner-bg, #000)));
+    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, transparent);
     color: var(--text, var(--mode-text-color, inherit));
     border-radius: var(--block-control-radius, 6px);
     padding: 6px 8px;
@@ -717,7 +734,7 @@
     gap: 6px;
     padding: 8px 12px 10px;
     border-top: 1px solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 10%, transparent);
-    background: var(--bg, var(--canvas-inner-bg, #000));
+    background: color-mix(in srgb, var(--bg, var(--canvas-inner-bg, #000)) var(--block-bg-opacity, 100%), transparent);
   }
 
   .add-input {
@@ -726,7 +743,7 @@
     padding: 9px 12px;
     border-radius: 10px;
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 25%, transparent);
-    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, var(--bg, var(--canvas-inner-bg, #000)));
+    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, transparent);
     color: var(--text, var(--mode-text-color, inherit));
     font-family: var(--block-body-font, inherit);
     font-size: 0.95rem;
@@ -817,7 +834,7 @@
 </style>
 
 <!-- svelte-ignore a11y-no-static-element-interactions -->
-<div class="task-mode" bind:this={canvasRef} style={`${canvasCssVars} ${taskColorVars} ${viewportVar}`} on:contextmenu={handleContextMenu}>
+<div class="task-mode" bind:this={canvasRef} style={`${canvasCssVars} ${taskColorVars} ${taskSurfaceVar} ${viewportVar}`} on:contextmenu={handleContextMenu}>
   <ModeWallpaper settings={backgroundSettings} />
   {#if taskBlocks.length}
     <div class="task-header">
