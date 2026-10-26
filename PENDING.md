@@ -16,12 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-26** (second round), one commit each:
 
-- F. **Task mode lists, UI/UX:**
-  - the list backgrounds see-through like other modes (Single Note);
-  - reordering: decide above/below by the middle of the task under the
-    finger, and show one thick line in the text's colour exactly in the gap
-    where it will land -- between two tasks, or under the last one;
-  - the drag handle lined up with the round check beside it.
 - G. **Simple Note on see-through themes**: the field where a task's name is
   typed is not see-through like the rest.
 - H. **Wallpapers when a phone is turned sideways**: many modes that use the

@@ -13,6 +13,8 @@
   // Open or closed, remembered on this device -- see the file.
   import { readDoneExpanded, writeDoneExpanded, readLastGoal, writeLastGoal } from '../utils/taskModeView.js';
   import { drawnSurface } from '../utils/modeSurface.js';
+  // Where a dragged task lands, and where its line goes -- see the file.
+  import { dropSlot, dropLineY, moveToSlot } from '../utils/dropPlacement.js';
   // Objective tasks -- a goal of time or of times; see utils/taskGoals.js.
   import TaskGoalLine from '../components/TaskGoalLine.svelte';
   import TaskGoalEditor from '../components/TaskGoalEditor.svelte';
@@ -296,13 +298,18 @@
 
   // ── Reordering ────────────────────────────────────────────────────
   let draggingTaskId = null;
-  let dragOverTaskId = null;
-  let dragOverPos = null;
+  // The slot the dragged task will land in, among the tasks of its own list
+  // (dropGroup, in order, without it), and where that slot's line is drawn in
+  // that list (dropLine: which list, and how far down). See dropPlacement.js.
+  let dropGroup = [];
+  let dropSlotIndex = null;
+  let dropLine = null;
+  const DROP_GAP = 6;
 
   // Desktop: drag via the dedicated handle.
   function startDrag(e, taskId) {
     e.preventDefault();
-    beginDrag(taskId);
+    beginDrag(taskId, { x: e.clientX, y: e.clientY });
   }
 
   // Mobile: press-and-hold a task to pick it up, then slide to reorder (the
@@ -364,42 +371,42 @@
     document.removeEventListener('touchmove', preventTouchScroll);
   }
 
+  // Asked 2026-10-26: decide above/below by the middle of a task, and show one
+  // thick line, in the text's colour, right in the middle of the gap it will
+  // land in -- or under the last task. The slot comes from the middles of the
+  // tasks in the dragged task's own list, so a gap between two tasks is a
+  // place too, not nothing (dropPlacement.js).
   function onDragMove(e) {
     if (!draggingTaskId) return;
     if (Math.abs(e.clientX - dragStartX) > 8 || Math.abs(e.clientY - dragStartY) > 8) dragMoved = true;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const itemEl = el?.closest('.task-item');
-    if (!itemEl) { dragOverTaskId = null; dragOverPos = null; return; }
-    const overId = itemEl.dataset.taskId;
-    if (!overId || overId === draggingTaskId) return;
+    const listEl = document.querySelector(`.task-item[data-task-id="${CSS.escape(draggingTaskId)}"]`)?.closest('.task-list');
+    if (!listEl) { dropSlotIndex = null; dropLine = null; return; }
+    const listTop = listEl.getBoundingClientRect().top;
+    const items = [...listEl.querySelectorAll(':scope > .task-item')].filter(li => li.dataset.taskId !== draggingTaskId);
+    const rects = items.map(li => {
+      const r = li.getBoundingClientRect();
+      return { top: r.top - listTop, bottom: r.bottom - listTop };
+    });
+    dropGroup = items.map(li => li.dataset.taskId);
+    dropSlotIndex = dropSlot(rects, e.clientY - listTop);
+    const y = dropLineY(rects, dropSlotIndex, DROP_GAP);
     const dragged = tasks.find(t => t.id === draggingTaskId);
-    const over = tasks.find(t => t.id === overId);
-    if (!dragged || !over || dragged.done !== over.done) { dragOverTaskId = null; dragOverPos = null; return; }
-    const rect = itemEl.getBoundingClientRect();
-    dragOverPos = (e.clientY - rect.top) < rect.height / 2 ? 'before' : 'after';
-    dragOverTaskId = overId;
+    dropLine = y === null ? null : { done: dragged?.done === true, y };
   }
 
   function endDrag() {
     removeDragListeners();
     const heldId = heldByTouch && !dragMoved ? draggingTaskId : null;
-    if (draggingTaskId && dragOverTaskId && draggingTaskId !== dragOverTaskId)
-      reorderTask(draggingTaskId, dragOverTaskId, dragOverPos);
-    draggingTaskId = null; dragOverTaskId = null; dragOverPos = null;
+    if (draggingTaskId && dragMoved && dropSlotIndex !== null) {
+      const group = dropGroup.map(id => tasks.find(t => t.id === id)).filter(Boolean);
+      const next = moveToSlot(tasks, draggingTaskId, group, dropSlotIndex);
+      if (next !== tasks) updateTasks(next);
+    }
+    draggingTaskId = null; dropSlotIndex = null; dropLine = null; dropGroup = [];
     heldByTouch = false;
     if (heldId) openGoalMenu(heldId, dragStartX, dragStartY);
   }
 
-  function reorderTask(draggedId, targetId, pos) {
-    const list = [...tasks];
-    const fromIdx = list.findIndex(t => t.id === draggedId);
-    if (fromIdx === -1) return;
-    const [moved] = list.splice(fromIdx, 1);
-    let toIdx = list.findIndex(t => t.id === targetId);
-    if (toIdx === -1) { list.push(moved); }
-    else { if (pos === 'after') toIdx++; list.splice(toIdx, 0, moved); }
-    updateTasks(list);
-  }
 
   // ── Inline edit ──────────────────────────────────────────────────
   let editingTaskId = null;
@@ -632,9 +639,12 @@
   .task-section {
     border-radius: 14px;
     border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 13%, transparent);
-    /* Asked 2026-10-25: on see-through themes, see-through. A card on the
-       mode is a block on a canvas, so it takes the theme's dial the same way. */
-    background: color-mix(in srgb, var(--bg, var(--canvas-inner-bg, #000)) var(--block-bg-opacity, 100%), transparent);
+    /* See-through, always: asked 2026-10-26, "normally the background should
+       be see-through like other modes, like Single Note". The mode's own
+       surface (and its wallpaper) is the background, as Single Note's writing
+       sits straight on its page; the card is only its outline. (On 2026-10-25
+       it took the theme's dial, which left it solid on every solid theme.) */
+    background: transparent;
     padding: 12px 12px 8px;
     display: flex;
     flex-direction: column;
@@ -685,6 +695,8 @@
 
   /* ── Task list ──────────────────────────────────────────────────── */
   .task-list {
+    /* The drop line is placed within the list. */
+    position: relative;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -706,13 +718,28 @@
     transition: box-shadow 0.1s, opacity 0.1s;
   }
   .task-item.dragging { opacity: 0.35; }
-  .task-item.drag-over-before { box-shadow: inset 0 2px 0 0 var(--text, var(--mode-text-color, #f5f5f5)); }
-  .task-item.drag-over-after  { box-shadow: inset 0 -2px 0 0 var(--text, var(--mode-text-color, #f5f5f5)); }
+  /* Where a dragged task will land: one thick line in the text's colour, in
+     the middle of the gap (dropPlacement.js says where). */
+  .drop-line {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 4px;
+    transform: translateY(-50%);
+    border-radius: 99px;
+    background: var(--text, var(--mode-text-color, currentColor));
+    pointer-events: none;
+    z-index: 3;
+  }
 
+  /* Lined up with the round check beside it (asked 2026-10-26): the same 36px
+     box and the same 4px from the top as .task-row gives the check, so their
+     middles are one line. */
   .drag-handle {
     flex-shrink: 0;
     width: 24px;
-    min-height: 44px;
+    height: 36px;
+    margin-top: 4px;
     padding: 0;
     border: none;
     background: none;
@@ -724,7 +751,6 @@
     color: var(--text, var(--mode-text-color, inherit));
     opacity: 0.3;
     align-self: flex-start;
-    padding-top: 13px;
   }
   .drag-handle:active { cursor: grabbing; opacity: 0.7; }
 
@@ -864,7 +890,7 @@
     gap: 6px;
     padding: 8px 12px 10px;
     border-top: 1px solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 10%, transparent);
-    background: color-mix(in srgb, var(--bg, var(--canvas-inner-bg, #000)) var(--block-bg-opacity, 100%), transparent);
+    background: transparent;
   }
 
   .add-input {
@@ -1016,12 +1042,13 @@
           </div>
           {#if todoTasks.length}
             <ul class="task-list">
+              {#if dropLine && !dropLine.done}
+                <li class="drop-line" aria-hidden="true" style="top: {dropLine.y}px"></li>
+              {/if}
               {#each todoTasks as task}
                 <li
                   class="task-item"
                   class:dragging={draggingTaskId === task.id}
-                  class:drag-over-before={dragOverTaskId === task.id && dragOverPos === 'before'}
-                  class:drag-over-after={dragOverTaskId === task.id && dragOverPos === 'after'}
                   data-task-id={task.id}
                   on:pointerdown={(e) => onItemPointerDown(e, task.id)}
                 >
@@ -1105,12 +1132,13 @@
           {#if doneExpanded}
             {#if doneTasks.length}
               <ul class="task-list">
+                {#if dropLine && dropLine.done}
+                  <li class="drop-line" aria-hidden="true" style="top: {dropLine.y}px"></li>
+                {/if}
                 {#each doneTasks as task}
                   <li
                     class="task-item"
                     class:dragging={draggingTaskId === task.id}
-                    class:drag-over-before={dragOverTaskId === task.id && dragOverPos === 'before'}
-                    class:drag-over-after={dragOverTaskId === task.id && dragOverPos === 'after'}
                     data-task-id={task.id}
                     on:pointerdown={(e) => onItemPointerDown(e, task.id)}
                   >
