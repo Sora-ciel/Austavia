@@ -192,13 +192,23 @@ describe('Indigo Gilt', () => {
 
 // Asked for on 2026-10-26: "add a see-through version of Redline".
 describe('Redline Glass', () => {
-  it("is Redline's red and lettering with its black surfaces taken away", () => {
+  it("is Redline's lettering and glow with its black surfaces taken away", () => {
     const { blockTheme } = REDLINE_GLASS_PRESET;
-    assert.equal(blockTheme.headerText, '#ff5c5c');
     assert.match(blockTheme.headerFont, /Chakra Petch/);
     assert.equal(blockTheme.bgOpacity, 0);
     assert.equal(blockTheme.headerOpacity, 0);
-    assert.match(blockTheme.shadow, /255, 45, 45/, 'keeps the warning-light glow');
+    assert.match(blockTheme.shadow, /0 0 18px rgba\(255, /, 'keeps the warning-light glow');
+  });
+
+  // Asked the same day: "a slightly more saturated and luminous red, so that
+  // it stands out better if you add a background".
+  it("writes in a purer, brighter red than Redline's, to stand out over a picture", () => {
+    const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const saturation = ([r, g, b]) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b);
+    const redline = rgb('#ff5c5c');
+    const glass = rgb(REDLINE_GLASS_PRESET.blockTheme.headerText);
+    assert.equal(glass[0], 255, 'full brightness');
+    assert.ok(saturation(glass) > saturation(redline) + 0.15, 'clearly more saturated');
   });
   it('is listed with the see-through family', () => {
     assert.ok(SEE_THROUGH_PRESETS.some(theme => theme.id === 'redline-glass' && theme.family === 'see-through'));

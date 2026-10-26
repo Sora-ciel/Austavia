@@ -235,27 +235,33 @@ export const INDIGO_GILT_GLASS_PRESET = seeThroughPreset({
  * the family's own levels (all clear, pop-ups backed), so the wallpaper shows
  * through the way it does in Amber Wire. The glow stays: on a picture it is
  * what keeps the edges findable, as the black did before.
+ *
+ * Its red is not Redline's. Asked the same day: "a slightly more saturated
+ * and luminous red, so that it stands out better if you add a background".
+ * Redline's #ff5c5c has white mixed in, which on a black page reads as soft
+ * and over a photo reads as salmon; this is a pure red at full brightness
+ * with a little blue (#ff2b45), and a stronger glow behind it.
  */
 export const REDLINE_GLASS_PRESET = seeThroughPreset({
   id: 'redline-glass',
   name: 'Redline Glass',
   description: 'Redline, see-through: red hairline edges and the warning-light glow over the wallpaper, with black pop-ups.',
-  ink: '#ff5c5c',
+  ink: '#ff2b45',
   backing: '#0a0607',
   controlColors: {
     left: { textColor: '#ffe4e4' },
     right: { textColor: '#ffe4e4' }
   },
   blockTheme: {
-    borderColor: 'rgba(255, 92, 92, 0.6)',
+    borderColor: 'rgba(255, 43, 69, 0.8)',
     borderWidth: '1px',
     borderRadius: '10px',
-    shadow: '0 0 0 1px rgba(10, 6, 7, 0.35), 0 0 16px rgba(255, 45, 45, 0.28)',
-    focusOutline: '#ff2d2d',
-    focusShadow: '0 0 0 2px rgba(255, 45, 45, 0.4), 0 0 14px rgba(255, 45, 45, 0.55)',
+    shadow: '0 0 0 1px rgba(10, 6, 7, 0.35), 0 0 18px rgba(255, 30, 55, 0.45)',
+    focusOutline: '#ff1a3c',
+    focusShadow: '0 0 0 2px rgba(255, 30, 55, 0.5), 0 0 16px rgba(255, 30, 55, 0.65)',
     headerFont: "'Chakra Petch', 'Segoe UI', sans-serif",
     headerLetterSpacing: '0.14em',
-    accentColor: '#ff2d2d',
+    accentColor: '#ff1a3c',
     accentText: '#100303'
   }
 });
