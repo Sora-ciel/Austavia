@@ -170,6 +170,29 @@ So before adding anything, look for the thing that already does it:
 When something cannot be shared, say why in a comment. A copy with no reason
 written next to it will be taken for the shared one by whoever comes next.
 
+## Everything somebody makes syncs
+
+Asked 2026-10-26, in as many words: "all content should be syncable in modes
+-- whenever we make changes or add a function that adds information, like
+the check square in TipTap, or objective and amount in tasks, it should all
+sync with our sync structure like other things before."
+
+So anything a person *makes* lives in the folder, where sync already carries
+it: inside a block (a note's text, a task's objective) or in the folder's
+mode settings (habits). Never in `localStorage` or a store of its own, and
+never in a second sync path written for the occasion -- that is the rule
+above, "one of everything", applied to sync.
+
+What may stay on one device is how *this device* shows things: which note is
+open, scroll positions, an open Done list, a ring already stopped here,
+volume. Several of those were asked for per device on purpose.
+
+`test/deviceOnlyState.test.js` lists every file allowed to keep anything on
+the device, each with its reason; a new one fails until it is added there,
+which is the moment to ask whether it is content. The one known exception is
+the Playlist library's imported tracks, never uploaded for their size -- see
+PENDING 2a.
+
 ## What is still owed is written down, not remembered
 
 [`PENDING.md`](PENDING.md) is the list. It exists because the same list was
