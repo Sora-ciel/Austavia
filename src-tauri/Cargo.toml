@@ -23,3 +23,10 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.6.2", features = [] }
 tauri-plugin-log = "2"
+
+# One Austavia at a time on a computer (2026-10-26): launching it again brings
+# the open window forward instead of starting a second copy. KDE's session
+# restore launched it once per window it had saved, so every restart added
+# windows. See run() in src/lib.rs.
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+tauri-plugin-single-instance = "2"

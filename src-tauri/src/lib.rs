@@ -90,7 +90,30 @@ pub fn run() {
   keep_playing_while_minimised();
   let_kde_draw_the_title_bar();
 
-  tauri::Builder::default()
+  let builder = tauri::Builder::default();
+
+  // One Austavia at a time on a computer. Reported 2026-10-26: "every time I
+  // come back from a restart, Austavia opens another window than the one
+  // already opened, making it two or even more." Under KDE it runs through
+  // XWayland, where each window records the command that started it; at login
+  // KDE ran that command once per saved window and again from its own session
+  // list, and every run was a whole new copy of the app -- so logging out with
+  // two saved three, and so on. Clicking the launcher twice did the same.
+  //
+  // Now a second launch finds the first, hands it over and exits, and the
+  // first brings its window forward. Registered before anything else, as the
+  // plugin asks, so the second copy stops before it has built a window.
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+      let _ = window.unminimize();
+      let _ = window.show();
+      let _ = window.set_focus();
+    }
+  }));
+
+  builder
     .invoke_handler(tauri::generate_handler![
       sign_in_window::open_sign_in_window,
       audio_server::serve_audio,
