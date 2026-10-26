@@ -10,6 +10,8 @@
   import MarkdownIt from 'markdown-it';
   import { sanitizeRichText, looksLikeHtml } from '../utils/sanitizeRichText.js';
   import TipTapEditor from '../components/TipTapEditor.svelte';
+  // Open or closed, remembered on this device -- see the file.
+  import { readDoneExpanded, writeDoneExpanded } from '../utils/taskModeView.js';
 
   // Same renderer tiptap-markdown uses, so a task reads the way the same
   // markdown would anywhere else in the app. html:false leaves raw tags
@@ -140,7 +142,12 @@
   }
 
   let newTaskText = '';
-  let doneExpanded = true;
+  let doneExpanded = readDoneExpanded(typeof localStorage === 'undefined' ? undefined : localStorage);
+
+  function toggleDoneExpanded() {
+    doneExpanded = !doneExpanded;
+    writeDoneExpanded(typeof localStorage === 'undefined' ? undefined : localStorage, doneExpanded);
+  }
 
   function updateBlock(id, updates, opts = {}) {
     if (!id) return;
@@ -931,7 +938,7 @@
           <div class="section-header">
             <span class="section-title">Done</span>
             <span class="section-count">{doneTasks.length}</span>
-            <button class="section-toggle" on:click={() => doneExpanded = !doneExpanded}
+            <button class="section-toggle" on:click={toggleDoneExpanded}
               title={doneExpanded ? 'Collapse' : 'Expand'}
             >{doneExpanded ? '▲' : '▼'}</button>
           </div>

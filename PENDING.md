@@ -18,8 +18,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 - c. **Task mode: tasks with a time to do** -- an objective with an amount of
   time attached.
-- d. **Task mode: the Done list stays open or closed** across restarts, per
-  device.
 - e. **Task mode: one line instead of two above the list**, and less height
   than one line takes now; and on see-through themes, see-through
   backgrounds there.
