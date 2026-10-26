@@ -4,7 +4,7 @@
   import { getModeDefinition, getModeOptions, hasWallpaper } from "../Modes/modeRegistry.js";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
-  import { addBackgroundPatch } from '../utils/modeBackground.js';
+  import { addBackgroundPatch, usesPortraitBackground } from '../utils/modeBackground.js';
   import { fitControls } from '../utils/controlsOverflow.js';
 
   export let mode;
@@ -324,11 +324,14 @@
     dispatch("modeSettingChange", { columnCount: next });
   }
 
-  // Single Note Mode background image — desktop and phone can each have
-  // their own image; which slot is read/written follows the same
-  // <=1024px breakpoint (compactUI) the rest of the toolbar already uses.
+  // The wallpaper's two pictures, a tall one and a wide one. The panel reads
+  // and writes whichever this screen is showing, chosen by its shape as every
+  // mode chooses (usesPortraitBackground). It went by the toolbar's 1024px
+  // breakpoint, so a phone held sideways showed the wide picture while the
+  // panel changed the tall one (2026-10-26).
   let bgPanelOpen = false;
-  $: bgImageKey = compactUI ? 'backgroundImageMobile' : 'backgroundImage';
+  let portraitScreen = false;
+  $: bgImageKey = portraitScreen ? 'backgroundImageMobile' : 'backgroundImage';
   // Read from and written to whichever mode is showing, so one panel serves
   // both. Everything below is otherwise identical between them.
   $: bgImage = backgroundSettings?.[bgImageKey] || '';
@@ -387,6 +390,7 @@
 
   function checkWidth() {
     compactUI = window.innerWidth <= 1024;
+    portraitScreen = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
     measureAvailable();
   }
 
@@ -448,6 +452,7 @@
 onMount(() => {
   checkWidth();
   window.addEventListener("resize", checkWidth);
+  window.addEventListener("orientationchange", checkWidth);
   window.addEventListener("click", handleClickOutside); // << add this
 
   // The window is not the only thing that changes the room on this line. The
@@ -461,6 +466,7 @@ onMount(() => {
 
   return () => {
     window.removeEventListener("resize", checkWidth);
+    window.removeEventListener("orientationchange", checkWidth);
     window.removeEventListener("click", handleClickOutside); // << cleanup
     watcher?.disconnect();
   };

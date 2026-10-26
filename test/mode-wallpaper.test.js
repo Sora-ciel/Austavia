@@ -32,6 +32,9 @@ it('has no wallpaper for a mode it does not know', () => {
 
 const WALLPAPER_DRAWERS = [
   'components/ModeWallpaper.svelte',
+  // Not a drawer, but the Bg panel edits the picture on show, so it has to
+  // agree with them about which one that is.
+  'advanced-param/LeftControls.svelte',
   'Modes/CanvasMode.svelte',
   'Modes/PlaylistMode.svelte',
   'Modes/SingleNoteMode.svelte'
