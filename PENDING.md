@@ -14,11 +14,6 @@ phone is several times worse for anything about layout or serialising.
 The order agreed for the run-up to launch. Each line points at the section
 that holds the detail; cross a line off in the same commit that finishes it.
 
-**Now, asked 2026-10-25**, each its own commit:
-
-- c. **Task mode: tasks with a time to do** -- an objective with an amount of
-  time attached.
-
 1. **Start the slow, outside things now**, because they run on the calendar
    rather than on code: Polar live and the payout proven with a real month
    (section 6 items 3-5, `POLAR.md` step 9) -- with the Stripe/payout
@@ -51,6 +46,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
 | next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |
 | next | **Signing in on the Linux app (.deb), in a window of its own.** Sign in with Google opens a small "Sign in with Google" window on Google's own page, with the account picker; choosing an account closes it and the main window is signed in and syncing. Closing it without finishing says the window was closed; pressing sign in again while it is open replaces it with a fresh one. Built 2026-10-09 (utils/desktopSignIn.js, src-tauri/src/sign_in_window.rs), after the first version, through the system browser, was asked to be in the app instead. A whole sign-in was traced on the user's account: Google accepted the window and returned a good token, and then Firebase hung, because `getAuth()` never finishes starting in the Linux app (its popup helper waits for ever on a tauri:// page) and a sign-in waits for start-up. The Linux app now uses `initializeAuth()` without that helper -- measured ready in 1ms in the real app, against never -- but a sign-in with the fix has not been done yet. If it ever hangs again it now says "Firebase did not answer the sign-in within 30 seconds" rather than nothing. The Windows app must still use its popup. And under KDE the window has KDE's own title bar (dark Breeze, KDE's buttons, the lotus) because it runs through XWayland; checked on 2026-10-09, but it is worth noticing whether typing, scrolling and pictures feel any different. `AUSTAVIA_WAYLAND=1` puts it back on Wayland. |
 | next | **Export and import.** Export asks: this folder or all, with settings, with pictures inside the file, with themes. Import shows what the file holds and goes into a new folder by default -- "Damn", or "Damn 1" / "Damn 2" when the name is taken -- or in place of the open folder (a kept copy first). A file exported before this still imports, named after the file. On the phone, export opens the share sheet. |

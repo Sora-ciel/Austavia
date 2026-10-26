@@ -13,6 +13,10 @@
   // Open or closed, remembered on this device -- see the file.
   import { readDoneExpanded, writeDoneExpanded } from '../utils/taskModeView.js';
   import { drawnSurface } from '../utils/modeSurface.js';
+  // Objective tasks -- a goal of time or of times; see utils/taskGoals.js.
+  import TaskGoalLine from '../components/TaskGoalLine.svelte';
+  import TaskGoalEditor from '../components/TaskGoalEditor.svelte';
+  import { settleTask, startTimer, pauseTimer, addProgress, setGoal, removeGoal, goalNow } from '../utils/taskGoals.js';
 
   // Same renderer tiptap-markdown uses, so a task reads the way the same
   // markdown would anywhere else in the app. html:false leaves raw tags
@@ -193,6 +197,75 @@
     updateTasks(tasks.filter(t => t.id !== taskId));
   }
 
+  // ── Objective tasks ──────────────────────────────────────────────
+  // The clock every bar reads. It only moves while a timer is running, so a
+  // list with none costs nothing.
+  let now = Date.now();
+  $: anyRunning = tasks.some(t => t?.goal?.runningSince);
+
+  // The pass that makes the stored state true: a daily objective on a new day
+  // starts again, a timer that reached its goal stops and is done. Absolute,
+  // from the tasks themselves (settleTask), so running it on open, every 30s
+  // and twice is all the same -- CLAUDE.md's rule for anything kept by events.
+  // Every list in the folder, not only the one on screen. Not an undo step:
+  // nobody did it.
+  function settleAll() {
+    const at = Date.now();
+    for (const block of taskBlocks) {
+      const list = Array.isArray(block.tasks) ? block.tasks : [];
+      let changed = false;
+      const next = list.map(task => {
+        const settled = settleTask(task, at);
+        if (settled !== task) changed = true;
+        return settled;
+      });
+      if (changed) updateBlock(block.id, { tasks: next }, { changedKeys: ['tasks'], pushToHistory: false });
+    }
+  }
+
+  onMount(() => {
+    settleAll();
+    const clock = setInterval(() => {
+      if (!anyRunning) return;
+      now = Date.now();
+      if (tasks.some(t => t?.goal?.runningSince && goalNow(t.goal, now)?.reached)) settleAll();
+    }, 1000);
+    const pass = setInterval(settleAll, 30000);
+    return () => { clearInterval(clock); clearInterval(pass); };
+  });
+
+  function changeTask(taskId, change) {
+    const at = Date.now();
+    now = at;
+    updateTasks(tasks.map(t => (t.id === taskId ? change(t, at) : t)));
+  }
+
+  const toggleTimer = task =>
+    changeTask(task.id, (t, at) => (goalNow(t.goal, at)?.running ? pauseTimer(t, at) : startTimer(t, at)));
+  const countOnce = task => changeTask(task.id, (t, at) => addProgress(t, 1, at));
+  const logGoal = (task, amount) => changeTask(task.id, (t, at) => addProgress(t, amount, at));
+
+  // The task's own menu: right-click on a computer, hold and let go on a phone.
+  let goalMenu = null;
+  $: goalMenuTask = goalMenu ? tasks.find(t => t.id === goalMenu.taskId) : null;
+
+  function openGoalMenu(taskId, x, y) {
+    closeCtxMenu();
+    goalMenu = { taskId, x, y };
+  }
+
+  function saveGoal(detail) {
+    const id = goalMenu?.taskId;
+    goalMenu = null;
+    if (id) changeTask(id, (t, at) => setGoal(t, detail, at));
+  }
+
+  function dropGoal() {
+    const id = goalMenu?.taskId;
+    goalMenu = null;
+    if (id) changeTask(id, t => removeGoal(t));
+  }
+
   function handleKeydown(e) {
     if (e.key === 'Enter') { e.preventDefault(); addTask(); }
   }
@@ -240,7 +313,7 @@
     if (e.target.closest('button, input, a')) return;      // don't hijack taps
     lpStartX = e.clientX; lpStartY = e.clientY;
     clearTimeout(lpTimer);
-    lpTimer = setTimeout(() => beginDrag(taskId), 420);
+    lpTimer = setTimeout(() => beginDrag(taskId, { held: true, x: lpStartX, y: lpStartY }), 420);
     window.addEventListener('pointermove', onLongPressMaybeCancel);
     window.addEventListener('pointerup', cancelLongPress);
     window.addEventListener('pointercancel', cancelLongPress);
@@ -259,9 +332,18 @@
     window.removeEventListener('pointercancel', cancelLongPress);
   }
 
-  function beginDrag(taskId) {
+  // A hold that is let go without moving is not a reorder: on a phone it is
+  // how a task's menu is asked for (there is no right-click there).
+  let heldByTouch = false;
+  let dragMoved = false;
+  let dragStartX = 0, dragStartY = 0;
+
+  function beginDrag(taskId, { held = false, x = 0, y = 0 } = {}) {
     cancelLongPress();
     draggingTaskId = taskId;
+    heldByTouch = held;
+    dragMoved = false;
+    dragStartX = x; dragStartY = y;
     if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', endDrag);
@@ -281,6 +363,7 @@
 
   function onDragMove(e) {
     if (!draggingTaskId) return;
+    if (Math.abs(e.clientX - dragStartX) > 8 || Math.abs(e.clientY - dragStartY) > 8) dragMoved = true;
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const itemEl = el?.closest('.task-item');
     if (!itemEl) { dragOverTaskId = null; dragOverPos = null; return; }
@@ -296,9 +379,12 @@
 
   function endDrag() {
     removeDragListeners();
+    const heldId = heldByTouch && !dragMoved ? draggingTaskId : null;
     if (draggingTaskId && dragOverTaskId && draggingTaskId !== dragOverTaskId)
       reorderTask(draggingTaskId, dragOverTaskId, dragOverPos);
     draggingTaskId = null; dragOverTaskId = null; dragOverPos = null;
+    heldByTouch = false;
+    if (heldId) openGoalMenu(heldId, dragStartX, dragStartY);
   }
 
   function reorderTask(draggedId, targetId, pos) {
@@ -341,6 +427,13 @@
   function handleContextMenu(e) {
     if (!taskBlock) return;
     e.preventDefault();
+    // A hold on a phone also fires this; the hold has its own path (endDrag).
+    if (draggingTaskId) return;
+    const item = e.target?.closest?.('.task-item');
+    if (item?.dataset?.taskId) {
+      openGoalMenu(item.dataset.taskId, e.clientX, e.clientY);
+      return;
+    }
     ctxMenu = { open: true, x: e.clientX, y: e.clientY };
   }
 
@@ -637,6 +730,14 @@
     vertical-align: middle;
   }
 
+  /* The task's writing, and its objective line under it when it has one. */
+  .task-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .task-text {
     flex: 1 1 auto;
     min-width: 0;
@@ -917,29 +1018,40 @@
                           stroke="var(--text,#f5f5f5)" stroke-width="1.5" stroke-opacity="0.55"/>
                       </svg>
                     </button>
-                    {#if editingTaskId === task.id}
-                      <div
-                        class="task-editor"
-                        on:click|stopPropagation
-                        on:keydown|stopPropagation={handleEditKeydown}
-                      >
-                        <TipTapEditor
-                          content={editText}
-                          emit="html"
-                          variant="inline"
-                          placeholder="Write the task…"
-                          on:change={(e) => (editText = e.detail)}
-                          on:blur={commitEditTask}
+                    <div class="task-main">
+                        {#if editingTaskId === task.id}
+                        <div
+                          class="task-editor"
+                          on:click|stopPropagation
+                          on:keydown|stopPropagation={handleEditKeydown}
+                        >
+                          <TipTapEditor
+                            content={editText}
+                            emit="html"
+                            variant="inline"
+                            placeholder="Write the task…"
+                            on:change={(e) => (editText = e.detail)}
+                            on:blur={commitEditTask}
+                          />
+                        </div>
+                      {:else}
+                        <span
+                          class="task-text"
+                          title="Double-click to edit"
+                          on:dblclick|stopPropagation={() => startEditTask(task)}
+                          on:click|stopPropagation
+                        >{@html renderTaskText(task.text)}</span>
+                      {/if}
+                      {#if task.goal}
+                        <TaskGoalLine
+                          goal={task.goal}
+                          {now}
+                          on:timer={() => toggleTimer(task)}
+                          on:count={() => countOnce(task)}
+                          on:log={(e) => logGoal(task, e.detail)}
                         />
-                      </div>
-                    {:else}
-                      <span
-                        class="task-text"
-                        title="Double-click to edit"
-                        on:dblclick|stopPropagation={() => startEditTask(task)}
-                        on:click|stopPropagation
-                      >{@html renderTaskText(task.text)}</span>
-                    {/if}
+                      {/if}
+                    </div>
                   </div>
                   <button class="delete-task-btn" aria-label="Delete task" on:click={() => deleteTask(task.id)}>×</button>
                 </li>
@@ -997,29 +1109,40 @@
                             stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                       </button>
-                      {#if editingTaskId === task.id}
-                        <div
-                          class="task-editor"
-                          on:click|stopPropagation
-                          on:keydown|stopPropagation={handleEditKeydown}
-                        >
-                          <TipTapEditor
-                            content={editText}
-                            emit="html"
-                            variant="inline"
-                            placeholder="Write the task…"
-                            on:change={(e) => (editText = e.detail)}
-                            on:blur={commitEditTask}
+                      <div class="task-main">
+                          {#if editingTaskId === task.id}
+                          <div
+                            class="task-editor"
+                            on:click|stopPropagation
+                            on:keydown|stopPropagation={handleEditKeydown}
+                          >
+                            <TipTapEditor
+                              content={editText}
+                              emit="html"
+                              variant="inline"
+                              placeholder="Write the task…"
+                              on:change={(e) => (editText = e.detail)}
+                              on:blur={commitEditTask}
+                            />
+                          </div>
+                        {:else}
+                          <span
+                            class="task-text done-text"
+                            title="Double-click to edit"
+                            on:dblclick|stopPropagation={() => startEditTask(task)}
+                            on:click|stopPropagation
+                          >{@html renderTaskText(task.text)}</span>
+                        {/if}
+                        {#if task.goal}
+                          <TaskGoalLine
+                            goal={task.goal}
+                            {now}
+                            on:timer={() => toggleTimer(task)}
+                            on:count={() => countOnce(task)}
+                            on:log={(e) => logGoal(task, e.detail)}
                           />
-                        </div>
-                      {:else}
-                        <span
-                          class="task-text done-text"
-                          title="Double-click to edit"
-                          on:dblclick|stopPropagation={() => startEditTask(task)}
-                          on:click|stopPropagation
-                        >{@html renderTaskText(task.text)}</span>
-                      {/if}
+                        {/if}
+                      </div>
                     </div>
                     <button class="delete-task-btn" aria-label="Delete task" on:click={() => deleteTask(task.id)}>×</button>
                   </li>
@@ -1054,6 +1177,18 @@
     <div class="no-list-placeholder">
       No task lists yet.<br/>Use <strong>+ Task List</strong> from the menu to create one.
     </div>
+  {/if}
+
+  {#if goalMenu && goalMenuTask}
+    <TaskGoalEditor
+      x={goalMenu.x}
+      y={goalMenu.y}
+      goal={goalMenuTask.goal || null}
+      taskLabel={(goalMenuTask.text || '').replace(/<[^>]*>/g, '').slice(0, 60)}
+      on:save={(e) => saveGoal(e.detail)}
+      on:remove={dropGoal}
+      on:close={() => (goalMenu = null)}
+    />
   {/if}
 </div>
 
