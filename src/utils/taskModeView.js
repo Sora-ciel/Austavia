@@ -39,3 +39,49 @@ export function writeDoneExpanded(storage, expanded) {
     // Not remembered; the mode works the same, it just opens the default way.
   }
 }
+
+/**
+ * ## The last objective set, as the starting point for the next
+ *
+ * Asked 2026-10-26: the goal field should remember "the one you put at last if
+ * it's a new task" -- and keep time and count apart, so a task switched to
+ * Count does not start with "30m" in it. So the last goal is kept per kind,
+ * with the kind and the daily switch last chosen, and a task with no objective
+ * yet opens its editor from them. On this device only, like the Done list.
+ */
+export const LAST_GOAL_KEY = 'austavia.taskMode.lastGoal';
+
+const EMPTY_LAST_GOAL = Object.freeze({ kind: 'time', time: null, count: null, daily: false });
+
+function positiveInt(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 ? n : null;
+}
+
+/** `{ kind, time (minutes), count, daily }`, with nulls for anything never set. */
+export function readLastGoal(storage) {
+  try {
+    const raw = JSON.parse(storage?.getItem(LAST_GOAL_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return { ...EMPTY_LAST_GOAL };
+    return {
+      kind: raw.kind === 'count' ? 'count' : 'time',
+      time: positiveInt(raw.time),
+      count: positiveInt(raw.count),
+      daily: raw.daily === true
+    };
+  } catch {
+    return { ...EMPTY_LAST_GOAL };
+  }
+}
+
+/** Records a goal just set, leaving the other kind's last value as it was. */
+export function writeLastGoal(storage, { kind, target, daily } = {}) {
+  if (kind !== 'time' && kind !== 'count') return;
+  const last = readLastGoal(storage);
+  const next = { ...last, kind, [kind]: positiveInt(target) ?? last[kind], daily: daily === true };
+  try {
+    storage?.setItem(LAST_GOAL_KEY, JSON.stringify(next));
+  } catch {
+    // Not remembered; the next editor simply starts empty.
+  }
+}

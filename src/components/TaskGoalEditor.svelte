@@ -13,20 +13,29 @@
   /** The task's current objective, or null for an ordinary task. */
   export let goal = null;
   export let taskLabel = '';
+  /**
+   * The last goal set on this device, per kind (readLastGoal in
+   * utils/taskModeView.js). Asked 2026-10-26: a new task starts from "the one
+   * you put at last", and time and count are two different fields.
+   */
+  export let last = { kind: 'time', time: null, count: null, daily: false };
 
   const dispatch = createEventDispatcher();
 
-  function asText(g) {
-    if (!g) return '';
-    if (g.kind === 'count') return String(g.target);
-    const h = Math.floor(g.target / 60);
-    const m = g.target % 60;
+  function minutesText(minutes) {
+    if (!minutes) return '';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
     return h ? (m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`) : `${m}m`;
   }
 
-  let kind = goal?.kind || 'time';
-  let targetText = asText(goal);
-  let daily = goal?.daily === true;
+  // Each kind keeps its own text, so switching never carries "30m" into the
+  // count box or 20 into the time one. A task's own goal fills its kind; the
+  // other kind, and a task with none yet, start from the last one set.
+  let kind = goal?.kind || last?.kind || 'time';
+  let timeText = goal?.kind === 'time' ? minutesText(goal.target) : minutesText(last?.time);
+  let countText = goal?.kind === 'count' ? String(goal.target) : (last?.count ? String(last.count) : '');
+  let daily = goal ? goal.daily === true : last?.daily === true;
   let error = '';
 
   // Kept on screen, whatever corner it was opened in.
@@ -35,7 +44,7 @@
   $: top = Math.max(8, Math.min(y, (typeof window === 'undefined' ? 800 : window.innerHeight) - 260));
 
   function save() {
-    const target = parseTarget(targetText, kind);
+    const target = parseTarget(kind === 'time' ? timeText : countText, kind);
     if (!target) {
       error = kind === 'time' ? 'Try 2h, 90m or 1h30' : 'A whole number, like 20';
       return;
@@ -66,14 +75,24 @@
 
   <label class="goal-field">
     <span>{kind === 'time' ? 'Time to do' : 'Times to do'}</span>
-    <input
-      bind:value={targetText}
-      placeholder={kind === 'time' ? '2h' : '20'}
-      inputmode={kind === 'count' ? 'numeric' : 'text'}
-      use:focusOnMount
-      on:keydown={onKey}
-      on:input={() => (error = '')}
-    />
+    {#if kind === 'time'}
+      <input
+        bind:value={timeText}
+        placeholder="2h, 90m, 1h30"
+        use:focusOnMount
+        on:keydown={onKey}
+        on:input={() => (error = '')}
+      />
+    {:else}
+      <input
+        bind:value={countText}
+        placeholder="20"
+        inputmode="numeric"
+        use:focusOnMount
+        on:keydown={onKey}
+        on:input={() => (error = '')}
+      />
+    {/if}
   </label>
   {#if error}<div class="goal-error">{error}</div>{/if}
 

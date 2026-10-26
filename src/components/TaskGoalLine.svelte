@@ -65,6 +65,15 @@
         on:click|stopPropagation={() => dispatch('timer')}
       >{state.running ? '⏸' : '▶'}</button>
     {:else}
+      <!-- Asked 2026-10-26: a minus for counts, beside the plus. -->
+      <button
+        type="button"
+        class="goal-btn"
+        aria-label="One less time"
+        title="One less time"
+        disabled={state.value <= 0}
+        on:click|stopPropagation={() => dispatch('uncount')}
+      >−1</button>
       <button
         type="button"
         class="goal-btn"
@@ -113,34 +122,36 @@
 <style>
   /* Everything here takes the writing's own colour (currentColor), tinted for
      the groove and the buttons -- the theme rule in CLAUDE.md. */
+  /* Sized for a finger: asked 2026-10-26, "the buttons are too small". */
   .goal-line {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 2px 6px;
-    font-size: 0.75rem;
+    gap: 8px;
+    padding: 2px 2px 8px;
+    font-size: 0.82rem;
   }
 
   .goal-btn {
     flex: none;
-    min-width: 26px;
-    height: 22px;
-    padding: 0 6px;
+    min-width: 38px;
+    height: 32px;
+    padding: 0 10px;
     border-radius: var(--block-control-radius, 6px);
     border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
     background: color-mix(in srgb, currentColor 10%, transparent);
     color: inherit;
     font: inherit;
-    font-size: 0.72rem;
+    font-size: 0.85rem;
     line-height: 1;
     cursor: pointer;
   }
   .goal-btn:hover { background: color-mix(in srgb, currentColor 20%, transparent); }
+  .goal-btn:disabled { opacity: 0.35; cursor: default; }
 
   .goal-bar {
     flex: 1 1 auto;
     min-width: 40px;
-    height: 5px;
+    height: 7px;
     border-radius: 99px;
     background: color-mix(in srgb, currentColor 18%, transparent);
     overflow: hidden;
@@ -162,16 +173,16 @@
 
   .goal-log {
     flex: none;
-    width: 64px;
-    height: 22px;
+    width: 80px;
+    height: 32px;
     box-sizing: border-box;
-    padding: 0 6px;
+    padding: 0 8px;
     border-radius: var(--block-control-radius, 6px);
     border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     background: color-mix(in srgb, currentColor 8%, transparent);
     color: inherit;
     font: inherit;
-    font-size: 0.72rem;
+    font-size: 0.85rem;
   }
   .goal-log.error { border-color: currentColor; border-style: dashed; }
 </style>

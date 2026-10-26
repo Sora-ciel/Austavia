@@ -11,7 +11,7 @@
   import { sanitizeRichText, looksLikeHtml } from '../utils/sanitizeRichText.js';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   // Open or closed, remembered on this device -- see the file.
-  import { readDoneExpanded, writeDoneExpanded } from '../utils/taskModeView.js';
+  import { readDoneExpanded, writeDoneExpanded, readLastGoal, writeLastGoal } from '../utils/taskModeView.js';
   import { drawnSurface } from '../utils/modeSurface.js';
   // Objective tasks -- a goal of time or of times; see utils/taskGoals.js.
   import TaskGoalLine from '../components/TaskGoalLine.svelte';
@@ -243,6 +243,8 @@
   const toggleTimer = task =>
     changeTask(task.id, (t, at) => (goalNow(t.goal, at)?.running ? pauseTimer(t, at) : startTimer(t, at)));
   const countOnce = task => changeTask(task.id, (t, at) => addProgress(t, 1, at));
+  const uncountOnce = task => changeTask(task.id, (t, at) => addProgress(t, -1, at));
+  const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
   const logGoal = (task, amount) => changeTask(task.id, (t, at) => addProgress(t, amount, at));
 
   // The task's own menu: right-click on a computer, hold and let go on a phone.
@@ -251,12 +253,13 @@
 
   function openGoalMenu(taskId, x, y) {
     closeCtxMenu();
-    goalMenu = { taskId, x, y };
+    goalMenu = { taskId, x, y, last: readLastGoal(deviceStorage()) };
   }
 
   function saveGoal(detail) {
     const id = goalMenu?.taskId;
     goalMenu = null;
+    writeLastGoal(deviceStorage(), detail);
     if (id) changeTask(id, (t, at) => setGoal(t, detail, at));
   }
 
@@ -1048,6 +1051,7 @@
                           {now}
                           on:timer={() => toggleTimer(task)}
                           on:count={() => countOnce(task)}
+                    on:uncount={() => uncountOnce(task)}
                           on:log={(e) => logGoal(task, e.detail)}
                         />
                       {/if}
@@ -1139,6 +1143,7 @@
                             {now}
                             on:timer={() => toggleTimer(task)}
                             on:count={() => countOnce(task)}
+                    on:uncount={() => uncountOnce(task)}
                             on:log={(e) => logGoal(task, e.detail)}
                           />
                         {/if}
@@ -1184,6 +1189,7 @@
       x={goalMenu.x}
       y={goalMenu.y}
       goal={goalMenuTask.goal || null}
+      last={goalMenu.last}
       taskLabel={(goalMenuTask.text || '').replace(/<[^>]*>/g, '').slice(0, 60)}
       on:save={(e) => saveGoal(e.detail)}
       on:remove={dropGoal}

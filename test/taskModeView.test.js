@@ -43,3 +43,28 @@ test('it is kept under its own name on the device, not in the folder', () => {
   writeDoneExpanded(storage, false);
   assert.equal(storage.getItem(DONE_EXPANDED_KEY), 'false');
 });
+
+// Asked 2026-10-26: the goal should remember "the one you put at last if it's
+// a new task", and time and count should be two different fields.
+import { readLastGoal, writeLastGoal } from '../src/utils/taskModeView.js';
+
+test('a new task starts from the last goal that was set', () => {
+  const storage = memoryStorage();
+  writeLastGoal(storage, { kind: 'time', target: 30, daily: true });
+  assert.deepEqual(readLastGoal(storage), { kind: 'time', time: 30, count: null, daily: true });
+});
+
+test('time and count are remembered apart: setting a count keeps the last time', () => {
+  const storage = memoryStorage();
+  writeLastGoal(storage, { kind: 'time', target: 30 });
+  writeLastGoal(storage, { kind: 'count', target: 20 });
+  const last = readLastGoal(storage);
+  assert.equal(last.time, 30);
+  assert.equal(last.count, 20);
+  assert.equal(last.kind, 'count');
+});
+
+test('nothing set yet, or storage that cannot be read, starts empty on Time', () => {
+  assert.deepEqual(readLastGoal(memoryStorage()), { kind: 'time', time: null, count: null, daily: false });
+  assert.deepEqual(readLastGoal({ getItem: () => '{broken' }), { kind: 'time', time: null, count: null, daily: false });
+});
