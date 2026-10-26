@@ -9,6 +9,87 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Now, asked 2026-10-26: one of everything, then the habit tracker
+
+Set 2026-10-26. Two halves, in this order, because the second is built on the
+first: the habit work is the first thing that has to *use* shared parts
+rather than add its own, so the shared parts come first.
+
+The rule behind it, in the user's words: "use the least amount of different
+code when two things use the same thing ... like how Linux installs apps
+using packages", so that modes can be added, improved or removed without
+dragging copies with them. Now in CLAUDE.md as "One of everything".
+
+### A. Shared parts first
+
+Measured on 2026-10-26, before any of it:
+
+- **The same colour under four names.** The text colour of a mode is
+  `--mode-text-color` (Habit, Simple Note, Single Note, Task, Playlist),
+  `--text-color` (Simple Note, 26 uses), `--text` (Task, 37 uses) and
+  `--active-note-text` (Single Note). The background is `--bg-color`, `--bg`,
+  `--active-note-bg`, `--pl-surface`, `--task-surface`.
+- **The same line copied four times.** `modeTextColor = canvasTheme.textColor
+  || getReadableTextColor(canvasTheme.innerBg)` is written out in Habit, Single
+  Note, Simple Note and Task, each building its own `canvasCssVars`.
+- **Hardcoded colours** (hex/rgba, fallbacks included): Task 39, Playlist 34,
+  Habit 28, Simple Note 24, Single Note 13, Canvas 8.
+- **Inputs and buttons styled per file**: 12 components style their own
+  `input`/`button`; LeftControls 10 rules, AdvancedCssPage 7, Habit 6.
+- **Undo does not reach mode settings.** The history (`pushHistory` /
+  `cloneState` in App.svelte) holds blocks and modeOrders only. Habits live in
+  `modeSettings.habit.habits`, so the Undo button that exists cannot bring a
+  deleted habit back -- and nor can it undo a wallpaper, a Task-mode add
+  direction or anything else in modeSettings.
+
+Steps, each landing on its own:
+
+1. **One set of mode colour names.** Worked out once, where every mode is
+   mounted, under the names CLAUDE.md already gives (`--app-text`,
+   `--app-bg`, `--app-surface`, `--app-border`) plus a mode-level pair
+   (`--mode-text`, `--mode-bg`) that a mode may override for itself and
+   otherwise inherits. The four copies of `modeTextColor` go; `--text`,
+   `--text-color`, `--active-note-text` and the rest become the shared names.
+   A test fails on a mode declaring its own text or background name. Playlist
+   is the one mode whose text really differs (its surface picks it) -- it
+   overrides the shared name rather than inventing one.
+2. **One input, one button, one field.** Base styles in app.css for text
+   inputs, buttons (plain, primary, small/icon) and pill toggles, in the
+   theme's colours; a component only adds what is truly its own. Converted
+   mode by mode, Habit first because it is rebuilt next. A test lists any
+   component restyling `input`/`button` from scratch.
+3. **Undo covers mode settings.** The existing history snapshot gains the
+   folder's modeSettings, so the Undo button and Ctrl+Z bring back a deleted
+   habit with no new mechanism. The wallpaper pictures are left out of each
+   history entry (data URLs of megabytes, copied per step) -- the slot is
+   restored by reference to what the entry before held, or the pictures stay
+   out of undo; decide when building. Folder snapshots (`folderSnapshots.js`)
+   are a different thing -- copies kept before a download -- and stay so.
+4. **Hardcoded colours out of the modes**, as each one is touched, rather
+   than as a sweep: a sweep across six modes at once is how a theme breaks
+   unnoticed.
+
+### B. The habit tracker (agreed 2026-10-26, numbers from the proposal)
+
+Each built from the parts above, and any new part added as a shared one --
+e.g. the Task-mode drop line, the objective editor, the alarm banner.
+
+1. **Deleting a habit is undoable** -- by step A3, not a new undo.
+2. **Streaks** beside the name: current and best. Absolute, recomputed from
+   the log each time, never kept as a counter.
+3. **Today stands out**: a larger square for today, the past days smaller.
+4. **Drag to reorder**, with `dropPlacement.js` and Task mode's drop line.
+5. **Colour or emoji per habit**, from the theme's colours or tints of them.
+6. **Habits that are not daily** (3 a week; Mon/Wed/Fri) and
+9. **a skipped day**, together: both change what "missed" means, so the streak
+   rule is written once for both.
+11. **A page per habit**: year grid, rates by week/month/year, streaks, notes.
+7. **Amounts and time**, reusing Task-mode objectives (`taskGoals.js`,
+   TaskGoalLine, TaskGoalEditor, the ring) rather than a second copy.
+8. **Reminders**, through AlarmRinger -- after background ringing (section 4).
+10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
+moment, archive instead of delete) after these, in an order to be agreed.
+
 ## Next, in order (set 2026-10-12)
 
 The order agreed for the run-up to launch. Each line points at the section

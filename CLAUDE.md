@@ -142,6 +142,34 @@ panel's sliders are what the rule is written from: they took the left panel's
 text colour, which is a theme colour, so nothing looked wrong from the inside —
 and they still did not match the mode they were sitting over.
 
+## One of everything
+
+Austavia is meant to be built like a Linux system out of packages, not like a
+program that installs a private copy of everything it needs: when two parts of
+the app do the same thing, they use the same code, and a mode is a thin thing
+assembled from shared parts. That is what lets a mode be added, improved or
+removed without dragging copies with it -- asked for in as many words on
+2026-10-26, "use the least amount of different code when two things use the
+same thing".
+
+So before adding anything, look for the thing that already does it:
+
+- **A colour has one name.** If two modes show the same colour under one
+  theme, they read it from the same variable. A mode can override it for
+  itself; it does not invent a second name for it.
+- **An input looks like every other input.** Base styles for fields, buttons
+  and toggles live once (app.css); a component adds only what is its own.
+- **A mechanism exists once.** Undo is the history in App.svelte; a feature
+  that needs undo puts its state where that history can see it rather than
+  writing an undo of its own. The same for the drop line (`dropPlacement.js`),
+  the ring and banner (AlarmRinger), objectives (`taskGoals.js`).
+- **A new shared part is made shared when it is made**, not copied once and
+  merged later. If a second mode is going to want it, it lives outside the
+  first.
+
+When something cannot be shared, say why in a comment. A copy with no reason
+written next to it will be taken for the shared one by whoever comes next.
+
 ## What is still owed is written down, not remembered
 
 [`PENDING.md`](PENDING.md) is the list. It exists because the same list was
