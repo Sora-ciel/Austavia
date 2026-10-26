@@ -146,6 +146,7 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
+  import { settleHabits } from './utils/habitGoals.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -3602,6 +3603,14 @@
         updateBlockHandler({ detail: { id: block.id, tasks: next, changedKeys: ['tasks'], pushToHistory: false, bumpVersion: true } });
       }
     }
+    // Habits with an amount or a time, the same way (utils/habitGoals.js).
+    // Not an undo step, as for tasks: nobody did it.
+    const current = modeSettings?.habit?.habits;
+    const settled = settleHabits(current, at);
+    if (settled !== current) {
+      modeSettings = normalizeModeSettings({ ...modeSettings, habit: { ...modeSettings.habit, habits: settled } });
+      persistAutosave(blocks, modeOrders, modeSettings, { immediate: true });
+    }
   }
 
   onMount(() => {
@@ -6216,8 +6225,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     const nextModeSettings = normalizeModeSettings(patch);
     modeSettings = nextModeSettings;
     // A habit added, ticked, renamed or deleted is a step the Undo button can
-    // take back. pushHistory saves as well.
-    if (habitsChange) {
+    // take back. pushHistory saves as well. A settle -- a timer reaching its
+    // goal by itself -- is not: nobody did it (as for tasks).
+    if (habitsChange && !detail.settled) {
       await pushHistory(blocks, modeOrders);
       return;
     }
@@ -7647,7 +7657,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
 <!-- Rings the open folder's alarms in every mode, not only where the clock is
      drawn. -->
-<AlarmRinger {blocks} themeStyle={overlayThemeStyle} quiet={popupLabelsOpen} />
+<AlarmRinger {blocks} {habits} themeStyle={overlayThemeStyle} quiet={popupLabelsOpen} />
 <!-- The always-on-top timer and alarm windows, on the Windows app only --
      see utils/clockPopups.js. -->
 <ClockPopupWindows {blocks} bind:open={popupLabelsOpen} />

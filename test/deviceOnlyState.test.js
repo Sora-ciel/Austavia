@@ -21,7 +21,7 @@ const DEVICE_ONLY = {
   'components/ClockPopupWindows.svelte': 'where the clock pop-up sits on this screen',
   'components/ColorPicker.svelte': 'the colour format last chosen',
   'components/NotePicker.svelte': 'the picker layout last chosen',
-  'Modes/HabitTrackerMode.svelte': 'only reads the old private list, to move it into the folder',
+  'Modes/HabitTrackerMode.svelte': 'the last goal set, as the default for the next (as Task mode)',
   'Modes/PlaylistMode.svelte': 'which playlist is open',
   'Modes/SingleNoteMode.svelte': 'which note was open',
   'Modes/TaskMode.svelte': 'the Done list open or shut (asked per device)',

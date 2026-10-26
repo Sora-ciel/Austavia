@@ -11,6 +11,12 @@
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createListReorder } from "../utils/listReorder.js";
   import HabitPage from "../components/HabitPage.svelte";
+  import TaskGoalLine from "../components/TaskGoalLine.svelte";
+  import TaskGoalEditor from "../components/TaskGoalEditor.svelte";
+  import { goalNow, startTimer, pauseTimer, addProgress, setGoal, removeGoal } from "../utils/taskGoals.js";
+  import { withHabitGoal, settleHabits } from "../utils/habitGoals.js";
+  import { startGoalClock } from "../utils/goalClock.js";
+  import { readLastGoal, writeLastGoal } from "../utils/taskModeView.js";
   import { moveToSlot } from "../utils/dropPlacement.js";
   import { habitStreaks } from "../utils/habitStreaks.js";
   import { onDestroy, createEventDispatcher } from "svelte";
@@ -211,6 +217,66 @@
   }
 
   onDestroy(() => clearTimeout(nameClickTimer));
+
+  // ── Amounts and time ────────────────────────────────────────────
+  // Agreed 2026-10-26 (item 7): "Drink water, 8 glasses" or "Read 20 min",
+  // reusing Task mode's objectives -- the same goal, the same line, the same
+  // editor, the same ring. A habit is handed to them as today's task and the
+  // answer written back (utils/habitGoals.js); reaching the goal ticks the day.
+  let now = Date.now();
+  $: anyRunning = habits.some(habit => habit.goal?.runningSince);
+
+  const changeGoal = (habitId, change) => saveHabits(withHabitGoal(habits, habitId, change, Date.now()));
+  const toggleTimer = habit =>
+    changeGoal(habit.id, (t, at) => (goalNow(t.goal, at)?.running ? pauseTimer(t, at) : startTimer(t, at)));
+  const countOnce = habit => changeGoal(habit.id, (t, at) => addProgress(t, 1, at));
+  const uncountOnce = habit => changeGoal(habit.id, (t, at) => addProgress(t, -1, at));
+  const logGoal = (habit, amount) => changeGoal(habit.id, (t, at) => addProgress(t, amount, at));
+
+  // A timer reaching its goal is put right at once while this is open; the
+  // app's own pass (App.svelte) does it every 15s whatever is open. Marked as
+  // a settle, so it is not an undo step.
+  function settleNow() {
+    const settled = settleHabits(habits, Date.now());
+    if (settled !== habits) dispatch("modeSettingChange", { habit: { habits: settled }, settled: true });
+  }
+
+  onMount(() => startGoalClock({
+    isRunning: () => anyRunning,
+    onTick: at => {
+      now = at;
+      if (habits.some(habit => habit.goal?.runningSince && goalNow(habit.goal, at)?.reached)) settleNow();
+    },
+    onSettle: settleNow
+  }));
+
+  const deviceStorage = () => (typeof localStorage === "undefined" ? undefined : localStorage);
+  let goalEditFor = null;
+  $: goalEditHabit = goalEditFor ? habits.find(habit => habit.id === goalEditFor.habitId) : null;
+
+  function openGoalEditor(habit, event) {
+    menuFor = null;
+    const row = event?.currentTarget?.closest?.(".habit-row")?.getBoundingClientRect();
+    goalEditFor = {
+      habitId: habit.id,
+      x: row ? row.right - 260 : 40,
+      y: row ? row.bottom + 4 : 120,
+      last: readLastGoal(deviceStorage())
+    };
+  }
+
+  function saveGoal(detail) {
+    const id = goalEditFor?.habitId;
+    goalEditFor = null;
+    writeLastGoal(deviceStorage(), detail);
+    if (id) changeGoal(id, (t, at) => setGoal(t, { ...detail, daily: true }, at));
+  }
+
+  function dropGoal() {
+    const id = goalEditFor?.habitId;
+    goalEditFor = null;
+    if (id) changeGoal(id, t => removeGoal(t));
+  }
 
   // ── When a habit is meant to be done ────────────────────────────
   // Agreed 2026-10-26: "Habits that aren't daily: '3 times a week' or
@@ -475,6 +541,12 @@
   /* The name opens the habit's page. */
   .habit-title {
     cursor: pointer;
+  }
+
+  /* An amount or a time: Task mode's line, across the whole row under the
+     days (components/TaskGoalLine.svelte). */
+  .habit-goal {
+    grid-column: 1 / -1;
   }
 
   .habit-title:hover {
@@ -898,6 +970,19 @@
               </button>
             {/each}
           </div>
+          {#if habit.goal}
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div class="habit-goal" on:pointerdown|stopPropagation>
+              <TaskGoalLine
+                goal={habit.goal}
+                {now}
+                on:timer={() => toggleTimer(habit)}
+                on:count={() => countOnce(habit)}
+                on:uncount={() => uncountOnce(habit)}
+                on:log={event => logGoal(habit, event.detail)}
+              />
+            </div>
+          {/if}
           {#if !compact}
             <div class="habit-actions">
               <button on:click={() => startRename(habit)}>Rename</button>
@@ -923,6 +1008,15 @@
                 on:click|stopPropagation={() => { menuFor = null; pageFor = habit.id; }}
               >
                 Open habit page
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="habit-menu-rename"
+                on:pointerdown|stopPropagation
+                on:click|stopPropagation={event => openGoalEditor(habit, event)}
+              >
+                {habit.goal ? "Change amount or time" : "Add an amount or time"}
               </button>
               <button
                 type="button"
@@ -978,6 +1072,20 @@
       {/each}
     </div>
   {/if}
+  {#if goalEditHabit}
+    <TaskGoalEditor
+      x={goalEditFor.x}
+      y={goalEditFor.y}
+      goal={goalEditHabit.goal || null}
+      taskLabel={goalEditHabit.name}
+      last={goalEditFor.last}
+      dailyFixed
+      on:save={event => saveGoal(event.detail)}
+      on:remove={dropGoal}
+      on:close={() => (goalEditFor = null)}
+    />
+  {/if}
+
   {#if pageHabit}
     <HabitPage
       habit={pageHabit}

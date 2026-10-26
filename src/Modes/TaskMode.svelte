@@ -16,6 +16,7 @@
   // Where a dragged task lands, and where its line goes -- see the file.
   import { moveToSlot } from '../utils/dropPlacement.js';
   import { createListReorder } from '../utils/listReorder.js';
+  import { startGoalClock } from '../utils/goalClock.js';
   // Objective tasks -- a goal of time or of times; see utils/taskGoals.js.
   import TaskGoalLine from '../components/TaskGoalLine.svelte';
   import TaskGoalEditor from '../components/TaskGoalEditor.svelte';
@@ -225,16 +226,16 @@
     }
   }
 
-  onMount(() => {
-    settleAll();
-    const clock = setInterval(() => {
-      if (!anyRunning) return;
-      now = Date.now();
+  // The tick and the pass are the shared ones (utils/goalClock.js), which the
+  // habit tracker uses too.
+  onMount(() => startGoalClock({
+    isRunning: () => anyRunning,
+    onTick: at => {
+      now = at;
       if (tasks.some(t => t?.goal?.runningSince && goalNow(t.goal, now)?.reached)) settleAll();
-    }, 1000);
-    const pass = setInterval(settleAll, 30000);
-    return () => { clearInterval(clock); clearInterval(pass); };
-  });
+    },
+    onSettle: settleAll
+  }));
 
   function changeTask(taskId, change) {
     const at = Date.now();

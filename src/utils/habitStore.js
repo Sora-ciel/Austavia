@@ -37,6 +37,7 @@
  */
 
 import { normalizeSchedule } from './habitSchedule.js';
+import { normalizeGoal } from './taskGoals.js';
 
 /** A day, as `habitDays.js` writes it. Anything else is not a day. */
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -119,7 +120,7 @@ function normalizeLog(log) {
 }
 
 /** What a habit is made of, and nothing a build reads besides. */
-const KNOWN_FIELDS = new Set(['id', 'name', 'log', 'schedule']);
+const KNOWN_FIELDS = new Set(['id', 'name', 'log', 'schedule', 'goal']);
 /** How big a field this build does not know may be, and still be kept. */
 const MAX_FOREIGN_FIELD = 4000;
 
@@ -183,6 +184,10 @@ export function normalizeHabits(value) {
     const kept = { id, name, log: normalizeLog(habit.log) };
     const schedule = normalizeSchedule(habit.schedule);
     if (schedule) kept.schedule = schedule;
+    // An amount or a time a day: a Task-mode objective, always daily
+    // (habitGoals.js).
+    const goal = normalizeGoal(habit.goal);
+    if (goal) kept.goal = { ...goal, daily: true };
     out.push({ ...kept, ...foreignFields(habit) });
   });
 

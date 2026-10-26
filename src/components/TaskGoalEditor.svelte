@@ -19,6 +19,11 @@
    * you put at last", and time and count are two different fields.
    */
   export let last = { kind: 'time', timeSeconds: null, count: null, daily: false };
+  /**
+   * Always daily, and no box to say otherwise: a habit's amount or time is per
+   * day by what a habit is (utils/habitGoals.js).
+   */
+  export let dailyFixed = false;
 
   const dispatch = createEventDispatcher();
 
@@ -33,7 +38,7 @@
   let kind = goal?.kind || last?.kind || 'time';
   let timeText = goal?.kind === 'time' ? durationText(goal.targetSeconds ?? goal.target * 60) : durationText(last?.timeSeconds);
   let countText = goal?.kind === 'count' ? String(goal.target) : (last?.count ? String(last.count) : '');
-  let daily = goal ? goal.daily === true : last?.daily === true;
+  let daily = dailyFixed || (goal ? goal.daily === true : last?.daily === true);
   let error = '';
 
   // Kept on screen, whatever corner it was opened in.
@@ -94,10 +99,12 @@
   </label>
   {#if error}<div class="goal-error">{error}</div>{/if}
 
-  <label class="goal-daily">
-    <input type="checkbox" bind:checked={daily} />
-    <span>Resets every day</span>
-  </label>
+  {#if !dailyFixed}
+    <label class="goal-daily">
+      <input type="checkbox" bind:checked={daily} />
+      <span>Resets every day</span>
+    </label>
+  {/if}
 
   <div class="goal-actions">
     {#if goal}

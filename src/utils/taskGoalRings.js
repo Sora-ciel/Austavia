@@ -30,6 +30,10 @@
  */
 
 import { goalFinishMoment, normalizeGoal } from './taskGoals.js';
+import { habitGoalTasks } from './habitGoals.js';
+
+/** Habits with an amount or a time ring the same way (2026-10-26, habitGoals.js). */
+const HABITS = { id: 'habits' };
 
 /** How long a finished time objective keeps ringing if nobody stops it. */
 export const RING_WINDOW_MS = 10 * 60 * 1000;
@@ -43,8 +47,8 @@ export function ringKey(taskId, finishedAt) {
   return `${taskId}@${finishedAt}`;
 }
 
-function tasksOf(blocks) {
-  const out = [];
+function tasksOf(blocks, habits = []) {
+  const out = habitGoalTasks(habits).map(task => ({ block: HABITS, task }));
   for (const block of Array.isArray(blocks) ? blocks : []) {
     if (block?.type !== 'task' || !Array.isArray(block.tasks)) continue;
     for (const task of block.tasks) {
@@ -58,9 +62,9 @@ function tasksOf(blocks) {
  * The objectives ringing now, newest first: `{ key, blockId, taskId, task,
  * kind, finishedAt, loud }`. `loud` is a ring until stopped; otherwise a chime.
  */
-export function goalRings({ blocks = [], now = Date.now(), answered = {} } = {}) {
+export function goalRings({ blocks = [], habits = [], now = Date.now(), answered = {} } = {}) {
   const rings = [];
-  for (const { block, task } of tasksOf(blocks)) {
+  for (const { block, task } of tasksOf(blocks, habits)) {
     const goal = normalizeGoal(task.goal);
     if (!goal) continue;
     const finishedAt = goalFinishMoment(goal);
@@ -82,9 +86,9 @@ export function goalRings({ blocks = [], now = Date.now(), answered = {} } = {})
  * How long until what is ringing next changes -- a timer finishing, or a ring
  * running out -- so the ringer can sleep until then. Null when nothing is due.
  */
-export function msUntilGoalRingChange({ blocks = [], now = Date.now() } = {}) {
+export function msUntilGoalRingChange({ blocks = [], habits = [], now = Date.now() } = {}) {
   let soonest = null;
-  for (const { task } of tasksOf(blocks)) {
+  for (const { task } of tasksOf(blocks, habits)) {
     const goal = normalizeGoal(task.goal);
     if (!goal) continue;
     const finishedAt = goalFinishMoment(goal);

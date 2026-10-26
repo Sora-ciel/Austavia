@@ -40,6 +40,8 @@
   import { htmlToText } from '../utils/htmlToText.js';
 
   export let blocks = [];
+  /** The folder's habits: one with an amount or a time rings like a task's. */
+  export let habits = [];
   /** The dialog palette App hands its other popups, so this reads as one of them. */
   export let themeStyle = '';
   /**
@@ -74,7 +76,7 @@
 
   const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
   let answeredGoals = readAnswered(deviceStorage());
-  $: goalRinging = goalRings({ blocks, now, answered: answeredGoals });
+  $: goalRinging = goalRings({ blocks, habits, now, answered: answeredGoals });
 
   function stopGoal(ring) {
     answeredGoals = answerRing(deviceStorage(), ring.key, Date.now());
@@ -102,13 +104,13 @@
     const waits = [
       msUntilAlarmCheck({ now, alarms }),
       ...timers.map(entry => msUntilTimerRingChange(entry.device.timer, now)),
-      msUntilGoalRingChange({ blocks, now })
+      msUntilGoalRingChange({ blocks, habits, now })
     ].filter(wait => wait !== null);
     wake = setTimeout(schedule, Math.min(...waits));
   }
 
   // Named only: the alarms and timers. See ClockFace for why not `wake`.
-  $: rescheduleFor(alarms, timers, blocks);
+  $: rescheduleFor(alarms, timers, blocks, habits);
   function rescheduleFor() {
     // Just after this update rather than inside it. schedule() sets `now`,
     // and Svelte does not re-run statements above this one for a change made
