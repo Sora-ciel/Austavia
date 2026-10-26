@@ -56,8 +56,7 @@ around line 592, InlineSeparator around line 316) should:
 Pictures are already `inline: true` atoms, so the model is right; it is the
 drawing and the caret that are not. Decide where the rule lives so a test can
 reach it (which positions are valid caret stops beside an atom), and check
-task-list checkboxes against the same rule. Wait for the checks in section 0
-on the editor before changing the node views.
+task-list checkboxes against the same rule.
 
 ### A. Shared parts first
 
