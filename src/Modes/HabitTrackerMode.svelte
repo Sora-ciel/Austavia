@@ -11,7 +11,7 @@
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createLongPress } from "../utils/longPress.js";
   import { onDestroy, createEventDispatcher } from "svelte";
-  import { habitsEqual, withDayTapped } from "../utils/habitStore.js";
+  import { habitsEqual, withDayTapped, withHabitRenamed } from "../utils/habitStore.js";
 
   export let modeLabels = {};
   export let activeMode = "default";
@@ -113,6 +113,43 @@
     menuFor = null;
     saveHabits(habits.filter(habit => habit.id !== habitId));
   };
+
+  // ── Renaming a habit ─────────────────────────────────────────────
+  // Asked 2026-10-25: "Make it possible to change name of the habit. On mobile
+  // in the long press pop up." The name turns into a field in place, already
+  // selected: Enter or leaving it saves, Escape keeps the old name. What a name
+  // may be is decided in withHabitRenamed (habitStore.js) -- an empty one is
+  // refused rather than taking the habit's history with it.
+  let renamingId = null;
+  let renameDraft = "";
+
+  function startRename(habit) {
+    menuFor = null;
+    renamingId = habit.id;
+    renameDraft = habit.name;
+  }
+
+  function commitRename() {
+    if (renamingId === null) return;
+    const id = renamingId;
+    renamingId = null;
+    saveHabits(withHabitRenamed(habits, id, renameDraft));
+  }
+
+  function cancelRename() {
+    renamingId = null;
+  }
+
+  function renameKey(event) {
+    if (event.key === "Enter") { event.preventDefault(); commitRename(); }
+    else if (event.key === "Escape") { event.preventDefault(); cancelRename(); }
+  }
+
+  // Focused and selected as it appears, so typing replaces the old name.
+  function focusAndSelect(node) {
+    node.focus();
+    node.select();
+  }
 
   // ── Holding a habit down ─────────────────────────────────────────
   // Asked for: "on mobile the thing to close the habit should probably be a
@@ -501,6 +538,10 @@
     /* Opaque, because it sits over the row it belongs to. */
     background: var(--canvas-inner-bg, #000000);
     box-shadow: var(--block-shadow, 0 6px 20px rgba(0, 0, 0, 0.45));
+    /* Rename above Delete, apart enough not to be hit for each other. */
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .habit-menu-name {
@@ -512,6 +553,24 @@
     white-space: nowrap;
   }
 
+  /* The name, while it is being changed: the row's own writing, in a field
+     tinted with that writing's colour, per CLAUDE.md. */
+  .habit-rename {
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: inherit;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 2px 6px;
+    border-radius: var(--block-control-radius, 6px);
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, currentColor) 35%, transparent);
+    background: color-mix(in srgb, var(--mode-text-color, currentColor) 10%, transparent);
+    outline: none;
+  }
+
+  .habit-menu-rename,
   .habit-menu-delete {
     width: 100%;
     /* A thumb-sized target: this one is worth being easy to hit deliberately
@@ -577,7 +636,23 @@
           on:contextmenu={event => { if (compact) event.preventDefault(); }}
         >
           <div class="habit-name" title={habit.name}>
-            <strong>{habit.name}</strong>
+            {#if renamingId === habit.id}
+              <!-- Its own touches stay its own: a hold here is selecting text,
+                   not asking the row for its menu. -->
+              <input
+                class="habit-rename"
+                aria-label="Habit name"
+                maxlength="120"
+                bind:value={renameDraft}
+                use:focusAndSelect
+                on:keydown={renameKey}
+                on:blur={commitRename}
+                on:pointerdown|stopPropagation
+              />
+            {:else}
+              <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+              <strong on:dblclick={() => startRename(habit)}>{habit.name}</strong>
+            {/if}
             <span>Tap a day to mark ✓ or ✕.</span>
           </div>
           <div class="calendar">
@@ -603,6 +678,7 @@
           </div>
           {#if !compact}
             <div class="habit-actions">
+              <button on:click={() => startRename(habit)}>Rename</button>
               <button on:click={() => deleteHabit(habit.id)}>Delete</button>
             </div>
           {/if}
@@ -617,6 +693,15 @@
             <div class="habit-menu-backdrop" on:pointerdown|stopPropagation={() => (menuFor = null)}></div>
             <div class="habit-menu" role="menu">
               <div class="habit-menu-name">{habit.name}</div>
+              <button
+                type="button"
+                role="menuitem"
+                class="habit-menu-rename"
+                on:pointerdown|stopPropagation
+                on:click|stopPropagation={() => startRename(habit)}
+              >
+                Rename habit
+              </button>
               <button
                 type="button"
                 role="menuitem"

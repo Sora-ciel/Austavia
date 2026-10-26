@@ -306,3 +306,28 @@ export function summariseHabits(habits) {
     };
   });
 }
+
+/**
+ * A habit with a new name.
+ *
+ * Asked 2026-10-25: "Make it possible to change name of the habit. On mobile in
+ * the long press pop up." Its days stay exactly as they were: a habit is the
+ * same habit under a new name, which is the whole difference from deleting it
+ * and adding another.
+ *
+ * The name is held to what normalizeHabits would make of it -- trimmed, cut to
+ * MAX_NAME_LENGTH -- and an empty one is refused rather than saved, since a
+ * habit with no name is dropped on the next read and would take its history
+ * with it. Refused, and unchanged, both return the list it was given, so the
+ * caller's equality guard stops the save.
+ */
+export function withHabitRenamed(habits, habitId, name) {
+  const list = Array.isArray(habits) ? habits : [];
+  const next = typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : '';
+  if (!next) return list;
+  const index = list.findIndex(habit => habit?.id === habitId);
+  if (index < 0 || list[index].name === next) return list;
+  const renamed = list.slice();
+  renamed[index] = { ...list[index], name: next };
+  return renamed;
+}

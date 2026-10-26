@@ -16,7 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-25**, each its own commit:
 
-- b. **Renaming a habit**, including from the long-press pop-up on the phone.
 - c. **Task mode: tasks with a time to do** -- an objective with an amount of
   time attached.
 - d. **Task mode: the Done list stays open or closed** across restarts, per

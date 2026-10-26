@@ -25,6 +25,7 @@ import {
   withDayTapped,
   mergeDeviceHabits,
   describeHabitChange,
+  withHabitRenamed,
   summariseHabits,
   MAX_HABITS,
   MAX_NAME_LENGTH
@@ -269,5 +270,40 @@ describe('the habit log', () => {
     assert.deepEqual(summariseHabits([habit({ log: { '2026-09-01': 'done', '2026-09-02': 'missed', '2026-09-03': true } })]), [
       { name: 'Drink water', done: 2, missed: 1, last: '2026-09-03' }
     ]);
+  });
+});
+
+// Asked 2026-10-25: "Make it possible to change name of the habit. On mobile in
+// the long press pop up."
+describe('renaming a habit', () => {
+  const habits = [
+    { id: 'a', name: 'Drink water', log: { '2026-10-24': 'done' } },
+    { id: 'b', name: 'Read', log: {} }
+  ];
+
+  it('a habit can be given a new name', () => {
+    const next = withHabitRenamed(habits, 'a', 'Drink 2L of water');
+    assert.equal(next[0].name, 'Drink 2L of water');
+  });
+
+  it('keeps every day it was ticked or crossed: it is the same habit, renamed', () => {
+    const next = withHabitRenamed(habits, 'a', 'Water');
+    assert.deepEqual(next[0].log, habits[0].log);
+    assert.equal(next[0].id, 'a');
+    assert.equal(next[1], habits[1]);
+  });
+
+  it('an empty name is refused, so the habit and its history are not lost', () => {
+    assert.equal(withHabitRenamed(habits, 'a', '   '), habits);
+  });
+
+  it('the same name, or an unknown habit, changes nothing and saves nothing', () => {
+    assert.equal(withHabitRenamed(habits, 'a', ' Drink water '), habits);
+    assert.equal(withHabitRenamed(habits, 'zzz', 'New'), habits);
+  });
+
+  it('a new name is trimmed and held to the usual length', () => {
+    const next = withHabitRenamed(habits, 'b', '  ' + 'x'.repeat(500));
+    assert.equal(next[1].name.length, 120);
   });
 });
