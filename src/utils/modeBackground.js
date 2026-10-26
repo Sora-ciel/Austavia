@@ -157,6 +157,32 @@ export function usesPortraitBackground({ width = 0, height = 0 } = {}) {
   return h > w;
 }
 
+/**
+ * How strongly a wallpaper shows when one is first put in. Asked for on
+ * 2026-10-26: "the default opacity of a bg setting when adding it should be at
+ * 25%" -- a picture at full strength fights the writing, and the first thing
+ * everybody did was drag the slider down.
+ */
+export const NEW_BACKGROUND_OPACITY = 25;
+
+/**
+ * What to save when a picture goes into one of the two slots.
+ *
+ * The 25% is for a folder getting its first wallpaper only. Opacity is shared
+ * by both slots, so adding the phone's picture to a folder whose desktop one
+ * is already set at 70% must not drop the desktop one to 25%; and a folder
+ * already showing a theme's wallpaper has been looked at at its strength. It
+ * is not the stored default either: a folder that never saved an opacity has
+ * been showing its picture at 100%, and should go on doing so.
+ */
+export function addBackgroundPatch(settings, key, src) {
+  const s = settings || {};
+  const hadPicture = Boolean(s.backgroundImage || s.backgroundImageMobile);
+  const patch = { [key]: src, bgThemeOptOut: false };
+  if (!hadPicture) patch.bgOpacity = NEW_BACKGROUND_OPACITY;
+  return patch;
+}
+
 /** Which of the two images this screen should show. */
 export function backgroundImageFor(settings, { isMobile = false } = {}) {
   const s = settings || {};

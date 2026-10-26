@@ -9,7 +9,9 @@ import {
   noteImageFilterCss,
   usesPortraitBackground,
   backgroundLayerStyle,
-  carryNotePictureSettings
+  carryNotePictureSettings,
+  addBackgroundPatch,
+  NEW_BACKGROUND_OPACITY
 } from '../src/utils/modeBackground.js';
 
 describe('normalizeBackgroundSettings', () => {
@@ -301,4 +303,25 @@ it('carries the old dials over settings that only hold the defaults', () => {
   assert.equal(shared.imagesFollowBackground, true);
   assert.equal(shared.imageOpacity, 40);
   assert.equal(shared.imageLuminosity, 100);
+});
+
+// Asked for on 2026-10-26: "the default opacity of a bg setting when adding it
+// should be at 25%".
+describe('adding a wallpaper', () => {
+  it('a wallpaper put into a folder that had none starts at 25%', () => {
+    assert.equal(NEW_BACKGROUND_OPACITY, 25);
+    assert.deepEqual(addBackgroundPatch({}, 'backgroundImage', 'data:a'),
+      { backgroundImage: 'data:a', bgThemeOptOut: false, bgOpacity: 25 });
+  });
+  it('adding the other screen\'s picture leaves the strength somebody already chose', () => {
+    const patch = addBackgroundPatch({ backgroundImage: 'data:a', bgOpacity: 70 }, 'backgroundImageMobile', 'data:b');
+    assert.equal('bgOpacity' in patch, false);
+  });
+  it('replacing a picture, or one the theme supplied, keeps its strength', () => {
+    assert.equal('bgOpacity' in addBackgroundPatch({ backgroundImage: 'data:a' }, 'backgroundImage', 'data:c'), false);
+    assert.equal('bgOpacity' in addBackgroundPatch({ backgroundImage: 'theme.jpg', backgroundFromTheme: true }, 'backgroundImage', 'data:c'), false);
+  });
+  it('a folder that never saved a strength keeps showing its picture at full', () => {
+    assert.equal(BACKGROUND_DEFAULTS.bgOpacity, 100);
+  });
 });

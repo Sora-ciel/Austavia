@@ -4,6 +4,7 @@
   import { getModeDefinition, getModeOptions, hasWallpaper } from "../Modes/modeRegistry.js";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
+  import { addBackgroundPatch } from '../utils/modeBackground.js';
   import { fitControls } from '../utils/controlsOverflow.js';
 
   export let mode;
@@ -368,7 +369,7 @@
     reader.onload = async () => {
       const src = String(reader.result || '');
       if (!(await mayUseBackground(src.length))) return;
-      setBgSetting({ [key]: src, bgThemeOptOut: false });
+      setBgSetting(addBackgroundPatch(backgroundSettings, key, src));
     };
     reader.readAsDataURL(file);
     event.target.value = '';
