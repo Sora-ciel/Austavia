@@ -34,6 +34,10 @@
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
   import { createRinger } from '../utils/ringTone.js';
   import { popupLabel } from '../utils/clockPopups.js';
+  // Finished objectives ring here too, in the same banner and with the same
+  // sound -- asked 2026-10-26. When and for how long: utils/taskGoalRings.js.
+  import { goalRings, msUntilGoalRingChange, readAnswered, answerRing } from '../utils/taskGoalRings.js';
+  import { htmlToText } from '../utils/htmlToText.js';
 
   export let blocks = [];
   /** The dialog palette App hands its other popups, so this reads as one of them. */
@@ -68,6 +72,28 @@
 
   $: rungTimers = timers.filter(entry => timerState(entry.device.timer, now) === 'ringing');
 
+  const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
+  let answeredGoals = readAnswered(deviceStorage());
+  $: goalRinging = goalRings({ blocks, now, answered: answeredGoals });
+
+  function stopGoal(ring) {
+    answeredGoals = answerRing(deviceStorage(), ring.key, Date.now());
+  }
+
+  function goalName(ring) {
+    const text = htmlToText(ring.task?.text || '').trim();
+    return text.length > 40 ? `${text.slice(0, 40)}…` : text || 'Objective';
+  }
+
+  // A count objective chimes once, the first time it is seen finished.
+  const chimed = new Set();
+  $: for (const ring of goalRinging) {
+    if (!ring.loud && !chimed.has(ring.key)) {
+      chimed.add(ring.key);
+      ringer.chime();
+    }
+  }
+
   function schedule() {
     clearTimeout(wake);
     now = Date.now();
@@ -75,13 +101,14 @@
     // again from the time, so a timer the device held back cannot make it miss.
     const waits = [
       msUntilAlarmCheck({ now, alarms }),
-      ...timers.map(entry => msUntilTimerRingChange(entry.device.timer, now))
+      ...timers.map(entry => msUntilTimerRingChange(entry.device.timer, now)),
+      msUntilGoalRingChange({ blocks, now })
     ].filter(wait => wait !== null);
     wake = setTimeout(schedule, Math.min(...waits));
   }
 
   // Named only: the alarms and timers. See ClockFace for why not `wake`.
-  $: rescheduleFor(alarms, timers);
+  $: rescheduleFor(alarms, timers, blocks);
   function rescheduleFor() {
     // Just after this update rather than inside it. schedule() sets `now`,
     // and Svelte does not re-run statements above this one for a change made
@@ -105,7 +132,7 @@
     ...ringing.map(alarm => popupLabel(alarm.id, 'alarm')),
     ...rungTimers.map(entry => popupLabel(entry.id, 'timer'))
   ];
-  $: ringer.set(ringingLabels.some(label => !quiet.has(label)));
+  $: ringer.set(ringingLabels.some(label => !quiet.has(label)) || goalRinging.some(ring => ring.loud));
 
   function stop(alarm) {
     setClockDevice(alarm.id, dismissed(alarm.device, Date.now()));
@@ -136,8 +163,8 @@
   });
 </script>
 
-{#if ringing.length || rungTimers.length}
-  <div class="alarm-banner" role="alertdialog" aria-label={ringing.length ? "Alarm ringing" : "Timer finished"} style={themeStyle}>
+{#if ringing.length || rungTimers.length || goalRinging.length}
+  <div class="alarm-banner" role="alertdialog" aria-label={ringing.length ? "Alarm ringing" : rungTimers.length ? "Timer finished" : "Objective done"} style={themeStyle}>
     {#each ringing as alarm (alarm.id)}
       <div class="alarm-line">
         <svg class="bell" viewBox="0 0 24 24" aria-hidden="true">
@@ -157,6 +184,19 @@
         <span class="alarm-when">Time's up</span>
         <button class="alarm-btn" on:click={() => changeTimer(entry, oneMoreMinute)}>+1 min</button>
         <button class="alarm-btn primary" on:click={() => changeTimer(entry, resetTimer)}>Stop</button>
+      </div>
+    {/each}
+    {#each goalRinging as ring (ring.key)}
+      <div class="alarm-line">
+        <svg class="bell" class:still={!ring.loud} viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M8 12.5l2.6 2.6L16 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="alarm-when goal-when">
+          <span class="goal-name">{goalName(ring)}</span>
+          <span class="goal-done">{ring.kind === 'time' ? "Time's up" : 'Done'}</span>
+        </span>
+        <button class="alarm-btn primary" on:click={() => stopGoal(ring)}>{ring.loud ? 'Stop' : 'OK'}</button>
       </div>
     {/each}
   </div>
@@ -201,6 +241,25 @@
     margin-right: auto;
   }
 
+  /* An objective's line names the task, which can be long: it shortens rather
+     than pushing the button off the banner. */
+  .goal-when {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 1rem;
+  }
+  .goal-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 52vw;
+  }
+  .goal-done {
+    font-size: 0.8rem;
+    opacity: 0.75;
+  }
+  .bell.still { animation: none; }
   .alarm-btn {
     font: inherit;
     color: var(--dlg-btn-text, inherit);

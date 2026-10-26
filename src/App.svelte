@@ -3,6 +3,7 @@
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
+  import { settleTask } from './utils/taskGoals.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
   import RightControls from './advanced-param/RightControls.svelte';
   import LeftControls from './advanced-param/LeftControls.svelte';
@@ -3570,6 +3571,42 @@
     event.preventDefault();
     toggleFullscreen();
   }
+
+  // ── Objectives, settled wherever the app is ─────────────────────
+  // A time objective's timer finishing, and a daily one starting again, are
+  // facts about the clock -- worked out from each task by settleTask. Task mode
+  // did it only while it was open, so a timer started there never finished (or
+  // moved to Done) while somebody was in another mode. This is the same
+  // absolute pass for the whole folder, every 15s and on coming back, so it
+  // holds in every mode; the ring itself is AlarmRinger's. Not an undo step,
+  // and a task block on the canvas is rebuilt to show it (it keeps its own
+  // copy of its tasks). See utils/taskGoals.js.
+  function settleTaskGoals() {
+    if (folderOpening) return;
+    const at = Date.now();
+    for (const block of blocks) {
+      if (block?.type !== 'task' || !Array.isArray(block.tasks)) continue;
+      let changed = false;
+      const next = block.tasks.map(task => {
+        const settled = settleTask(task, at);
+        if (settled !== task) changed = true;
+        return settled;
+      });
+      if (changed) {
+        updateBlockHandler({ detail: { id: block.id, tasks: next, changedKeys: ['tasks'], pushToHistory: false, bumpVersion: true } });
+      }
+    }
+  }
+
+  onMount(() => {
+    const pass = setInterval(settleTaskGoals, 15000);
+    const onVisible = () => { if (document.visibilityState === 'visible') settleTaskGoals(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(pass);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  });
 
   function handleUndoRedoShortcut(event) {
     const key = event.key?.toLowerCase();

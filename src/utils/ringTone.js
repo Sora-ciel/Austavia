@@ -41,6 +41,13 @@ export function createRinger() {
   }
 
   return {
+    /**
+     * One ring and no more: a count objective finished by a tap (see
+     * utils/taskGoalRings.js), where somebody is already looking.
+     */
+    chime() {
+      beep();
+    },
     /** Start or stop ringing. Safe to call with the same value repeatedly. */
     set(on) {
       if (on && !beeper) {

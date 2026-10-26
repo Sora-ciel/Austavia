@@ -16,9 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-26** (second round), one commit each:
 
-- E. **Objectives: seconds**, in a time goal (and what is typed for it); and
-  **a sound and a pop-up when one finishes**, reusing the timer's, on every
-  device.
 - F. **Task mode lists, UI/UX:**
   - the list backgrounds see-through like other modes (Single Note);
   - reordering: decide above/below by the middle of the task under the
@@ -63,6 +60,7 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
 | next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |
 | next | **Signing in on the Linux app (.deb), in a window of its own.** Sign in with Google opens a small "Sign in with Google" window on Google's own page, with the account picker; choosing an account closes it and the main window is signed in and syncing. Closing it without finishing says the window was closed; pressing sign in again while it is open replaces it with a fresh one. Built 2026-10-09 (utils/desktopSignIn.js, src-tauri/src/sign_in_window.rs), after the first version, through the system browser, was asked to be in the app instead. A whole sign-in was traced on the user's account: Google accepted the window and returned a good token, and then Firebase hung, because `getAuth()` never finishes starting in the Linux app (its popup helper waits for ever on a tauri:// page) and a sign-in waits for start-up. The Linux app now uses `initializeAuth()` without that helper -- measured ready in 1ms in the real app, against never -- but a sign-in with the fix has not been done yet. If it ever hangs again it now says "Firebase did not answer the sign-in within 30 seconds" rather than nothing. The Windows app must still use its popup. And under KDE the window has KDE's own title bar (dark Breeze, KDE's buttons, the lotus) because it runs through XWayland; checked on 2026-10-09, but it is worth noticing whether typing, scrolling and pictures feel any different. `AUSTAVIA_WAYLAND=1` puts it back on Wayland. |
@@ -470,6 +468,17 @@ crops *more* than the short card needs (say to a square first, then to the
 card). Only that would be the app's to fix.
 
 ## 4. Loose ends
+
+- **A finished objective rings only while Austavia is open** (2026-10-26).
+  The banner and sound are the timer's (AlarmRinger), in every mode on every
+  device -- but with the app closed, or a phone that has put it to sleep, it
+  rings when the app comes back, not at the moment. The clock timer already
+  has the native halves: the Android "Time's up" notification
+  (TimerNotificationPlugin, fed by utils/timerChip.js's timerNotice) and the
+  Windows always-on-top pop-ups (utils/clockPopups.js). Both are keyed to a
+  clock block today; an objective would need its own entry in each, with the
+  notification's buttons (pause, stop) routed back to the task. Asked for "all
+  types of devices", so this is owed, not optional.
 
 - **Ctrl+Z after typing and then recolouring a block** undoes the typing
   first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the

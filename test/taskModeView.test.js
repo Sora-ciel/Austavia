@@ -50,21 +50,27 @@ import { readLastGoal, writeLastGoal } from '../src/utils/taskModeView.js';
 
 test('a new task starts from the last goal that was set', () => {
   const storage = memoryStorage();
-  writeLastGoal(storage, { kind: 'time', target: 30, daily: true });
-  assert.deepEqual(readLastGoal(storage), { kind: 'time', time: 30, count: null, daily: true });
+  writeLastGoal(storage, { kind: 'time', target: 1800, daily: true });
+  assert.deepEqual(readLastGoal(storage), { kind: 'time', timeSeconds: 1800, count: null, daily: true });
 });
 
 test('time and count are remembered apart: setting a count keeps the last time', () => {
   const storage = memoryStorage();
-  writeLastGoal(storage, { kind: 'time', target: 30 });
+  writeLastGoal(storage, { kind: 'time', target: 1800 });
   writeLastGoal(storage, { kind: 'count', target: 20 });
   const last = readLastGoal(storage);
-  assert.equal(last.time, 30);
+  assert.equal(last.timeSeconds, 1800);
   assert.equal(last.count, 20);
   assert.equal(last.kind, 'count');
 });
 
 test('nothing set yet, or storage that cannot be read, starts empty on Time', () => {
-  assert.deepEqual(readLastGoal(memoryStorage()), { kind: 'time', time: null, count: null, daily: false });
-  assert.deepEqual(readLastGoal({ getItem: () => '{broken' }), { kind: 'time', time: null, count: null, daily: false });
+  assert.deepEqual(readLastGoal(memoryStorage()), { kind: 'time', timeSeconds: null, count: null, daily: false });
+  assert.deepEqual(readLastGoal({ getItem: () => '{broken' }), { kind: 'time', timeSeconds: null, count: null, daily: false });
+});
+
+test('a last time saved in minutes, before seconds, is not misread as seconds', () => {
+  const storage = memoryStorage();
+  storage.setItem('austavia.taskMode.lastGoal', JSON.stringify({ kind: 'time', time: 30 }));
+  assert.equal(readLastGoal(storage).timeSeconds, null);
 });

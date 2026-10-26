@@ -6,7 +6,7 @@
    * The rules are in utils/taskGoals.js.
    */
   import { createEventDispatcher } from 'svelte';
-  import { parseTarget } from '../utils/taskGoals.js';
+  import { parseTarget, formatDuration } from '../utils/taskGoals.js';
 
   export let x = 0;
   export let y = 0;
@@ -18,22 +18,20 @@
    * utils/taskModeView.js). Asked 2026-10-26: a new task starts from "the one
    * you put at last", and time and count are two different fields.
    */
-  export let last = { kind: 'time', time: null, count: null, daily: false };
+  export let last = { kind: 'time', timeSeconds: null, count: null, daily: false };
 
   const dispatch = createEventDispatcher();
 
-  function minutesText(minutes) {
-    if (!minutes) return '';
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return h ? (m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`) : `${m}m`;
+  // "1h 30m", "45s": what parseTarget reads back.
+  function durationText(seconds) {
+    return seconds ? formatDuration(seconds) : '';
   }
 
   // Each kind keeps its own text, so switching never carries "30m" into the
   // count box or 20 into the time one. A task's own goal fills its kind; the
   // other kind, and a task with none yet, start from the last one set.
   let kind = goal?.kind || last?.kind || 'time';
-  let timeText = goal?.kind === 'time' ? minutesText(goal.target) : minutesText(last?.time);
+  let timeText = goal?.kind === 'time' ? durationText(goal.targetSeconds ?? goal.target * 60) : durationText(last?.timeSeconds);
   let countText = goal?.kind === 'count' ? String(goal.target) : (last?.count ? String(last.count) : '');
   let daily = goal ? goal.daily === true : last?.daily === true;
   let error = '';
@@ -46,7 +44,7 @@
   function save() {
     const target = parseTarget(kind === 'time' ? timeText : countText, kind);
     if (!target) {
-      error = kind === 'time' ? 'Try 2h, 90m or 1h30' : 'A whole number, like 20';
+      error = kind === 'time' ? 'Try 2h, 90m, 45s or 1m30s' : 'A whole number, like 20';
       return;
     }
     dispatch('save', { kind, target, daily });
@@ -78,7 +76,7 @@
     {#if kind === 'time'}
       <input
         bind:value={timeText}
-        placeholder="2h, 90m, 1h30"
+        placeholder="2h, 90m, 45s"
         use:focusOnMount
         on:keydown={onKey}
         on:input={() => (error = '')}

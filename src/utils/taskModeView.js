@@ -51,21 +51,23 @@ export function writeDoneExpanded(storage, expanded) {
  */
 export const LAST_GOAL_KEY = 'austavia.taskMode.lastGoal';
 
-const EMPTY_LAST_GOAL = Object.freeze({ kind: 'time', time: null, count: null, daily: false });
+// Time in seconds since objectives took seconds (2026-10-26), under its own
+// name, so a value saved in minutes before that is not read as seconds.
+const EMPTY_LAST_GOAL = Object.freeze({ kind: 'time', timeSeconds: null, count: null, daily: false });
 
 function positiveInt(value) {
   const n = Number(value);
   return Number.isInteger(n) && n >= 1 ? n : null;
 }
 
-/** `{ kind, time (minutes), count, daily }`, with nulls for anything never set. */
+/** `{ kind, timeSeconds, count, daily }`, with nulls for anything never set. */
 export function readLastGoal(storage) {
   try {
     const raw = JSON.parse(storage?.getItem(LAST_GOAL_KEY) || 'null');
     if (!raw || typeof raw !== 'object') return { ...EMPTY_LAST_GOAL };
     return {
       kind: raw.kind === 'count' ? 'count' : 'time',
-      time: positiveInt(raw.time),
+      timeSeconds: positiveInt(raw.timeSeconds),
       count: positiveInt(raw.count),
       daily: raw.daily === true
     };
@@ -78,7 +80,8 @@ export function readLastGoal(storage) {
 export function writeLastGoal(storage, { kind, target, daily } = {}) {
   if (kind !== 'time' && kind !== 'count') return;
   const last = readLastGoal(storage);
-  const next = { ...last, kind, [kind]: positiveInt(target) ?? last[kind], daily: daily === true };
+  const field = kind === 'time' ? 'timeSeconds' : 'count';
+  const next = { ...last, kind, [field]: positiveInt(target) ?? last[field], daily: daily === true };
   try {
     storage?.setItem(LAST_GOAL_KEY, JSON.stringify(next));
   } catch {
