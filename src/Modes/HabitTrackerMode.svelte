@@ -13,7 +13,8 @@
   import { moveToSlot } from "../utils/dropPlacement.js";
   import { habitStreaks } from "../utils/habitStreaks.js";
   import { onDestroy, createEventDispatcher } from "svelte";
-  import { habitsEqual, withDayTapped, withHabitRenamed } from "../utils/habitStore.js";
+  import { habitsEqual, withDayTapped, withHabitRenamed, withScheduleSet } from "../utils/habitStore.js";
+  import { isDue, describeSchedule, normalizeSchedule, WEEKDAY_ORDER } from "../utils/habitSchedule.js";
 
   export let modeLabels = {};
   export let activeMode = "default";
@@ -81,6 +82,7 @@
   $: compact = viewportWidth <= 1024;
   $: days = recentDays({ today, count: daysToShow({ width: viewportWidth }) }).map(day => ({
     key: day.key,
+    date: day.date,
     isToday: day.isToday,
     label: formatDayLabel(day.date, compact),
     number: formatDayNumber(day.date, compact),
@@ -185,6 +187,37 @@
   const guardClick = event => reorder.swallowClick(event);
 
   onDestroy(() => reorder.destroy());
+
+  // ── When a habit is meant to be done ────────────────────────────
+  // Agreed 2026-10-26: "Habits that aren't daily: '3 times a week' or
+  // 'Mon/Wed/Fri'. Days it isn't due show as rest days, not ✕, and don't break
+  // the streak." Set in the habit's menu; stored and read in
+  // utils/habitSchedule.js, counted in utils/habitStreaks.js.
+  const weekdayLetter = day =>
+    new Date(2026, 9, 26 + ((day + 6) % 7)).toLocaleDateString(undefined, { weekday: "narrow" });
+  const weekdayName = day =>
+    new Date(2026, 9, 26 + ((day + 6) % 7)).toLocaleDateString(undefined, { weekday: "long" });
+
+  function setSchedule(habitId, schedule) {
+    saveHabits(withScheduleSet(habits, habitId, schedule));
+  }
+
+  function toggleWeekday(habit, day) {
+    const current = normalizeSchedule(habit.schedule);
+    const chosen = current?.kind === "days" ? current.days : [];
+    const next = chosen.includes(day) ? chosen.filter(d => d !== day) : [...chosen, day];
+    setSchedule(habit.id, next.length ? { kind: "days", days: next } : undefined);
+  }
+
+  // The first press, from any other schedule, starts at 3 a week -- the
+  // example the request gave -- rather than stepping from 7, where + did
+  // nothing and − gave 6.
+  function stepTimes(habit, by) {
+    const current = normalizeSchedule(habit.schedule);
+    if (current?.kind !== "weekly") return setSchedule(habit.id, { kind: "weekly", times: 3 });
+    const next = Math.max(1, Math.min(7, current.times + by));
+    setSchedule(habit.id, next >= 7 ? undefined : { kind: "weekly", times: next });
+  }
 
   // Streaks, worked out from each habit's days whenever they change -- see
   // utils/habitStreaks.js. A value rather than a call in the template, so the
@@ -302,6 +335,96 @@
     opacity: 0.6;
   }
 
+  .habit-schedule {
+    font-size: 0.75rem;
+    opacity: 0.65;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* A day the habit is not meant for: there, and tappable -- a habit done on a
+     rest day counts -- but faint, so it does not read as one left undone. */
+  .day-button.rest:not(.done) {
+    opacity: 0.4;
+    border-style: dashed;
+  }
+
+  /* Skipped: neither done nor missed. Outlined like an empty day, dashed,
+     with its dash. */
+  .day-button.skipped {
+    background: transparent;
+    border-style: dashed;
+    opacity: 0.75;
+  }
+
+  /* The schedule, inside the habit's menu. Choices are the menu's own buttons
+     in the writing's colour; the chosen one is filled with it. */
+  .habit-schedule-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 2px;
+  }
+
+  .schedule-label {
+    font-size: 0.72rem;
+    opacity: 0.7;
+    padding: 2px 6px 0;
+  }
+
+  .schedule-choice,
+  .weekday,
+  .times-step {
+    border-radius: var(--block-control-radius, 8px);
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, currentColor) 25%, transparent);
+    background: color-mix(in srgb, var(--mode-text-color, currentColor) 8%, transparent);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .schedule-choice {
+    min-height: 36px;
+    text-align: left;
+    padding: 0 10px;
+  }
+
+  .schedule-choice.chosen,
+  .weekday.chosen {
+    background: var(--mode-text-color, currentColor);
+    color: var(--canvas-inner-bg, #000000);
+  }
+
+  .weekday-row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .weekday {
+    min-height: 34px;
+    padding: 0;
+  }
+
+  .times-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 36px;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    border-radius: var(--block-control-radius, 8px);
+  }
+
+  .times-row.chosen {
+    outline: 1px solid var(--mode-text-color, currentColor);
+  }
+
+  .times-step {
+    min-height: 34px;
+    font-size: 1.1rem;
+  }
+
   .habit-row {
     border-radius: var(--block-border-radius, 16px);
     padding: 12px 14px;
@@ -414,6 +537,10 @@
     .habit-streak .streak-words,
     .habit-streak.quiet {
       display: none;
+    }
+
+    .habit-schedule {
+      font-size: 0.62rem;
     }
 
     .habit-grid {
@@ -557,7 +684,8 @@
     right: 8px;
     top: calc(100% - 4px);
     z-index: 11;
-    min-width: 168px;
+    /* Wide enough for a week of day buttons a thumb can hit. */
+    min-width: 248px;
     padding: 6px;
     border-radius: var(--block-control-radius, 10px);
     border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 25%, transparent));
@@ -633,7 +761,7 @@
   <ModeWallpaper settings={backgroundSettings} />
   <div class="habit-header">
     <h2>{modeLabels?.[activeMode] ?? "Habit Tracker"}</h2>
-    <p>Tap a day to mark it ✓, again for ✕, again to clear. Today is the last square.</p>
+    <p>Tap a day to mark it ✓, again for ✕, again for – (skipped), again to clear. Today is the last square.</p>
   </div>
 
   <div class="habit-form">
@@ -661,7 +789,13 @@
           class:dragging={draggingId === habit.id}
           data-habit-id={habit.id}
           on:pointerdown={event => reorder.itemDown(event, habit.id)}
-          on:contextmenu={event => { if (compact) event.preventDefault(); }}
+          on:contextmenu={event => {
+            // A right-click is a computer's way to the habit's menu, as a hold
+            // is a phone's -- the same as Task mode. On a phone the hold has
+            // its own path, so the system's long-press menu is only stopped.
+            event.preventDefault();
+            if (!compact) menuFor = habit.id;
+          }}
         >
           {#if !compact}
             <button
@@ -690,12 +824,15 @@
               <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
               <strong on:dblclick={() => startRename(habit)}>{habit.name}</strong>
             {/if}
+            {#if habit.schedule}
+              <span class="habit-schedule">{describeSchedule(habit.schedule)}</span>
+            {/if}
             {#if streaks[habit.id]?.current > 0}
               <span class="habit-streak" title="Days in a row{streaks[habit.id].best > streaks[habit.id].current ? `; best ${streaks[habit.id].best}` : ''}">
-                🔥 {streaks[habit.id].current}<span class="streak-words">{' '}{streaks[habit.id].current === 1 ? 'day' : 'days'}{#if streaks[habit.id].best > streaks[habit.id].current} · best {streaks[habit.id].best}{/if}</span>
+                🔥 {streaks[habit.id].current}<span class="streak-words">{' '}{streaks[habit.id].current === 1 ? streaks[habit.id].unit.slice(0, -1) : streaks[habit.id].unit}{#if streaks[habit.id].best > streaks[habit.id].current} · best {streaks[habit.id].best}{/if}</span>
               </span>
             {:else if streaks[habit.id]?.best > 0}
-              <span class="habit-streak quiet">Best: {streaks[habit.id].best} {streaks[habit.id].best === 1 ? 'day' : 'days'}</span>
+              <span class="habit-streak quiet">Best: {streaks[habit.id].best} {streaks[habit.id].best === 1 ? streaks[habit.id].unit.slice(0, -1) : streaks[habit.id].unit}</span>
             {/if}
           </div>
           <div class="calendar" style="--past-days: {Math.max(0, days.length - 1)}">
@@ -703,7 +840,8 @@
               <button
                 class="day-button {habit.log?.[day.key] ?? 'none'}"
                 class:is-today={day.isToday}
-                title={day.full}
+                class:rest={!isDue(habit.schedule, day.date)}
+                title={isDue(habit.schedule, day.date) ? day.full : `${day.full} -- a rest day`}
                 aria-label={day.full}
                 on:click={event => { if (!guardClick(event)) toggleDay(habit.id, day.key); }}
               >
@@ -714,6 +852,8 @@
                     ? "✓"
                     : habit.log?.[day.key] === "missed"
                     ? "✕"
+                    : habit.log?.[day.key] === "skipped"
+                    ? "–"
                     : "•"}
                 </span>
               </button>
@@ -745,6 +885,36 @@
               >
                 Rename habit
               </button>
+              <!-- When it is meant to be done. Every change saves at once, as a
+                   tap on a day does, and the Undo button takes it back. -->
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <div class="habit-schedule-editor" on:pointerdown|stopPropagation>
+                <button
+                  type="button"
+                  class="schedule-choice"
+                  class:chosen={!habit.schedule}
+                  on:click|stopPropagation={() => setSchedule(habit.id, undefined)}
+                >Every day</button>
+                <div class="schedule-label">On these days</div>
+                <div class="weekday-row">
+                  {#each WEEKDAY_ORDER as day}
+                    <button
+                      type="button"
+                      class="weekday"
+                      class:chosen={habit.schedule?.kind === "days" && habit.schedule.days.includes(day)}
+                      aria-label={weekdayName(day)}
+                      title={weekdayName(day)}
+                      on:click|stopPropagation={() => toggleWeekday(habit, day)}
+                    >{weekdayLetter(day)}</button>
+                  {/each}
+                </div>
+                <div class="schedule-label">Or so many times a week</div>
+                <div class="times-row" class:chosen={habit.schedule?.kind === "weekly"}>
+                  <button type="button" class="times-step" aria-label="Fewer" on:click|stopPropagation={() => stepTimes(habit, -1)}>−</button>
+                  <span>{habit.schedule?.kind === "weekly" ? `${habit.schedule.times}× a week` : "Off"}</span>
+                  <button type="button" class="times-step" aria-label="More" on:click|stopPropagation={() => stepTimes(habit, 1)}>+</button>
+                </div>
+              </div>
               <button
                 type="button"
                 role="menuitem"

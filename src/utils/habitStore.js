@@ -36,6 +36,8 @@
  * output, byte for byte, including the order of the day keys.
  */
 
+import { normalizeSchedule } from './habitSchedule.js';
+
 /** A day, as `habitDays.js` writes it. Anything else is not a day. */
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -64,7 +66,11 @@ function idFor(habit, index) {
 }
 
 /**
- * What a day says: `'done'` (✓) or `'missed'` (✕). Anything else is no mark.
+ * What a day says: `'done'` (✓), `'missed'` (✕) or `'skipped'` (–). Anything
+ * else is no mark.
+ *
+ * Skipped was added 2026-10-26 ("a third mark for sick days or travel, so the
+ * streak doesn't break"): a day that counts neither way -- see habitStreaks.js.
  *
  * The tracker has always had both -- "Tap a day to mark ✓ or ✕" -- but when
  * habits moved into the folder this store kept only "ticked or not", as
@@ -79,22 +85,74 @@ function idFor(habit, index) {
 export function dayMark(value) {
   if (value === 'done' || value === true) return 'done';
   if (value === 'missed') return 'missed';
+  if (value === 'skipped') return 'skipped';
   return null;
 }
+
+/**
+ * A mark this build does not know -- written by a newer one -- that is kept
+ * rather than dropped. Before skipped existed, a build that met one deleted it
+ * on its next save; from here on a later mark survives an older build, drawn
+ * as no mark but never thrown away.
+ */
+const FOREIGN_MARK = /^[a-z][a-z-]{0,23}$/;
+// Words that meant "no mark" in earlier builds, which wrote them for a
+// cleared day; they are no mark, not a mark from the future.
+const NO_MARK = new Set(['none', 'clear', 'cleared', 'empty']);
+const keptMark = value => dayMark(value) ??
+  (typeof value === 'string' && FOREIGN_MARK.test(value) && !NO_MARK.has(value) ? value : null);
 
 /** The marks, keyed by day, in a fixed order and with nothing else in them. */
 function normalizeLog(log) {
   if (!log || typeof log !== 'object') return {};
 
   const days = Object.keys(log)
-    .filter(key => DAY_KEY.test(key) && dayMark(log[key]))
+    .filter(key => DAY_KEY.test(key) && keptMark(log[key]))
     .sort();
 
   // Rebuilt rather than filtered in place: an object's key order is part of
   // what JSON.stringify produces, and two devices must serialise the same
   // habits to the same string or each will think the other has edited it.
   const out = {};
-  for (const day of days) out[day] = dayMark(log[day]);
+  for (const day of days) out[day] = keptMark(log[day]);
+  return out;
+}
+
+/** What a habit is made of, and nothing a build reads besides. */
+const KNOWN_FIELDS = new Set(['id', 'name', 'log', 'schedule']);
+/** How big a field this build does not know may be, and still be kept. */
+const MAX_FOREIGN_FIELD = 4000;
+
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) out[key] = canonical(value[key]);
+    return out;
+  }
+  return value;
+}
+
+/**
+ * The fields of a habit this build does not know, kept as they came.
+ *
+ * Until 2026-10-26 a habit was rebuilt from its id, name and days alone, so
+ * any build meeting something newer -- a schedule, a colour -- deleted it on
+ * its next save, and a phone not yet updated undid the computer's work. Kept,
+ * in a fixed order so two devices still write the same bytes, and only when
+ * small: this is a payload every device downloads.
+ */
+function foreignFields(habit) {
+  const out = {};
+  for (const key of Object.keys(habit).sort()) {
+    if (KNOWN_FIELDS.has(key) || key.startsWith('_')) continue;
+    const value = habit[key];
+    if (value === undefined || typeof value === 'function') continue;
+    let size = 0;
+    try { size = JSON.stringify(value)?.length ?? 0; } catch { continue; }
+    if (size === 0 || size > MAX_FOREIGN_FIELD) continue;
+    out[key] = canonical(value);
+  }
   return out;
 }
 
@@ -122,7 +180,10 @@ export function normalizeHabits(value) {
     if (seen.has(id)) return;
     seen.add(id);
 
-    out.push({ id, name, log: normalizeLog(habit.log) });
+    const kept = { id, name, log: normalizeLog(habit.log) };
+    const schedule = normalizeSchedule(habit.schedule);
+    if (schedule) kept.schedule = schedule;
+    out.push({ ...kept, ...foreignFields(habit) });
   });
 
   return out;
@@ -159,12 +220,30 @@ export function habitsToAdopt({ inFolder, onDevice } = {}) {
   return mine.length > 0 ? mine : null;
 }
 
-/** A tap on a day: nothing, then ✓, then ✕, then nothing again. */
+/**
+ * A tap on a day: nothing, then ✓, then ✕, then skipped (–), then nothing.
+ *
+ * Skipped joined the cycle on 2026-10-26, agreed as "a third mark" for sick
+ * days and travel. It goes after ✕ so the two marks used most stay one and
+ * two taps away; clearing a day now takes one tap more.
+ */
 export function nextMark(current) {
   const mark = dayMark(current);
   if (mark === null) return 'done';
   if (mark === 'done') return 'missed';
+  if (mark === 'missed') return 'skipped';
   return null;
+}
+
+/** The habits with one habit's schedule set; undefined is every day. */
+export function withScheduleSet(habits, habitId, schedule) {
+  const list = normalizeHabits(habits);
+  const next = normalizeSchedule(schedule);
+  return list.map(habit => {
+    if (habit.id !== habitId) return habit;
+    const { schedule: _old, ...rest } = habit;
+    return next ? { ...rest, schedule: next } : rest;
+  });
 }
 
 /** The habits with one day of one habit moved on by a tap. */
@@ -269,7 +348,7 @@ export function describeHabitChange(before, after) {
   const was = normalizeHabits(before);
   const now = normalizeHabits(after);
   const lines = [];
-  const symbol = mark => (mark === 'done' ? '✓' : mark === 'missed' ? '✕' : '•');
+  const symbol = mark => (mark === 'done' ? '✓' : mark === 'missed' ? '✕' : mark === 'skipped' ? '–' : '•');
 
   const wasById = new Map(was.map(habit => [habit.id, habit]));
   const nowById = new Map(now.map(habit => [habit.id, habit]));

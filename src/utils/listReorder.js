@@ -53,6 +53,14 @@ export const DROP_GAP = 6;
  */
 export const PICK_UP_MS = 420;
 
+/**
+ * How soon after a hold is let go a click still belongs to it. A phone often
+ * sends no click at all after a long press; a "swallow the next click" with no
+ * time limit then waited and ate the next real tap, whenever it came -- seen
+ * 2026-10-26 as a day that would not take its third tap.
+ */
+export const HOLD_CLICK_MS = 400;
+
 export function createListReorder({
   listOf,
   itemsIn,
@@ -70,7 +78,7 @@ export function createListReorder({
   let group = [];
   let slot = null;
   let pressedId = null;
-  let swallow = false;
+  let swallowUntil = 0;
 
   const hold = createLongPress({
     delay: PICK_UP_MS,
@@ -147,7 +155,7 @@ export function createListReorder({
     onLine(null);
     onPick(null);
     if (wasHeldStill) {
-      swallow = true;
+      swallowUntil = Date.now() + HOLD_CLICK_MS;
       onHeld(id, origin);
     }
   }
@@ -188,8 +196,8 @@ export function createListReorder({
 
     /** The click after a hold, eaten before it does anything. True if eaten. */
     swallowClick(event) {
-      if (!swallow) return false;
-      swallow = false;
+      if (Date.now() > swallowUntil) return false;
+      swallowUntil = 0;
       event?.preventDefault?.();
       event?.stopPropagation?.();
       return true;

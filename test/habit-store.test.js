@@ -22,6 +22,7 @@ import {
   habitsToAdopt,
   dayMark,
   nextMark,
+  withScheduleSet,
   withDayTapped,
   mergeDeviceHabits,
   describeHabitChange,
@@ -173,10 +174,14 @@ describe('habitsToAdopt', () => {
 // draws ✓ for 'done' and ✕ for 'missed', so a tap was saved and drew nothing,
 // and could not be taken back. Wanted: a tap marks the day, as it always did.
 describe('marking a day', () => {
-  it('a tap goes nothing, then ✓, then ✕, then nothing again', () => {
+  // Changed on purpose 2026-10-26: a skipped day (–) was agreed as "a third
+  // mark for sick days or travel, so the streak doesn't break", and joins the
+  // cycle after ✕. It used to go straight from ✕ back to nothing.
+  it('a tap goes nothing, then ✓, then ✕, then skipped, then nothing again', () => {
     assert.equal(nextMark(undefined), 'done');
     assert.equal(nextMark('done'), 'missed');
-    assert.equal(nextMark('missed'), null);
+    assert.equal(nextMark('missed'), 'skipped');
+    assert.equal(nextMark('skipped'), null);
   });
 
   it('a tap is saved as the mark the tracker draws', () => {
@@ -185,7 +190,9 @@ describe('marking a day', () => {
     const twice = withDayTapped(once, 'h1', '2026-09-30');
     assert.equal(twice[0].log['2026-09-30'], 'missed');
     const thrice = withDayTapped(twice, 'h1', '2026-09-30');
-    assert.equal('2026-09-30' in thrice[0].log, false);
+    assert.equal(thrice[0].log['2026-09-30'], 'skipped');
+    const fourth = withDayTapped(thrice, 'h1', '2026-09-30');
+    assert.equal('2026-09-30' in fourth[0].log, false);
   });
 
   it('a day saved as `true` by the builds in between reads as ✓, and the next tap moves on from it', () => {
@@ -305,5 +312,36 @@ describe('renaming a habit', () => {
   it('a new name is trimmed and held to the usual length', () => {
     const next = withHabitRenamed(habits, 'b', '  ' + 'x'.repeat(500));
     assert.equal(next[1].name.length, 120);
+  });
+});
+
+// Agreed 2026-10-26: habits that are not every day, and a skipped day. And
+// with them a rule the store did not have: what a build does not understand,
+// it keeps. A habit used to be rebuilt from its id, name and days alone, so an
+// older build deleted anything newer the next time it saved.
+describe('schedules, skipped days, and fields from newer builds', () => {
+  it('keeps a schedule, and a skipped day, through a round trip', () => {
+    const [h] = normalizeHabits([habit({ schedule: { kind: 'days', days: [5, 1, 3, 3] }, log: { '2026-10-20': 'skipped' } })]);
+    assert.deepEqual(h.schedule, { kind: 'days', days: [1, 3, 5] });
+    assert.equal(h.log['2026-10-20'], 'skipped');
+  });
+
+  it('every day is no schedule at all, as for every habit made before', () => {
+    assert.equal('schedule' in normalizeHabits([habit({ schedule: { kind: 'days', days: [0, 1, 2, 3, 4, 5, 6] } })])[0], false);
+    assert.equal('schedule' in withScheduleSet([habit({ schedule: { kind: 'weekly', times: 3 } })], 'h1', undefined)[0], false);
+  });
+
+  it('keeps a field and a mark it does not know, in a fixed order, so a newer build is not undone', () => {
+    const [h] = normalizeHabits([habit({ colour: '#ff2b45', log: { '2026-10-20': 'half', '2026-10-21': 'none' } })]);
+    assert.equal(h.colour, '#ff2b45');
+    assert.deepEqual(h.log, { '2026-10-20': 'half' });
+    assert.ok(habitsEqual([h], normalizeHabits([h])));
+  });
+
+  it('a schedule is set on one habit and nothing else', () => {
+    const list = [habit(), habit({ id: 'h2', name: 'Other' })];
+    const next = withScheduleSet(list, 'h2', { kind: 'weekly', times: 3 });
+    assert.deepEqual(next[1].schedule, { kind: 'weekly', times: 3 });
+    assert.equal('schedule' in next[0], false);
   });
 });
