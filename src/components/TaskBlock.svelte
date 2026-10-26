@@ -62,7 +62,14 @@
     };
   }
 
-  const todoTasks = () => tasks.filter(task => !task.done);
+  // Reactive, not a function: a template that calls a function only redraws
+  // when the function itself changes, so the list drawn from it never saw a
+  // task added, ticked or deleted. It used to get redrawn anyway, because every
+  // change rebuilt the whole block; since a block's own changes stopped
+  // rebuilding it (2026-10-05, utils/blockVersions.js), the list stayed as it
+  // was until the folder was opened again -- reported 2026-10-26: "you add them
+  // but you see the added tasks only after clicking at the folder again".
+  $: todoTasks = tasks.filter(task => !task.done);
 
   function sendUpdate(changedKeys, { pushToHistory } = {}) {
     const detail = {
@@ -612,7 +619,7 @@
       <button on:click={addTask} data-focus-guard>Add</button>
     </div>
     <ul class="task-list">
-      {#each todoTasks() as task (task.id)}
+      {#each todoTasks as task (task.id)}
         <li
           class="task-item"
           data-task-id={task.id}
