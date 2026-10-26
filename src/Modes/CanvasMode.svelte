@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { setCanvasScale, setCanvasRef } from '../canvasState.js';
   import ModeBackground from '../components/ModeBackground.svelte';
-  import { MIN_CANVAS_WIDTH, MIN_ZOOM, MAX_ZOOM, getInitialCanvasScale } from '../utils/canvasFit.js';
+  import { MIN_CANVAS_WIDTH, MIN_ZOOM, MAX_ZOOM, getInitialCanvasScale, canvasExtent } from '../utils/canvasFit.js';
   import { htmlToText as htmlToPlainText } from '../utils/htmlToText.js';
   import TextBlock from '../components/TextBlock.svelte';
   import ImgBlock from '../components/ImgBlock.svelte';
@@ -143,36 +143,17 @@
     return { left: BLOCK_MARGIN_LEFT, right: BLOCK_MARGIN_RIGHT };
   }
 
+  // Measured in canvasFit.js (canvasExtent), where the rule that left is
+  // held like top is written down and tested.
   function measureCanvasFromBlocks() {
-    if (!Array.isArray(blocks) || blocks.length === 0) {
-      return { width: MIN_CANVAS_WIDTH, height: MIN_CANVAS_HEIGHT, offsetX: 0 };
-    }
-
-    let minX = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = 0;
-
-    for (const block of blocks) {
-      const x = Number(block?.position?.x ?? 0);
-      const y = Number(block?.position?.y ?? 0);
-      const width = Number(block?.size?.width ?? 220);
-      const height = Number(block?.size?.height ?? 140);
-
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
-    }
-
-    const safeMinX = Number.isFinite(minX) ? minX : 0;
-    const safeMaxX = Number.isFinite(maxX) ? maxX : 0;
-    const contentWidth = Math.max(0, safeMaxX - safeMinX);
-    const horizontalMargins = getHorizontalMargins();
-
-    return {
-      width: Math.max(MIN_CANVAS_WIDTH, contentWidth + horizontalMargins.left + horizontalMargins.right),
-      height: Math.max(MIN_CANVAS_HEIGHT, maxY + BLOCK_MARGIN_BOTTOM),
-      offsetX: horizontalMargins.left - safeMinX
-    };
+    const margins = getHorizontalMargins();
+    return canvasExtent(blocks, {
+      marginLeft: margins.left,
+      marginRight: margins.right,
+      marginBottom: BLOCK_MARGIN_BOTTOM,
+      minWidth: MIN_CANVAS_WIDTH,
+      minHeight: MIN_CANVAS_HEIGHT
+    });
   }
 
   function getViewportScaleFloor() {
