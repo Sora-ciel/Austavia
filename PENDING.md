@@ -16,8 +16,6 @@ that holds the detail; cross a line off in the same commit that finishes it.
 
 **Now, asked 2026-10-25**, each its own commit:
 
-- a. **A checkbox in every editor** -- a working to-do item that can go
-  anywhere text is written.
 - b. **Renaming a habit**, including from the long-press pop-up on the phone.
 - c. **Task mode: tasks with a time to do** -- an objective with an amount of
   time attached.

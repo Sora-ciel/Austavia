@@ -5,6 +5,8 @@
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
   import { ListItem } from '@tiptap/extension-list-item';
+  // The same package the bullet list already comes from (via StarterKit).
+  import { TaskList, TaskItem } from '@tiptap/extension-list';
   import { Markdown } from 'tiptap-markdown';
   import { shortcutFor, markShortcutFor, separatorFillsLine } from '../utils/markdownShortcuts.js';
   import { imagesFrom, hasImage } from '../utils/pastedImages.js';
@@ -369,6 +371,12 @@
   // being valid.
   const AnyBlockListItem = ListItem.extend({ content: 'block+' });
 
+  // A checkbox, asked for 2026-10-25: "a checkbox that actually works ... so
+  // that everywhere you can also just add a checkbox". Its content is any block
+  // for the same reason as a list item's above: a title can be a to-do too.
+  // Nested, so a checkbox can sit under another one.
+  const AnyBlockTaskItem = TaskItem.extend({ content: 'block+' }).configure({ nested: true });
+
   /**
    * A picture pasted into a note becomes a picture in the note.
    *
@@ -517,6 +525,10 @@
               case 'orderedList':
                 run.toggleOrderedList();
                 if (found.start > 1) run.updateAttributes('orderedList', { start: found.start });
+                break;
+              case 'taskList':
+                run.toggleTaskList();
+                if (found.checked) run.updateAttributes('taskItem', { checked: true });
                 break;
               case 'blockquote':
                 run.toggleBlockquote();
@@ -728,6 +740,8 @@
         // in utils/textHistory.js instead, so it outlives a remount.
         StarterKit.configure({ history: false, listItem: false }),
         AnyBlockListItem,
+        TaskList,
+        AnyBlockTaskItem,
         // html:true so setContent can parse BOTH legacy markdown content and the
         // HTML we now store. We store HTML (getHTML) because markdown collapses
         // consecutive blank lines — HTML keeps every empty paragraph.
@@ -1200,6 +1214,37 @@
 
   :global(.tiptap-inner ul, .tiptap-inner ol) { padding-left: 1.4em; margin: 0.3em 0; }
   :global(.tiptap-inner li) { margin: 0.15em 0; }
+
+  /* Checkboxes -- matched as items of a checkbox list, because that is what
+     the editor draws: its <li> carries data-checked but not data-type. The box takes the writing's colour (accent-color: currentColor)
+     so it belongs to whatever theme it sits in, per CLAUDE.md; a ticked line
+     fades and is struck through, the way a done task reads everywhere else. */
+  :global(.tiptap-inner ul[data-type="taskList"]) { list-style: none; padding-left: 0.15em; }
+  :global(.tiptap-inner ul[data-type="taskList"] > li) {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45em;
+  }
+  :global(.tiptap-inner ul[data-type="taskList"] > li > label) {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    height: 1.4em;
+    user-select: none;
+  }
+  :global(.tiptap-inner ul[data-type="taskList"] > li > label > input) {
+    accent-color: currentColor;
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    cursor: pointer;
+  }
+  :global(.tiptap-inner ul[data-type="taskList"] > li > div) { flex: 1; min-width: 0; }
+  :global(.tiptap-inner ul[data-type="taskList"] > li > div > *:first-child) { margin-top: 0; }
+  :global(.tiptap-inner ul[data-type="taskList"] > li[data-checked="true"] > div) {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
 
   /* These three were white, which is a colour that belongs to no theme and was
      invisible on half of them. currentColor is the writing's own colour

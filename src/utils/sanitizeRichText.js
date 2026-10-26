@@ -12,7 +12,10 @@ const ALLOWED_TAGS = new Set([
   'STRONG', 'B', 'EM', 'I', 'U', 'S', 'CODE', 'PRE',
   'UL', 'OL', 'LI', 'BLOCKQUOTE',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-  'A', 'IMG', 'HR'
+  'A', 'IMG', 'HR',
+  // A checkbox written into a task (2026-10-25). Only ever a checkbox: any
+  // other input is removed below.
+  'LABEL', 'INPUT'
 ]);
 
 // Only what a tag needs. A span keeps the one attribute that says it is a
@@ -22,7 +25,10 @@ const ALLOWED_TAGS = new Set([
 const ALLOWED_ATTRS = {
   A: ['href', 'title'],
   IMG: ['src', 'alt', 'title', 'width', 'height', 'data-align'],
-  SPAN: ['data-inline-separator']
+  SPAN: ['data-inline-separator'],
+  UL: ['data-type'],
+  LI: ['data-type', 'data-checked'],
+  INPUT: ['type', 'checked']
 };
 
 // data: is allowed for images only — that's how a freshly pasted picture
@@ -78,6 +84,16 @@ export function sanitizeRichText(html) {
           if (url) child.setAttribute('src', url);
           else child.remove();
         }
+      }
+
+      if (child.tagName === 'INPUT') {
+        if (child.getAttribute('type') !== 'checkbox') {
+          child.remove();
+          continue;
+        }
+        // Shown, not used: what is read here is a copy of the writing, and a
+        // tick made on it would go nowhere. Ticking happens in the editor.
+        child.setAttribute('disabled', '');
       }
 
       if (child.tagName === 'A') {

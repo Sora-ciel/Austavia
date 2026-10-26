@@ -168,3 +168,25 @@ test('a separator with something already beside it is a short divider', () => {
   assert.equal(separatorFillsLine({ hasContentAfter: true }), false);
 });
 
+
+// Asked 2026-10-25: "add a checkbox that actually works to our tiptap, so that
+// everywhere you can also just add a checkbox."
+
+test('typing [ ] at the start of a line makes a checkbox', () => {
+  const found = shortcutFor('[ ] ');
+  assert.equal(found?.kind, 'taskList');
+  assert.equal(found.checked, false);
+});
+
+test('typing [x] makes one that is already ticked', () => {
+  assert.equal(shortcutFor('[x] ')?.checked, true);
+  assert.equal(shortcutFor('[X] ')?.checked, true);
+});
+
+test('a checkbox can follow a picture, like every other line shortcut', () => {
+  assert.equal(shortcutFor(`${LEAF}[ ] `)?.kind, 'taskList');
+});
+
+test('brackets in the middle of writing stay brackets', () => {
+  assert.equal(shortcutFor('see [ ] '), null);
+});

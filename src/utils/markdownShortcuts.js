@@ -96,6 +96,17 @@ const RULES = [
     extra: (match) => ({ level: match[1].length })
   },
   {
+    // A checkbox. Asked 2026-10-25: "add a checkbox that actually works to our
+    // tiptap, so that everywhere you can also just add a checkbox". `[ ] ` is
+    // an empty one and `[x] ` a ticked one -- GitHub's markdown for a to-do,
+    // and what the editor's own task item understands. Before the bullet list,
+    // which would otherwise never let `[` be reached at the start of a line;
+    // inside a bullet, `[ ] ` turns that line into a checkbox instead.
+    kind: 'taskList',
+    pattern: new RegExp(`${BLOCK_START}\\s*\\[([ xX]?)\\]\\s$`),
+    extra: (match) => ({ checked: /x/i.test(match[1]) })
+  },
+  {
     kind: 'bulletList',
     pattern: new RegExp(`${BLOCK_START}\\s*([-+*])\\s$`),
     extra: () => ({})
