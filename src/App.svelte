@@ -61,8 +61,10 @@
     subscribeAccountPlan,
     subscribeSubscription,
     deleteRemoteFile,
-    binRemoteFile
+    binRemoteFile,
+    firebaseConfig
   } from './firebaseClient.js';
+  import { releaseChannel, channelName, channelBadge, versionLabel } from './utils/releaseChannel.js';
   import ExportDialog from './components/ExportDialog.svelte';
   import ImportDialog from './components/ImportDialog.svelte';
   import BinDialog from './components/BinDialog.svelte';
@@ -148,6 +150,19 @@
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits } from './utils/habitGoals.js';
+
+  // Which Austavia this is -- the real one, staging, a preview of the site, or
+  // the dev server -- and the one way it is shown: the tab's name, a badge,
+  // and the version in diagnostics. Asked 2026-10-26; see
+  // utils/releaseChannel.js. Fixed for the life of the page.
+  const channel = releaseChannel({
+    projectId: firebaseConfig?.projectId,
+    hostname: typeof location === 'undefined' ? '' : location.hostname,
+    dev: import.meta.env?.DEV === true
+  });
+  const channelBadgeText = channelBadge(channel);
+  const shownVersion = versionLabel(typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev', channel);
+  if (typeof document !== 'undefined') document.title = channelName(channel);
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -2149,7 +2164,7 @@
           : 'web';
 
     return formatDiagnostics(buildDiagnostics({
-      version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev',
+      version: shownVersion,
       platform,
       mode,
       folder: currentSaveName,
@@ -6292,7 +6307,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       storageJournal = appendLaunch(
         stored,
         journalEntry({
-          version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev',
+          version: shownVersion,
           store
         })
       );
@@ -7238,6 +7253,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <!-- The dialog colours (--dlg-*) are set here too, so a dialog a mode opens
      (components/AppDialog.svelte) is in the theme's pop-up colours. -->
 <div class="app" style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
+  <!-- Which Austavia this is, when it is not the real one: inside .app so it
+       takes the theme's colours. utils/releaseChannel.js; nothing on production. -->
+  {#if channelBadgeText}
+    <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
+  {/if}
   <div class="controls" bind:this={controlsRef} style={controlsStyle}>
     <LeftControls
       bind:currentSaveName

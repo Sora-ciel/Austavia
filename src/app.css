@@ -585,3 +585,31 @@ ul[data-type="taskList"] > li[data-checked="true"] > div {
   margin: 0 2px;
   padding: 0 4px;
 }
+
+/* Which Austavia this is, when it is not the real one (utils/releaseChannel.js):
+   STAGING, PREVIEW · real data, LOCAL. Bottom left, out of the way of the
+   controls, never taking a click. In the app's own colours -- its writing on
+   its background -- so it reads on every theme; the preview one is filled,
+   because it is the one that is easy to mistake for a test and is not. */
+.channel-badge {
+  position: fixed;
+  left: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 2500;
+  pointer-events: none;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font: 600 0.68rem/1.6 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-text, #ffffff);
+  background: var(--app-bg, #000000);
+  border: 1px solid var(--app-text, #ffffff);
+  opacity: 0.85;
+}
+
+.channel-badge.channel-preview {
+  color: var(--app-bg, #000000);
+  background: var(--app-text, #ffffff);
+  opacity: 1;
+}

@@ -29,6 +29,28 @@ Nothing in the app polls GitHub for a new version — there is no updater in
 `src/`, `src-tauri/` or `tauri.conf.json` — so a prerelease cannot arrive on
 somebody's device on its own.
 
+## Telling them apart
+
+Asked 2026-10-26: "can we follow a certain convention to see the difference
+between the staging version and the production one? We should probably have
+the same convention for pre-releases of the site even if it doesn't have a
+build." One convention, everywhere a build or a site can be seen:
+
+| | Production | Staging | Preview | Local |
+| --- | --- | --- | --- | --- |
+| What it is | the real app | `arial-staging`, separate data | a test of the site on a preview channel -- **real data** | the dev server |
+| Name (window, tab, launcher) | Austavia | Austavia Staging | Austavia Preview | Austavia Local |
+| Badge, bottom left | none | STAGING | PREVIEW · REAL DATA | LOCAL |
+| Version in diagnostics | 0.8.662 | 0.8.662 · staging | 0.8.662 · preview | 0.8.662 · local |
+| Installer files | `Austavia_0.8.662…` | `Austavia-Staging_0.8.662…` | none | none |
+| GitHub release title | `v0.8.66 — <phrase>` | `Staging v0.8.662 — <phrase>` | `Preview v0.8.662 — <phrase>` | none |
+
+The app works out which it is by itself (`utils/releaseChannel.js`), from the
+project it talks to and the address it is served from -- so a preview of the
+site labels itself with no build of its own, and the real app can never be
+labelled by mistake. The version numbers are the same scheme for all of them
+(a test build adds a digit); the label is what says which kind it is.
+
 ## A staging pre-release
 
 Asked for on 2026-10-26: "a pre-release for staging, and package the deb and
