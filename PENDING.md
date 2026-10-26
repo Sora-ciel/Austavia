@@ -91,7 +91,11 @@ Steps, each landing on its own:
    A test fails on a mode declaring its own text or background name. Playlist
    is the one mode whose text really differs (its surface picks it) -- it
    overrides the shared name rather than inventing one.
-2. **One input, one button, one field.** Base styles in app.css for text
+2. **One dialog** -- done for Bin, Export, Import and the habit page
+   (`components/AppDialog.svelte`, 2026-10-26). Left: the app's own alert and
+   confirm dialog in App.svelte (`.app-dialog*`), which has its own buttons and
+   keyboard handling; move it onto AppDialog.
+2b. **One input, one button, one field.** Base styles in app.css for text
    inputs, buttons (plain, primary, small/icon) and pill toggles, in the
    theme's colours; a component only adds what is truly its own. Converted
    mode by mode, Habit first because it is rebuilt next. A test lists any
@@ -109,7 +113,6 @@ Each built from the parts above, and any new part added as a shared one --
 e.g. the Task-mode drop line, the objective editor, the alarm banner.
 
 5. **Colour or emoji per habit**, from the theme's colours or tints of them.
-11. **A page per habit**: year grid, rates by week/month/year, streaks, notes.
 7. **Amounts and time**, reusing Task-mode objectives (`taskGoals.js`,
    TaskGoalLine, TaskGoalEditor, the ring) rather than a second copy.
 8. **Reminders**, through AlarmRinger -- after background ringing (section 4).

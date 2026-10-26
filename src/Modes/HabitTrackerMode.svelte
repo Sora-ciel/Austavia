@@ -10,6 +10,7 @@
   import { getReadableTextColor } from "../utils/readableColor.js";
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createListReorder } from "../utils/listReorder.js";
+  import HabitPage from "../components/HabitPage.svelte";
   import { moveToSlot } from "../utils/dropPlacement.js";
   import { habitStreaks } from "../utils/habitStreaks.js";
   import { onDestroy, createEventDispatcher } from "svelte";
@@ -187,6 +188,29 @@
   const guardClick = event => reorder.swallowClick(event);
 
   onDestroy(() => reorder.destroy());
+
+  // ── A habit's page ──────────────────────────────────────────────
+  // Agreed 2026-10-26 (item 11): tap a habit's name to look back over it --
+  // components/HabitPage.svelte. On a computer a double-click on the name
+  // still renames it, so a single click waits a moment to be sure it is not
+  // the first half of one.
+  let pageFor = null;
+  let nameClickTimer = null;
+  $: pageHabit = pageFor ? habits.find(habit => habit.id === pageFor) : null;
+
+  function nameClick(habit, event) {
+    if (guardClick(event)) return;
+    clearTimeout(nameClickTimer);
+    if (compact) { pageFor = habit.id; return; }
+    nameClickTimer = setTimeout(() => { pageFor = habit.id; }, 260);
+  }
+
+  function nameDoubleClick(habit) {
+    clearTimeout(nameClickTimer);
+    startRename(habit);
+  }
+
+  onDestroy(() => clearTimeout(nameClickTimer));
 
   // ── When a habit is meant to be done ────────────────────────────
   // Agreed 2026-10-26: "Habits that aren't daily: '3 times a week' or
@@ -446,6 +470,16 @@
 
   .habit-name strong {
     font-size: 1.05rem;
+  }
+
+  /* The name opens the habit's page. */
+  .habit-title {
+    cursor: pointer;
+  }
+
+  .habit-title:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .calendar {
@@ -822,7 +856,12 @@
               />
             {:else}
               <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-              <strong on:dblclick={() => startRename(habit)}>{habit.name}</strong>
+              <strong
+                class="habit-title"
+                title="Open {habit.name}"
+                on:click={event => nameClick(habit, event)}
+                on:dblclick={() => nameDoubleClick(habit)}
+              >{habit.name}</strong>
             {/if}
             {#if habit.schedule}
               <span class="habit-schedule">{describeSchedule(habit.schedule)}</span>
@@ -881,6 +920,15 @@
                 role="menuitem"
                 class="habit-menu-rename"
                 on:pointerdown|stopPropagation
+                on:click|stopPropagation={() => { menuFor = null; pageFor = habit.id; }}
+              >
+                Open habit page
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                class="habit-menu-rename"
+                on:pointerdown|stopPropagation
                 on:click|stopPropagation={() => startRename(habit)}
               >
                 Rename habit
@@ -929,5 +977,13 @@
         </div>
       {/each}
     </div>
+  {/if}
+  {#if pageHabit}
+    <HabitPage
+      habit={pageHabit}
+      {today}
+      on:tap={event => toggleDay(pageHabit.id, event.detail)}
+      on:close={() => (pageFor = null)}
+    />
   {/if}
 </section>
