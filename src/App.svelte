@@ -145,6 +145,7 @@
   import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
+  import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
   import {
     startupGate,
     releasedWithoutSyncing,
@@ -2791,7 +2792,10 @@
 
     return {
       blocks: blocksClone,
-      modeOrders: cloneModeOrders(normalizedOrders)
+      modeOrders: cloneModeOrders(normalizedOrders),
+      // The habits, so the Undo button reaches them -- see
+      // utils/undoableSettings.js for what is in and what is left out.
+      settings: settingsForHistory(modeSettings)
     };
   }
 
@@ -3523,6 +3527,7 @@
       );
       blocks = [...snapshotBlocks];
       modeOrders = cloneModeOrders(snapshotOrders);
+      modeSettings = settingsFromHistory(modeSettings, snapshotState);
       await persistAutosave(snapshotBlocks, snapshotOrders, modeSettings, { immediate: true });
     }
   }
@@ -3538,6 +3543,7 @@
       );
       blocks = [...snapshotBlocks];
       modeOrders = cloneModeOrders(snapshotOrders);
+      modeSettings = settingsFromHistory(modeSettings, snapshotState);
       await persistAutosave(snapshotBlocks, snapshotOrders, modeSettings, { immediate: true });
     }
   }
@@ -6192,6 +6198,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       patch = { ...patch, playlist: { ...patch.playlist, ...detail.playlist } };
     }
 
+    const habitsChange = detail.habit && typeof detail.habit === 'object' &&
+      !habitsEqual(modeSettings?.habit?.habits, detail.habit.habits ?? modeSettings?.habit?.habits);
+    // Typing not yet in the history gets its own entry first, so undoing the
+    // habit change does not also take the typing with it.
+    if (habitsChange) await ensureCurrentHistorySnapshot();
+
     if (detail.habit && typeof detail.habit === 'object') {
       // Said in words in the sync log, so a tap that did not stick, or a
       // habit that went missing, can be traced to the moment it happened.
@@ -6203,6 +6215,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     const nextModeSettings = normalizeModeSettings(patch);
     modeSettings = nextModeSettings;
+    // A habit added, ticked, renamed or deleted is a step the Undo button can
+    // take back. pushHistory saves as well.
+    if (habitsChange) {
+      await pushHistory(blocks, modeOrders);
+      return;
+    }
     await persistAutosave(blocks, modeOrders, nextModeSettings, { immediate: true });
   }
 

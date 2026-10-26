@@ -96,13 +96,9 @@ Steps, each landing on its own:
    theme's colours; a component only adds what is truly its own. Converted
    mode by mode, Habit first because it is rebuilt next. A test lists any
    component restyling `input`/`button` from scratch.
-3. **Undo covers mode settings.** The existing history snapshot gains the
-   folder's modeSettings, so the Undo button and Ctrl+Z bring back a deleted
-   habit with no new mechanism. The wallpaper pictures are left out of each
-   history entry (data URLs of megabytes, copied per step) -- the slot is
-   restored by reference to what the entry before held, or the pictures stay
-   out of undo; decide when building. Folder snapshots (`folderSnapshots.js`)
-   are a different thing -- copies kept before a download -- and stay so.
+3. ~~Undo covers mode settings~~ -- done for habits 2026-10-26
+   (`utils/undoableSettings.js`). The wallpaper and the other display
+   preferences stay out on purpose; see that file.
 4. **Hardcoded colours out of the modes**, as each one is touched, rather
    than as a sweep: a sweep across six modes at once is how a theme breaks
    unnoticed.
@@ -112,7 +108,6 @@ Steps, each landing on its own:
 Each built from the parts above, and any new part added as a shared one --
 e.g. the Task-mode drop line, the objective editor, the alarm banner.
 
-1. **Deleting a habit is undoable** -- by step A3, not a new undo.
 2. **Streaks** beside the name: current and best. Absolute, recomputed from
    the log each time, never kept as a counter.
 3. **Today stands out**: a larger square for today, the past days smaller.
