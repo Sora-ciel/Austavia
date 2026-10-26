@@ -20,6 +20,45 @@ code when two things use the same thing ... like how Linux installs apps
 using packages", so that modes can be added, improved or removed without
 dragging copies with them. Now in CLAUDE.md as "One of everything".
 
+### First: writing (asked 2026-10-26, after the plan below was set)
+
+"Next thing I'll do is the improvement on writing" -- so this goes ahead of
+A and B. Two asks:
+
+**1. A long note lags on the phone.** Reported: "after 3000 words and a couple
+of images in Single Note mode it starts lagging on phone". Not measured on a
+phone yet -- measure first, on a copy of such a note, before choosing.
+What is already known points at two sections below, in this order:
+
+- **Section 2, pictures stored by reference**, is the likely main cause with
+  pictures in the note: each picture is megabytes of base64 inside the
+  writing, so every save and every undo step copies all of it. Staged in
+  four steps there, and it has failed before -- keep to the stages.
+- **Section 1a, letting the editor be laid out on its own**: 7ms a keystroke
+  at 16k characters on a desktop, several times that on a phone. The obvious
+  fix (`contain: layout`) breaks scrolling; the restructure it needs is
+  written there.
+
+**2. Everything that is not text behaves like one character.** Asked: "all
+the non-text markdown-like things we added should behave like one character
+kinda. You should be able to put yourself on its right and left. Even for
+images, to make it easier to move etc." So a picture, the inline separator
+and anything else drawn by a node view (TipTapEditor.svelte: ResizableImage
+around line 592, InlineSeparator around line 316) should:
+
+- take the caret on either side, by click and by arrow keys -- including a
+  picture alone on its line, at the start or end of a paragraph, which is
+  where browsers refuse to draw a caret next to `contenteditable=false`;
+- be stepped over by one arrow press, deleted by one Backspace/Delete, and
+  selected and moved (cut/paste, drag) as one character;
+- work the same on the phone's touch caret.
+
+Pictures are already `inline: true` atoms, so the model is right; it is the
+drawing and the caret that are not. Decide where the rule lives so a test can
+reach it (which positions are valid caret stops beside an atom), and check
+task-list checkboxes against the same rule. Wait for the checks in section 0
+on the editor before changing the node views.
+
 ### A. Shared parts first
 
 Measured on 2026-10-26, before any of it:
