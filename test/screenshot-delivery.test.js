@@ -13,6 +13,9 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  captureScale,
+  withinTime,
+  CAPTURE_LIMITS,
   screenshotFileName,
   canCopyImage,
   deliveryMessage
@@ -125,4 +128,25 @@ describe('deliveryMessage', () => {
   it('only calls it a failure when nothing arrived', () => {
     assert.equal(deliveryMessage({}), 'Could not save that view.');
   });
+});
+
+// Reported 2026-10-26, Android: "the screenshot button doesn't work. It
+// doesn't save anywhere or even copy" -- and nothing appeared, not even an
+// error, which is a capture that never finishes.
+
+it('on a phone, a long note is drawn small enough for the phone to hold', () => {
+  const scale = captureScale({ width: 400, height: 20000, phone: true });
+  assert.ok(400 * 20000 * scale * scale <= CAPTURE_LIMITS.phone.area);
+  assert.ok(20000 * scale <= CAPTURE_LIMITS.phone.edge);
+  assert.ok(scale > 0);
+});
+
+it('a short view is still drawn at twice the size, on a phone as on a computer', () => {
+  assert.equal(captureScale({ width: 400, height: 800, phone: true }), 2);
+  assert.equal(captureScale({ width: 1920, height: 1080 }), 2);
+});
+
+it('a step that never finishes fails, naming the step, instead of leaving the button busy', async () => {
+  await assert.rejects(withinTime(new Promise(() => {}), 20, 'drawing the page'), /drawing the page/);
+  assert.equal(await withinTime(Promise.resolve('png'), 20, 'drawing the page'), 'png');
 });

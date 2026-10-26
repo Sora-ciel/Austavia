@@ -138,7 +138,7 @@
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
-  import { screenshotFileName, canCopyImage, deliveryMessage } from './utils/screenshotDelivery.js';
+  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, withinTime, CAPTURE_DEADLINES } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, textChunks } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
@@ -3865,24 +3865,11 @@
   let screenshotNote = '';
   let screenshotNoteTimer;
 
-  const SCREENSHOT_SCALE = 2;
-  // Browsers refuse to allocate a canvas beyond roughly 16384px on a side, and
-  // cap the total area as well. Rather than fail outright on a very large
-  // board, the scale is reduced until the result fits.
-  const MAX_CANVAS_EDGE = 16384;
-  const MAX_CANVAS_AREA = 16384 * 16384;
-
-  function fittingScale(width, height) {
-    let scale = SCREENSHOT_SCALE;
-    scale = Math.min(scale, MAX_CANVAS_EDGE / Math.max(1, width));
-    scale = Math.min(scale, MAX_CANVAS_EDGE / Math.max(1, height));
-    const areaLimited = Math.sqrt(MAX_CANVAS_AREA / Math.max(1, width * height));
-    scale = Math.min(scale, areaLimited);
-    // Deliberately allowed below 1:1. A board already wider than the browser's
-    // limit has to be scaled down to be captured at all, and a smaller image is
-    // a better outcome than a failed one.
-    return Math.min(SCREENSHOT_SCALE, scale);
-  }
+  // How big the picture may be drawn is decided in utils/screenshotDelivery.js
+  // (captureScale): a phone is held to far less than a computer, because past
+  // its memory the drawing never finishes rather than failing.
+  const capturingOnPhone = () =>
+    onAndroidApp() || (typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT);
 
   // Temporarily opens every scrollable pane inside `root` so its whole content
   // is laid out, and hands back a function that puts them all back.
@@ -3965,7 +3952,7 @@
       // Measured after expanding, so the size covers the content now on show.
       const width = Math.max(target.scrollWidth, target.clientWidth, 1);
       const height = Math.max(target.scrollHeight, target.clientHeight, 1);
-      const scale = fittingScale(width, height);
+      const scale = captureScale({ width, height, phone: capturingOnPhone() });
 
       // Canvas pins its wallpaper outside the board, so the board is captured
       // with nothing behind it and the wallpaper painted in underneath -- see
@@ -3979,7 +3966,7 @@
           })
         : null;
 
-      const drawn = await html2canvas(target, {
+      const drawn = await withinTime(html2canvas(target, {
         backgroundColor: wallpaper ? null : backdrop,
         scale,
         logging: false,
@@ -3991,10 +3978,13 @@
         scrollX: 0,
         scrollY: 0,
         // The button itself and any open popover are furniture, not content.
+        // A picture in the view that will not load is left out after 5s rather
+        // than the default 15s, inside the drawing's own deadline.
+        imageTimeout: 5000,
         ignoreElements: element =>
           element.classList?.contains('screenshot-btn') ||
           element.classList?.contains('player-panel')
-      });
+      }), CAPTURE_DEADLINES.drawing, 'drawing the page');
 
       if (board) board.style.transform = previousTransform || '';
       restoreScrollers();
@@ -4002,7 +3992,11 @@
 
       const canvas = wallpaper ? await underlayWallpaper(drawn, wallpaper, backdrop) : drawn;
 
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const blob = await withinTime(
+        new Promise(resolve => canvas.toBlob(resolve, 'image/png')),
+        CAPTURE_DEADLINES.picture,
+        'making the picture'
+      );
       if (!blob) throw new Error('The image came back empty.');
       return blob;
     } catch (error) {
@@ -4148,7 +4142,9 @@
     } catch (error) {
       console.error('Screenshot failed', error);
       await copying.catch(() => {});
-      await appAlert("Couldn't capture this view.");
+      // The reason is shown, not only logged: on a phone there is no console
+      // to read, and which step stopped is what decides the fix.
+      await appAlert(`Couldn't capture this view. ${error?.message || ''}`.trim());
     } finally {
       screenshotBusy = false;
     }
