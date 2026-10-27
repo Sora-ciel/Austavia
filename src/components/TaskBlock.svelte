@@ -15,7 +15,15 @@
     return sanitizeRichText(looksLikeHtml(value) ? value : md.render(value));
   }
 
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+  import TaskGoalLine from './TaskGoalLine.svelte';
+  import TaskGoalEditor from './TaskGoalEditor.svelte';
+  import { goalNow, startTimer, pauseTimer, addProgress, setGoal, removeGoal } from '../utils/taskGoals.js';
+  import { startGoalClock } from '../utils/goalClock.js';
+  import { readLastGoal, writeLastGoal } from '../utils/taskModeView.js';
+  import { createListReorder } from '../utils/listReorder.js';
+  import { moveToSlot } from '../utils/dropPlacement.js';
+  import { portal } from '../utils/portal.js';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import ColorField from './ColorField.svelte';
 
@@ -258,56 +266,86 @@
     addTask();
   }
 
-  // ── Reordering (drag the handle) ────────────────────────────────
+  // ── Reordering ──────────────────────────────────────────────────
+  // The shared gestures (utils/listReorder.js), as in Task mode: the handle on
+  // a computer, hold and slide on a phone, the line in the middle of the gap.
+  // This block had a reordering of its own, a third copy; asked 2026-10-27
+  // that a block can do everything its mode can (CLAUDE.md, "A block works on
+  // its own"). Only the tasks still to do are drawn here, so a task moves
+  // among those and the done ones keep their places (moveToSlot).
+  let listEl;
   let draggingTaskId = null;
-  let dragOverTaskId = null;
-  let dragOverPos = null;
+  let dropLine = null;
 
-  function startDrag(e, taskId) {
-    e.preventDefault();
-    e.stopPropagation();
-    ensureFocus();
-    draggingTaskId = taskId;
-    window.addEventListener('pointermove', onDragMove);
-    window.addEventListener('pointerup', onDragEnd);
+  const reorder = createListReorder({
+    listOf: () => listEl,
+    itemsIn: list => [...list.querySelectorAll(':scope > .task-item')],
+    idOf: element => element.dataset.taskId,
+    onPick: taskId => { draggingTaskId = taskId; if (taskId) ensureFocus(); },
+    // Measured on screen, drawn inside the Canvas's zoom: back to the block's
+    // own pixels, and past however far the list has been scrolled.
+    onLine: line => {
+      const scale = Number(canvasScale) > 0 ? Number(canvasScale) : 1;
+      dropLine = line ? { y: line.y / scale + (listEl?.scrollTop || 0) } : null;
+    },
+    onDrop: (taskId, groupIds, slot) => {
+      const group = groupIds.map(gid => tasks.find(t => t.id === gid)).filter(Boolean);
+      const next = moveToSlot(tasks, taskId, group, slot);
+      if (next !== tasks) updateTasks(next);
+    },
+    onHeld: (taskId, point) => openGoalMenu(taskId, point.x, point.y)
+  });
+
+  // ── Objectives ──────────────────────────────────────────────────
+  // Time and amounts, as in Task mode -- the same goal, line, editor and ring
+  // -- so the block does not need the mode for them. Asked 2026-10-27: "a
+  // block ... should be able to work even if the mode isn't there". The menu
+  // is a right-click on a computer, a hold let go on a phone.
+  let now = Date.now();
+  $: anyRunning = tasks.some(t => t?.goal?.runningSince);
+
+  function changeTask(taskId, change) {
+    const at = Date.now();
+    updateTasks(tasks.map(t => (t.id === taskId ? change(t, at) : t)));
+  }
+  const toggleTimer = task =>
+    changeTask(task.id, (t, at) => (goalNow(t.goal, at)?.running ? pauseTimer(t, at) : startTimer(t, at)));
+  const countOnce = task => changeTask(task.id, (t, at) => addProgress(t, 1, at));
+  const uncountOnce = task => changeTask(task.id, (t, at) => addProgress(t, -1, at));
+  const logGoal = (task, amount) => changeTask(task.id, (t, at) => addProgress(t, amount, at));
+
+  // The clock moves the bars; settling is App.svelte's 15s pass over every
+  // task block, so nothing is settled twice from here.
+  let stopClock = () => {};
+  onMount(() => { stopClock = startGoalClock({ isRunning: () => anyRunning, onTick: at => { now = at; } }); });
+  onDestroy(() => { stopClock(); reorder.destroy(); });
+
+  const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
+  let goalMenu = null;
+  $: goalMenuTask = goalMenu ? tasks.find(t => t.id === goalMenu.taskId) : null;
+
+  function openGoalMenu(taskId, x, y) {
+    goalMenu = { taskId, x, y, last: readLastGoal(deviceStorage()) };
   }
 
-  function onDragMove(e) {
-    if (!draggingTaskId) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const itemEl = el?.closest('.task-item');
-    if (!itemEl) { dragOverTaskId = null; dragOverPos = null; return; }
-    const overId = itemEl.dataset.taskId;
-    if (!overId || overId === draggingTaskId) return;
-    const rect = itemEl.getBoundingClientRect();
-    dragOverPos = (e.clientY - rect.top) < rect.height / 2 ? 'before' : 'after';
-    dragOverTaskId = overId;
+  function taskContextMenu(event, taskId) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (reorder.draggingId) return;
+    openGoalMenu(taskId, event.clientX, event.clientY);
   }
 
-  function onDragEnd() {
-    window.removeEventListener('pointermove', onDragMove);
-    window.removeEventListener('pointerup', onDragEnd);
-    if (draggingTaskId && dragOverTaskId && draggingTaskId !== dragOverTaskId) {
-      reorderTask(draggingTaskId, dragOverTaskId, dragOverPos);
-    }
-    draggingTaskId = null;
-    dragOverTaskId = null;
-    dragOverPos = null;
+  function saveGoal(detail) {
+    const taskId = goalMenu?.taskId;
+    goalMenu = null;
+    writeLastGoal(deviceStorage(), detail);
+    if (taskId) changeTask(taskId, (t, at) => setGoal(t, detail, at));
   }
 
-  function reorderTask(draggedId, targetId, pos) {
-    const list = [...tasks];
-    const fromIdx = list.findIndex(t => t.id === draggedId);
-    if (fromIdx === -1) return;
-    const [moved] = list.splice(fromIdx, 1);
-    let toIdx = list.findIndex(t => t.id === targetId);
-    if (toIdx === -1) {
-      list.push(moved);
-    } else {
-      if (pos === 'after') toIdx++;
-      list.splice(toIdx, 0, moved);
-    }
-    updateTasks(list);
+  function dropGoal() {
+    const taskId = goalMenu?.taskId;
+    goalMenu = null;
+    if (taskId) changeTask(taskId, t => removeGoal(t));
   }
 
   // ── Inline edit (double-click a task to rewrite it) ─────────────
@@ -445,6 +483,8 @@
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
+    /* The drop line is placed from the top of the list. */
+    position: relative;
   }
 
   /* Nothing in here repaints the block's own colour.
@@ -471,11 +511,21 @@
     border: 1px solid var(--text);
     box-sizing: border-box;
     transition: box-shadow 0.1s ease, opacity 0.1s ease;
+    /* So an objective's line can take a row of its own under the task. */
+    flex-wrap: wrap;
   }
 
   .task-item.dragging { opacity: 0.4; }
-  .task-item.drag-over-before { box-shadow: inset 0 2px 0 0 var(--text); }
-  .task-item.drag-over-after { box-shadow: inset 0 -2px 0 0 var(--text); }
+
+  /* The drop line takes the block's writing colour (app.css draws it in
+     currentColor). */
+  .task-list :global(.drop-line) { color: var(--text); }
+
+  /* An objective: Task mode's line, across the row under the task. */
+  .task-goal {
+    flex-basis: 100%;
+    min-width: 0;
+  }
 
   .drag-handle {
     flex-shrink: 0;
@@ -618,21 +668,24 @@
       />
       <button on:click={addTask} data-focus-guard>Add</button>
     </div>
-    <ul class="task-list">
+    <ul class="task-list" bind:this={listEl}>
+      {#if dropLine}
+        <li class="drop-line" aria-hidden="true" style="top: {dropLine.y}px"></li>
+      {/if}
       {#each todoTasks as task (task.id)}
         <li
           class="task-item"
           data-task-id={task.id}
           class:dragging={draggingTaskId === task.id}
-          class:drag-over-before={dragOverTaskId === task.id && dragOverPos === 'before'}
-          class:drag-over-after={dragOverTaskId === task.id && dragOverPos === 'after'}
+          on:pointerdown={(e) => reorder.itemDown(e, task.id)}
+          on:contextmenu={(e) => taskContextMenu(e, task.id)}
         >
           <!-- svelte-ignore a11y-click-events-have-key-events -->
           <button
             class="drag-handle"
             data-focus-guard
             aria-label="Drag to reorder"
-            on:pointerdown={(e) => startDrag(e, task.id)}
+            on:pointerdown={(e) => { e.stopPropagation(); ensureFocus(); reorder.handleDown(e, task.id); }}
           >
             <svg viewBox="0 0 10 16" width="8" height="13" fill="currentColor">
               <circle cx="2" cy="2" r="1.3"/><circle cx="8" cy="2" r="1.3"/>
@@ -694,10 +747,40 @@
           >
             ×
           </button>
+          {#if task.goal}
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div class="task-goal" data-focus-guard on:pointerdown|stopPropagation>
+              <TaskGoalLine
+                goal={task.goal}
+                {now}
+                on:timer={() => toggleTimer(task)}
+                on:count={() => countOnce(task)}
+                on:uncount={() => uncountOnce(task)}
+                on:log={(e) => logGoal(task, e.detail)}
+              />
+            </div>
+          {/if}
         </li>
       {/each}
     </ul>
   </div>
+
+  {#if goalMenu && goalMenuTask}
+    <!-- Out to the app's root: inside the Canvas's zoom a fixed pop-up is drawn
+         scaled and in the wrong place (utils/portal.js). -->
+    <div use:portal>
+      <TaskGoalEditor
+        x={goalMenu.x}
+        y={goalMenu.y}
+        goal={goalMenuTask.goal || null}
+        taskLabel={goalMenuTask.text?.replace(/<[^>]*>/g, '').slice(0, 60) || ''}
+        last={goalMenu.last}
+        on:save={(e) => saveGoal(e.detail)}
+        on:remove={dropGoal}
+        on:close={() => (goalMenu = null)}
+      />
+    </div>
+  {/if}
 
   <div
     class="resize-handle"

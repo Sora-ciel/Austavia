@@ -8,14 +8,17 @@ import { readFileSync } from 'node:fs';
 // utils/listReorder.js, and every list that can be reordered uses it. Task
 // mode had its own copy until the habit tracker needed the same thing.
 
-const REORDERABLE = ['Modes/TaskMode.svelte', 'Modes/HabitTrackerMode.svelte'];
+const REORDERABLE = ['Modes/TaskMode.svelte', 'Modes/HabitTrackerMode.svelte', 'components/TaskBlock.svelte'];
 const read = path => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
 
 test('every reorderable list uses the one shared drag, not a copy of its own', () => {
   for (const path of REORDERABLE) {
     const source = read(path);
     assert.match(source, /createListReorder\(/, `${path} uses listReorder.js`);
-    assert.doesNotMatch(source, /addEventListener\(['"]pointermove/, `${path} tracks the pointer itself`);
+    // The signs of a reorder of its own: finding the item under the pointer,
+    // or working out a drop slot or "before/after" itself. (A block may still
+    // track the pointer to move the whole block -- that is not reordering.)
+    assert.doesNotMatch(source, /elementFromPoint\(|dropSlot\(|dragOverPos|reorderTask\(/, `${path} reorders by itself`);
     assert.doesNotMatch(source, /^\s*\.drop-line\s*\{/m, `${path} draws its own drop line`);
   }
 });

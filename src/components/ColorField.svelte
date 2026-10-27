@@ -1,4 +1,5 @@
 <script>
+  import { portal } from '../utils/portal.js';
   import { createEventDispatcher, onMount, onDestroy } from 'svelte';
   import ColorPicker from './ColorPicker.svelte';
 
@@ -13,14 +14,8 @@
   // zoomed canvas) becomes its containing block instead — which throws the
   // popover's position and size off by the canvas zoom factor. Rendering it
   // straight on <body> keeps it correctly viewport-fixed at any zoom level.
-  function portal(node) {
-    document.body.appendChild(node);
-    return {
-      destroy() {
-        if (node.parentNode) node.parentNode.removeChild(node);
-      }
-    };
-  }
+  // The shared one (utils/portal.js). It used to move the picker to <body>; it
+  // now goes to .app, still clear of the Canvas's transform.
 
   let open = false;
   let btnEl, popEl;

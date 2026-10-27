@@ -254,9 +254,10 @@ What follows:
 - **A new mode starts from its block**: write the block, then the mode that
   shows it, never the other way round.
 
-Where the app does not follow this yet is listed in PENDING ("Blocks and
-their modes"): habits and the music library live in their modes' settings
-with no block, and the task block cannot use objectives off Task mode.
+**Two accepted exceptions**, decided 2026-10-27: habits and the music library
+live in their modes' settings (Habit Tracker, Playlist) and have no block.
+Anything new follows the rule. What is still owed is in PENDING ("Blocks and
+their modes").
 
 ## What is still owed is written down, not remembered
 

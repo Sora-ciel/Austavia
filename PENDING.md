@@ -119,27 +119,21 @@ moment, archive instead of delete) after these, in an order to be agreed.
 
 ## Blocks and their modes (rule in CLAUDE.md, asked 2026-10-27)
 
-Where the app does not yet follow "a block works on its own; a mode only
-shows blocks", found 2026-10-27:
+Checked against "a block works on its own; a mode only shows blocks" on
+2026-10-27:
 
-1. **The task block cannot use objectives.** The time and amount goals, the
-   timer, +1 and the goal menu exist only in Task mode (TaskGoalLine and
-   TaskGoalEditor are mounted there alone). Owed to TaskBlock, reusing the
-   same components.
-2. **Habits have no block.** They live in the folder's mode settings
-   (`modeSettings.habit.habits`), so they cannot be on a Canvas or in a page --
-   and "a page can hold all blocks" (decided for Page mode) needs them to.
-   A habit block, with the Habit Tracker becoming the mode that mounts habit
-   blocks. Moving the data is the hard part: one-time, on every device, with
-   older builds still writing the old place -- plan it like a sync change.
-3. **The music library has no block.** Playlist mode keeps tracks and
-   playlists in `modeSettings.playlist`; the music block is one track. A
-   playlist block would let a playlist sit in a page or on a Canvas. Same
-   kind of move as 2.
-
-Do 1 when the task block is next touched. 2 and 3 are their own projects and
-come before Page mode's step 3 (blocks inside a page), since a page holding
-"all blocks" means these too.
+- **The task block could not use objectives** -- fixed the same day: the goal
+  line, the goal menu (right-click, or hold and let go) and the shared
+  reordering with the drop line, all from the same pieces Task mode uses.
+- **Habits and the music library have no block, and that is decided**
+  (2026-10-27): they stay in their modes' settings as the two accepted
+  exceptions. So "a page holds every kind of block" means every block; the
+  Habit Tracker and the Playlist are not blocks.
+- **Owed: the task block moves and resizes itself** with its own copy of the
+  code every other block gets from `BlockShell.svelte` (TextBlock, ClockBlock
+  and MusicBlock use it; TaskBlock has its own onDragStart, onResizeStart and
+  pointer listeners). Move it onto BlockShell, so a fix to moving blocks
+  reaches it too.
 
 ## Planned 2026-10-27: Page mode, and nests
 
@@ -231,9 +225,9 @@ character (the "atoms" item) before anything can be embedded in it.
 
 ### Decided 2026-10-27
 
-- (a) **A page can hold every kind of block** -- which makes "Blocks and their
-  modes" items 2 and 3 (a habit block, a playlist block) prerequisites for
-  that part of step 3.
+- (a) **A page can hold every kind of block.** Habits and the music library
+  are not blocks (an accepted exception, see "Blocks and their modes"), so
+  they are not part of this.
 - (b) **A page's writing is one `page` block** in the folder: it syncs, undoes
   and exports like everything else, and other modes can show it.
 - (c) **Nests hold, in this order: folders, then page blocks, then pictures.**
