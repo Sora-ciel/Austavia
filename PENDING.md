@@ -117,6 +117,122 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Planned 2026-10-27: Page mode, and nests
+
+Asked: "a mode that is like Notion -- a page mode, where you'll be able to add
+folders like the databases in Notion. You'll be able to add the blocks using
+'/' and the name of the block or command." And: folders are found inside other
+folders "using a link to folders instead of actually being inside, so that in
+another folder you can also have that link". Notion's databases are called
+**nests** here, "because you'll be able to nest a bunch of things, not just
+other folders".
+
+Comes **after the writing work** at the top of this file: a page is one long
+document with blocks inside it, so it inherits every cost a long note has
+(section 1a, section 2) and needs pictures and blocks to behave as one
+character (the "atoms" item) before anything can be embedded in it.
+
+### What it is
+
+- **A page is a folder, shown as one document.** Page mode is a seventh mode
+  in `modeRegistry.js`, like Single Note: one writing column, full width, the
+  folder's wallpaper and theme. Typing `/` opens a menu of blocks and
+  commands, filtered as you type (`/hea` → Heading).
+- **Blocks inside a page are the folder's real blocks.** `/image`, `/music`,
+  `/clock`, `/task` create an ordinary block and put a reference to it in the
+  page (a node holding its id), drawn by the block's own component. So the
+  same picture is on the Canvas and in the page, edited in either -- no second
+  kind of image (CLAUDE.md, "One of everything").
+- **A nest is a block that holds links**, drawn as tiles (later a list, a
+  table). What it can link to, in the order they would be built: folders,
+  web addresses, a block in another folder, and anything later added. A link
+  is never containment: one folder can be in any number of nests, in any
+  number of folders, and deleting a nest deletes no folder.
+- **`/page` makes a folder and links it where you typed** -- Notion's sub-page,
+  done as a new folder plus a link, so "pages inside pages" needs nothing
+  more.
+
+### In order, each landing on its own
+
+0. **A folder that keeps its identity when renamed.** Today a folder's name
+   *is* its id (`saveRemoteFile(fileName, ...)`); a rename is a new folder plus
+   a tombstone on the old name. A link by name would break on every rename.
+   So each folder gets a `folderId` stored inside it, kept across renames and
+   synced. For folders that exist already it must come out the same on every
+   device without them talking to each other, or two devices give one folder
+   two ids: derived from the name the first time (`legacy:<name>`), then
+   carried. The cloud index needs it too, so a link can be followed to a
+   folder this device has not downloaded -- check `database.rules.json`'s
+   index rule accepts the field, and deploy the rule first. Nothing visible;
+   tests for: a rename keeps the id, two devices derive the same one, an old
+   build keeps it (it will, from 0.8.662 -- see keepUnknown).
+1. **The `/` menu, in every editor.** One shared command list and menu
+   (TipTap's suggestion utility), in Single Note, text blocks and pages alike.
+   First only what already exists: text, headings, lists, checkbox, quote,
+   divider, inline separator, picture. Useful the day it lands, before Page
+   mode exists. Keyboard (arrows, Enter, Escape) and touch; on a phone a `+`
+   at the start of an empty line opens the same menu.
+2. **Page mode itself.** Where the page's writing lives is decision (b)
+   below. Title at the top (the folder name, renaming the folder), the column,
+   wallpaper, theme, the channel badge. No embedded blocks yet.
+3. **Blocks inside a page.** A `blockRef` node (marked
+   `data-austavia-node="blockRef"`, per keepUnknown) drawn by the block's own
+   component; `/image`, `/music`, `/embed`, `/clock`, `/task`, `/habit`
+   create the block and place the reference. Deleting the reference asks
+   whether to delete the block or only take it off the page. Needs the atoms
+   work: a block in the text must take the caret on either side and move as
+   one character.
+4. **Nests, first version: folders as tiles.** A `nest` block type, so it
+   also works on the Canvas and in Simple Note. `/nest` adds one; "Add" opens a
+   search over every folder (local and cloud, by name, using the index from
+   step 0). A tile shows the folder's name, a cover (its wallpaper or first
+   picture) and opens it. A linked folder that was deleted shows as such, with
+   Restore if it is in the bin; never an error. Opening a folder from a nest
+   keeps a way back (step 7).
+5. **`/page`**: a new folder, opened in Page mode, linked where the command was
+   typed -- in the text as a page link, or into a nest.
+6. **Nests, more things**: web links (title and icon), a block in another
+   folder (a preview, opening that folder at that block), and pages. Each is
+   one more `kind` on an entry; a kind this build does not know is kept and
+   drawn as "made in a newer version" (keepUnknown).
+7. **Getting around**: a back button and breadcrumbs after following links;
+   "Linked from" on a folder, worked out by reading every folder's nests --
+   recomputed, never kept as a list (CLAUDE.md, recomputing), and cached
+   only as a cache.
+8. **Nests as databases**: views (tiles, list, table, board), sort and
+   filter, and properties per entry (tags, status, a date, a number) --
+   the "database" half of Notion. The biggest single step; its shape should be
+   decided once 4-6 have been used for a while.
+
+### Things that need deciding
+
+- (a) **Which blocks can a page hold?** Proposed: all of them, as references.
+- (b) **Where a page's writing lives.** Either a single `page` block in the
+  folder (then it is one block among others, and shows in other modes as a
+  long text block), or the folder's mode settings (then other modes do not
+  see it). Proposed: a `page` block -- it syncs, undoes and exports like
+  everything else, and Canvas can show it, at no extra cost.
+- (c) **What a nest holds first.** Proposed: folders only, then links, then
+  blocks from other folders.
+- (d) **Properties** (Notion columns): now or after nests have been used?
+  Proposed: after.
+- (e) **Whether the folder list itself changes.** With nests, folders form a
+  web rather than a tree; the list can stay flat, with a "Top level" view of
+  folders no nest links to. Proposed: leave it flat until step 7.
+
+### What could go wrong
+
+- **Every device must be on 0.8.662 or later before step 0 ships.** Earlier
+  builds drop fields they do not know; from 0.8.662 they keep them.
+- **A page with many embedded blocks is the slowest thing the app would
+  draw.** Steps 3 onwards wait for the writing work, and a page should draw
+  blocks off screen lazily.
+- **Links across folders meet sync**: a folder linked from another device
+  that has not downloaded yet; a folder renamed or deleted elsewhere. Step 0
+  and the tombstones from 0b are what make these answerable.
+- **Cycles**: A nests B, B nests A. Harmless as links; anything that previews
+  a nest's contents inside another nest must stop at one level.
+
 ## Next, in order (set 2026-10-12)
 
 The order agreed for the run-up to launch. Each line points at the section
