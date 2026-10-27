@@ -226,6 +226,38 @@ This protects from this version on. Versions already installed before it do
 not have it, which is why a release that adds stored fields should say to
 update every device.
 
+## A block works on its own; a mode only shows blocks
+
+Asked 2026-10-27: "sometimes a block can just be a block, but sometimes a
+block can also be a mode ... both of those types of blocks should be able to
+work even if the mode isn't there. Just by downloading the block -- the mode
+just does a mount of the block into the mode ... so that we don't end up
+having a hard time guessing the structure."
+
+So there are two shapes, and only two:
+
+- **A block with no mode** -- the clock and timer. Everything it is lives in
+  the block.
+- **A block with a mode of its own** -- the task block and Task mode. The
+  data is still the block's, and the block alone can do everything with it.
+  The mode is a way of showing blocks of that type: it finds them in the
+  folder and mounts them, laid out its own way. It adds a layout, never data
+  or abilities the block lacks.
+
+What follows:
+
+- **Data lives in blocks.** A mode keeps nothing of its own in the folder
+  beyond how it is shown (column count, which way tasks are added). If a mode
+  needs something saved, that is a block, or a field on one.
+- **Anything a mode can do to a block, the block can do itself**, on the
+  Canvas or in a page. A feature built in a mode first is owed to its block.
+- **A new mode starts from its block**: write the block, then the mode that
+  shows it, never the other way round.
+
+Where the app does not follow this yet is listed in PENDING ("Blocks and
+their modes"): habits and the music library live in their modes' settings
+with no block, and the task block cannot use objectives off Task mode.
+
 ## What is still owed is written down, not remembered
 
 [`PENDING.md`](PENDING.md) is the list. It exists because the same list was

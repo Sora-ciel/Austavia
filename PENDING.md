@@ -117,6 +117,30 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Blocks and their modes (rule in CLAUDE.md, asked 2026-10-27)
+
+Where the app does not yet follow "a block works on its own; a mode only
+shows blocks", found 2026-10-27:
+
+1. **The task block cannot use objectives.** The time and amount goals, the
+   timer, +1 and the goal menu exist only in Task mode (TaskGoalLine and
+   TaskGoalEditor are mounted there alone). Owed to TaskBlock, reusing the
+   same components.
+2. **Habits have no block.** They live in the folder's mode settings
+   (`modeSettings.habit.habits`), so they cannot be on a Canvas or in a page --
+   and "a page can hold all blocks" (decided for Page mode) needs them to.
+   A habit block, with the Habit Tracker becoming the mode that mounts habit
+   blocks. Moving the data is the hard part: one-time, on every device, with
+   older builds still writing the old place -- plan it like a sync change.
+3. **The music library has no block.** Playlist mode keeps tracks and
+   playlists in `modeSettings.playlist`; the music block is one track. A
+   playlist block would let a playlist sit in a page or on a Canvas. Same
+   kind of move as 2.
+
+Do 1 when the task block is next touched. 2 and 3 are their own projects and
+come before Page mode's step 3 (blocks inside a page), since a page holding
+"all blocks" means these too.
+
 ## Planned 2026-10-27: Page mode, and nests
 
 Asked: "a mode that is like Notion -- a page mode, where you'll be able to add
@@ -191,34 +215,38 @@ character (the "atoms" item) before anything can be embedded in it.
    keeps a way back (step 7).
 5. **`/page`**: a new folder, opened in Page mode, linked where the command was
    typed -- in the text as a page link, or into a nest.
-6. **Nests, more things**: web links (title and icon), a block in another
-   folder (a preview, opening that folder at that block), and pages. Each is
+6. **Nests, more things**, in the decided order: page blocks, pictures, then
+   web links (title and icon) and a block in another folder (a preview,
+   opening that folder at that block). Each is
    one more `kind` on an entry; a kind this build does not know is kept and
    drawn as "made in a newer version" (keepUnknown).
 7. **Getting around**: a back button and breadcrumbs after following links;
    "Linked from" on a folder, worked out by reading every folder's nests --
    recomputed, never kept as a list (CLAUDE.md, recomputing), and cached
    only as a cache.
-8. **Nests as databases**: views (tiles, list, table, board), sort and
-   filter, and properties per entry (tags, status, a date, a number) --
-   the "database" half of Notion. The biggest single step; its shape should be
-   decided once 4-6 have been used for a while.
+8. **Nests as databases.** 8a: views -- tiles with a picture and a name,
+   list, table, board -- chosen per nest, with sort and filter. 8b, later:
+   properties per entry (a tag, a status, a date, a number), Notion's
+   columns. 8b's shape is decided once 4-8a have been used.
 
-### Things that need deciding
+### Decided 2026-10-27
 
-- (a) **Which blocks can a page hold?** Proposed: all of them, as references.
-- (b) **Where a page's writing lives.** Either a single `page` block in the
-  folder (then it is one block among others, and shows in other modes as a
-  long text block), or the folder's mode settings (then other modes do not
-  see it). Proposed: a `page` block -- it syncs, undoes and exports like
-  everything else, and Canvas can show it, at no extra cost.
-- (c) **What a nest holds first.** Proposed: folders only, then links, then
-  blocks from other folders.
-- (d) **Properties** (Notion columns): now or after nests have been used?
-  Proposed: after.
-- (e) **Whether the folder list itself changes.** With nests, folders form a
-  web rather than a tree; the list can stay flat, with a "Top level" view of
-  folders no nest links to. Proposed: leave it flat until step 7.
+- (a) **A page can hold every kind of block** -- which makes "Blocks and their
+  modes" items 2 and 3 (a habit block, a playlist block) prerequisites for
+  that part of step 3.
+- (b) **A page's writing is one `page` block** in the folder: it syncs, undoes
+  and exports like everything else, and other modes can show it.
+- (c) **Nests hold, in this order: folders, then page blocks, then pictures.**
+  Web links and blocks from other folders after that. Step 6 follows this
+  order.
+- (d) **Views come first, properties later.** What was asked for is changing
+  *how* a nest shows what it holds -- tiles with a picture and a name (Notion's
+  gallery, the one used before), a list, a table, a board. Properties
+  (Notion's columns: a tag, a status, a date on each entry) are a separate
+  thing, left until views have been used. Step 8 is split accordingly: 8a
+  views, 8b properties.
+- (e) **The folder list stays as it is**, with other ways to show it to come
+  later -- as the note picker got its layouts -- not tied to nests.
 
 ### What could go wrong
 
