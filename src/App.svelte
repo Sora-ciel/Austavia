@@ -3,7 +3,9 @@
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
-  import { settleTask } from './utils/taskGoals.js';
+  import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress } from './utils/taskGoals.js';
+  import { answerRing } from './utils/taskGoalRings.js';
+  import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
   import RightControls from './advanced-param/RightControls.svelte';
   import LeftControls from './advanced-param/LeftControls.svelte';
@@ -149,7 +151,7 @@
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
-  import { settleHabits } from './utils/habitGoals.js';
+  import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
   // Which Austavia this is -- the real one, staging, a preview of the site, or
   // the dev server -- and the one way it is shown: the tab's name, a badge,
@@ -3540,6 +3542,34 @@
   // holds in every mode; the ring itself is AlarmRinger's. Not an undo step,
   // and a task block on the canvas is rebuilt to show it (it keeps its own
   // copy of its tasks). See utils/taskGoals.js.
+  // A button pressed on the timer's notification for an objective
+  // (utils/goalNotices.js): pause or resume, a minute more, or stop. On one
+  // that is ringing, pause and stop answer the ring, as Stop does in the app;
+  // the ringer is told, since it keeps the answers it has read.
+  function handleGoalAction(event) {
+    const { owner, taskId, action, ringKey } = event.detail || {};
+    const at = Date.now();
+    if (ringKey && (action === 'toggle' || action === 'stop')) {
+      try { answerRing(localStorage, ringKey, at); } catch { /* rings out its window */ }
+      window.dispatchEvent(new CustomEvent('austavia:goal-answered'));
+      return;
+    }
+    const change =
+      action === 'toggle' ? (t, now) => (goalNow(t.goal, now)?.running ? pauseGoalTimer(t, now) : startGoalTimer(t, now))
+      : action === 'plus' ? (t, now) => addProgress(t, 60, now)
+      : action === 'stop' ? (t, now) => pauseGoalTimer(t, now)
+      : null;
+    if (!change || !taskId) return;
+    if (owner === HABITS_OWNER) {
+      handleModeSettingChange({ detail: { habit: { habits: withHabitGoal(modeSettings?.habit?.habits, taskId, change, at) } } });
+      return;
+    }
+    const block = blocks.find(b => b.id === owner && b.type === 'task');
+    if (!block || !Array.isArray(block.tasks)) return;
+    const tasks = block.tasks.map(t => (t.id === taskId ? change(t, at) : t));
+    updateBlockHandler({ detail: { id: block.id, tasks, changedKeys: ['tasks'], pushToHistory: true, bumpVersion: true } });
+  }
+
   function settleTaskGoals() {
     if (folderOpening) return;
     const at = Date.now();
@@ -7288,6 +7318,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
          a notification instead. -->
     <TimerChip
       {blocks}
+      {habits}
+      on:goalAction={handleGoalAction}
       themeStyle={overlayThemeStyle}
       notificationTheme={{ bg: themeExtras.popupBg || rightTheme.panelBg, text: rightTheme.textColor, accent: leftTheme.buttonText }}
     />

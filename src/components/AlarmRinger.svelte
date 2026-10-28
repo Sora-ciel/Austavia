@@ -76,6 +76,10 @@
 
   const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
   let answeredGoals = readAnswered(deviceStorage());
+  // A ring stopped from the notification (App.svelte, handleGoalAction) is
+  // written to this device's answers outside this component; read them again.
+  const rereadAnswered = () => { answeredGoals = readAnswered(deviceStorage()); };
+  if (typeof window !== 'undefined') window.addEventListener('austavia:goal-answered', rereadAnswered);
   $: goalRinging = goalRings({ blocks, habits, now, answered: answeredGoals });
 
   function stopGoal(ring) {
@@ -155,6 +159,7 @@
   });
 
   onDestroy(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('austavia:goal-answered', rereadAnswered);
     // Also stops a reschedule already queued from starting the timer again.
     mounted = false;
     clearTimeout(wake);

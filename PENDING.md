@@ -331,6 +331,7 @@ list below with what was observed.
 | next | **Arial Staging on the phone and on Linux** (0.8.662, 2026-10-28). Installs beside Austavia under its own name, with a STAGING badge and "0.8.662 · staging" in diagnostics. Sign in with Google on the phone: this is the first build with the staging project's own Android app and the release key's fingerprint, so it is the first time that sign-in can work. Then sync between the phone, the Linux app and https://arial-staging.web.app; the habit schedules, skipped days and amounts; the cloud bin. |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
 | next | **Wallpapers follow the phone turning, in every mode.** With a folder that has both a tall and a wide picture, turn the phone sideways in Simple Note, Habit Tracker and Task mode: the wide picture should appear, and the tall one again when it is turned back -- as Canvas, Single Note and Playlist already did. They used to choose by a width of 1024px, which a phone on its side is still under. Seen in a browser 2026-10-26 by resizing; still to see on the phone. |
+| next | **Objectives in the phone's notification** (2026-10-28). Start a time objective on a task or a habit and leave the app: the timer's notification shows it counting down under the task's name, with pause, +1 minute and stop working from the shade. Let it finish with the app shut: "Time's up" with sound. Stop it from the shade; opening the app, it is not still ringing. A clock timer and an objective at once: the ringing one shows first, then the soonest to end, with "(+1 more)". |
 | next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
 | next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |
@@ -740,16 +741,19 @@ card). Only that would be the app's to fix.
 
 ## 4. Loose ends
 
-- **A finished objective rings only while Austavia is open** (2026-10-26).
-  The banner and sound are the timer's (AlarmRinger), in every mode on every
-  device -- but with the app closed, or a phone that has put it to sleep, it
-  rings when the app comes back, not at the moment. The clock timer already
-  has the native halves: the Android "Time's up" notification
-  (TimerNotificationPlugin, fed by utils/timerChip.js's timerNotice) and the
-  Windows always-on-top pop-ups (utils/clockPopups.js). Both are keyed to a
-  clock block today; an objective would need its own entry in each, with the
-  notification's buttons (pause, stop) routed back to the task. Asked for "all
-  types of devices", so this is owed, not optional.
+- **Objectives outside the app: Android done, the desktop pop-ups owed.**
+  Reported again 2026-10-28 ("I asked for that, not just an in-app timer").
+  Android since 2026-10-28: running and ringing time objectives join the
+  timer's own notification (utils/goalNotices.js), ranked with the clock
+  timers, its buttons routed back by a `goal:<owner>:<taskId>` key
+  (App.svelte, handleGoalAction), and its alarm playing "Time's up" with the
+  app shut. **Owed: the Windows always-on-top pop-ups** (utils/clockPopups.js,
+  ClockPopupWindows.svelte, popup/ClockPopup.svelte) are keyed to clock
+  blocks and read the clock's device memory; an objective needs a pop-up kind
+  of its own, fed from the folder rather than that memory. And **Linux has no
+  pop-ups at all**, for timers either -- they are opened on the Windows app
+  only; whether Tauri's always-on-top windows behave under KDE/XWayland has to
+  be tried before they are switched on there.
 
 - **Ctrl+Z after typing and then recolouring a block** undoes the typing
   first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the

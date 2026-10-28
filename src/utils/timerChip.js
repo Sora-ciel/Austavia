@@ -82,12 +82,17 @@ export function timerNotice(timers = [], devices = {}, theme = {}) {
   const shown = (timers || []).filter(entry => entry.phase !== 'stopped');
   const first = shown[0];
   if (!first) return null;
-  const endsAt = first.phase === 'running' ? Number(devices[first.blockId]?.timer?.endsAt) || 0 : 0;
+  // An objective brings its own end and name (utils/goalNotices.js); a clock
+  // timer's end is in this device's memory of it.
+  const endsAt = first.phase === 'running'
+    ? Number(first.endsAt || devices[first.blockId]?.timer?.endsAt) || 0
+    : 0;
+  const name = first.title || 'Timer';
   return {
     blockId: first.blockId,
     phase: first.phase,
     endsAt: String(endsAt),
-    title: shown.length > 1 ? `Timer (+${shown.length - 1} more)` : 'Timer',
+    title: shown.length > 1 ? `${name} (+${shown.length - 1} more)` : name,
     text: first.phase === 'ringing' ? "Time's up" : first.phase === 'paused' ? `Paused · ${timerReading(first.left)}` : '',
     // What a paused timer shows in place of the countdown.
     remaining: first.phase === 'paused' ? timerReading(first.left) : '',

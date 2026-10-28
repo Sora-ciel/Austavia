@@ -11,7 +11,9 @@
    * clock (clockDeviceStore.js), the same record the block and the pop-ups
    * read, so a change here is a change everywhere.
    */
-  import { onDestroy } from 'svelte';
+  import { onDestroy, createEventDispatcher } from 'svelte';
+  import { goalTimers, withGoalTimers, parseGoalKey } from '../utils/goalNotices.js';
+  import { readAnswered } from '../utils/taskGoalRings.js';
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
   import { startTimer, pauseTimer, resetTimer, oneMoreMinute, timerReading } from '../utils/countdown.js';
   import { activeTimers, timerPlace, timerNotice, sameNotice } from '../utils/timerChip.js';
@@ -25,6 +27,10 @@
   import PlayerIcon from './PlayerIcons.svelte';
 
   export let blocks = [];
+  /** The folder's habits: one with a time objective joins the notification. */
+  export let habits = [];
+
+  const dispatch = createEventDispatcher();
   /** The dialog palette App gives its other pop-ups. */
   export let themeStyle = '';
   /** The same colours the Windows pop-up is drawn in: { bg, text, accent }. */
@@ -46,6 +52,16 @@
     (blocks || []).filter(block => block?.type === 'clock').map(block => [block.id, peekClockDevice(block.id, $clockDevices)])
   );
   $: timers = activeTimers({ blocks, devices, now, keep: shown });
+  // Running and ringing time objectives, for the notification only: they go
+  // where the timer goes on a phone, so they reach it with the app shut
+  // (asked 2026-10-28; utils/goalNotices.js). Rings already stopped on this
+  // device are read afresh each time, since the ringer or the notification
+  // may have stopped one since.
+  const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
+  $: goals = place === 'notification'
+    ? goalTimers({ blocks, habits, now, answered: readAnswered(deviceStorage()) })
+    : [];
+  $: shaded = withGoalTimers(timers, goals);
   $: first = timers[0];
   $: if (!timers.length && (open || shown.length)) closePanel();
 
@@ -54,7 +70,7 @@
   let tick = null;
   // The notification counts down on its own, so the shade needs a look once
   // a second at most -- for a timer running out, not for its figure.
-  $: setTicking(timers.length > 0 && place !== 'none' ? (place === 'toolbar' ? 250 : 1000) : 0);
+  $: setTicking((timers.length > 0 || goals.length > 0) && place !== 'none' ? (place === 'toolbar' ? 250 : 1000) : 0);
   let tickEvery = 0;
   function setTicking(every) {
     if (every === tickEvery) return;
@@ -68,20 +84,28 @@
   // scratch -- one lost update must not leave the shade wrong for good (the
   // recompute rule in CLAUDE.md).
   let lastNotice;
-  $: notice = place === 'notification' ? timerNotice(timers, devices, notificationTheme) : null;
+  $: notice = place === 'notification' ? timerNotice(shaded, devices, notificationTheme) : null;
   $: if (place === 'notification' && !sameNotice(notice, lastNotice)) sendNotice(notice);
   function sendNotice(next) {
     lastNotice = next;
     if (next) showTimerNotification(next);
     else clearTimerNotification();
   }
-  const resend = () => { if (place === 'notification') sendNotice(timerNotice(timers, devices, notificationTheme)); };
+  const resend = () => { if (place === 'notification') sendNotice(timerNotice(shaded, devices, notificationTheme)); };
   const resendTimer = nativeAndroid ? setInterval(resend, 30000) : null;
   const onVisible = () => { if (document.visibilityState === 'visible') { now = Date.now(); resend(); } };
   if (nativeAndroid) {
     document.addEventListener('visibilitychange', onVisible);
     onTimerNotificationAction(({ action, blockId }) => {
       if (!blockId) return;
+      // An objective's button: the folder holds it, so App does it.
+      const goal = parseGoalKey(blockId);
+      if (goal) {
+        const entry = goals.find(item => item.blockId === blockId);
+        dispatch('goalAction', { ...goal, action, ringKey: entry?.ringKey || null });
+        now = Date.now();
+        return;
+      }
       const entry = activeTimers({ blocks, devices, now: Date.now() }).find(item => item.blockId === blockId);
       if (action === 'toggle' && entry) togglePause(entry);
       else if (action === 'plus') change(blockId, oneMoreMinute);
