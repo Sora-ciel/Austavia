@@ -331,7 +331,6 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
-| next | **The screenshot, with its wallpaper.** Reported 2026-10-28 after the size fix: the button now saves, but the picture came without the background. Every mode's wallpaper is now painted under the capture (as Canvas's already was), with the phone or the wide picture chosen by the screen's shape, and the Habit Tracker now hands its own area to the capture. Take a screenshot in each mode on the phone, upright and on its side, with a wallpaper set: the picture should have it. |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
 | next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
@@ -755,6 +754,29 @@ card). Only that would be the app's to fix.
   pop-ups at all**, for timers either -- they are opened on the Windows app
   only; whether Tauri's always-on-top windows behave under KDE/XWayland has to
   be tried before they are switched on there.
+
+- **The phone's screenshots still have no wallpaper** (reported again
+  2026-10-28, on the Austavia Staging APK with b667d27 in it; to come back to).
+  What is known:
+  - **In a browser it is fixed.** A test folder with a solid red wallpaper:
+    the saved picture is red in all six modes, at computer size and at phone
+    size with a phone picture set (pixels read from the PNG). So what differs
+    on the phone is not the capture's logic but something about the phone.
+  - **Not the bucket's cross-origin rule**: both projects answer
+    `access-control-allow-origin: *` (curl with an Origin header).
+  - **Differences left between the test and the phone**, in the order to
+    check: (1) the phone's wallpaper is a synced *link* to cloud storage, the
+    test's a picture held in the folder -- the underlay loads it with
+    `crossOrigin='anonymous'` and gives up after 5s (`loadImageWithin`),
+    silently but for a console warning; a large photo over mobile data may
+    simply be slower than that; (2) `ctx.filter` for blur and brightness in
+    the Android WebView; (3) which picture slot the phone has, and whether
+    `wallpaperSettingsFor` picks the settings the screen draws from (themes
+    add their own wallpaper to Single Note's settings, not Canvas's).
+  - **The next step is to look, not guess**: the phone on USB with debugging
+    on, `~/Android/Sdk/platform-tools/adb logcat | grep -i chromium`, and the
+    "The wallpaper could not be drawn into the screenshot" warning -- or
+    chrome://inspect on this computer for the WebView's console.
 
 - **Ctrl+Z after typing and then recolouring a block** undoes the typing
   first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the
