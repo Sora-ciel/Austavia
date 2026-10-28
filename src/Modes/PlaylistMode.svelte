@@ -1008,6 +1008,7 @@
   // playlist, each with how many songs it holds; renaming, deleting and a new
   // playlist live here now that the column of playlists is gone (2026-10-28).
   const ALL_MUSIC = '__all-music';
+  $: playlistTrackCount = selectedPlaylist ? selectedPlaylist.trackIds.length : tracks.length;
   let pickerOpen = false;
   $: pickerItems = [
     { id: ALL_MUSIC, name: 'All music', count: tracks.length, current: !selectedPlaylistId },
@@ -1434,6 +1435,12 @@
     white-space: nowrap;
   }
   .pl-title-chevron { flex: none; opacity: 0.7; }
+  .pl-track-count {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
   .pl-new-playlist {
     margin: 0 10px 12px;
     min-height: 44px;
@@ -1760,6 +1767,7 @@
     {#if pickerOpen}
       <PickerSheet
         title="Playlists"
+        searchLabel="Search playlists"
         items={pickerItems}
         on:pick={(event) => pickPlaylist(event.detail)}
         on:close={() => (pickerOpen = false)}
@@ -1768,17 +1776,20 @@
       </PickerSheet>
     {/if}
     <div class="pl-tracks" bind:this={listEl} bind:clientHeight={listViewport} on:scroll={onListScroll}>
-      <!-- The playlist's name, which opens the list of playlists. Asked
-           2026-10-28: "be able to click on the name of the playlist ... All
-           music will be written Playlist instead, and when you click it opens
-           a page like the one in Single Note to search notes, but simpler". It
-           replaces the column of playlists beside the music. -->
+      <!-- The open playlist's name -- All music being one of them -- which opens
+           the list of playlists, and how many tracks it holds beside it. Asked
+           2026-10-28: "be able to click on the name of the playlist ... it opens
+           a page like the one in Single Note"; then, the same day, "we'll go back
+           to All music ... make the button have the name of what playlist you're
+           on, and All music is one of those playlists ... you have the number of
+           music like 'Track: 389'". It replaces the column of playlists. -->
       <div class="pl-title-row">
         <button class="pl-title" aria-haspopup="dialog" on:click={() => (pickerOpen = true)}>
-          <span class="pl-title-name">{selectedPlaylist ? selectedPlaylist.name : 'Playlist'}</span>
+          <span class="pl-title-name">{selectedPlaylist ? selectedPlaylist.name : 'All music'}</span>
           <svg class="pl-title-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
-        {#if selectedPlaylist}<span class="pl-count">✓ adds or removes</span>{/if}
+        <span class="pl-track-count">{playlistTrackCount} {playlistTrackCount === 1 ? 'track' : 'tracks'}</span>
+        {#if selectedPlaylist}<span class="pl-count">· ✓ adds or removes</span>{/if}
       </div>
 
       {#if dedupeOpen}

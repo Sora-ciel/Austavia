@@ -23,13 +23,21 @@
 
   export let title = '';
   export let items = [];
+  /** A search field in the head, filtering the rows by name, as the note picker has. */
+  export let searchable = true;
+  export let searchLabel = 'Search';
+
+  let query = '';
+  $: shown = query.trim()
+    ? items.filter(item => item.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : items;
 
   const dispatch = createEventDispatcher();
   let sheet;
 
   // Every row keeps room for as many buttons as the busiest one, so the counts
   // line up in one column whether or not a row has buttons of its own.
-  $: actionSlots = Math.max(0, ...items.map(item => (item.actions || []).length));
+  $: actionSlots = Math.max(0, ...shown.map(item => (item.actions || []).length));
 
   function onKeydown(event) {
     if (event.key === 'Escape') {
@@ -46,11 +54,15 @@
 <!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <div class="picker-sheet" role="dialog" aria-label={title} tabindex="-1" bind:this={sheet} on:keydown={onKeydown}>
   <div class="sheet-head">
-    <h3 class="sheet-title">{title}</h3>
+    {#if searchable}
+      <input class="sheet-search" type="search" placeholder={searchLabel} aria-label={searchLabel} bind:value={query} />
+    {:else}
+      <h3 class="sheet-title">{title}</h3>
+    {/if}
     <button class="sheet-close" title="Close" aria-label="Close" on:click={() => dispatch('close')}>×</button>
   </div>
   <ul class="sheet-list">
-    {#each items as item (item.id)}
+    {#each shown as item (item.id)}
       <li class="sheet-row" class:current={item.current}>
         <button class="sheet-pick" aria-current={item.current ? 'true' : undefined} on:click={() => dispatch('pick', item.id)}>
           <span class="sheet-name">{item.name}</span>
@@ -96,6 +108,23 @@
     font-weight: 700;
   }
 
+  /* As the note picker's search: tinted with the writing's colour. */
+  .sheet-search {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-radius: 8px;
+    padding: 8px 10px;
+    outline: none;
+  }
+
+  .sheet-search:focus {
+    border-color: color-mix(in srgb, currentColor 60%, transparent);
+  }
+
   .sheet-close {
     width: 34px;
     height: 34px;
@@ -123,18 +152,28 @@
     padding: 0 10px 10px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
+  /* Each row a card, as the note picker draws its notes (asked 2026-10-28,
+     "the same style as Single Note mode"): a border in the writing's colour,
+     solid for the one open now. */
   .sheet-row {
     display: flex;
     align-items: center;
     gap: 4px;
+    padding-right: 4px;
+    border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
     border-radius: 10px;
   }
 
+  .sheet-row:hover {
+    border-color: color-mix(in srgb, currentColor 55%, transparent);
+  }
+
   .sheet-row.current {
-    background: color-mix(in srgb, currentColor 12%, transparent);
+    border-color: currentColor;
+    box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
   }
 
   .sheet-pick {
@@ -154,10 +193,6 @@
     cursor: pointer;
   }
 
-  .sheet-pick:hover {
-    background: color-mix(in srgb, currentColor 8%, transparent);
-  }
-
   .sheet-name {
     flex: 1;
     min-width: 0;
@@ -166,8 +201,8 @@
     white-space: nowrap;
   }
 
-  .sheet-row.current .sheet-name {
-    font-weight: 700;
+  .sheet-name {
+    font-weight: 600;
   }
 
   .sheet-count {

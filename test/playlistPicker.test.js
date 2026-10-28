@@ -15,8 +15,15 @@ test('the playlist is chosen from its name, which opens the list -- there is no 
   assert.doesNotMatch(mode, /class="pl-sidebar"/);
 });
 
-test('the whole library reads "Playlist" as the title, and "All music" in the list, first, with its count', () => {
-  assert.match(mode, /selectedPlaylist \? selectedPlaylist\.name : 'Playlist'/);
+// Changed the same day: "we'll go back to All music ... make the button have
+// the name of what playlist you're on, and All music is one of those
+// playlists ... you have the number of music like 'Track: 389'".
+test('the button is named after the playlist open, All music being one of them, with its track count beside it', () => {
+  assert.match(mode, /selectedPlaylist \? selectedPlaylist\.name : 'All music'/);
+  assert.match(mode, /class="pl-track-count">\{playlistTrackCount\}/);
+});
+
+test('All music is in the list, first, with its count', () => {
   assert.match(mode, /\{ id: ALL_MUSIC, name: 'All music', count: tracks\.length/);
 });
 
