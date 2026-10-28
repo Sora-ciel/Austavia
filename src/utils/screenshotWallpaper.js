@@ -74,3 +74,35 @@ export function wallpaperRect({ imageWidth, imageHeight, width, height, size = '
     height: drawnHeight
   };
 }
+
+/**
+ * Every mode's wallpaper goes into a screenshot the same way: painted
+ * underneath, never captured.
+ *
+ * Reported 2026-10-28, on the phone: "the screenshot ... without capturing
+ * the background." Canvas already painted its wallpaper in underneath the
+ * captured board. The other modes left theirs to the capture itself -- a layer
+ * fixed to the screen, which the capture reproduces only partly or not at all
+ * depending on the layout: Simple Note came out red in the middle and bare at
+ * the bottom, and the phone got none. So in every mode with a wallpaper the
+ * layer is left out of the capture (`isWallpaperLayer`), the mode's own
+ * background is cleared for it, and the picture is painted underneath, from
+ * the settings that mode draws it from (`wallpaperSettingsFor`).
+ */
+
+/** The element each mode draws its wallpaper in -- left out of a capture. */
+export const WALLPAPER_LAYER_CLASSES = ['canvas-bg-holder', 'mode-wallpaper', 'note-bg-clip', 'pl-bg-holder'];
+
+export function isWallpaperLayer(element) {
+  return WALLPAPER_LAYER_CLASSES.some(name => element?.classList?.contains(name));
+}
+
+/**
+ * Which settings a mode's wallpaper comes from: Canvas keeps only what the
+ * folder set; every other mode also shows a theme's own wallpaper (App.svelte,
+ * canvasBackgroundSettings and singleNoteSettings). Null for a mode without.
+ */
+export function wallpaperSettingsFor(mode, { hasWallpaper, canvas, others } = {}) {
+  if (!hasWallpaper) return null;
+  return mode === 'default' ? canvas || null : others || null;
+}

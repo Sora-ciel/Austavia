@@ -102,7 +102,7 @@
     isHatoBackground
   } from './utils/hatoTheme.js';
 
-  import { MODE_DEFINITIONS, MODE_ORDER, getModeDefinition } from "./Modes/modeRegistry.js";
+  import { MODE_DEFINITIONS, MODE_ORDER, getModeDefinition, hasWallpaper } from "./Modes/modeRegistry.js";
   import { getCanvasViewport } from './canvasState.js';
   import { getOpeningViewportBox } from './utils/canvasFit.js';
   import { clickOutside } from './utils/clickOutside.js';
@@ -128,7 +128,7 @@
   import { usageForPlan } from './utils/planLimits.js';
   import { getReadableTextColor } from './utils/readableColor.js';
   // The wallpaper settings shared by Single Note and Canvas mode.
-  import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings } from './utils/modeBackground.js';
+  import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings, usesPortraitBackground } from './utils/modeBackground.js';
   import { ensureMusicCover, forgetCoverlessTrack } from './utils/musicCovers.js';
   import { FOLDERS_ENTRY, packMusic, readMusicManifest, unpackMusic, mergeMusicLibrary } from './utils/musicTransfer.js';
   import { nowPlayingRecord } from './utils/nowPlaying.js';
@@ -146,7 +146,7 @@
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, textChunks } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
-  import { wallpaperPaint, wallpaperRect } from './utils/screenshotWallpaper.js';
+  import { wallpaperPaint, wallpaperRect, isWallpaperLayer, wallpaperSettingsFor, WALLPAPER_LAYER_CLASSES } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
@@ -3920,6 +3920,7 @@
    */
   async function captureScreenshotBlob() {
     let restoreScrollers = () => {};
+    let restoreBackground = () => {};
     try {
       // html2canvas-pro rather than html2canvas: the original stops at
       // "unsupported color function" on anything using color-mix(), which the
@@ -3951,17 +3952,49 @@
       const height = Math.max(target.scrollHeight, target.clientHeight, 1);
       const scale = captureScale({ width, height, phone: capturingOnPhone() });
 
-      // Canvas pins its wallpaper outside the board, so the board is captured
-      // with nothing behind it and the wallpaper painted in underneath -- see
-      // utils/screenshotWallpaper.js. Other modes draw theirs inside what is
-      // captured and need nothing extra.
+      // Every mode's wallpaper is painted in underneath the capture rather than
+      // captured: the layer it sits in on screen is fixed to the window, which
+      // the capture reproduces only partly or not at all -- the phone's
+      // screenshots came out with none (2026-10-28). See
+      // utils/screenshotWallpaper.js. So the layer is left out, the mode's own
+      // background is cleared while it is drawn, and the picture goes under.
       const backdrop = canvasTheme?.innerBg || canvasTheme?.outerBg || '#000000';
-      const wallpaper = board && mode === 'default'
-        ? wallpaperPaint(canvasBackgroundSettings, {
-            isMobile: typeof window !== 'undefined' && window.innerWidth <= MOBILE_BREAKPOINT,
+      const wallpaperSettings = wallpaperSettingsFor(mode, {
+        hasWallpaper: hasWallpaper(mode),
+        canvas: canvasBackgroundSettings,
+        others: singleNoteSettings
+      });
+      const wallpaper = wallpaperSettings
+        ? wallpaperPaint(wallpaperSettings, {
+            // The picture the screen is showing, chosen by the screen's shape
+            // as the wallpaper itself chooses (usesPortraitBackground). This
+            // went by a 1024px width, so whenever the two disagreed -- a phone
+            // on its side, a window 1024 wide -- the screenshot looked for the
+            // other picture and painted none (reported 2026-10-28).
+            isMobile: typeof window !== 'undefined' &&
+              usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight }),
             scale
           })
         : null;
+
+      // The mode's own background sits under its wallpaper on screen; in the
+      // picture the wallpaper is painted on that same colour (underlayWallpaper),
+      // so the captured part must let it through.
+      // Which element that is depends on the mode -- the captured root, or a
+      // panel inside it (the Habit Tracker draws its wallpaper inside its own
+      // section) -- so it is whatever each wallpaper layer sits in.
+      if (wallpaper) {
+        const grounds = new Set([target]);
+        const scope = canvasRef || target;
+        for (const name of WALLPAPER_LAYER_CLASSES) {
+          for (const layer of scope.querySelectorAll?.(`.${name}`) || []) {
+            if (layer.parentElement) grounds.add(layer.parentElement);
+          }
+        }
+        const saved = [...grounds].map(element => [element, element.style.background]);
+        for (const [element] of saved) element.style.background = 'transparent';
+        restoreBackground = () => { for (const [element, value] of saved) element.style.background = value || ''; };
+      }
 
       const drawn = await withinTime(html2canvas(target, {
         backgroundColor: wallpaper ? null : backdrop,
@@ -3980,9 +4013,12 @@
         imageTimeout: 5000,
         ignoreElements: element =>
           element.classList?.contains('screenshot-btn') ||
-          element.classList?.contains('player-panel')
+          element.classList?.contains('player-panel') ||
+          (wallpaper && isWallpaperLayer(element))
       }), CAPTURE_DEADLINES.drawing, 'drawing the page');
 
+      restoreBackground();
+      restoreBackground = () => {};
       if (board) board.style.transform = previousTransform || '';
       restoreScrollers();
       restoreScrollers = () => {};
@@ -4004,8 +4040,10 @@
       throw error;
     } finally {
       // Panes are put back even if the capture threw part-way through,
-      // otherwise the mode would be left with its scrollers hanging open.
+      // otherwise the mode would be left with its scrollers hanging open --
+      // and the mode's background, cleared for the wallpaper, likewise.
       restoreScrollers();
+      restoreBackground();
     }
   }
 

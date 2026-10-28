@@ -9,6 +9,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { wallpaperPaint, wallpaperRect } from '../src/utils/screenshotWallpaper.js';
+import { readFileSync as readSource } from 'node:fs';
+import { WALLPAPER_LAYER_CLASSES, isWallpaperLayer, wallpaperSettingsFor } from '../src/utils/screenshotWallpaper.js';
 
 describe('wallpaperPaint', () => {
   it('is nothing when there is no wallpaper', () => {
@@ -61,4 +63,43 @@ describe('wallpaperRect', () => {
     const rect = wallpaperRect({ imageWidth: 100, imageHeight: 100, width: 100, height: 100, bleed: 10 });
     assert.deepEqual(rect, { x: -10, y: -10, width: 120, height: 120 });
   });
+});
+
+// Reported 2026-10-28, on the phone: "the screenshot ... without capturing the
+// background." Every mode's wallpaper is now painted under the capture, as
+// Canvas's was; the layer it is drawn in on screen is left out.
+
+it('every mode with a wallpaper gets it in its screenshot, from the settings it is drawn from', () => {
+  const canvas = { backgroundImage: 'c' };
+  const others = { backgroundImage: 'o' };
+  assert.equal(wallpaperSettingsFor('default', { hasWallpaper: true, canvas, others }), canvas);
+  for (const mode of ['simple', 'single', 'habit', 'task', 'playlist']) {
+    assert.equal(wallpaperSettingsFor(mode, { hasWallpaper: true, canvas, others }), others, mode);
+  }
+  assert.equal(wallpaperSettingsFor('single', { hasWallpaper: false, canvas, others }), null);
+});
+
+it('the layer every mode draws its wallpaper in is one the capture knows to leave out', () => {
+  const drawers = {
+    'Modes/CanvasMode.svelte': 'canvas-bg-holder',
+    'components/ModeWallpaper.svelte': 'mode-wallpaper',
+    'Modes/SingleNoteMode.svelte': 'note-bg-clip',
+    'Modes/PlaylistMode.svelte': 'pl-bg-holder'
+  };
+  for (const [path, name] of Object.entries(drawers)) {
+    const source = readSource(new URL(`../src/${path}`, import.meta.url), 'utf8');
+    assert.match(source, new RegExp(`class="${name}`), path);
+    assert.ok(WALLPAPER_LAYER_CLASSES.includes(name));
+    assert.equal(isWallpaperLayer({ classList: { contains: c => c === name } }), true);
+  }
+});
+
+// Found while fixing the above: the Habit Tracker never handed its root to the
+// app, so its screenshot was of the whole page, whose own background covered
+// the wallpaper. Every mode the switcher mounts hands its root up.
+it('every mode hands its root up, so the screenshot is of the mode and not the whole page', () => {
+  const switcher = readSource(new URL('../src/Modes/ModeSwitcher.svelte', import.meta.url), 'utf8');
+  const mounts = switcher.match(/<[A-Z]\w*Mode\b[\s\S]*?\/>/g) || [];
+  assert.ok(mounts.length >= 6, `found ${mounts.length}`);
+  for (const mount of mounts) assert.match(mount, /bind:canvasRef/, mount.split('\n')[0]);
 });

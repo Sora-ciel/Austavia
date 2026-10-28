@@ -37,6 +37,13 @@
    */
   export let habits = [];
 
+  /**
+   * This mode's root, handed to the app as every mode's is -- the screenshot
+   * captures it. Without it the screenshot took the whole page, whose own
+   * background covered the wallpaper (found 2026-10-28).
+   */
+  export let canvasRef = null;
+
   const dispatch = createEventDispatcher();
 
   let newHabitName = "";
@@ -863,7 +870,7 @@
   }
 </style>
 
-<section class="habit-tracker" style={canvasCssVars}>
+<section class="habit-tracker" style={canvasCssVars} bind:this={canvasRef}>
   <ModeWallpaper settings={backgroundSettings} />
   <div class="habit-header">
     <h2>{modeLabels?.[activeMode] ?? "Habit Tracker"}</h2>

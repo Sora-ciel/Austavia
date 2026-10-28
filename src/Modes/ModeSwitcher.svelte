@@ -125,6 +125,7 @@
     <HabitTrackerMode
       {modeLabels}
       activeMode={mode}
+      bind:canvasRef
       {canvasColors}
       backgroundSettings={singleNoteSettings}
       {habits}
