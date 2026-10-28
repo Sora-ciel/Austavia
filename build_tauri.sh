@@ -11,7 +11,7 @@ if [ ! -x node_modules/.bin/vite ]; then
   npm install --include=dev
 fi
 
-# --staging: "Austavia Staging", pointed at the arial-staging project, for
+# --staging: "Arial Staging", pointed at the arial-staging project, for
 # trying a pre-release (asked 2026-10-26). Its own name, identifier and binary
 # (src-tauri/tauri.staging.conf.json), so it installs beside the real app and
 # keeps its own local data. Built from .env.staging; the tests run first.

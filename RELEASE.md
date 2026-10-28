@@ -39,10 +39,10 @@ build." One convention, everywhere a build or a site can be seen:
 | | Production | Staging | Preview | Local |
 | --- | --- | --- | --- | --- |
 | What it is | the real app | `arial-staging`, separate data | a test of the site on a preview channel -- **real data** | the dev server |
-| Name (window, tab, launcher) | Austavia | Austavia Staging | Austavia Preview | Austavia Local |
+| Name (window, tab, launcher) | Austavia | Arial Staging | Austavia Preview | Austavia Local |
 | Badge, bottom left | none | STAGING | PREVIEW · REAL DATA | LOCAL |
 | Version in diagnostics | 0.8.662 | 0.8.662 · staging | 0.8.662 · preview | 0.8.662 · local |
-| Installer files | `Austavia_0.8.662…` | `Austavia-Staging_0.8.662…` | none | none |
+| Installer files | `Austavia_0.8.662…` | `Arial-Staging_0.8.662…` | none | none |
 | GitHub release title | `v0.8.66 — <phrase>` | `Staging v0.8.662 — <phrase>` | `Preview v0.8.662 — <phrase>` | none |
 
 The app works out which it is by itself (`utils/releaseChannel.js`), from the
@@ -52,6 +52,13 @@ labelled by mistake. The version numbers are the same scheme for all of them
 (a test build adds a digit); the label is what says which kind it is.
 
 ## A staging pre-release
+
+**Named "Arial Staging"** (asked 2026-10-28, "so that it's easy to see the
+difference with the normal app"): the app's old name, which nobody outside
+uses any more, so it can never be mistaken for Austavia on a launcher or a
+home screen. Only the name a person sees; the identifier stays
+`com.sora.austavia.staging`, since changing it would make it a new app to
+Android and to Linux, with its folders left behind.
 
 Asked for on 2026-10-26: "a pre-release for staging, and package the deb and
 apk too for staging, so that I have the staging one for pre-releases and can
@@ -68,8 +75,8 @@ pre-release does can reach a real note (see the staging note in `CLAUDE.md`).
 | GitHub | `--prerelease`, title says *staging*, never `Latest` |
 | Production | **not touched** -- not its site, rules or functions |
 
-The staging apps are **separate apps**, not a setting: "Austavia Staging",
-`com.sora.austavia.staging`, its own binary (`austavia-staging`) and its own
+The staging apps are **separate apps**, not a setting: "Arial Staging",
+`com.sora.austavia.staging`, its own binary (`arial-staging`) and its own
 local storage. They install beside the real Austavia and can neither replace
 it nor see its folders. That is also why going back is free here: the
 `versionCode` rule below applies to each app on its own.

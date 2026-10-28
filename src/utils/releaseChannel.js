@@ -30,7 +30,9 @@ export const STAGING_PROJECT = 'arial-staging';
 
 const CHANNELS = {
   production: { name: 'Austavia', badge: '', suffix: '' },
-  staging: { name: 'Austavia Staging', badge: 'Staging', suffix: 'staging' },
+  // The app's old name, asked 2026-10-28 "so that it's easy to see the
+  // difference with the normal app" -- see RELEASE.md.
+  staging: { name: 'Arial Staging', badge: 'Staging', suffix: 'staging' },
   preview: { name: 'Austavia Preview', badge: 'Preview · real data', suffix: 'preview' },
   local: { name: 'Austavia Local', badge: 'Local', suffix: 'local' }
 };

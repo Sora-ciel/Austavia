@@ -23,7 +23,7 @@ test('anything talking to the staging project says Staging, wherever it runs', (
     const channel = releaseChannel({ projectId: 'arial-staging', hostname, dev: hostname === 'localhost' });
     assert.equal(channel, 'staging', hostname);
   }
-  assert.equal(channelName('staging'), 'Austavia Staging');
+  assert.equal(channelName('staging'), 'Arial Staging');
   assert.equal(versionLabel('0.8.662', 'staging'), '0.8.662 · staging');
 });
 

@@ -1,6 +1,6 @@
 {
-  "productName": "Austavia Staging",
-  "mainBinaryName": "austavia-staging",
+  "productName": "Arial Staging",
+  "mainBinaryName": "arial-staging",
   "identifier": "com.sora.austavia.staging",
   "build": {
     "beforeBuildCommand": "npm test && npm run build:staging"
@@ -8,7 +8,7 @@
   "app": {
     "windows": [
       {
-        "title": "Austavia Staging",
+        "title": "Arial Staging",
         "dragDropEnabled": false,
         "maximized": true,
         "width": 800,

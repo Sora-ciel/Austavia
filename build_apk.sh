@@ -16,7 +16,7 @@ cd "$(dirname "$0")"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
 
-# --staging: "Austavia Staging", pointed at the arial-staging project, for
+# --staging: "Arial Staging", pointed at the arial-staging project, for
 # trying a pre-release on a phone (asked 2026-10-26). A separate app to Android
 # (com.sora.austavia.staging, see app/build.gradle), so it installs beside the
 # real one. Built from .env.staging, after the tests.
