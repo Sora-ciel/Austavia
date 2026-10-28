@@ -7,6 +7,7 @@
    * Asked 2026-10-25 -- see that file for the request in full.
    */
   import { createEventDispatcher } from 'svelte';
+  import PlayerIcons from './PlayerIcons.svelte';
   import { goalNow, goalLabel, parseTarget } from '../utils/taskGoals.js';
 
   export let goal;
@@ -63,7 +64,12 @@
         aria-label={state.running ? 'Pause' : 'Start'}
         title={state.running ? 'Pause' : 'Start'}
         on:click|stopPropagation={() => dispatch('timer')}
-      >{state.running ? '⏸' : '▶'}</button>
+      >
+        <!-- The player's own icons, drawn in the writing's colour. They were
+             the characters ⏸ and ▶, and ⏸ is drawn by the system as a coloured
+             emoji that no theme can reach (reported 2026-10-28). -->
+        <PlayerIcons name={state.running ? 'pause' : 'play'} size={14} />
+      </button>
     {:else}
       <!-- Asked 2026-10-26: a minus for counts, beside the plus. -->
       <button

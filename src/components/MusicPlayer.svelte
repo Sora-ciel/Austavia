@@ -1,4 +1,5 @@
 <script>
+  import PlayerIcons from './PlayerIcons.svelte';
   /**
    * The playing part of a music block, without the block.
    *
@@ -111,11 +112,13 @@
     <p class="empty">Nothing here yet. Import music in Playlist mode.</p>
   {:else}
     <div class="transport">
-      <button on:click={() => step(-1)} aria-label="Previous track" data-focus-guard>⏮</button>
+      <!-- The player's SVG icons, in the theme's colour; the ⏮ ⏸ ⏭ characters
+           were drawn as coloured emoji no theme could reach (2026-10-28). -->
+      <button on:click={() => step(-1)} aria-label="Previous track" data-focus-guard><PlayerIcons name="prev" /></button>
       <button class="play" on:click={onPlayPause} aria-label={playingHere ? 'Pause' : 'Play'} data-focus-guard>
-        {playingHere ? '⏸' : '▶'}
+        <PlayerIcons name={playingHere ? 'pause' : 'play'} />
       </button>
-      <button on:click={() => step(1)} aria-label="Next track" data-focus-guard>⏭</button>
+      <button on:click={() => step(1)} aria-label="Next track" data-focus-guard><PlayerIcons name="next" /></button>
       <span class="count">{queue.length} track{queue.length === 1 ? '' : 's'}</span>
     </div>
 
