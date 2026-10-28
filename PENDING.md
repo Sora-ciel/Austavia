@@ -117,6 +117,32 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Before the next release: ordering the music (asked 2026-10-28)
+
+Asked: "a way to list the music by the creation date, the newer first, and it
+would be the default way to list the music. And you would be able to change it
+to another way to order the list. The one chosen is saved by device."
+
+- **A track does not record when it was added.** It is `{ id, fileName,
+  title }` plus tags (PlaylistMode.svelte, the import around line 410). From
+  now on the import writes `addedAt` (when it came into Austavia) and
+  `fileDate` (the file's own `lastModified`) onto each track, in the library
+  that syncs (`modeSettings.playlist.tracks`, kept by older builds from
+  0.8.662).
+- **The tracks already there need no date to be right**: each import is added
+  to the end of the library, so the library's order *is* the order they were
+  added. Newest first is that order reversed, with dated tracks placed by
+  their date. A track without `addedAt` is treated as older than every one
+  with it.
+- **The orders**: Recently added (the default), Oldest added, Title A-Z,
+  Artist, Album, Length -- decided in a plain module with tests in the words
+  of the request ("the newest is first by default"), not in the mode.
+- **Saved per device** (asked so): localStorage, next to the open playlist,
+  and listed in `test/deviceOnlyState.test.js` with its reason.
+- **Where it applies**: the whole library. A playlist keeps its own order
+  (it was arranged by hand) unless the order is changed while it is open --
+  to confirm.
+
 ## Blocks and their modes (rule in CLAUDE.md, asked 2026-10-27)
 
 Checked against "a block works on its own; a mode only shows blocks" on
