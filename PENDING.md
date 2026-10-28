@@ -123,20 +123,25 @@ Asked: "a way to list the music by the creation date, the newer first, and it
 would be the default way to list the music. And you would be able to change it
 to another way to order the list. The one chosen is saved by device."
 
-- **A track does not record when it was added.** It is `{ id, fileName,
-  title }` plus tags (PlaylistMode.svelte, the import around line 410). From
-  now on the import writes `addedAt` (when it came into Austavia) and
-  `fileDate` (the file's own `lastModified`) onto each track, in the library
-  that syncs (`modeSettings.playlist.tracks`, kept by older builds from
-  0.8.662).
-- **The tracks already there need no date to be right**: each import is added
-  to the end of the library, so the library's order *is* the order they were
-  added. Newest first is that order reversed, with dated tracks placed by
-  their date. A track without `addedAt` is treated as older than every one
-  with it.
-- **The orders**: Recently added (the default), Oldest added, Title A-Z,
-  Artist, Album, Length -- decided in a plain module with tests in the words
-  of the request ("the newest is first by default"), not in the mode.
+- **"Creation date" is the file's own date** (corrected 2026-10-28: "no, we
+  want the file's own date") -- `File.lastModified`, when the music file was
+  made or last changed on the device it came from, not when it was added to
+  Austavia. A track does not record it today: it is `{ id, fileName, title }`
+  plus tags (PlaylistMode.svelte, the import around line 410). The import
+  writes it as `fileDate` onto the track, in the library that syncs
+  (`modeSettings.playlist.tracks`, kept by older builds from 0.8.662).
+- **Tracks already there get theirs from their file.** The import stores each
+  file exactly as it arrived, and a stored File keeps its `lastModified`; so
+  a pass over this device's stored audio fills in `fileDate` for every track
+  that lacks one -- absolute and repeatable, the recompute rule -- and the
+  dates sync to the other devices. A track whose audio is on no device that
+  has run the pass has no date yet and is listed after the dated ones, in
+  library order. Check the stored value really is a File (with
+  `lastModified`) and not a bare Blob before relying on this.
+- **The orders**: Newest first by the file's date (the default), Oldest
+  first, Title A-Z, Artist, Album, Length -- decided in a plain module with
+  tests in the words of the request ("the newer first ... the default way to
+  list the music"), not in the mode.
 - **Saved per device** (asked so): localStorage, next to the open playlist,
   and listed in `test/deviceOnlyState.test.js` with its reason.
 - **Where it applies**: the whole library. A playlist keeps its own order
