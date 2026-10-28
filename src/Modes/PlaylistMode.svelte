@@ -3,6 +3,7 @@
   import { getReadableTextColor } from '../utils/readableColor.js';
   import { logSync } from '../utils/syncLog.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
+  import PickerSheet from '../components/PickerSheet.svelte';
   import ScrollingText from '../components/ScrollingText.svelte';
   import { ensureMusicCover, forgetCoverlessTrack } from '../utils/musicCovers.js';
   import { packMusic, readMusicManifest, unpackMusic, mergeMusicLibrary } from '../utils/musicTransfer.js';
@@ -1002,6 +1003,49 @@
     if (selectedPlaylistId === id) selectedPlaylistId = null;
   }
 
+  // ── Choosing a playlist ─────────────────────────────────────────
+  // The sheet the title opens (PickerSheet.svelte): All music first, then each
+  // playlist, each with how many songs it holds; renaming, deleting and a new
+  // playlist live here now that the column of playlists is gone (2026-10-28).
+  const ALL_MUSIC = '__all-music';
+  let pickerOpen = false;
+  $: pickerItems = [
+    { id: ALL_MUSIC, name: 'All music', count: tracks.length, current: !selectedPlaylistId },
+    ...playlists.map(playlist => ({
+      id: playlist.id,
+      name: playlist.name,
+      count: playlist.trackIds.length,
+      current: selectedPlaylistId === playlist.id,
+      actions: [
+        {
+          label: '✎',
+          title: `Rename ${playlist.name}`,
+          run: () => {
+            const name = prompt('Playlist name', playlist.name);
+            if (name && name.trim()) renamePlaylist(playlist.id, name.trim());
+          }
+        },
+        {
+          label: '×',
+          title: `Delete ${playlist.name}`,
+          run: () => {
+            if (confirm(`Delete the playlist "${playlist.name}"? Its songs stay in All music.`)) deletePlaylist(playlist.id);
+          }
+        }
+      ]
+    }))
+  ];
+
+  function pickPlaylist(id) {
+    selectedPlaylistId = id === ALL_MUSIC ? null : id;
+    pickerOpen = false;
+  }
+
+  function newPlaylistFromPicker() {
+    createPlaylist();
+    pickerOpen = false;
+  }
+
   function toggleTrackInPlaylist(trackId) {
     if (!selectedPlaylist) return;
     const trackIds = selectedPlaylist.trackIds.includes(trackId)
@@ -1284,7 +1328,7 @@
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* The picture sits behind everything and takes no clicks. Clipped to the
@@ -1337,22 +1381,10 @@
      fading the wallpaper faded to black instead of to the colour this mode
      wears. Single Note keeps its own background for exactly this reason and
      only clears its inner surfaces. */
-  .playlist-mode.has-wallpaper .pl-sidebar,
   .playlist-mode.has-wallpaper .pl-tracks {
     background: transparent;
   }
 
-  .pl-sidebar {
-    min-height: 0;
-    overflow-y: auto;
-    /* Names are cut short instead; nothing here is worth scrolling sideways
-       for. The row of names on a narrow screen overrides this, because there
-       the sideways scroll is the whole design. */
-    overflow-x: hidden;
-    padding: 10px;
-    border-right: 1px solid var(--pl-line);
-    background: var(--pl-surface, var(--canvas-inner-bg, #000));
-  }
 
   /* Explicit background here too: without it the track list showed the app
      surface behind the mode instead of the theme's own colour. */
@@ -1371,43 +1403,49 @@
     margin: 2px 0 8px;
   }
 
-  .pl-playlist {
+  /* The open playlist's name, as a button: it opens the list of playlists. */
+  .pl-title-row {
     display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 2px 0 8px;
+  }
+  .pl-title {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
-    /* Without this the row is 100% *plus* its padding and border, so the column
-       scrolled sideways by twenty pixels whatever the playlist was called. */
-    box-sizing: border-box;
-    padding: 7px 9px;
+    max-width: 100%;
+    padding: 4px 8px;
+    margin-left: -8px;
+    border: none;
     border-radius: 8px;
-    cursor: pointer;
-    border: 1px solid transparent;
-    background: none;
+    background: transparent;
     color: inherit;
-    text-align: left;
-    font-size: 0.85rem;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
   }
-  .pl-playlist:hover { background: var(--pl-soft); }
-  .pl-playlist.active {
-    border-color: color-mix(in srgb, var(--mode-text-color, #fff) 45%, transparent);
-    background: var(--pl-soft);
-  }
-  /* A long name is cut short rather than made to fit, and the column never
-     scrolls sideways to chase it.
-     
-     The floor is the point of the `min-width`: truncating purely on what is
-     left over leaves about six letters, which is not enough to tell two
-     playlists apart. Fourteen characters' worth is reserved first and the
-     count beside it gives way — the number is a detail, the name is how you
-     find the thing. */
-  .pl-playlist-name {
-    flex: 1 1 auto;
-    min-width: min(14ch, 100%);
+  .pl-title:hover { background: var(--pl-soft); }
+  .pl-title-name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .pl-title-chevron { flex: none; opacity: 0.7; }
+  .pl-new-playlist {
+    margin: 0 10px 12px;
+    min-height: 44px;
+    border: 1px dashed var(--pl-line);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .pl-new-playlist:hover { background: var(--pl-soft); }
+
   .pl-count {
     flex: 0 1 auto;
     min-width: 0;
@@ -1627,59 +1665,7 @@
   .pl-empty { opacity: 0.6; font-size: 0.85rem; padding: 20px 4px; line-height: 1.5; }
   .pl-busy { font-size: 0.8rem; opacity: 0.8; }
 
-  /* Narrow enough that the playlists cannot have a column of their own, they
-     become a single row of names above the music.
-     
-     What was here before gave them 30vh whether there were twenty of them or
-     one: 249px of a 812px phone, mostly empty, and a panel that scrolled
-     vertically — which was the complaint. A row is as tall as one name, and it
-     scrolls sideways only when there are more names than fit. */
-  @media (max-width: 1024px) {
-    /* The row of names takes what it needs and the music takes the rest.
-       Without the explicit rows both are `auto`, which shares the height
-       between them — and the strip ends up taller than the panel it replaced. */
-    .pl-body {
-      grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
-    }
-    .pl-sidebar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 10px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      border-right: none;
-      border-bottom: 1px solid var(--pl-line);
-    }
-    .pl-sidebar .pl-section-title { display: none; }
-    .pl-playlist {
-      width: auto;
-      flex: 0 0 auto;
-      border-radius: 999px;
-      border-color: var(--pl-line);
-      padding: 6px 12px;
-      /* One line box for every chip, names and the ＋ alike, so they sit level
-         however big the glyph inside them is. */
-      line-height: 20px;
-    }
-    /* The delete × is the other thing that can make a chip taller than its
-       neighbours; here it lives inside the same line box as the name. */
-    .pl-sidebar .pl-icon-btn {
-      padding: 0 2px;
-      font-size: 0.9rem;
-      line-height: 20px;
-    }
-    .pl-playlist-name { flex: 0 0 auto; max-width: 38vw; }
-  }
 
-  /* Only drawn where the toolbar has given the action away — see
-     utils/playlistToolbar.js. */
-  .pl-playlist-new {
-    justify-content: center;
-    min-width: 38px;
-    font-size: 0.95rem;
-  }
 </style>
 
 <svelte:window
@@ -1771,45 +1757,29 @@
   </div>
 
   <div class="pl-body">
-    <div class="pl-sidebar">
-      <p class="pl-section-title">Playlists</p>
-      <button class="pl-playlist" class:active={!selectedPlaylistId} on:click={() => (selectedPlaylistId = null)}>
-        <span class="pl-playlist-name">All music</span>
-        <span class="pl-count">{tracks.length}</span>
-      </button>
-      {#each playlists as playlist (playlist.id)}
-        <div class="pl-playlist" class:active={selectedPlaylistId === playlist.id}>
-          <span
-            class="pl-playlist-name"
-            role="button"
-            tabindex="0"
-            title="Double-click to rename"
-            on:click={() => (selectedPlaylistId = playlist.id)}
-            on:keydown={(e) => e.key === 'Enter' && (selectedPlaylistId = playlist.id)}
-            on:dblclick={() => {
-              const name = prompt('Playlist name', playlist.name);
-              if (name) renamePlaylist(playlist.id, name);
-            }}
-          >{playlist.name}</span>
-          <span class="pl-count">{playlist.trackIds.length}</span>
-          <button class="pl-icon-btn" title="Delete playlist" on:click|stopPropagation={() => deletePlaylist(playlist.id)}>×</button>
-        </div>
-      {/each}
-      {#if layout.strip.includes('newPlaylist')}
-        <button
-          class="pl-playlist pl-playlist-new"
-          title={playlistActions.newPlaylist.title}
-          aria-label={playlistActions.newPlaylist.label}
-          on:click={() => runAction(playlistActions.newPlaylist)}
-        >＋</button>
-      {/if}
-    </div>
-
+    {#if pickerOpen}
+      <PickerSheet
+        title="Playlists"
+        items={pickerItems}
+        on:pick={(event) => pickPlaylist(event.detail)}
+        on:close={() => (pickerOpen = false)}
+      >
+        <button slot="footer" class="pl-new-playlist" on:click={newPlaylistFromPicker}>＋ New playlist</button>
+      </PickerSheet>
+    {/if}
     <div class="pl-tracks" bind:this={listEl} bind:clientHeight={listViewport} on:scroll={onListScroll}>
-      <p class="pl-section-title">
-        {selectedPlaylist ? selectedPlaylist.name : 'All music'}
-        {#if selectedPlaylist}<span class="pl-count"> — ✓ adds or removes</span>{/if}
-      </p>
+      <!-- The playlist's name, which opens the list of playlists. Asked
+           2026-10-28: "be able to click on the name of the playlist ... All
+           music will be written Playlist instead, and when you click it opens
+           a page like the one in Single Note to search notes, but simpler". It
+           replaces the column of playlists beside the music. -->
+      <div class="pl-title-row">
+        <button class="pl-title" aria-haspopup="dialog" on:click={() => (pickerOpen = true)}>
+          <span class="pl-title-name">{selectedPlaylist ? selectedPlaylist.name : 'Playlist'}</span>
+          <svg class="pl-title-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+        {#if selectedPlaylist}<span class="pl-count">✓ adds or removes</span>{/if}
+      </div>
 
       {#if dedupeOpen}
         <div class="pl-dedupe">

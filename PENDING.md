@@ -95,6 +95,11 @@ Steps, each landing on its own:
    (`components/AppDialog.svelte`, 2026-10-26). Left: the app's own alert and
    confirm dialog in App.svelte (`.app-dialog*`), which has its own buttons and
    keyboard handling; move it onto AppDialog.
+2a. **One picker.** `components/PickerSheet.svelte` (2026-10-28) is the sheet
+   Playlist mode chooses a playlist from. Single Note's NotePicker is the same
+   shape with more in it -- search, layouts, folders -- and has its own copy of
+   the sheet, the head and the rows; move it onto PickerSheet, adding a
+   search and a slot for its grid there rather than keeping a second sheet.
 2b. **One input, one button, one field.** Base styles in app.css for text
    inputs, buttons (plain, primary, small/icon) and pill toggles, in the
    theme's colours; a component only adds what is truly its own. Converted
