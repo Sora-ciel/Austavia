@@ -53,8 +53,11 @@ labelled by mistake. The version numbers are the same scheme for all of them
 
 ## A staging pre-release
 
-**Named "Arial Staging"** (asked 2026-10-28, "so that it's easy to see the
-difference with the normal app"): the app's old name, which nobody outside
+**Named "Arial Staging"** -- except under the icon on Android, which reads
+"Austavia Staging" (changed the same day: "I made a mistake to the name, but
+just the name that shows when you're looking at the app on Android") --
+asked 2026-10-28, "so that it's easy to see the difference with the normal
+app": the app's old name, which nobody outside
 uses any more, so it can never be mistaken for Austavia on a launcher or a
 home screen. Only the name a person sees; the identifier stays
 `com.sora.austavia.staging`, since changing it would make it a new app to
