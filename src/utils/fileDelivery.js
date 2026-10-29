@@ -51,13 +51,42 @@ function download(blob, name) {
 }
 
 /**
- * Saves or shares `blob` as `name`. Resolves to 'downloaded', 'shared', or
- * 'cancelled' when the share sheet was closed without choosing anything.
+ * Saves or shares `blob` as `name`. Resolves to 'downloaded', 'saved' (into
+ * the phone's Downloads, see below), 'shared', or 'cancelled' when the share
+ * sheet was closed without choosing anything.
+ *
+ * `toDownloads`, in the Android app: write it into the phone's Downloads
+ * folder instead of offering the share sheet, and with `copy` put it on the
+ * clipboard too. Asked 2026-10-29 for screenshots: "the app downloads the
+ * image in the download folder of Android and also copies it, because our
+ * sharing doesn't make it easy to actually export at our actual resolution"
+ * -- the apps the sheet hands it to re-compress it. Done natively
+ * (SaveToDevicePlugin.java), since a web download saves nothing there; where
+ * that is not possible (Android before 10) it falls back to the sheet.
+ * `lastResult` says whether the copy happened.
  */
-export async function deliverFile(blob, name, { title = '' } = {}) {
+export let lastResult = { copied: false };
+
+function saveToDevicePlugin() {
+  return typeof window !== 'undefined' ? window.Capacitor?.Plugins?.SaveToDevice || null : null;
+}
+
+export async function deliverFile(blob, name, { title = '', toDownloads = false, copy = false } = {}) {
+  lastResult = { copied: false };
   if (deliveryRoute({ nativeAndroid: isNativeAndroid() }) === 'download') {
     download(blob, name);
     return 'downloaded';
+  }
+
+  const saver = toDownloads ? saveToDevicePlugin() : null;
+  if (saver) {
+    try {
+      const result = await saver.saveToDownloads({ name, mime: blob.type || 'application/octet-stream', data: await blobToBase64(blob), copy });
+      lastResult = { copied: result?.copied === true };
+      return 'saved';
+    } catch (error) {
+      console.warn('Could not save to Downloads; offering the share sheet instead:', error);
+    }
   }
 
   const [{ Filesystem, Directory }, { Share }] = await Promise.all([

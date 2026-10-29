@@ -76,7 +76,7 @@
   import { embedCloudFiles } from './utils/cloudFiles.js';
   import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
   import { solidColor } from './utils/cssColor.js';
-  import { deliverFile, isNativeAndroid as onAndroidApp } from './utils/fileDelivery.js';
+  import { deliverFile, isNativeAndroid as onAndroidApp, lastResult as deliveryLastResult } from './utils/fileDelivery.js';
   import { PENDING_DELETES_KEY, readPending, withPending, settlePending, deletesToRun } from './utils/folderMoves.js';
   import { reconcileThemes } from './utils/themeSync.js';
   import {
@@ -4200,8 +4200,16 @@
       const blob = await capture;
       // A download on a computer; the system share sheet in the Android app,
       // where a web download saved nothing -- see utils/fileDelivery.js.
-      const how = await deliverFile(blob, screenshotFileName({ saveName: currentSaveName, mode }), { title: 'Screenshot' });
+      // In the Android app: into the phone's Downloads at full resolution, and
+      // onto the clipboard (asked 2026-10-29) -- the share sheet only if that
+      // cannot be done. See utils/fileDelivery.js.
+      const how = await deliverFile(blob, screenshotFileName({ saveName: currentSaveName, mode }), {
+        title: 'Screenshot',
+        toDownloads: true,
+        copy: true
+      });
       if (how === 'downloaded') noteScreenshot(deliveryMessage({ copied: await copying, downloaded: true }));
+      else if (how === 'saved') noteScreenshot(deliveryLastResult.copied ? 'Saved to Downloads and copied' : 'Saved to Downloads');
       else if (how === 'shared') noteScreenshot('Shared');
     } catch (error) {
       console.error('Screenshot failed', error);

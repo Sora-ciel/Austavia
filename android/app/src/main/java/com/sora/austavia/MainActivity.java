@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MediaNotificationPlugin.class);
         registerPlugin(DiagnosticsPlugin.class);
         registerPlugin(TimerNotificationPlugin.class);
+        registerPlugin(SaveToDevicePlugin.class);
         super.onCreate(savedInstanceState);
         keepTheWebViewAboveTheKeyboard();
         letTheStagingAppBeInspected();
