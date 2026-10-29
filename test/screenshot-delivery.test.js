@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 
 import {
   captureScale,
+  listCaptureHeight,
   withinTime,
   CAPTURE_LIMITS,
   screenshotFileName,
@@ -149,4 +150,20 @@ it('a short view is still drawn at twice the size, on a phone as on a computer',
 it('a step that never finishes fails, naming the step, instead of leaving the button busy', async () => {
   await assert.rejects(withinTime(new Promise(() => {}), 20, 'drawing the page'), /drawing the page/);
   assert.equal(await withinTime(Promise.resolve('png'), 20, 'drawing the page'), 'png');
+});
+
+// Reported 2026-10-28: a long playlist's screenshot was a sliver. Asked: show
+// everything if possible, otherwise "show to a certain limit -- but do show
+// everything inside that limit". A list stops at the limit, at full size.
+
+it('a list too long for one picture is drawn at full size up to the limit, not shrunk to a sliver', () => {
+  // 1890 tracks of 54px on a 384px-wide phone.
+  const height = listCaptureHeight({ width: 384, height: 1890 * 54, phone: true });
+  assert.ok(height < 1890 * 54);
+  assert.ok(captureScale({ width: 384, height, phone: true }) >= 1, 'readable: never smaller than the screen');
+  assert.ok(height >= 8000, `as much as the phone can draw: ${height}px`);
+});
+
+it('a list that fits is drawn whole', () => {
+  assert.equal(listCaptureHeight({ width: 384, height: 3000, phone: true }), 3000);
 });

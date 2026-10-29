@@ -19,6 +19,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
+  import { SCREENSHOT_EVENT, rowsForCapture } from '../utils/screenshotDelivery.js';
   import { playbackPool, openingPlaylist } from '../utils/playlistPlayback.js';
   import {
     sizeGroups,
@@ -259,12 +260,23 @@
   // Nothing is assigned unless it differs, so this settles rather than looping.
   afterUpdate(measureList);
 
-  $: rowWindow = windowRange({
-    scrollTop: listScrollTop - rowsOffset,
-    viewportHeight: listViewport,
-    rowHeight,
-    count: visibleTracks.length
+  // While a screenshot is drawn, the rows it can hold are drawn too, from the
+  // top -- otherwise the picture is of the empty space that stands in for
+  // rows off screen (utils/screenshotDelivery.js, SCREENSHOT_EVENT).
+  let capturing = false;
+  const onScreenshot = event => { capturing = event.detail?.capturing === true; };
+  onMount(() => {
+    window.addEventListener(SCREENSHOT_EVENT, onScreenshot);
+    return () => window.removeEventListener(SCREENSHOT_EVENT, onScreenshot);
   });
+  $: rowWindow = capturing
+    ? { start: 0, end: Math.min(visibleTracks.length, rowsForCapture(rowHeight)), padTop: 0, padBottom: 0 }
+    : windowRange({
+        scrollTop: listScrollTop - rowsOffset,
+        viewportHeight: listViewport,
+        rowHeight,
+        count: visibleTracks.length
+      });
   $: renderedTracks = visibleTracks.slice(rowWindow.start, rowWindow.end);
   $: loadCoversFor(renderedTracks);
   $: listedTracks = searchNeedle

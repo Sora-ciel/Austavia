@@ -296,6 +296,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **A screenshot of a long list** (2026-10-28). In Playlist mode with hundreds of tracks: the picture shows the list from the top at full size, as far as one picture can go (about 150 rows), every row drawn -- no longer a sliver of the whole list. It takes a few seconds on the phone. Check the rows near the bottom of the picture have their titles. |
 | next | **The music in order, newest file first** (2026-10-28). Playlist mode lists the music by each file's own date, newest first, and the order can be changed at the end of the title row (Newest first, Oldest first, Title, Artist, Album, Length); the choice stays on that device and pressing play follows it. Music imported before this gets its date from the stored file on a device that has the audio, and the dates sync. Music restored from an Export zip may have no date and is listed after the dated tracks. Check it on the phone with a real library. |
 | next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
@@ -727,12 +728,6 @@ card). Only that would be the app's to fix.
   before or with the next full release; until then the real app's
   screenshots lack a synced wallpaper and Export cannot put synced pictures
   inside the file (both fetch the picture, and the bucket refused).
-
-- **A screenshot of a long list is a sliver.** Playlist mode with ~390 tracks
-  came out 107 x 8192 px on the phone: the capture opens every scrolled pane
-  to draw all of it (expandScrollers), and the phone's size limit then shrinks
-  the whole thing to fit. To decide: draw only what is on screen in long
-  lists, or cap how far a list is opened. Seen 2026-10-28.
 
 - **Ctrl+Z after typing and then recolouring a block** undoes the typing
   first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the

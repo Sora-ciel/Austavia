@@ -142,7 +142,7 @@
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
-  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, withinTime, CAPTURE_DEADLINES } from './utils/screenshotDelivery.js';
+  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, textChunks } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
@@ -3941,6 +3941,16 @@
       const previousTransform = board ? board.style.transform : null;
       if (board) board.style.transform = 'none';
 
+      // A list that draws only what is on screen draws the rest now, up to what
+      // the picture can hold, and is given two frames to do it -- or a tenth of
+      // a second, since a page that is not being shown gets no frames at all,
+      // and waiting for one left the button busy for good (seen 2026-10-28).
+      window.dispatchEvent(new CustomEvent(SCREENSHOT_EVENT, { detail: { capturing: true } }));
+      await Promise.race([
+        new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+        new Promise(resolve => setTimeout(resolve, 100))
+      ]);
+
       // Modes other than Canvas scroll their own panes — the task list, the
       // track list — and only the visible slice of those would be drawn.
       // Opening them up for the capture is what makes this work for every mode
@@ -3948,8 +3958,14 @@
       restoreScrollers = expandScrollers(target);
 
       // Measured after expanding, so the size covers the content now on show.
+      // A list longer than one readable picture stops at the limit rather than
+      // shrinking to a sliver (listCaptureHeight); Canvas, one layout, is
+      // shrunk to fit whole instead.
       const width = Math.max(target.scrollWidth, target.clientWidth, 1);
-      const height = Math.max(target.scrollHeight, target.clientHeight, 1);
+      const fullHeight = Math.max(target.scrollHeight, target.clientHeight, 1);
+      const height = mode === 'default'
+        ? fullHeight
+        : listCaptureHeight({ width, height: fullHeight, phone: capturingOnPhone() });
       const scale = captureScale({ width, height, phone: capturingOnPhone() });
 
       // Every mode's wallpaper is painted in underneath the capture rather than
@@ -4044,6 +4060,7 @@
       // and the mode's background, cleared for the wallpaper, likewise.
       restoreScrollers();
       restoreBackground();
+      window.dispatchEvent(new CustomEvent(SCREENSHOT_EVENT, { detail: { capturing: false } }));
     }
   }
 
