@@ -370,7 +370,7 @@
    * comes down to the order the stylesheets happen to be in — which differs
    * between the dev server and the build. Blocks were 1.1rem in the app and
    * 1.05rem while working on them, and nothing said so. The same trap is
-   * written up over --active-note-bg in TipTapEditor; this is the second time.
+   * written up over --editor-paper in TipTapEditor; this is the second time.
    *
    * It excludes the inline editor a task row uses, which is right anyway: that
    * one takes its size from the row around it. */

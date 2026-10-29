@@ -133,7 +133,7 @@
     gap: 8px;
     border-radius: var(--block-control-radius, 10px);
     border: 1px solid color-mix(in srgb, var(--text, var(--mode-text-color, currentColor)) 25%, transparent);
-    background: var(--task-surface, var(--canvas-inner-bg, #000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000));
     color: var(--text, var(--mode-text-color, inherit));
     box-shadow: var(--block-shadow, 0 6px 20px rgba(0, 0, 0, 0.45));
     font-size: 0.85rem;

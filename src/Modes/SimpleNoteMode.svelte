@@ -1,4 +1,5 @@
 <script>
+  import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
   // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
   // in modeRegistry.js.
@@ -51,47 +52,9 @@
 
   $: canvasTheme = { ...defaultCanvasColors, ...(canvasColors || {}) };
   $: leftTheme = { ...defaultLeftControlColors, ...(leftControlColors || {}) };
-  $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
+  $: modeTextColor = modeTextColorFor(canvasTheme);
   $: canvasCssVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor}; --left-text-color: ${leftTheme.textColor}; --left-button-bg: ${leftTheme.buttonBg};`;
 
-  function getReadableTextColor(color) {
-    if (!color) return '#f5f5f5';
-    const parsed = parseColor(color);
-    if (!parsed) return '#f5f5f5';
-    const [r, g, b] = parsed;
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.6 ? '#121212' : '#f5f5f5';
-  }
-
-  function parseColor(color) {
-    const trimmed = color.trim();
-    if (trimmed.startsWith('#')) {
-      const hex = trimmed.slice(1);
-      if (hex.length === 3) {
-        return [
-          parseInt(hex[0] + hex[0], 16),
-          parseInt(hex[1] + hex[1], 16),
-          parseInt(hex[2] + hex[2], 16)
-        ];
-      }
-      if (hex.length === 6) {
-        return [
-          parseInt(hex.slice(0, 2), 16),
-          parseInt(hex.slice(2, 4), 16),
-          parseInt(hex.slice(4, 6), 16)
-        ];
-      }
-    }
-    const rgbMatch = trimmed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (rgbMatch) {
-      return [
-        Number(rgbMatch[1]),
-        Number(rgbMatch[2]),
-        Number(rgbMatch[3])
-      ];
-    }
-    return null;
-  }
 
   function deleteBlock(id) {
     dispatch('delete', { id });
@@ -777,17 +740,17 @@
 .container {
   /* Faded by the theme's own dial, as a canvas block is -- a theme that
      makes block surfaces see-through does so here too. */
-  background: color-mix(in srgb, var(--bg-color) var(--block-bg-opacity, 100%), transparent);
-  color: var(--text-color);
+  background: color-mix(in srgb, var(--bg) var(--block-bg-opacity, 100%), transparent);
+  color: var(--text);
   text-shadow: var(--block-text-shadow, none);
   padding: 4px;
   width: 100%;
   box-sizing: border-box;
   border-radius: 20px;
   overflow: hidden;
-  border: 2px solid var(--simple-note-border-color, var(--text-color));
-  box-shadow: var(--simple-note-block-shadow, 0 0 2px 1px var(--text-color),
-              0 0 6px 2px var(--text-color));
+  border: 2px solid var(--simple-note-border-color, var(--text));
+  box-shadow: var(--simple-note-block-shadow, 0 0 2px 1px var(--text),
+              0 0 6px 2px var(--text));
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -803,7 +766,7 @@
 /* TipTap overrides for grid cards */
 :global(.container .tiptap-wrap) {
   background: transparent;
-  color: var(--text-color);
+  color: var(--text);
   /* The app's own face, which carries every weight between 100 and 900 —
      see the @font-face in app.css. Arial was named here and has two. */
   font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
@@ -823,7 +786,7 @@
   overflow-y: visible;
 }
 :global(.container .tiptap-inner) {
-  color: var(--text-color);
+  color: var(--text);
   padding: 10px;
   min-height: 40px;
   flex: unset;
@@ -844,9 +807,9 @@
 input[type="text"] {
   width: 100%;
   border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--text-color) 22%, transparent);
-  background: color-mix(in srgb, var(--text-color) 8%, transparent);
-  color: var(--text-color);
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
   font-size: 1rem;
   margin-top: 8px;
 }
@@ -857,15 +820,15 @@ input[type="text"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px dashed color-mix(in srgb, var(--text-color) 45%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--text) 45%, transparent);
   border-radius: 14px;
   margin-bottom: 8px;
 }
 
 .image-select-button {
-  border: 2px solid var(--text-color);
+  border: 2px solid var(--text);
   background: transparent;
-  color: var(--text-color);
+  color: var(--text);
   border-radius: 12px;
   padding: 10px 14px;
   font-weight: 700;
@@ -888,7 +851,7 @@ input[type="text"] {
   padding: 4px 8px;
   border-radius: 8px;
   margin-top: 4px;
-  background: color-mix(in srgb, var(--text-color) 10%, transparent);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
   font-size: 0.95rem;
 }
 
@@ -906,10 +869,10 @@ input[type="text"] {
 }
 
 .task-add-row button {
-  border: 1px solid color-mix(in srgb, var(--text-color) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--text-color) 10%, transparent);
-  color: var(--text-color);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
   padding: 6px 10px;
   cursor: pointer;
 }
@@ -931,7 +894,7 @@ input[type="text"] {
 .task-item button {
   border: none;
   background: transparent;
-  color: var(--text-color);
+  color: var(--text);
   cursor: pointer;
   font-size: 1rem;
 }
@@ -950,8 +913,8 @@ input[type="text"] {
 }
 
 .task-item.dragging { opacity: 0.5; position: relative; z-index: 2; }
-.task-item.drag-over-before { box-shadow: inset 0 2px 0 0 var(--text-color); }
-.task-item.drag-over-after  { box-shadow: inset 0 -2px 0 0 var(--text-color); }
+.task-item.drag-over-before { box-shadow: inset 0 2px 0 0 var(--text); }
+.task-item.drag-over-after  { box-shadow: inset 0 -2px 0 0 var(--text); }
 
 .task-item button.drag-handle {
   flex-shrink: 0;
@@ -963,7 +926,7 @@ input[type="text"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-color);
+  color: var(--text);
   opacity: 0.35;
 }
 .task-item button.drag-handle:active { cursor: grabbing; opacity: 0.7; }
@@ -971,9 +934,9 @@ input[type="text"] {
 .task-editor {
   flex: 1;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--text-color, #fff) 30%, transparent);
-  background: color-mix(in srgb, var(--text-color, #fff) 8%, transparent);
-  color: var(--text-color, inherit);
+  border: 1px solid color-mix(in srgb, var(--text, #fff) 30%, transparent);
+  background: color-mix(in srgb, var(--text, #fff) 8%, transparent);
+  color: var(--text, inherit);
   border-radius: 6px;
   padding: 5px 7px;
 }
@@ -1136,7 +1099,7 @@ input[type="text"] {
         <div
           class="container"
           class:focused={block.id === focusedBlockId}
-          style="--bg-color: {block.bgColor}; --text-color: {block.textColor};"
+          style="--bg: {block.bgColor}; --text: {block.textColor};"
           on:click={(event) => handleBlockClick(event, block.id)}
           on:contextmenu={(event) => handleContextMenu(event, block.id)}
           on:touchstart={(event) => startTouchHold(event, block.id)}
@@ -1282,12 +1245,12 @@ input[type="text"] {
                       >
                         {#if task.done}
                           <svg viewBox="0 0 20 20" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10" cy="10" r="9" fill="var(--text-color)" stroke="var(--text-color)" stroke-width="1"/>
-                            <path d="M5.5 10.5 L8.5 13.5 L14.5 7" stroke="var(--bg-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="10" cy="10" r="9" fill="var(--text)" stroke="var(--text)" stroke-width="1"/>
+                            <path d="M5.5 10.5 L8.5 13.5 L14.5 7" stroke="var(--bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
                         {:else}
                           <svg viewBox="0 0 20 20" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="10" cy="10" r="8.5" fill="transparent" stroke="var(--text-color)" stroke-width="1.5" stroke-opacity="0.5"/>
+                            <circle cx="10" cy="10" r="8.5" fill="transparent" stroke="var(--text)" stroke-width="1.5" stroke-opacity="0.5"/>
                           </svg>
                         {/if}
                       </button>

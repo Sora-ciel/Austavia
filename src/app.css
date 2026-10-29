@@ -184,14 +184,15 @@ b {
    Named once, so anything that needs "the colours of where this is" has them.
 
    The chain runs from the most local outwards: a block sets --text and --bg on
-   itself, Single Note mode sets --active-note-*, a mode surface sets
+   itself, a mode sets --mode-surface-text and --mode-surface for what its
+   content sits on, and
    --mode-text-color and --canvas-inner-bg, and .app seeds --app-text and
    --app-bg. Declared on everything rather than inherited, so each element works
    the chain out from what *it* has inherited — which is what makes this true at
    any depth without anybody opting in. */
 * {
-  --region-ink: var(--text, var(--active-note-text, var(--mode-text-color, var(--app-text, #ffffff))));
-  --region-paper: var(--bg, var(--active-note-bg, var(--canvas-inner-bg, var(--app-bg, #000000))));
+  --region-ink: var(--text, var(--mode-surface-text, var(--mode-text-color, var(--app-text, #ffffff))));
+  --region-paper: var(--bg, var(--mode-surface, var(--canvas-inner-bg, var(--app-bg, #000000))));
 }
 
 /* Highlighting a word reverses those two: the highlight takes the region's

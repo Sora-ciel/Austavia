@@ -1,10 +1,10 @@
 <script>
+  import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
   // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
   // in modeRegistry.js.
   export let backgroundSettings = {};
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
-  import { getReadableTextColor } from '../utils/readableColor.js';
   import ColorField from '../components/ColorField.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import MarkdownIt from 'markdown-it';
@@ -111,7 +111,7 @@
 
   const defaultCanvasColors = { outerBg: '#000000', innerBg: '#000000' };
   $: canvasTheme = { ...defaultCanvasColors, ...(canvasColors || {}) };
-  $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
+  $: modeTextColor = modeTextColorFor(canvasTheme);
   $: canvasCssVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor};`;
 
   $: taskBlocks = blocks.filter(b => b.type === 'task');
@@ -138,7 +138,8 @@
   // theme's dial goes down, never toward see-through -- the rule Single Note
   // and Playlist share (utils/modeSurface.js). The cards on it fade toward
   // see-through, like blocks on the canvas; see the styles.
-  $: taskSurfaceVar = `--task-surface: ${drawnSurface(taskBlock?.bgColor || canvasTheme.innerBg, canvasTheme.innerBg)};`;
+  $: taskSurfaceVar = `--mode-surface: ${drawnSurface(taskBlock?.bgColor || canvasTheme.innerBg, canvasTheme.innerBg)};` +
+    ` --mode-surface-text: ${taskBlock?.textColor || modeTextColor};`;
 
   $: taskColorVars = [
     taskBlock?.bgColor ? `--bg: ${taskBlock.bgColor};` : '',
@@ -427,7 +428,7 @@
     flex-direction: column;
     width: 100%;
     height: calc(var(--tm-h, 100dvh) - var(--controls-height, 56px));
-    background: var(--task-surface, var(--bg, var(--canvas-inner-bg, #000)));
+    background: var(--mode-surface, var(--bg, var(--canvas-inner-bg, #000)));
     color: var(--text, var(--mode-text-color, #fff));
     box-sizing: border-box;
     font-family: var(--block-body-font, inherit);
@@ -460,9 +461,9 @@
 
   .task-tab {
     flex-shrink: 0;
-    border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--tab-text, var(--mode-text-color, #fff)) 30%, transparent);
-    background: var(--tab-bg, transparent);
-    color: var(--tab-text, var(--mode-text-color, inherit));
+    border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 30%, transparent);
+    background: var(--bg, transparent);
+    color: var(--text, var(--mode-text-color, inherit));
     padding: 3px 10px;
     border-radius: 999px;
     font-size: 0.72rem;
@@ -477,8 +478,8 @@
   .task-tab:hover { opacity: 0.8; }
   .task-tab[aria-selected='true'] {
     opacity: 1;
-    border-color: color-mix(in srgb, var(--tab-text, var(--mode-text-color, #fff)) 80%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--tab-text, var(--mode-text-color, #fff)) 35%, transparent);
+    border-color: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 80%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 35%, transparent);
   }
 
   .new-list-btn {
@@ -894,7 +895,7 @@
             class="task-tab"
             role="tab"
             aria-selected={block.id === selectedTaskId}
-            style="{block.bgColor ? `--tab-bg: ${block.bgColor};` : ''} {block.textColor ? `--tab-text: ${block.textColor};` : ''}"
+            style="--bg: {block.bgColor || 'transparent'}; --text: {block.textColor || 'var(--mode-text-color, inherit)'};"
             on:click={() => selectTaskList(block.id)}
           >{getTabLabel(block, i)}</button>
         {/each}

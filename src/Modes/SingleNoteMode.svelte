@@ -1,10 +1,10 @@
 <script>
+  import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import NotePicker from '../components/NotePicker.svelte';
   import { noteTitle } from '../utils/noteSearch.js';
   import { htmlToText } from '../utils/htmlToText.js';
-  import { getReadableTextColor } from '../utils/readableColor.js';
   import { surfaceColors, drawnSurface } from '../utils/modeSurface.js';
   import {
     STORAGE_KEY as LAST_NOTE_KEY,
@@ -207,7 +207,7 @@
   };
 
   $: canvasTheme = { ...defaultCanvasColors, ...(canvasColors || {}) };
-  $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
+  $: modeTextColor = modeTextColorFor(canvasTheme);
   // The note's own colour, or the theme's for the mode when there is no note.
   // Shared with Playlist mode through utils/modeSurface.js: that mode was asked
   // to look "like in Single Note mode", and two copies of a rule that is meant
@@ -227,8 +227,11 @@
   $: scrollbarAlpha = Math.max(0.2, bgImage ? bgOpacity : 1);
   $: canvasCssVars =
     `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg};` +
-    ` --mode-text-color: ${modeTextColor}; --active-note-bg: ${activeNoteBg};` +
-    ` --active-note-text: ${activeNoteText}; --sb-alpha: ${scrollbarAlpha};`;
+    ` --mode-text-color: ${modeTextColor}; --mode-surface: ${activeNoteBg};` +
+    ` --mode-surface-text: ${activeNoteText}; --sb-alpha: ${scrollbarAlpha};` +
+    // The editor paints its writing area only where asked to: here, where the
+    // note is the page. A text block's editor stays see-through (TipTapEditor).
+    ` --editor-paper: ${activeNoteBg}; --editor-ink: ${activeNoteText};`;
 
   // Appended rather than folded in, so a note with nothing to dim carries no
   // --note-image-filter at all and the rule below stays inert.
@@ -418,7 +421,7 @@
     flex-direction: column;
     width: 100%;
     height: 100%;
-    background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000000));
     color: var(--mode-text-color, #ffffff);
     /* The theme's shadow under writing, as a canvas block has it -- this mode
        is the text block filling the window, counter and buttons included. */
@@ -430,7 +433,7 @@
     --sb-track: transparent;
     --sb-thumb: color-mix(
       in srgb,
-      var(--active-note-text, var(--mode-text-color, #ffffff)) calc(var(--sb-alpha, 1) * 100%),
+      var(--mode-surface-text, var(--mode-text-color, #ffffff)) calc(var(--sb-alpha, 1) * 100%),
       transparent
     );
   }
@@ -540,8 +543,8 @@
     width: 100%;
     padding: 3px 12px;
     box-sizing: border-box;
-    background: var(--active-note-bg);
-    color: var(--active-note-text, inherit);
+    background: var(--mode-surface);
+    color: var(--mode-surface-text, inherit);
   }
 
   .note-stats {
@@ -646,8 +649,8 @@
   }
 
   :global(.single-note .tiptap-wrap) {
-    background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
-    color: var(--active-note-text, var(--mode-text-color, #ffffff));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000000));
+    color: var(--mode-surface-text, var(--mode-text-color, #ffffff));
     /* The app's own face, which carries every weight between 100 and 900 —
        see the @font-face in app.css. Arial was named here and has two. */
     font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
@@ -655,7 +658,7 @@
     line-height: 1.6;
   }
   :global(.single-note .tiptap-inner) {
-    color: var(--active-note-text, var(--mode-text-color, #ffffff));
+    color: var(--mode-surface-text, var(--mode-text-color, #ffffff));
     padding: 12px;
   }
 
@@ -674,7 +677,7 @@
     display: flex;
     justify-content: flex-end;
     padding: 4px 12px;
-    background: var(--active-note-bg, var(--canvas-inner-bg, #000000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000000));
   }
 
   /* Out of the way while the keyboard is up.
@@ -692,7 +695,7 @@
   .note-footer button {
     background: transparent;
     border: none;
-    color: var(--active-note-text, var(--mode-text-color, #ffffff));
+    color: var(--mode-surface-text, var(--mode-text-color, #ffffff));
     font-size: 1.1rem;
     padding: 0 6px;
     cursor: pointer;

@@ -71,15 +71,11 @@ Measured on 2026-10-26, before any of it:
 
 Steps, each landing on its own:
 
-1. **One set of mode colour names.** Worked out once, where every mode is
-   mounted, under the names CLAUDE.md already gives (`--app-text`,
-   `--app-bg`, `--app-surface`, `--app-border`) plus a mode-level pair
-   (`--mode-text`, `--mode-bg`) that a mode may override for itself and
-   otherwise inherits. The four copies of `modeTextColor` go; `--text`,
-   `--text-color`, `--active-note-text` and the rest become the shared names.
-   A test fails on a mode declaring its own text or background name. Playlist
-   is the one mode whose text really differs (its surface picks it) -- it
-   overrides the shared name rather than inventing one.
+1. ~~One set of mode colour names~~ -- done 2026-10-29: the names in
+   CLAUDE.md ("A colour has one name"), the four copies of modeTextColor made
+   one, Simple Note's private copy of the readable-colour rule and the unused
+   SimpleNoteModeLegacy.svelte removed. Checked by every element's computed
+   colours in all six modes, before and after: none changed.
 2. **One dialog** -- done for Bin, Export, Import and the habit page
    (`components/AppDialog.svelte`, 2026-10-26). Left: the app's own alert and
    confirm dialog in App.svelte (`.app-dialog*`), which has its own buttons and

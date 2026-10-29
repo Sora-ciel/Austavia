@@ -51,6 +51,17 @@ import { getReadableTextColor } from './readableColor.js';
  * way to say which one Playlist mode is, and the first one is at least stable —
  * it does not change as blocks are added, and it does not change on a reload.
  */
+/**
+ * A mode's writing colour: the theme's own text colour, or one worked out to
+ * read on the mode's background when the theme does not say. It was written
+ * out in four modes (Habit, Single Note, Simple Note, Task) -- the same line
+ * four times -- until 2026-10-29 (CLAUDE.md, "One of everything"). Set on the
+ * mode as --mode-text-color.
+ */
+export function modeTextColor(canvasTheme = {}) {
+  return canvasTheme?.textColor || getReadableTextColor(canvasTheme?.innerBg);
+}
+
 export function surfaceBlock(blocks = [], type = '') {
   if (!type) return null;
   const types = Array.isArray(type) ? type : [type];

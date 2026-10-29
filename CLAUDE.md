@@ -157,6 +157,12 @@ So before adding anything, look for the thing that already does it:
 - **A colour has one name.** If two modes show the same colour under one
   theme, they read it from the same variable. A mode can override it for
   itself; it does not invent a second name for it.
+  The names (2026-10-29, test/colourNames.test.js): a block's own colours
+  are `--bg` and `--text`; what a mode's content sits on is `--mode-surface`
+  and `--mode-surface-text`; a mode's writing and background are
+  `--mode-text-color` (from `modeTextColor` in utils/modeSurface.js) and
+  `--canvas-inner-bg`; what an editor paints behind its text, where a mode
+  wants it to, is `--editor-paper` and `--editor-ink`.
 - **An input looks like every other input.** Base styles for fields, buttons
   and toggles live once (app.css); a component adds only what is its own.
 - **A mechanism exists once.** Undo is the history in App.svelte; a feature

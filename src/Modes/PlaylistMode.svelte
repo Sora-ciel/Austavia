@@ -72,7 +72,8 @@
   $: modeTextColor = surface.text;
   $: cssVars =
     `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg};` +
-    ` --pl-surface: ${drawnSurface(surface.bg, canvasTheme.innerBg)}; --mode-text-color: ${modeTextColor};`;
+    ` --mode-surface: ${drawnSurface(surface.bg, canvasTheme.innerBg)}; --mode-text-color: ${modeTextColor};` +
+    ` --mode-surface-text: ${modeTextColor};`;
 
   // What a run has produced but not yet committed.
   //
@@ -1286,13 +1287,13 @@
     position: relative;
     /* The whole surface, not just the panels, so no untouched corner is left
        showing the app background through. */
-    background: var(--pl-surface, var(--canvas-inner-bg, #000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000));
     color: var(--mode-text-color, #fff);
-    --sb-track: var(--pl-surface, var(--canvas-inner-bg));
+    --sb-track: var(--mode-surface, var(--canvas-inner-bg));
     /* This mode wears the music block's colour rather than the theme's for the
        mode, so it says which background a highlight should show through to;
        see the ::selection rule in app.css. */
-    --selection-text: var(--pl-surface, var(--canvas-inner-bg));
+    --selection-text: var(--mode-surface, var(--canvas-inner-bg));
     --sb-thumb: var(--mode-text-color);
     --pl-line: color-mix(in srgb, var(--mode-text-color, #fff) 14%, transparent);
     --pl-soft: color-mix(in srgb, var(--mode-text-color, #fff) 8%, transparent);
@@ -1351,7 +1352,7 @@
     border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 26%, transparent);
     /* Opaque on purpose: it sits over the wallpaper and over the track list,
        and a translucent menu on a photograph cannot be read. */
-    background: var(--pl-surface, var(--canvas-inner-bg, #000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000));
     box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   }
   .pl-menu-item {
@@ -1445,7 +1446,7 @@
     min-height: 0;
     overflow-y: auto;
     padding: 10px 12px;
-    background: var(--pl-surface, var(--canvas-inner-bg, #000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000));
   }
 
   .pl-section-title {
@@ -1715,7 +1716,7 @@
     margin-bottom: 6px;
     border-radius: 8px;
     border: 1px solid var(--pl-line);
-    background: var(--pl-surface, var(--canvas-inner-bg, #000));
+    background: var(--mode-surface, var(--canvas-inner-bg, #000));
   }
   .pl-bulk .pl-btn { padding: 5px 9px; font-size: 0.79rem; }
   .pl-btn-danger { border-color: color-mix(in srgb, #ff6b6b 60%, transparent); }
@@ -1729,7 +1730,7 @@
     font-size: 0.79rem;
     cursor: pointer;
   }
-  .pl-bulk-select option { background: var(--pl-surface, var(--canvas-inner-bg, #000)); color: var(--mode-text-color, #fff); }
+  .pl-bulk-select option { background: var(--mode-surface, var(--canvas-inner-bg, #000)); color: var(--mode-text-color, #fff); }
 
   .pl-track.selected {
     background: color-mix(in srgb, var(--mode-text-color, #fff) 12%, transparent);

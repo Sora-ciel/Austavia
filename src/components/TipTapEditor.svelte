@@ -1232,12 +1232,14 @@
      * classes each — so which one won came down to the order the stylesheets
      * happened to load. That is why it looked intermittent.
      *
-     * Transparent and inherit instead: Single Note mode sets --active-note-bg
-     * and --active-note-text on every note it draws, so it is unaffected, and
-     * anywhere else the editor now shows the colours of whatever contains it.
+     * Transparent and inherit instead: Single Note mode sets --editor-paper
+     * and --editor-ink on every note it draws -- named for this one purpose,
+     * not borrowed from a block's colours, which would paint a see-through
+     * block solid -- and anywhere else the editor shows the colours of
+     * whatever contains it.
      */
-    background: var(--active-note-bg, transparent);
-    color: var(--active-note-text, inherit);
+    background: var(--editor-paper, transparent);
+    color: var(--editor-ink, inherit);
     box-sizing: border-box;
     /* The app's own face, which carries every weight between 100 and 900 —
        see the @font-face in app.css. Arial was named here and has two. */
@@ -1381,8 +1383,8 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: var(--active-note-text, #ffffff);
-    border: 2px solid var(--active-note-bg, #000000);
+    background: var(--editor-ink, #ffffff);
+    border: 2px solid var(--editor-paper, #000000);
     cursor: nwse-resize;
     opacity: 0;
     transition: opacity 0.15s ease;

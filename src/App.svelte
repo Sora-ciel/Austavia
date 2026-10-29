@@ -2614,10 +2614,10 @@
 
   $: simpleNoteBlockShadow = themeShadowIsDisabled(blockTheme?.shadow)
     ? 'none'
-    : '0 0 2px 1px var(--text-color), 0 0 6px 2px var(--text-color)';
+    : '0 0 2px 1px var(--text), 0 0 6px 2px var(--text)';
   $: simpleNoteBorderColor = themeShadowIsDisabled(blockTheme?.shadow)
-    ? 'var(--bg-color)'
-    : 'var(--text-color)';
+    ? 'var(--bg)'
+    : 'var(--text)';
 
   // The opacities are stored as plain numbers, because that is what a slider
   // reads and writes and what a saved theme should hold — a bare 80 survives a

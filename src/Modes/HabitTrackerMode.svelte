@@ -1,4 +1,5 @@
 <script>
+  import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
   // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
   // in modeRegistry.js.
@@ -7,7 +8,6 @@
   // The shared one, rather than the copy that used to live here: that copy did
   // not understand 4- or 8-digit hex, so a theme using either fell through to
   // light text and could put it on a light background.
-  import { getReadableTextColor } from "../utils/readableColor.js";
   import { recentDays, daysToShow } from "../utils/habitDays.js";
   import { createListReorder } from "../utils/listReorder.js";
   import HabitPage from "../components/HabitPage.svelte";
@@ -60,7 +60,7 @@
   // none. This mode used to always compute, so it ignored whatever the theme
   // actually asked for and picked its own black or white — the one thing a
   // theme is most obviously entitled to decide.
-  $: modeTextColor = canvasTheme.textColor || getReadableTextColor(canvasTheme.innerBg);
+  $: modeTextColor = modeTextColorFor(canvasTheme);
   // The styles below reach for the block theme's variables and fall back when
   // one does not resolve. That fallback is not a rare path here, it is the
   // usual one: `--block-header-bg` is declared on .app as `var(--bg)`, and
