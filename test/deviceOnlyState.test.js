@@ -24,7 +24,7 @@ const DEVICE_ONLY = {
   'components/ColorPicker.svelte': 'the colour format last chosen',
   'components/NotePicker.svelte': 'the picker layout last chosen',
   'Modes/HabitTrackerMode.svelte': 'the last goal set, as the default for the next (as Task mode)',
-  'Modes/PlaylistMode.svelte': 'which playlist is open',
+  'Modes/PlaylistMode.svelte': 'which playlist is open, and the order the music is listed in (asked per device)',
   'Modes/SingleNoteMode.svelte': 'which note was open',
   'Modes/TaskMode.svelte': 'the Done list open or shut (asked per device)',
   'popup/ClockPopup.svelte': 'the pop-up kept, hidden or moved on this screen',

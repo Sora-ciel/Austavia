@@ -4,6 +4,7 @@
   import { logSync } from '../utils/syncLog.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
   import PickerSheet from '../components/PickerSheet.svelte';
+  import { TRACK_ORDERS, sortTracks, readTrackOrder, writeTrackOrder, withFileDates } from '../utils/trackOrder.js';
   import ScrollingText from '../components/ScrollingText.svelte';
   import { ensureMusicCover, forgetCoverlessTrack } from '../utils/musicCovers.js';
   import { packMusic, readMusicManifest, unpackMusic, mergeMusicLibrary } from '../utils/musicTransfer.js';
@@ -134,9 +135,17 @@
   }
   $: if (openingPlaylistSettled) rememberPlaylistId(selectedPlaylistId);
   $: selectedPlaylist = playlists.find(p => p.id === selectedPlaylistId) || null;
-  $: playlistTracks = selectedPlaylist
-    ? selectedPlaylist.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean)
-    : tracks;
+  // In the order chosen on this device -- newest file first unless changed
+  // (utils/trackOrder.js, asked 2026-10-28). Everything below reads this, so
+  // the list, the search and what plays next all follow it.
+  let trackOrder = readTrackOrder(typeof localStorage === 'undefined' ? undefined : localStorage);
+  $: writeTrackOrder(typeof localStorage === 'undefined' ? undefined : localStorage, trackOrder);
+  $: playlistTracks = sortTracks(
+    selectedPlaylist
+      ? selectedPlaylist.trackIds.map(id => tracks.find(t => t.id === id)).filter(Boolean)
+      : tracks,
+    trackOrder
+  );
 
   // Every row, every time. This used to render 200 at a time behind a "show
   // more" button, on the theory that nobody scrolls a few thousand rows before
@@ -265,6 +274,33 @@
   let availableIds = new Set();
   async function refreshAvailability() {
     availableIds = await getAvailableMusicIds();
+    fillFileDates();
+  }
+
+  // The file's own date, which the order reads -- recorded at import.
+  const fileDateOf = file => (Number(file?.lastModified) > 0 ? { fileDate: Number(file.lastModified) } : {});
+
+  // Tracks added before the date was recorded get it from their stored file,
+  // on any device that has the audio, and the date then syncs to the others.
+  // A pass that only fills gaps, from the file itself, so it is safe to run
+  // whenever what is stored here changes (CLAUDE.md, recomputing).
+  let fillingDates = false;
+  async function fillFileDates() {
+    if (fillingDates) return;
+    const missing = tracks.filter(track => !(Number(track.fileDate) > 0) && availableIds.has(track.id));
+    if (!missing.length) return;
+    fillingDates = true;
+    try {
+      const dates = new Map();
+      for (const track of missing) {
+        const stored = await loadMusicTrack(track.id).catch(() => null);
+        if (Number(stored?.lastModified) > 0) dates.set(track.id, Number(stored.lastModified));
+      }
+      const next = withFileDates(library?.tracks || [], dates);
+      if (next !== (library?.tracks || [])) updateLibrary({ ...library, tracks: next });
+    } finally {
+      fillingDates = false;
+    }
   }
 
   // What can actually be played, which during an import is more than the store
@@ -418,7 +454,7 @@
         for (const entry of entries) copiedBytes += entry.file?.size || 0;
         for (const { id, file } of entries) {
           // No tags yet — that is pass two. The file name stands in until then.
-          added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
+          added.push({ id, fileName: file.name, title: titleFromFileName(file.name), ...fileDateOf(file) });
         }
       } catch (error) {
         // A chunk that will not commit is retried one at a time, so a single
@@ -427,7 +463,7 @@
         for (const { id, file } of entries) {
           try {
             await saveMusicTrack(id, file);
-            added.push({ id, fileName: file.name, title: titleFromFileName(file.name) });
+            added.push({ id, fileName: file.name, title: titleFromFileName(file.name), ...fileDateOf(file) });
           } catch (single) {
             console.warn('Could not add a track:', file?.name, single);
             failures.push(file?.name || 'unnamed file');
@@ -1430,6 +1466,21 @@
     white-space: nowrap;
   }
   .pl-title-chevron { flex: none; opacity: 0.7; }
+  /* The order, at the end of the title row, in the writing's colour. */
+  .pl-order {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.8rem;
+    color: inherit;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    border-radius: 8px;
+    padding: 4px 6px;
+  }
+  .pl-order option {
+    color: var(--mode-text-color, #ffffff);
+    background: var(--canvas-inner-bg, #000000);
+  }
   .pl-track-count {
     font-size: 0.85rem;
     opacity: 0.7;
@@ -1784,6 +1835,12 @@
           <svg class="pl-title-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         <span class="pl-track-count">{playlistTrackCount} {playlistTrackCount === 1 ? 'track' : 'tracks'}</span>
+        <!-- How the list is ordered, kept per device (utils/trackOrder.js). -->
+        <select class="pl-order" aria-label="Order the music" bind:value={trackOrder}>
+          {#each TRACK_ORDERS as order (order.id)}
+            <option value={order.id}>{order.label}</option>
+          {/each}
+        </select>
       </div>
 
       {#if dedupeOpen}

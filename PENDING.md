@@ -122,37 +122,6 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
-## Before the next release: ordering the music (asked 2026-10-28)
-
-Asked: "a way to list the music by the creation date, the newer first, and it
-would be the default way to list the music. And you would be able to change it
-to another way to order the list. The one chosen is saved by device."
-
-- **"Creation date" is the file's own date** (corrected 2026-10-28: "no, we
-  want the file's own date") -- `File.lastModified`, when the music file was
-  made or last changed on the device it came from, not when it was added to
-  Austavia. A track does not record it today: it is `{ id, fileName, title }`
-  plus tags (PlaylistMode.svelte, the import around line 410). The import
-  writes it as `fileDate` onto the track, in the library that syncs
-  (`modeSettings.playlist.tracks`, kept by older builds from 0.8.662).
-- **Tracks already there get theirs from their file.** The import stores each
-  file exactly as it arrived, and a stored File keeps its `lastModified`; so
-  a pass over this device's stored audio fills in `fileDate` for every track
-  that lacks one -- absolute and repeatable, the recompute rule -- and the
-  dates sync to the other devices. A track whose audio is on no device that
-  has run the pass has no date yet and is listed after the dated ones, in
-  library order. Check the stored value really is a File (with
-  `lastModified`) and not a bare Blob before relying on this.
-- **The orders**: Newest first by the file's date (the default), Oldest
-  first, Title A-Z, Artist, Album, Length -- decided in a plain module with
-  tests in the words of the request ("the newer first ... the default way to
-  list the music"), not in the mode.
-- **Saved per device** (asked so): localStorage, next to the open playlist,
-  and listed in `test/deviceOnlyState.test.js` with its reason.
-- **Where it applies**: the whole library. A playlist keeps its own order
-  (it was arranged by hand) unless the order is changed while it is open --
-  to confirm.
-
 ## Blocks and their modes (rule in CLAUDE.md, asked 2026-10-27)
 
 Checked against "a block works on its own; a mode only shows blocks" on
@@ -327,6 +296,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **The music in order, newest file first** (2026-10-28). Playlist mode lists the music by each file's own date, newest first, and the order can be changed at the end of the title row (Newest first, Oldest first, Title, Artist, Album, Length); the choice stays on that device and pressing play follows it. Music imported before this gets its date from the stored file on a device that has the audio, and the dates sync. Music restored from an Export zip may have no date and is listed after the dated tracks. Check it on the phone with a real library. |
 | next | **Objectives: seconds, and a ring when one finishes.** A goal can be typed as 45s, 1m30, 1:05:10 or 1h 5m 10s, and the bar counts the seconds. A **time** objective reaching its goal rings like a timer -- the same banner ("Time's up") and sound, in whichever mode is open -- until Stop; a **count** one reaching its goal by +1 chimes once and its banner goes by itself after 6s. Seen in a browser 2026-10-26; still to see on the phone (sound and buzz) and on the Windows app. Older builds still read a seconds goal, rounded up to whole minutes. |
 | next | **Objective tasks in Task mode.** Right-click a task (hold and let go on the phone): Time or Count, the goal (2h, 90m, 1h30 / 20), Resets every day. Time: ▶/⏸ fills the bar, sessions add up, and it keeps running across a restart; ✎ logs by hand (15m, -10m). Count: +1, ✎ to log several. Reaching the goal moves it to Done. Seen in a browser on 2026-10-25; still to see: a **daily** one coming back to To Do at 0 the next morning, and a timer started on the phone showing the same time on the computer. |
 | next | **Typing during a slow download is kept** (staging, two tabs). In tab A put a large picture into a folder; in tab B, signed in to the same account with that folder open, switch away and back so the resume check runs, and start typing straight away while it downloads. The typing must survive; the sync log should say "edited here while the cloud copy was downloading; the edit stays", and the next sync then sends it. The error "started editing without checking the cloud first" may still appear -- it now means only that the check was slow. |
