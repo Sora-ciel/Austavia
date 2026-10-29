@@ -3945,7 +3945,15 @@
       // the picture can hold, and is given two frames to do it -- or a tenth of
       // a second, since a page that is not being shown gets no frames at all,
       // and waiting for one left the button busy for good (seen 2026-10-28).
-      window.dispatchEvent(new CustomEvent(SCREENSHOT_EVENT, { detail: { capturing: true } }));
+      // Anything the page wants finished first -- a list's covers, say -- is
+      // handed back in `waits` and given up to four seconds; a cover that has
+      // not arrived by then is drawn as the blank it is on screen.
+      const waits = [];
+      window.dispatchEvent(new CustomEvent(SCREENSHOT_EVENT, { detail: { capturing: true, waits } }));
+      await Promise.race([
+        Promise.all(waits.map(wait => Promise.resolve(wait).catch(() => {}))),
+        new Promise(resolve => setTimeout(resolve, 4000))
+      ]);
       await Promise.race([
         new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
         new Promise(resolve => setTimeout(resolve, 100))

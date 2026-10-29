@@ -264,7 +264,16 @@
   // top -- otherwise the picture is of the empty space that stands in for
   // rows off screen (utils/screenshotDelivery.js, SCREENSHOT_EVENT).
   let capturing = false;
-  const onScreenshot = event => { capturing = event.detail?.capturing === true; };
+  const onScreenshot = event => {
+    capturing = event.detail?.capturing === true;
+    // The rows the picture holds get their covers before it is drawn; covers
+    // load as rows appear, and these have only just appeared (seen on the
+    // phone 2026-10-28: half a screenshot of blank notes).
+    if (capturing && Array.isArray(event.detail?.waits)) {
+      const rows = visibleTracks.slice(0, rowsForCapture(rowHeight, screenScale(window.devicePixelRatio)));
+      event.detail.waits.push(loadCoversFor(rows));
+    }
+  };
   onMount(() => {
     window.addEventListener(SCREENSHOT_EVENT, onScreenshot);
     return () => window.removeEventListener(SCREENSHOT_EVENT, onScreenshot);
