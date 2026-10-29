@@ -755,28 +755,20 @@ card). Only that would be the app's to fix.
   only; whether Tauri's always-on-top windows behave under KDE/XWayland has to
   be tried before they are switched on there.
 
-- **The phone's screenshots still have no wallpaper** (reported again
-  2026-10-28, on the Austavia Staging APK with b667d27 in it; to come back to).
-  What is known:
-  - **In a browser it is fixed.** A test folder with a solid red wallpaper:
-    the saved picture is red in all six modes, at computer size and at phone
-    size with a phone picture set (pixels read from the PNG). So what differs
-    on the phone is not the capture's logic but something about the phone.
-  - **Not the bucket's cross-origin rule**: both projects answer
-    `access-control-allow-origin: *` (curl with an Origin header).
-  - **Differences left between the test and the phone**, in the order to
-    check: (1) the phone's wallpaper is a synced *link* to cloud storage, the
-    test's a picture held in the folder -- the underlay loads it with
-    `crossOrigin='anonymous'` and gives up after 5s (`loadImageWithin`),
-    silently but for a console warning; a large photo over mobile data may
-    simply be slower than that; (2) `ctx.filter` for blur and brightness in
-    the Android WebView; (3) which picture slot the phone has, and whether
-    `wallpaperSettingsFor` picks the settings the screen draws from (themes
-    add their own wallpaper to Single Note's settings, not Canvas's).
-  - **The next step is to look, not guess**: the phone on USB with debugging
-    on, `~/Android/Sdk/platform-tools/adb logcat | grep -i chromium`, and the
-    "The wallpaper could not be drawn into the screenshot" warning -- or
-    chrome://inspect on this computer for the WebView's console.
+- **Apply `storage.cors.json` to the production bucket.** Done for staging
+  2026-10-28 (Cloud Shell, `gcloud storage buckets update
+  gs://arial-staging.firebasestorage.app --cors-file=cors.json`), which with
+  freshCopyUrl put the wallpaper into the phone's screenshots -- seen on the
+  phone. Production needs the same for `gs://arial-473c1.firebasestorage.app`,
+  before or with the next full release; until then the real app's
+  screenshots lack a synced wallpaper and Export cannot put synced pictures
+  inside the file (both fetch the picture, and the bucket refused).
+
+- **A screenshot of a long list is a sliver.** Playlist mode with ~390 tracks
+  came out 107 x 8192 px on the phone: the capture opens every scrolled pane
+  to draw all of it (expandScrollers), and the phone's size limit then shrinks
+  the whole thing to fit. To decide: draw only what is on screen in long
+  lists, or cap how far a list is opened. Seen 2026-10-28.
 
 - **Ctrl+Z after typing and then recolouring a block** undoes the typing
   first, not the colour (2026-10-12). Ctrl+Z now goes to the workspace when the

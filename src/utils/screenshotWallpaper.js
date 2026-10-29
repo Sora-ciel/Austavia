@@ -106,3 +106,22 @@ export function wallpaperSettingsFor(mode, { hasWallpaper, canvas, others } = {}
   if (!hasWallpaper) return null;
   return mode === 'default' ? canvas || null : others || null;
 }
+
+/**
+ * The address to load a wallpaper from for a screenshot: a fresh copy of one
+ * in the cloud, the picture itself for one held in the folder.
+ *
+ * Found on the phone 2026-10-28, through its DevTools: the screenshot drew no
+ * wallpaper because a picture can only be drawn into another if its server
+ * says so (CORS), and the storage bucket did not -- fixed with
+ * storage.cors.json. But the phone had already shown the wallpaper, and kept
+ * that copy, without the permission, in its cache; asked for the same address
+ * again it answered from the cache and refused. The same address with a marker
+ * added loaded at once. So a screenshot always asks for its own copy, whatever
+ * any cache holds. It costs one download of the wallpaper per screenshot.
+ */
+export function freshCopyUrl(src, stamp = Date.now()) {
+  const value = String(src || '');
+  if (!/^https?:\/\//i.test(value)) return value;
+  return `${value}${value.includes('?') ? '&' : '?'}screenshot=${stamp}`;
+}

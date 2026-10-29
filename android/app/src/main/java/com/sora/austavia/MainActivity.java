@@ -18,6 +18,25 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(TimerNotificationPlugin.class);
         super.onCreate(savedInstanceState);
         keepTheWebViewAboveTheKeyboard();
+        letTheStagingAppBeInspected();
+    }
+
+    /**
+     * The staging app's page can be inspected from a computer over USB
+     * (chrome://inspect, or adb and the DevTools socket); the real app's
+     * cannot.
+     *
+     * Release builds switch WebView debugging off, which is right for the
+     * Austavia people install -- and meant the staging app, which exists to
+     * be tried and taken apart, could only be debugged through pasted logs.
+     * Found 2026-10-28 chasing a screenshot that lost its wallpaper on the
+     * phone alone. Keyed to the staging package (app/build.gradle,
+     * -Pstaging), so the real app is never opened up by it.
+     */
+    private void letTheStagingAppBeInspected() {
+        if (getPackageName().endsWith(".staging")) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true);
+        }
     }
 
     /**

@@ -146,7 +146,7 @@
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, textChunks } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
-  import { wallpaperPaint, wallpaperRect, isWallpaperLayer, wallpaperSettingsFor, WALLPAPER_LAYER_CLASSES } from './utils/screenshotWallpaper.js';
+  import { wallpaperPaint, wallpaperRect, isWallpaperLayer, wallpaperSettingsFor, WALLPAPER_LAYER_CLASSES, freshCopyUrl } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
@@ -4069,7 +4069,9 @@
       // screenshot then cannot be read back out at all. Asked for with CORS,
       // it either arrives clean or fails here and is left out.
       image.crossOrigin = 'anonymous';
-      image.src = src;
+      // Its own copy, not the one the screen already showed: that one can sit
+      // in the cache without the permission to be drawn (freshCopyUrl).
+      image.src = freshCopyUrl(src);
     });
   }
 

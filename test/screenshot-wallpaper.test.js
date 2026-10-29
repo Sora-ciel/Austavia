@@ -103,3 +103,18 @@ it('every mode hands its root up, so the screenshot is of the mode and not the w
   assert.ok(mounts.length >= 6, `found ${mounts.length}`);
   for (const mount of mounts) assert.match(mount, /bind:canvasRef/, mount.split('\n')[0]);
 });
+
+// Found on the phone 2026-10-28: a wallpaper the screen had already shown sat
+// in the cache without the permission to be drawn into a picture, so the
+// screenshot, asking for the same address, was refused. It asks for its own.
+import { freshCopyUrl } from '../src/utils/screenshotWallpaper.js';
+
+it('a screenshot fetches its own copy of a wallpaper from the cloud, never the cached one', () => {
+  const cloud = 'https://firebasestorage.googleapis.com/v0/b/x/o/wall.jpg?alt=media&token=abc';
+  assert.equal(freshCopyUrl(cloud, 7), `${cloud}&screenshot=7`);
+  assert.equal(freshCopyUrl('https://example.com/wall.jpg', 7), 'https://example.com/wall.jpg?screenshot=7');
+});
+
+it('a wallpaper held in the folder is used as it is', () => {
+  assert.equal(freshCopyUrl('data:image/png;base64,AAAA', 7), 'data:image/png;base64,AAAA');
+});
