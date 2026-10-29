@@ -19,6 +19,9 @@
     syncTextHistory
   } from '../utils/textHistory.js';
   import { createUpdateCoalescer } from '../utils/editorUpdates.js';
+  import { Plugin, TextSelection, NodeSelection } from '@tiptap/pm/state';
+  import { Decoration, DecorationSet } from '@tiptap/pm/view';
+  import { stepOver, sideOfClick, needsDrawnCaret, isInlineAtom } from '../utils/atomCaret.js';
   import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
 
   export let content = '';
@@ -476,6 +479,85 @@
     }
   });
 
+  // ── A picture is one character ────────────────────────────────────
+  // Asked 2026-10-26, taken up 2026-10-29: everything in a note that is not
+  // text "should behave like one character ... you should be able to put
+  // yourself on its right and left". The rules are utils/atomCaret.js; this
+  // carries them out, for every inline atom -- pictures, the separator, parts
+  // from a newer version -- in every editor.
+  function drawnCaret() {
+    const caret = document.createElement('span');
+    caret.className = 'tiptap-drawn-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    return caret;
+  }
+
+  const AtomCaret = Extension.create({
+    name: 'atomCaret',
+
+    addKeyboardShortcuts() {
+      const step = dir => ({ editor: ed }) => {
+        const { selection } = ed.state;
+        const target = stepOver({
+          dir,
+          empty: selection.empty,
+          pos: selection.from,
+          nodeBefore: selection.$from.nodeBefore,
+          nodeAfter: selection.$from.nodeAfter,
+          selected: selection instanceof NodeSelection ? selection.node : null,
+          from: selection.from,
+          to: selection.to
+        });
+        if (target === null) return false;
+        ed.view.dispatch(ed.state.tr.setSelection(TextSelection.create(ed.state.doc, target)).scrollIntoView());
+        return true;
+      };
+      return { ArrowRight: step(1), ArrowLeft: step(-1) };
+    },
+
+    addProseMirrorPlugins() {
+      const caretState = state => {
+        const { selection } = state;
+        return needsDrawnCaret({
+          empty: selection.empty,
+          nodeBefore: selection.$from.nodeBefore,
+          nodeAfter: selection.$from.nodeAfter
+        });
+      };
+      return [
+        new Plugin({
+          props: {
+            // The editor's own cursor beside a piece, where the browser draws
+            // none; the browser's is hidden then, so there are never two.
+            decorations(state) {
+              if (!caretState(state)) return null;
+              return DecorationSet.create(state.doc, [
+                Decoration.widget(state.selection.from, drawnCaret, { side: -1, key: 'drawn-caret', ignoreSelection: true })
+              ]);
+            },
+            attributes(state) {
+              return caretState(state) ? { class: 'tiptap-caret-drawn' } : {};
+            },
+            // A click on a piece puts the cursor on the side clicked. Its bar
+            // and handle (a picture's alignment and size) keep their clicks.
+            handleClickOn(view, pos, node, nodePos, event, direct) {
+              if (!direct || !isInlineAtom(node)) return false;
+              if (event.target?.closest?.('.tiptap-img-bar, .tiptap-img-handle')) return false;
+              const dom = view.nodeDOM(nodePos);
+              const rect = dom?.getBoundingClientRect?.();
+              if (!rect) return false;
+              const side = sideOfClick({ left: rect.left, right: rect.right, x: event.clientX });
+              const at = side === 'before' ? nodePos : nodePos + node.nodeSize;
+              view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, at)));
+              view.focus();
+              return true;
+            }
+          }
+        })
+      ];
+    }
+  });
+
   // A list item may begin with anything, not only a paragraph.
   //
   // This is what makes a title able to become a list item while staying a
@@ -872,6 +954,7 @@
         InlineSeparator,
         KeptBlock,
         KeptInline,
+        AtomCaret,
         AggregateMarkdown,
         Placeholder.configure({ placeholder }),
       ],

@@ -39,24 +39,13 @@ What is already known points at two sections below, in this order:
   fix (`contain: layout`) breaks scrolling; the restructure it needs is
   written there.
 
-**2. Everything that is not text behaves like one character.** Asked: "all
-the non-text markdown-like things we added should behave like one character
-kinda. You should be able to put yourself on its right and left. Even for
-images, to make it easier to move etc." So a picture, the inline separator
-and anything else drawn by a node view (TipTapEditor.svelte: ResizableImage
-around line 592, InlineSeparator around line 316) should:
-
-- take the caret on either side, by click and by arrow keys -- including a
-  picture alone on its line, at the start or end of a paragraph, which is
-  where browsers refuse to draw a caret next to `contenteditable=false`;
-- be stepped over by one arrow press, deleted by one Backspace/Delete, and
-  selected and moved (cut/paste, drag) as one character;
-- work the same on the phone's touch caret.
-
-Pictures are already `inline: true` atoms, so the model is right; it is the
-drawing and the caret that are not. Decide where the rule lives so a test can
-reach it (which positions are valid caret stops beside an atom), and check
-task-list checkboxes against the same rule.
+**2. Everything that is not text behaves like one character** -- done
+2026-10-29 (utils/atomCaret.js and TipTapEditor's AtomCaret): one arrow press
+steps over a picture, a click on its left or right half puts the cursor on
+that side, and beside one the editor draws the cursor itself, since the
+browser draws none next to a picture at the edge of a line. Backspace and
+Delete already took one in a single press. Not done: dragging a picture to
+move it within the text -- cut and paste moves it meanwhile.
 
 ### A. Shared parts first
 
@@ -296,6 +285,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **A picture in a note is one character** (2026-10-29). In a note with a picture -- alone on its line, and between words: one arrow press steps over it either way; tapping its left or right half puts the cursor on that side; a cursor shows beside it at the start or end of a line (it was invisible there); Backspace after it removes it. On the phone, with the touch cursor too. |
 | next | **Phone screenshots go to Downloads, and the clipboard** (2026-10-29). Seen on the phone: the button says "Saved to Downloads and copied" and the PNG is in Download at full size (5495 x 2160 for a Canvas board). Still to see: pasting it (it should paste as a picture in a chat), and that it shows in the gallery's Download album. Android before 10 still gets the share sheet. |
 | next | **A screenshot of a long list** (2026-10-28). Seen on the phone: Playlist mode with 537 tracks gives a 1080 x 8190 picture -- the phone's full width, about 54 songs from the top, every cover in, the wallpaper behind -- in about 10 seconds. Still to see: other long lists (Task mode with many tasks) and the desktop app. |
 | next | **The music in order, newest file first** (2026-10-28). Playlist mode lists the music by each file's own date, newest first, and the order can be changed at the end of the title row (Newest first, Oldest first, Title, Artist, Album, Length); the choice stays on that device and pressing play follows it. Music imported before this gets its date from the stored file on a device that has the audio, and the dates sync. Music restored from an Export zip may have no date and is listed after the dated tracks. Check it on the phone with a real library. |

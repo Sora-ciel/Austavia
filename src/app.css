@@ -615,3 +615,20 @@ ul[data-type="taskList"] > li[data-checked="true"] > div {
   background: var(--app-text, #ffffff);
   opacity: 1;
 }
+
+/* The cursor the editor draws beside a picture or another one-piece part of
+   a note, where the browser draws none (utils/atomCaret.js). In the writing's
+   colour, blinking as a cursor does; the browser's own is hidden meanwhile. */
+.tiptap-caret-drawn { caret-color: transparent; }
+.tiptap-drawn-caret {
+  display: inline-block;
+  width: 0;
+  height: 1.2em;
+  vertical-align: text-bottom;
+  border-left: 1.5px solid currentColor;
+  margin-right: -1.5px;
+  pointer-events: none;
+  animation: tiptap-caret-blink 1.06s steps(1) infinite;
+}
+.ProseMirror:not(.ProseMirror-focused) .tiptap-drawn-caret { display: none; }
+@keyframes tiptap-caret-blink { 50% { opacity: 0; } }
