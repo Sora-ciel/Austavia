@@ -1047,16 +1047,11 @@
     pickerOpen = false;
   }
 
-  function toggleTrackInPlaylist(trackId) {
-    if (!selectedPlaylist) return;
-    const trackIds = selectedPlaylist.trackIds.includes(trackId)
-      ? selectedPlaylist.trackIds.filter(id => id !== trackId)
-      : [...selectedPlaylist.trackIds, trackId];
-    updateLibrary({
-      ...library,
-      playlists: playlists.map(p => (p.id === selectedPlaylist.id ? { ...p, trackIds } : p))
-    });
-  }
+  // A playlist's tracks are listed exactly as All music's are (asked
+  // 2026-10-28: "it should be the same as if it was just in All music, without
+  // that button and change of styling"). Taking tracks out of a playlist is
+  // done from the selection -- Select, then "Remove from this playlist".
+
 
   // What plays next comes from the playlist you are in, not from what a search
   // has narrowed the screen to -- see playbackPool in utils/playlistPlayback.js.
@@ -1789,7 +1784,6 @@
           <svg class="pl-title-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
         <span class="pl-track-count">{playlistTrackCount} {playlistTrackCount === 1 ? 'track' : 'tracks'}</span>
-        {#if selectedPlaylist}<span class="pl-count">· ✓ adds or removes</span>{/if}
       </div>
 
       {#if dedupeOpen}
@@ -1887,7 +1881,6 @@
         <div style="height:{rowWindow.padTop}px" aria-hidden="true"></div>
         {#each renderedTracks as track (track.id)}
           {@const available = playable.has(track.id)}
-          {@const inPlaylist = selectedPlaylist?.trackIds.includes(track.id)}
           <div
             class="pl-track"
             class:playing={nowPlayingId === track.id}
@@ -1942,13 +1935,6 @@
               </div>
             </div>
 
-            {#if selectedPlaylist}
-              <button
-                class="pl-icon-btn"
-                title={inPlaylist ? 'Remove from playlist' : 'Add to playlist'}
-                on:click={() => toggleTrackInPlaylist(track.id)}
-              >{inPlaylist ? '✓' : '＋'}</button>
-            {/if}
           </div>
         {/each}
         <div style="height:{rowWindow.padBottom}px" aria-hidden="true"></div>

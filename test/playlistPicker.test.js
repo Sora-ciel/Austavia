@@ -30,3 +30,12 @@ test('All music is in the list, first, with its count', () => {
 test('every playlist in the list shows how many songs it holds', () => {
   assert.match(mode, /count: playlist\.trackIds\.length/);
 });
+
+// Asked the same day: in a playlist other than All music, the button on each
+// track that removed it "should be the same as if it was just in All music,
+// without that button and change of styling". Removing is in the selection.
+test('a playlist lists its tracks as All music does, with no add-or-remove button on each', () => {
+  assert.doesNotMatch(mode, /toggleTrackInPlaylist\(/);
+  assert.doesNotMatch(mode, /adds or removes/);
+  assert.match(mode, /Remove from this playlist/);
+});
