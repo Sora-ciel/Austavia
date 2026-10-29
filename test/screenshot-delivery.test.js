@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 
 import {
   captureScale,
+  screenScale,
   listCaptureHeight,
   withinTime,
   CAPTURE_LIMITS,
@@ -166,4 +167,21 @@ it('a list too long for one picture is drawn at full size up to the limit, not s
 
 it('a list that fits is drawn whole', () => {
   assert.equal(listCaptureHeight({ width: 384, height: 3000, phone: true }), 3000);
+});
+
+// Reported 2026-10-28: the long-list screenshot was "not at full width, so low
+// quality" -- 384 pixels across on a phone 1080 wide. Asked: "lower the max
+// height to have actually the width of the phone".
+it('a list on a phone is drawn as sharp as the phone draws, holding fewer rows to do it', () => {
+  const sharpness = screenScale(2.8125); // a 1080-pixel-wide phone, 384 points across
+  assert.equal(sharpness, 2.8125);
+  const height = listCaptureHeight({ width: 384, height: 390 * 54, phone: true, scale: sharpness });
+  const scale = captureScale({ width: 384, height, phone: true, wanted: sharpness });
+  assert.equal(Math.round(384 * scale), 1080, 'the full width of the phone');
+  assert.ok(height >= 54 * 50, `still about fifty rows: ${Math.round(height / 54)}`);
+});
+
+it('a screen that draws less than twice the page is still drawn at twice; none past three', () => {
+  assert.equal(screenScale(1), 2);
+  assert.equal(screenScale(4), 3);
 });

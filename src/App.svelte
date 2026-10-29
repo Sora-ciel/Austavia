@@ -142,7 +142,7 @@
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
-  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
+  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, screenScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, textChunks } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
@@ -3963,10 +3963,12 @@
       // shrunk to fit whole instead.
       const width = Math.max(target.scrollWidth, target.clientWidth, 1);
       const fullHeight = Math.max(target.scrollHeight, target.clientHeight, 1);
+      // As sharp as this screen draws (screenScale): a phone's ~2.8, not 1.
+      const sharpness = screenScale(typeof window === 'undefined' ? 1 : window.devicePixelRatio);
       const height = mode === 'default'
         ? fullHeight
-        : listCaptureHeight({ width, height: fullHeight, phone: capturingOnPhone() });
-      const scale = captureScale({ width, height, phone: capturingOnPhone() });
+        : listCaptureHeight({ width, height: fullHeight, phone: capturingOnPhone(), scale: sharpness });
+      const scale = captureScale({ width, height, phone: capturingOnPhone(), wanted: sharpness });
 
       // Every mode's wallpaper is painted in underneath the capture rather than
       // captured: the layer it sits in on screen is fixed to the window, which
@@ -6772,8 +6774,20 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 
 .right-controls {
-  margin-left: auto;
+  margin-left: 8px;
 }
+
+/* The camera sits just before the settings button, on every screen (asked
+   2026-10-28: "it should be to the right, so it is always just before the
+   settings button, on every type of device, instead of being in the centre").
+   It takes the free space in the bar, so it and the settings button are
+   pushed to the right together; it was in the middle on phones, where the bar
+   spread its items evenly, and after the left buttons on a computer. When the
+   timer or the mini player is showing, they take the free space instead, and
+   the camera stays beside the settings button. */
+.controls > .screenshot-btn { margin-left: auto; }
+:global(.controls > .timer-chip-wrap ~ .screenshot-btn),
+.controls > .mini-player ~ .screenshot-btn { margin-left: 8px; }
 
 /* The timer chip opens the right-hand group, before the mini player: it takes
    the free space to its left, and the player then sits just after it rather
@@ -6787,7 +6801,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   flex-shrink: 0;
   min-height: 42px;
   padding: 8px 12px;
-  margin-left: 8px;
   border-radius: 8px;
   border: 1px solid var(--controls-border, #333);
   background: var(--controls-bg, #333);
@@ -7091,10 +7104,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
   /* Icon only, so it costs as little of the row as the settings button. */
   .screenshot-btn {
-    margin-left: 4px;
     padding: 6px 8px;
     min-height: 36px;
   }
+  :global(.controls > .timer-chip-wrap ~ .screenshot-btn),
+  .controls > .mini-player ~ .screenshot-btn { margin-left: 4px; }
 }
 
 
@@ -7238,7 +7252,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   }
 
   .right-controls {
-    margin-left: 0;
+    margin-left: 4px;
   }
 }
 

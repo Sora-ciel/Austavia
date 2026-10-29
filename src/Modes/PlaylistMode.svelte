@@ -19,7 +19,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
-  import { SCREENSHOT_EVENT, rowsForCapture } from '../utils/screenshotDelivery.js';
+  import { SCREENSHOT_EVENT, rowsForCapture, screenScale } from '../utils/screenshotDelivery.js';
   import { playbackPool, openingPlaylist } from '../utils/playlistPlayback.js';
   import {
     sizeGroups,
@@ -270,7 +270,7 @@
     return () => window.removeEventListener(SCREENSHOT_EVENT, onScreenshot);
   });
   $: rowWindow = capturing
-    ? { start: 0, end: Math.min(visibleTracks.length, rowsForCapture(rowHeight)), padTop: 0, padBottom: 0 }
+    ? { start: 0, end: Math.min(visibleTracks.length, rowsForCapture(rowHeight, screenScale(window.devicePixelRatio))), padTop: 0, padBottom: 0 }
     : windowRange({
         scrollTop: listScrollTop - rowsOffset,
         viewportHeight: listViewport,
