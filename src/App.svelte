@@ -1,5 +1,7 @@
 <script>
   import { onMount, onDestroy, tick, setContext } from 'svelte';
+  import { writable } from 'svelte/store';
+  import { folderCard } from './utils/folderDirectory.js';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
@@ -151,6 +153,7 @@
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
   import { putOnPage, placeOnPage, samePage } from './utils/pageLayout.js';
+  import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -2692,6 +2695,7 @@
     music: ['position', 'size', 'bgColor', 'textColor', 'playlistId', 'trackUrl', 'title', 'content'],
     embed: ['position', 'size', 'bgColor', 'textColor', 'content'],
     task: ['tasks', 'title'],
+    nest: ['position', 'size', 'bgColor', 'textColor', 'links', 'title'],
     clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate', 'alarmTime', 'alarmEnabled'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };
@@ -2962,6 +2966,31 @@
   }
 
   setContext('appDialogs', { alert: appAlert, confirm: appConfirm, prompt: appPrompt });
+
+  // ── Every folder, as a nest shows it ──────────────────────────────────
+  // Name, id and cover of each folder (utils/folderDirectory.js), worked out
+  // whole from the folders themselves whenever the list of folders or the
+  // open folder changes -- never patched by edits. NestBlock reads it, and
+  // opens a folder through `open`.
+  const folderDirectory = writable([]);
+  const openFolderName = writable('');
+  $: openFolderName.set(currentSaveName);
+  let directoryRun = 0;
+  async function refreshFolderDirectory(names) {
+    const run = ++directoryRun;
+    const cards = [];
+    for (const name of names || []) {
+      try {
+        cards.push(folderCard(name, await loadBlocks(name)));
+      } catch {
+        // A folder that cannot be read is left out until it can.
+      }
+      if (run !== directoryRun) return;
+    }
+    folderDirectory.set(cards.sort((a, b) => a.name.localeCompare(b.name)));
+  }
+  $: refreshFolderDirectory(savedList, currentSaveName);
+  setContext('folders', { directory: folderDirectory, current: openFolderName, open: name => load(name) });
 
   $: leftTheme = controlColors.left || CONTROL_COLOR_DEFAULTS.left;
   // The toolbar's buttons are coloured with buttonText, not textColor, and on
@@ -3830,8 +3859,8 @@
     if (mode === "single") type = "text";
     // A clock is read at a glance, so it starts the size of one rather than the
     // size of a note.
-    const blockW = type === 'clock' ? 260 : 300;
-    const blockH = type === 'clock' ? 150 : 200;
+    const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : 300;
+    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
     const position = mode === 'default'
@@ -3843,6 +3872,7 @@
       content: "",
       src: "",
       ...(type === "task" ? { tasks: [], title: "Task List" } : {}),
+      ...(type === "nest" ? { links: [], title: "Nest" } : {}),
       // 24-hour by default: the owner is in France, and the setting is one
       // click away for anyone who is not.
       // The alarm starts at seven and off: a time to change rather than a blank
@@ -5705,7 +5735,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         target = `${name} (this device)`;
         while (remoteNames.has(target)) target = `${name} (this device ${suffix++})`;
         const payload = await loadBlocks(name);
-        await saveBlocks(target, payload);
+        // Not the cloud's folder of that name: one of its own (utils/folderIdentity.js).
+        await saveBlocks(target, { ...payload, modeSettings: settingsForCopy(payload?.modeSettings) });
         await deleteBlocks(name);
         if (currentSaveName === name) {
           currentSaveName = target;
@@ -6027,7 +6058,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           const next = {
             blocks: importedBlocks,
             modeOrders: ensureModeOrders(importedBlocks, write.modeOrders),
-            modeSettings: normalizeModeSettings(write.modeSettings === undefined ? current?.modeSettings : write.modeSettings)
+            // In place of the folder, it stays that folder (utils/folderIdentity.js).
+            modeSettings: normalizeModeSettings(write.modeSettings === undefined
+              ? current?.modeSettings
+              : settingsInPlaceOf(write.modeSettings, write.name, current?.modeSettings))
           };
           await keepReplacedCopy(write.name, current, next);
           await saveBlocks(write.name, next);
@@ -6036,7 +6070,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           await saveBlocks(write.name, {
             blocks: importedBlocks,
             modeOrders: ensureModeOrders(importedBlocks, write.modeOrders),
-            modeSettings: normalizeModeSettings(write.modeSettings)
+            modeSettings: normalizeModeSettings(settingsForCopy(write.modeSettings))
           });
           logSync('save', write.name, 'made by an import');
         }
@@ -6127,7 +6161,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         await appAlert(`${failed} picture${failed === 1 ? '' : 's'} in this folder could not be fetched, so it was not renamed. Try again when online.`);
         return;
       }
-      await saveBlocks(to, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: payload.modeSettings });
+      // The same folder under a new name: its id goes with it, so a nest's
+      // link to it still leads to it (utils/folderIdentity.js).
+      await saveBlocks(to, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: settingsForRename(payload.modeSettings, from) });
       await deleteBlocks(from);
       writeOwedDeletes(withPending(readOwedDeletes(), from));
       savedList = await listSavedBlocks();
@@ -6242,7 +6278,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         return;
       }
       const copyName = uniqueName(name, savedList);
-      await saveBlocks(copyName, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: payload.modeSettings });
+      // A different folder: it takes its own id from its name.
+      await saveBlocks(copyName, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: settingsForCopy(payload.modeSettings) });
       savedList = await listSavedBlocks();
       logSync('save', copyName, `duplicated from "${name}"`);
       autoSyncDirty = true;

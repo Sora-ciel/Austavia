@@ -14,6 +14,7 @@
   import EmbedBlock from './EmbedBlock.svelte';
   import ClockBlock from './ClockBlock.svelte';
   import TaskBlock from './TaskBlock.svelte';
+  import NestBlock from './NestBlock.svelte';
   import { recallScroll } from '../utils/scrollMemory.js';
 
   export let block;
@@ -94,6 +95,15 @@
   <TaskBlock
     {...common}
     initialTasks={block.tasks}
+    initialTitle={block.title}
+    on:delete
+    on:update
+    on:focusToggle
+  />
+{:else if block.type === 'nest'}
+  <NestBlock
+    {...common}
+    initialLinks={block.links}
     initialTitle={block.title}
     on:delete
     on:update

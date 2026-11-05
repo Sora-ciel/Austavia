@@ -4,7 +4,9 @@ export const BLOCK_DEFINITIONS = {
   music: { type: 'music', label: 'Music', icon: '+' },
   embed: { type: 'embed', label: 'Embed', icon: '+' },
   task: { type: 'task', label: 'Task List', icon: '+' },
-  clock: { type: 'clock', label: 'Clock & alarm', icon: '+' }
+  clock: { type: 'clock', label: 'Clock & alarm', icon: '+' },
+  // Links to folders, as tiles (NestBlock.svelte).
+  nest: { type: 'nest', label: 'Nest', icon: '+' }
 };
 
 export function getBlockDefinition(type) {

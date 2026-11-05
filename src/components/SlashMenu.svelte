@@ -24,6 +24,14 @@
   export let query = '';
   /** The colours of the page it opens over. */
   export let themeStyle = '';
+  /** What the search field says before anything is typed. */
+  export let searchLabel = 'Search blocks…';
+  /** Shown when nothing matches. */
+  export let emptyLabel = 'No block matches';
+
+  // Rows come in groups -- `group` when a row names its own, else new blocks
+  // and blocks already in the folder.
+  const groupOf = item => item.group ?? (item.kind === 'new' ? 'New' : 'Already in this folder');
 
   const dispatch = createEventDispatcher();
   let menuEl;
@@ -67,8 +75,8 @@
   {#if search}
     <input
       class="slash-search"
-      placeholder="Search blocks…"
-      aria-label="Search blocks"
+      placeholder={searchLabel}
+      aria-label={searchLabel}
       bind:this={searchEl}
       bind:value={query}
       on:input={() => dispatch('query', query)}
@@ -76,8 +84,8 @@
     />
   {/if}
   {#each items as item, i (item.id)}
-    {#if i === 0 || item.kind !== items[i - 1].kind}
-      <div class="slash-group">{item.kind === 'new' ? 'New' : 'Already in this folder'}</div>
+    {#if i === 0 || groupOf(item) !== groupOf(items[i - 1])}
+      <div class="slash-group">{groupOf(item)}</div>
     {/if}
     <button
       class="slash-row"
@@ -90,10 +98,10 @@
       on:click={() => dispatch('pick', item)}
     >
       <span class="slash-name">{item.name}</span>
-      {#if item.kind === 'existing'}<span class="slash-hint">{item.hint}</span>{/if}
+      {#if item.hint && item.kind !== 'new'}<span class="slash-hint">{item.hint}</span>{/if}
     </button>
   {:else}
-    <div class="slash-none">No block matches</div>
+    <div class="slash-none">{emptyLabel}</div>
   {/each}
 </div>
 

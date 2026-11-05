@@ -216,17 +216,16 @@ start of an empty line on a phone.
 
 ### In order, each landing on its own
 
-0. **A folder that keeps its identity when renamed.** Today a folder's name
-   *is* its id (`saveRemoteFile(fileName, ...)`); a rename is a new folder plus
-   a tombstone on the old name, so a link by name breaks on every rename. Each
-   folder gets a `folderId` stored inside it, carried across renames and
-   synced; for folders that exist already it must come out the same on every
-   device without them talking to each other (derived from the name the
-   first time, `legacy:<name>`, then carried). The cloud index carries it too,
-   so a link can be followed to a folder not downloaded yet -- check the index
+0. **A folder that keeps its identity when renamed** -- *landed 2026-11-04*
+   (utils/folderIdentity.js). A folder's id is `modeSettings.folder.id`, or
+   `legacy:<name>` when it has none, so nothing is written for a folder never
+   renamed and every device works out the same id. A rename writes the id
+   into the folder under its new name; a duplicate, an import into a new
+   folder and a local folder adopted beside a cloud one of the same name drop
+   it and take their own. Kept by every build from 0.8.662 (mode settings
+   keep unknown fields). **Still owed:** the cloud index carrying the id, so
+   a link can be followed to a folder not downloaded yet -- check the index
    rule in `database.rules.json` accepts the field and deploy it first.
-   Nothing visible. Tests: a rename keeps the id; two devices derive the same
-   one; an older build keeps it.
 1. **The `/` menu, in every editor**: one shared command list and menu, in
    Single Note, text blocks and pages. First the text kinds that exist
    already -- headings, lists, checkbox, quote, divider, separator, picture.
@@ -234,15 +233,22 @@ start of an empty line on a phone.
    a `+` at the start of an empty line opens the same menu.
 2. **Page mode** -- landed 2026-11-04, then redirected the same day; see
    "Redirected 2026-11-04" above for what it is now.
-3. **`/` places blocks**: the same choice as "＋ Block…", from `/` typed in a
-   text block, splitting it where `/` was typed. Moving between blocks with the keys: up at the top of
+3. **`/` places blocks** -- *landed 2026-11-04*, see step (d) above. Still
+   owed: moving between blocks with the keys: up at the top of
    a text block goes to the one above, Backspace at the start of one after a
    removed block joins the two halves again.
-4. **Nests, first version: folders as tiles.** A `nest` block (so it also
-   works on the Canvas), a search over every folder, local and cloud (step
-   0's index). A tile shows the name, a cover (the wallpaper or first
-   picture), and opens the folder; a deleted one shows as deleted, with Restore
-   if it is in the bin.
+4. **Nests, first version: folders as tiles** -- *landed 2026-11-04*
+   (NestBlock.svelte, utils/folderDirectory.js). A `nest` block, on the
+   Canvas ("+ Nest") and on a page ("/nest"), holds `links: [{ folderId,
+   name }]`. "＋ Folder" searches this device's folders (the same menu as
+   "/"); a tile shows the folder's current name over its cover (wallpaper,
+   else first picture) and opens it; × takes the link out, deleting nothing.
+   App works the directory out whole from the folders whenever the folder
+   list or the open folder changes ('folders' context). **Still owed:** cloud
+   folders not downloaded (step 0's index); a deleted folder shows "Not
+   found" rather than Restore from the bin; covers stored in the cloud
+   (`{ type: 'storage' }`) are not shown yet; the directory loads every
+   folder to build itself, which wants measuring with many big folders.
 5. **`/page`**: a new folder, opened in Page mode, linked where it was typed.
 6. **Further**: nests gain page blocks, then pictures, then web links and
    blocks from other folders; the `/` menu offers blocks from other folders,
@@ -318,6 +324,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Nests** (2026-11-04). "+ Nest" on the Canvas, or "/nest" on a page: "＋ Folder" lists this device's other folders; a tile shows the folder's name over its wallpaper (or first picture) and opens it; × takes it out of the nest without touching the folder. Rename a linked folder: the tile follows the new name (seen in a browser). Duplicate it: the copy is a separate folder, not the linked one. On a second device after a sync the same tiles. Check on the phone, and that an older build keeps both the nest and the folder ids. |
 | next | **"/" on a page** (2026-11-04). In the writing on a page, type / (at the start of a line or after a space): a menu opens under the cursor with a new block of each kind, then the folder's blocks not on the page yet; typing after the / filters it ("/cour" finds a list called Courses), arrows and Enter pick, Escape closes. Picked at the end of the writing, the block goes under it; at the start, over it; in the middle, the writing is cut in two around it. One Undo takes it all back. "＋ Block…" opens the same menu with a search field. On the phone, check the menu opens above the keyboard and a tap picks. |
 | next | **Page mode** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page, with no frames or colours of their own. Click anywhere on the empty page and write: paragraphs typed together are one text block. "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. The ⋮⋮ beside a block (top right on a phone): drag it onto another block's left or right edge to put them side by side, above or below for a row of its own; press it for "Take off page" (the block stays in the folder) and "Delete block". Undo takes any of it back; another device after a sync shows the same page. A row of several stacks on a phone. Seen in a browser; on the phone check dragging the handle with a finger, and that the task list, picture, clock and music look right on a page.
 | next | **Every block in one frame** (2026-11-04). The image, task and embed blocks now use the same frame as text, clock and music (BlockShell). On the Canvas: drag each by its header, resize from the corner (an image keeps its shape), change both colours, delete, change a picture (⏏), add and tick tasks. All should feel as before; the embed lost its empty ⚙ settings panel. |

@@ -169,7 +169,8 @@ export const PAGE_BLOCK_TYPES = [
   { type: 'task', label: 'Task list' },
   { type: 'clock', label: 'Clock' },
   { type: 'music', label: 'Music' },
-  { type: 'embed', label: 'Embed' }
+  { type: 'embed', label: 'Embed' },
+  { type: 'nest', label: 'Nest' }
 ];
 
 /** How an existing block is named in the list to pick from: its title, or its first line. */
@@ -180,6 +181,7 @@ export function blockPickName(block, htmlToText = value => String(value || '')) 
   if (block.type === 'image') return 'Image';
   if (block.type === 'embed') return String(block.content || '').trim() || 'Embed';
   if (block.type === 'music') return (block.title || '').trim() || 'Music';
+  if (block.type === 'nest') return (block.title || '').trim() || 'Nest';
   const first = htmlToText(block.content || '').split('\n').map(line => line.trim()).find(Boolean);
   return first ? (first.length > 60 ? `${first.slice(0, 60)}…` : first) : 'Empty text';
 }
