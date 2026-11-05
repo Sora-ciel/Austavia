@@ -74,3 +74,19 @@ test('a last time saved in minutes, before seconds, is not misread as seconds', 
   storage.setItem('austavia.taskMode.lastGoal', JSON.stringify({ kind: 'time', time: 30 }));
   assert.equal(readLastGoal(storage).timeSeconds, null);
 });
+
+// Asked 2026-11-04: the list's name field goes, and the list's own tab renames
+// it when pressed again.
+import { tabPress } from '../src/utils/taskModeView.js';
+
+test('pressing the tab of another list opens that list', () => {
+  assert.equal(tabPress({ pressedId: 'b', selectedId: 'a' }), 'select');
+});
+
+test('pressing the tab of the list already open lets you rename it', () => {
+  assert.equal(tabPress({ pressedId: 'a', selectedId: 'a' }), 'rename');
+});
+
+test('with no list open, a press only opens', () => {
+  assert.equal(tabPress({ pressedId: 'a', selectedId: null }), 'select');
+});

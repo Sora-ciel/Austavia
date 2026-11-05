@@ -11,7 +11,7 @@
   import { sanitizeRichText, looksLikeHtml } from '../utils/sanitizeRichText.js';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   // Open or closed, remembered on this device -- see the file.
-  import { readDoneExpanded, writeDoneExpanded, readLastGoal, writeLastGoal } from '../utils/taskModeView.js';
+  import { readDoneExpanded, writeDoneExpanded, readLastGoal, writeLastGoal, tabPress } from '../utils/taskModeView.js';
   import { drawnSurface } from '../utils/modeSurface.js';
   // Where a dragged task lands, and where its line goes -- see the file.
   import { moveToSlot } from '../utils/dropPlacement.js';
@@ -277,9 +277,37 @@
     if (e.key === 'Enter') { e.preventDefault(); addTask(); }
   }
 
-  function updateTitle(value, opts = {}) {
-    if (!selectedTaskId) return;
-    updateBlock(selectedTaskId, { title: value }, { changedKeys: ['title'], ...opts });
+  // The open list's tab, pressed again, becomes its name to type into
+  // (tabPress in taskModeView.js); Enter or leaving it keeps the name, Escape
+  // puts the old one back.
+  let renamingId = null;
+  let renameInput;
+
+  async function pressTab(id) {
+    if (tabPress({ pressedId: id, selectedId: selectedTaskId }) === 'rename') {
+      renamingId = id;
+      await tick();
+      renameInput?.focus();
+      renameInput?.select();
+      return;
+    }
+    selectTaskList(id);
+  }
+
+  function finishRename(event, keep = true) {
+    if (!renamingId) return;
+    const id = renamingId;
+    renamingId = null;
+    const block = taskBlocks.find(b => b.id === id);
+    const value = event.target.value.trim();
+    if (keep && block && value !== (block.title || '')) {
+      updateBlock(id, { title: value }, { changedKeys: ['title'], pushToHistory: true });
+    }
+  }
+
+  function renameKeydown(event) {
+    if (event.key === 'Enter') { event.preventDefault(); finishRename(event); }
+    else if (event.key === 'Escape') { event.preventDefault(); finishRename(event, false); }
   }
 
   function selectTaskList(id) {
@@ -447,9 +475,8 @@
   }
 
   .task-tabs-row {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-width: 0;
-    max-width: 45%;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -497,24 +524,23 @@
   .new-list-btn:hover { opacity: 1; }
 
   .task-title-row {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
     display: flex;
     align-items: center;
     gap: 6px;
   }
 
-  .task-title-row input {
-    flex: 1 1 auto;
-    min-width: 0;
-    padding: 2px 8px;
-    border-radius: 8px;
-    border: var(--block-border-width, 1px) solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 30%, transparent);
-    background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, transparent);
-    color: var(--text, var(--mode-text-color, inherit));
-    font-size: 0.88rem;
-    font-family: var(--block-body-font, inherit);
-    box-sizing: border-box;
+  /* The open list's tab while its name is typed: the same pill, as wide as a
+     name usually is, without the capitals so what is typed reads as typed. */
+  .task-tab-rename {
+    opacity: 1;
+    width: 11em;
+    cursor: text;
+    text-transform: none;
+    outline: none;
+    border-color: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 80%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 35%, transparent);
   }
 
   .delete-list-btn {
@@ -890,26 +916,33 @@
   {#if taskBlocks.length}
     <div class="task-header">
       <div class="task-tabs-row" role="tablist">
-        {#each taskBlocks as block, i}
-          <button
-            class="task-tab"
-            role="tab"
-            aria-selected={block.id === selectedTaskId}
-            style="--bg: {block.bgColor || 'transparent'}; --text: {block.textColor || 'var(--mode-text-color, inherit)'};"
-            on:click={() => selectTaskList(block.id)}
-          >{getTabLabel(block, i)}</button>
+        {#each taskBlocks as block, i (block.id)}
+          {#if renamingId === block.id}
+            <input
+              class="task-tab task-tab-rename"
+              aria-label="List name"
+              style="--bg: {block.bgColor || 'transparent'}; --text: {block.textColor || 'var(--mode-text-color, inherit)'};"
+              value={block.title || ''}
+              placeholder={`List ${i + 1}`}
+              bind:this={renameInput}
+              on:keydown={renameKeydown}
+              on:blur={finishRename}
+            />
+          {:else}
+            <button
+              class="task-tab"
+              role="tab"
+              aria-selected={block.id === selectedTaskId}
+              title={block.id === selectedTaskId ? 'Press again to rename' : undefined}
+              style="--bg: {block.bgColor || 'transparent'}; --text: {block.textColor || 'var(--mode-text-color, inherit)'};"
+              on:click={() => pressTab(block.id)}
+            >{getTabLabel(block, i)}</button>
+          {/if}
         {/each}
       </div>
 
       {#if taskBlock}
         <div class="task-title-row">
-          <input
-            type="text"
-            value={taskBlock.title || ''}
-            on:input={e => updateBlock(selectedTaskId, { title: e.target.value }, { changedKeys: ['title'], pushToHistory: false })}
-            on:blur={e => updateBlock(selectedTaskId, { title: e.target.value }, { changedKeys: ['title'], pushToHistory: true })}
-            placeholder="Task list title…"
-          />
           <ColorField
             value={taskBlock.bgColor || '#000000'}
             title="Background Color"

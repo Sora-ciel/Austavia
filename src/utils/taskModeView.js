@@ -88,3 +88,17 @@ export function writeLastGoal(storage, { kind, target, daily } = {}) {
     // Not remembered; the next editor simply starts empty.
   }
 }
+
+/**
+ * What pressing a list's tab does.
+ *
+ * Asked 2026-11-04: "the place you can change the name of the task list should
+ * be gone and instead on the button to choose your task that got the name of
+ * the task list if you press multiple time you should be able to change the
+ * name of that list". So the separate name field is gone: a press on another
+ * list's tab opens that list, and a press on the tab of the list already open
+ * turns the tab into its name, ready to type.
+ */
+export function tabPress({ pressedId, selectedId } = {}) {
+  return pressedId && pressedId === selectedId ? 'rename' : 'select';
+}
