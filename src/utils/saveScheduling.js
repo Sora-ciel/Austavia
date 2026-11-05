@@ -134,3 +134,17 @@ export function saveTarget(payload, currentFolder = '') {
 export function nameForUnnamedSave(existingFolders = []) {
   return uniqueName('default', existingFolders);
 }
+
+/**
+ * Whether a save can be skipped as changing nothing.
+ *
+ * Only for a folder that is really stored. Reported 2026-11-04: "the new file
+ * in the controls doesn't seem to work -- I tried writing 'aceuil' and pressing
+ * OK and it didn't create the file." loadBlocks hands back an empty folder for
+ * a name that has never been saved, so a new folder -- empty, as new folders
+ * are -- compared equal to it, was judged unchanged, and was never written.
+ * Nothing appeared in the list until something was put in it.
+ */
+export function saveChangesNothing({ stored = false, before = '', after = '' } = {}) {
+  return Boolean(stored) && before === after;
+}

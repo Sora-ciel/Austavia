@@ -112,7 +112,7 @@
   // Sync writes down what it decided, so a loop can be read back instead of
   // guessed at. See utils/syncLog.js.
   import { logSync, describeDifference, getSyncLog, persistNow } from './utils/syncLog.js';
-  import { mayTakeSave, saveTarget, nameForUnnamedSave } from './utils/saveScheduling.js';
+  import { mayTakeSave, saveTarget, nameForUnnamedSave, saveChangesNothing } from './utils/saveScheduling.js';
   import { stalledLocks, anyHeld } from './utils/syncLocks.js';
   import { buildDiagnostics, formatDiagnostics } from './utils/diagnostics.js';
   // How long a typing save waits, and the ceiling that stops it waiting for
@@ -3341,7 +3341,12 @@
       // Merely opening a folder used to rewrite it, restamping modifiedAt and
       // making an untouched folder look newer than the cloud copy (and worth
       // re-uploading). Skip the write when nothing actually changed.
-      const existing = await loadBlocks(folder);
+      // Only a folder that is really stored can be "unchanged": loadBlocks
+      // answers a name never saved with an empty folder, and a new folder, empty
+      // as new folders are, then looked unchanged and was never written
+      // (saveChangesNothing, 2026-11-04).
+      const stored = (await listSavedBlocks()).includes(folder);
+      const existing = stored ? await loadBlocks(folder) : null;
       if (existing) {
         const before = saveContentFingerprint(
           existing.blocks,
@@ -3349,7 +3354,7 @@
           normalizeModeSettings(existing.modeSettings)
         );
         const after = saveContentFingerprint(payload.blocks, normalizedOrders, normalizedSettings);
-        if (before === after) {
+        if (saveChangesNothing({ stored, before, after })) {
           logSync('skip', folder, 'nothing changed, folder left alone');
           return;
         }
