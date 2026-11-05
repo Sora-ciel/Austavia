@@ -68,6 +68,19 @@
    * "Page mode").
    */
   export let placement = 'canvas';
+  /**
+   * On a page, a block is as tall as what is in it -- except one whose body
+   * fills whatever height it is given (a clock's face, an embedded page),
+   * which keeps the height it has on the Canvas.
+   */
+  export let pageKeepsHeight = false;
+  $: onPage = placement === 'page';
+  // On a page a block is drawn in the page's colours, not its own: asked
+  // 2026-11-04, "text blocks and other blocks and all won't have the colors
+  // on the borders". Its own colours stay in the block for the Canvas.
+  $: frameStyle = onPage
+    ? `--bg: transparent; --text: var(--mode-text-color, currentColor);${pageKeepsHeight ? ` height:${size.height}px;` : ''}`
+    : `left:${position.x}px; top:${position.y}px; width:${size.width}px; height:${size.height}px; --bg: ${bgColor}; --text: color-mix(in srgb, ${textColor} var(--block-text-opacity, 100%), transparent);`;
 
   const dispatch = createEventDispatcher();
 
@@ -284,15 +297,25 @@
 <div
   class="note {className}"
   class:focused
+  class:on-page={onPage}
   bind:this={rootEl}
   data-block-id={id}
-  style="left:{position.x}px; top:{position.y}px; width:{size.width}px; height:{size.height}px; --bg: {bgColor}; --text: color-mix(in srgb, {textColor} var(--block-text-opacity, 100%), transparent);"
+  style={frameStyle}
   role="button"
   tabindex="0"
   aria-pressed={focused}
   on:click={handleClick}
   on:keydown={handleKeydown}
 >
+  {#if onPage}
+    <!-- No header on a page: the type's own controls (a picture's ⏏) show
+         over the block's corner while the pointer is on it. -->
+    {#if $$slots['header-controls']}
+      <div class="page-tools" role="presentation" on:click|stopPropagation on:keydown|stopPropagation>
+        <slot name="header-controls" {commit} {ensureFocus} />
+      </div>
+    {/if}
+  {:else}
   <div
     class="header"
     bind:this={headerEl}
@@ -328,14 +351,18 @@
     </div>
   </div>
 
+  {/if}
+
   <slot {commit} {ensureFocus} {size} {position} />
 
+  {#if !onPage}
   <div
     class="resize-handle"
     role="presentation"
     on:mousedown={onResizeStart}
     on:touchstart={onResizeStart}
   ></div>
+  {/if}
 </div>
 
 <style>
@@ -360,6 +387,51 @@
   .note.focused {
     outline: 2px solid var(--block-focus-outline, rgba(110, 168, 255, 0.85));
     box-shadow: var(--block-focus-shadow, 0 0 0 2px rgba(110, 168, 255, 0.35), 0 0 12px rgba(110, 168, 255, 0.5));
+  }
+  /* On a page: in the flow, as wide as its place, nothing drawn round it --
+     the page is the surface (PENDING, "Page mode"). */
+  .note.on-page,
+  .note.on-page.focused {
+    position: relative;
+    border: none;
+    border-radius: 4px;
+    box-shadow: none;
+    outline: none;
+    background: transparent;
+    overflow: visible;
+    text-shadow: none;
+  }
+  .page-tools {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 2;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 80%, transparent);
+    border-radius: 6px;
+  }
+  .note.on-page:hover .page-tools,
+  .note.on-page:focus-within .page-tools {
+    opacity: 1;
+  }
+  /* The writing on a page is always reachable -- a click anywhere in it puts
+     the caret there -- and grows with what is written instead of scrolling. */
+  :global(.note.on-page .tiptap-wrap) {
+    pointer-events: auto !important;
+    overflow: visible;
+    flex: none;
+  }
+  :global(.note.on-page .tiptap-wrap:not(.tiptap-inline)) {
+    font-size: 1.05rem;
+    font-weight: 400;
+    line-height: 1.6;
+  }
+  :global(.note.on-page .tiptap-inner) {
+    padding: 2px 2px;
+    text-box-trim: none;
   }
   .header {
     padding: 6px 10px;

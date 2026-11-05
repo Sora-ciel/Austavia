@@ -99,8 +99,8 @@ test('every part of a note this version adds carries the name an older version k
 });
 
 test('a page keeps the entries and fields a newer version gave it', () => {
-  const newer = { page: { entries: [{ blockId: 'a', folderId: 'elsewhere' }, { blockId: 'b', width: 'wide' }], cover: 'x' } };
+  const newer = { page: { rows: [{ cells: [{ blockId: 'a', folderId: 'elsewhere' }, { blockId: 'b', width: 0.3 }], gap: 2 }], cover: 'x' } };
   const kept = normalizeModeSettings(newer).page;
-  assert.deepEqual(kept.entries, newer.page.entries);
+  assert.deepEqual(kept.rows, newer.page.rows);
   assert.equal(kept.cover, 'x');
 });

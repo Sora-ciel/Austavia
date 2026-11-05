@@ -208,6 +208,11 @@
 </script>
 
 <style>
+  .page-task-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
   .content {
     display: flex;
     flex-direction: column;
@@ -398,6 +403,10 @@
   on:focusToggle
 >
   <div class="content">
+    {#if placement === 'page'}
+      <!-- A page draws no header, so the list's name goes above it. -->
+      <div class="page-task-title">{title || 'Task List'}</div>
+    {/if}
     <div class="task-input">
       <input
         type="text"

@@ -31,7 +31,7 @@
  */
 
 import { normalizeHabits, habitsEqual } from './habitStore.js';
-import { normalizePageEntries, samePage } from './pageEntries.js';
+import { normalizePageRows, samePage } from './pageLayout.js';
 
 /**
  * What of the mode settings goes into a history entry: the habits, and which
@@ -41,7 +41,7 @@ import { normalizePageEntries, samePage } from './pageEntries.js';
 export function settingsForHistory(modeSettings) {
   return {
     habits: normalizeHabits(modeSettings?.habit?.habits),
-    page: normalizePageEntries(modeSettings?.page?.entries)
+    page: normalizePageRows(modeSettings?.page?.rows)
   };
 }
 
@@ -58,8 +58,8 @@ export function settingsFromHistory(modeSettings, entry) {
   }
   // An entry from before pages were in the history says nothing of them, and
   // is not read as "an empty page".
-  if (Array.isArray(saved.page) && !samePage(modeSettings?.page?.entries, saved.page)) {
-    next = { ...next, page: { ...(next?.page || {}), entries: normalizePageEntries(saved.page) } };
+  if (Array.isArray(saved.page) && !samePage(modeSettings?.page?.rows, saved.page)) {
+    next = { ...next, page: { ...(next?.page || {}), rows: normalizePageRows(saved.page) } };
   }
   return next;
 }

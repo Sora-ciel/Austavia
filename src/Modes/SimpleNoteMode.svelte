@@ -34,12 +34,6 @@
   export let leftControlColors = {};
   export let canvasRef;
   export let columnCount = 2;
-  // Page mode shows its blocks through this mode rather than a copy of it
-  // (CLAUDE.md, "one of everything"): one column, centred, with the page's
-  // title and its add row in the `top` and `bottom` slots, and "Take off page"
-  // in each block's menu -- see PageMode.svelte.
-  export let layout = 'grid';
-  $: onPage = layout === 'page';
   // The music library and what the app's one player is doing with it, so a
   // music block here is the same player as on the canvas.
   export let library = { tracks: [], playlists: [] };
@@ -304,7 +298,6 @@
     if (block.type === 'text' || block.type === 'cleantext') {
       if (block.content) items.push({ id: 'copyText', label: 'Copy text' });
     }
-    if (onPage) items.push({ id: 'takeOff', label: 'Take off page' });
     items.push({ id: 'delete', label: 'Delete block', variant: 'danger' });
     return items;
   }
@@ -337,8 +330,6 @@
     } else if (actionId === 'delete') {
       deleteFromMenu(block.id);
       return;
-    } else if (actionId === 'takeOff') {
-      dispatch('takeOff', { id: block.id });
     }
     closeBlockMenu();
   }
@@ -1077,25 +1068,8 @@ input[type="text"] {
 }
 
 
-/* A page: one column down the middle, as wide as reads well, with room
-   round it for the wallpaper. The slots span the whole row in either
-   layout. */
-.simple-wrapper.page-layout {
-  grid-template-columns: minmax(0, 46rem);
-  justify-content: center;
-  align-content: start;
-  padding-top: 14px;
-  padding-bottom: 40vh;
-}
-
-.simple-span {
-  grid-column: 1 / -1;
-  min-width: 0;
-}
-
 /* Above the wallpaper, which sits at z-index 0 between this mode's own
    background and its content -- see ModeWallpaper.svelte. */
-.simple-wrapper > .simple-span,
 .simple-wrapper > .simple-column {
   position: relative;
   z-index: 1;
@@ -1110,9 +1084,8 @@ input[type="text"] {
 
 
 
-<div class="simple-wrapper" class:page-layout={onPage} bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
+<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
   <ModeWallpaper settings={backgroundSettings} />
-  {#if $$slots.top}<div class="simple-span"><slot name="top" /></div>{/if}
   {#each renderColumns as column}
     <div class="simple-column">
       {#each column as block (blockKey(block))}
@@ -1327,7 +1300,6 @@ input[type="text"] {
       {/each}
     </div>
   {/each}
-  {#if $$slots.bottom}<div class="simple-span"><slot name="bottom" /></div>{/if}
 </div>
 
 {#if blockMenu.blockId}

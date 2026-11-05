@@ -39,8 +39,8 @@
   // utils/modeBackground.js.
   export let canvasBackgroundSettings = {};
   export let taskAddDirection = 'above';
-  /** Which blocks Page mode shows, in order -- modeSettings.page.entries. */
-  export let pageEntries = [];
+  /** What Page mode shows, row by row -- modeSettings.page.rows. */
+  export let pageRows = [];
   export let musicLibrary = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
@@ -128,12 +128,11 @@
     <PageMode
       {openFolder}
       {blocks}
-      entries={pageEntries}
+      rows={pageRows}
       {focusedBlockId}
       bind:canvasRef
       {canvasColors}
       backgroundSettings={singleNoteSettings}
-      {leftControlColors}
       library={musicLibrary}
       {nowPlayingId}
       {isPlaying}

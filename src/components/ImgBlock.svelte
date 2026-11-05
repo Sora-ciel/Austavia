@@ -168,7 +168,14 @@
     </label>
   </svelte:fragment>
 
-  <div class="media-container">
+  <!-- On a page the picture sets the height: its own shape, as wide as its
+       place, and never taller than most of the screen. -->
+  <div
+    class="media-container"
+    style={placement === 'page' && aspectRatio > 0
+      ? `flex: none; aspect-ratio: ${aspectRatio}; width: min(100%, calc(70vh * ${aspectRatio}));`
+      : ''}
+  >
     {#if mediaSrc}
       {#if mediaSrc.startsWith('data:video')}
         <!-- svelte-ignore a11y-click-events-have-key-events -->

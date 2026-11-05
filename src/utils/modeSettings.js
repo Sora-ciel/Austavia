@@ -20,7 +20,7 @@
 import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings } from './modeBackground.js';
 import { normalizeHabits } from './habitStore.js';
 import { withUnknown } from './keepUnknown.js';
-import { normalizePageSettings } from './pageEntries.js';
+import { normalizePageSettings } from './pageLayout.js';
 
 export const DEFAULT_MODE_SETTINGS = {
   simple: {
@@ -40,8 +40,8 @@ export const DEFAULT_MODE_SETTINGS = {
   // already is one -- see utils/habitStore.js.
   habit: { habits: [] },
   // Page mode (2026-11-04): which of the folder's blocks the page shows, in
-  // order -- see utils/pageEntries.js.
-  page: { entries: [] },
+  // order -- see utils/pageLayout.js.
+  page: { rows: [] },
   // The folder's one wallpaper, drawn by every mode, under
   // Canvas mode's own id -- see hasWallpaper in modeRegistry.js. Single Note
   // had one of its own under `single`; it is no longer kept at all, so a

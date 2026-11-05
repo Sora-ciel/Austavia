@@ -39,13 +39,13 @@ test('when the habits already match, nothing is replaced', () => {
 
 // Page mode, 2026-11-04: which blocks a page shows rides in the same history.
 test('undoing taking a block off a page puts it back in its place', () => {
-  const page = entries => ({ habit: { habits: [] }, page: { entries } });
-  const before = settingsForHistory(page([{ blockId: 'a' }, { blockId: 'b' }]));
-  const restored = settingsFromHistory(page([{ blockId: 'b' }]), { settings: before });
-  assert.deepEqual(restored.page.entries.map(e => e.blockId), ['a', 'b']);
+  const page = ids => ({ habit: { habits: [] }, page: { rows: ids.map(blockId => ({ cells: [{ blockId }] })) } });
+  const before = settingsForHistory(page(['a', 'b']));
+  const restored = settingsFromHistory(page(['b']), { settings: before });
+  assert.deepEqual(restored.page.rows.map(r => r.cells[0].blockId), ['a', 'b']);
 });
 
 test('a history entry from before pages is not read as an empty page', () => {
-  const now = { habit: { habits: [] }, page: { entries: [{ blockId: 'a' }] } };
+  const now = { habit: { habits: [] }, page: { rows: [{ cells: [{ blockId: 'a' }] }] } };
   assert.equal(settingsFromHistory(now, { settings: { habits: [] } }), now);
 });

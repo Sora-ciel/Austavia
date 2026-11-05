@@ -1,34 +1,43 @@
 <script>
   /**
-   * Page mode: the blocks put on the page, one under another, under the
-   * folder's name -- a page like Notion's, made of the folder's own blocks.
+   * Page mode: a page like Notion's, made of the folder's own blocks.
    *
-   * Planned 2026-10-27 and started 2026-11-04 (PENDING, "Page mode, and
-   * nests"). Asked to start from an existing mode, "it's easier to get the
-   * colors and structure for sync right": it is Simple Note's block view, in
-   * a one-column layout, not a copy of it -- so every block looks, edits,
-   * moves and syncs exactly as it does there (CLAUDE.md, "one of
-   * everything"). What is the page's own is only which blocks it shows, in
-   * what order: utils/pageEntries.js decides, this acts.
+   * Planned 2026-10-27 (PENDING, "Page mode, and nests"); redirected
+   * 2026-11-04 on seeing a first version built from Simple Note's cards:
+   * "text blocks and other blocks and all won't have the colors on the
+   * borders. second. the page wherever you click, it's basically a line and
+   * you can directly write something ... on one line or multiple lines we
+   * can have multiple blocks sharing the width etc."
    *
-   * Still to come, in PENDING's order: "/" in the writing to place blocks,
-   * moving between blocks with the keys, nests.
+   * So a block here is the same component as on the Canvas (Block.svelte),
+   * drawn with BlockShell's `placement="page"`: no frame, no header, no
+   * colours of its own, as wide as its place. The page is rows of them, a
+   * row being one block or several side by side; a ⋮⋮ handle beside each one
+   * moves it -- onto another's side to share its row, above or below for a
+   * row of its own -- and opens its menu. A click on the empty page writes.
+   *
+   * What is the page's own is only its rows: utils/pageLayout.js decides,
+   * this acts. "/" in the writing comes next (PENDING).
    */
-  import { createEventDispatcher, tick } from 'svelte';
-  import SimpleNoteMode from './SimpleNoteMode.svelte';
+  import { createEventDispatcher, tick, onMount } from 'svelte';
+  import Block from '../components/Block.svelte';
+  import ModeWallpaper from '../components/ModeWallpaper.svelte';
   import PickerSheet from '../components/PickerSheet.svelte';
+  import BlockContextMenu from '../components/BlockContextMenu.svelte';
+  import Lightbox from '../components/Lightbox.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
+  import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
+  import { isPrimaryPointer } from '../utils/pointer.js';
   import {
-    blocksOnPage, blocksOffPage, putOnPage, takeOffPage, swapOnPage,
+    blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, dropSide,
     PAGE_BLOCK_TYPES, blockPickName
-  } from '../utils/pageEntries.js';
+  } from '../utils/pageLayout.js';
 
   export let openFolder = '';
   export let blocks = [];
-  export let entries = [];
+  export let rows = [];
   export let focusedBlockId = null;
   export let canvasColors = {};
-  export let leftControlColors = {};
   export let backgroundSettings = {};
   export let canvasRef;
   export let library = { tracks: [], playlists: [] };
@@ -37,19 +46,48 @@
 
   const dispatch = createEventDispatcher();
 
-  $: shown = blocksOnPage(entries, blocks);
+  $: canvasTheme = { outerBg: '#000000', innerBg: '#000000', ...(canvasColors || {}) };
+  $: modeTextColor = modeTextColorFor(canvasTheme);
+  $: pageVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor};`;
+
+  $: shownRows = blocksOnPage(rows, blocks);
 
   function changePage(next) {
-    dispatch('modeSettingChange', { page: { entries: next } });
+    dispatch('modeSettingChange', { page: { rows: next } });
   }
 
-  function swap(event) {
-    const { aId, bId } = event.detail || {};
-    changePage(swapOnPage(entries, aId, bId));
+  // ── Writing anywhere ─────────────────────────────────────────────────
+  // A click on the page itself, not on a block or a control, writes:
+  // utils/pageLayout.js clickBelow says where.
+  let wantCaretIn = null;
+
+  function editorOf(blockId) {
+    return canvasRef?.querySelector(`[data-page-block="${blockId}"] .ProseMirror`)?.editor || null;
   }
 
-  function takeOff(event) {
-    changePage(takeOffPage(entries, event.detail?.id, { blocks }));
+  async function caretAtEnd(blockId) {
+    if (focusedBlockId !== blockId) dispatch('focusToggle', { id: blockId });
+    await tick();
+    editorOf(blockId)?.commands.focus('end');
+  }
+
+  function onPageClick(event) {
+    if (event.target.closest?.('.page-cell, button, input, a, .page-title, .picker-sheet')) return;
+    const answer = clickBelow(shownRows);
+    if (answer.focus) {
+      caretAtEnd(answer.focus);
+    } else {
+      wantCaretIn = 'new';
+      dispatch('addBlock', { type: 'text' });
+    }
+  }
+
+  // The block just made for writing takes the caret once it is drawn: App
+  // focuses the new block, and here the editor inside it is given the caret.
+  $: if (wantCaretIn === 'new' && focusedBlockId && shownRows.some(row => row.blocks.some(b => b.id === focusedBlockId))) {
+    const id = focusedBlockId;
+    wantCaretIn = null;
+    tick().then(() => editorOf(id)?.commands.focus('end'));
   }
 
   // ── The title: the folder's name, renamed by pressing it ─────────────
@@ -77,114 +115,286 @@
 
   // ── Adding: a type, then New or one of the folder's blocks of it ─────
   let picking = null; // null | 'type' | a block type
+  const ofType = (block, type) => block.type === type || (type === 'text' && block.type === 'cleantext');
 
   $: typeItems = PAGE_BLOCK_TYPES.map(({ type, label }) => ({
     id: type,
     name: label,
-    count: blocksOffPage(entries, blocks).filter(block => block.type === type || (type === 'text' && block.type === 'cleantext')).length || undefined
+    count: blocksOffPage(rows, blocks).filter(block => ofType(block, type)).length || undefined
   }));
 
   $: choiceItems = picking && picking !== 'type'
     ? [
         { id: '__new', name: `New ${PAGE_BLOCK_TYPES.find(t => t.type === picking)?.label.toLowerCase() || 'block'}` },
-        ...blocksOffPage(entries, blocks)
-          .filter(block => block.type === picking || (picking === 'text' && block.type === 'cleantext'))
+        ...blocksOffPage(rows, blocks)
+          .filter(block => ofType(block, picking))
           .map(block => ({ id: block.id, name: blockPickName(block, htmlToText) }))
       ]
     : [];
-
-  function pickType(event) {
-    picking = event.detail;
-  }
 
   function pickBlock(event) {
     const id = event.detail;
     const type = picking;
     picking = null;
     if (id === '__new') dispatch('addBlock', { type });
-    else changePage(putOnPage(entries, id, { blocks }));
+    else changePage(putOnPage(rows, id, { blocks }));
   }
+
+  // ── A block's handle: its menu, and moving it ────────────────────────
+  let menu = null; // { blockId, x, y }
+
+  function openMenu(blockId, handle) {
+    const box = handle.getBoundingClientRect();
+    menu = { blockId, x: box.right + 4, y: box.top };
+  }
+
+  function menuAction(id) {
+    const blockId = menu?.blockId;
+    menu = null;
+    if (!blockId) return;
+    if (id === 'takeOff') changePage(takeOffPage(rows, blockId, { blocks }));
+    else if (id === 'delete') dispatch('delete', { id: blockId });
+  }
+
+  // Moving: hold the handle and drag. Where it lands is decided by
+  // dropSide (pageLayout.js): near a block's left or right edge is beside
+  // it, anywhere else above or below it.
+  const DRAG_THRESHOLD = 5;
+  let press = null;    // { blockId, x, y }
+  let dragging = null; // blockId
+  let drop = null;     // { targetId, side, box }
+
+  function handleDown(event, blockId) {
+    if (!isPrimaryPointer(event)) return;
+    press = { blockId, x: event.clientX, y: event.clientY };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleCancel);
+  }
+
+  function handleMove(event) {
+    if (!press) return;
+    if (!dragging) {
+      if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < DRAG_THRESHOLD) return;
+      dragging = press.blockId;
+    }
+    event.preventDefault();
+    let target = null;
+    for (const el of document.elementsFromPoint(event.clientX, event.clientY)) {
+      const cell = el.closest?.('[data-page-block]');
+      if (cell) { target = cell; break; }
+    }
+    if (!target || target.dataset.pageBlock === dragging) { drop = null; return; }
+    const rect = target.getBoundingClientRect();
+    const pageRect = canvasRef.getBoundingClientRect();
+    drop = {
+      targetId: target.dataset.pageBlock,
+      side: dropSide({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, x: event.clientX, y: event.clientY }),
+      box: {
+        left: rect.left - pageRect.left + canvasRef.scrollLeft,
+        top: rect.top - pageRect.top + canvasRef.scrollTop,
+        width: rect.width,
+        height: rect.height
+      }
+    };
+  }
+
+  function stopListening() {
+    window.removeEventListener('pointermove', handleMove);
+    window.removeEventListener('pointerup', handleUp);
+    window.removeEventListener('pointercancel', handleCancel);
+  }
+
+  function handleUp() {
+    stopListening();
+    if (dragging && drop) {
+      changePage(placeOnPage(rows, dragging, { targetId: drop.targetId, side: drop.side, blocks }));
+    } else if (!dragging && press) {
+      // A press without a move is a click: the menu.
+      const handle = canvasRef?.querySelector(`[data-page-block="${press.blockId}"] .page-handle`);
+      if (handle) openMenu(press.blockId, handle);
+    }
+    press = null;
+    dragging = null;
+    drop = null;
+  }
+
+  function handleCancel() {
+    stopListening();
+    press = null;
+    dragging = null;
+    drop = null;
+  }
+
+  // Where the line showing the drop is drawn, inside the page.
+  $: dropLine = drop
+    ? (drop.side === 'left' || drop.side === 'right'
+        ? `left:${drop.side === 'left' ? drop.box.left - 6 : drop.box.left + drop.box.width + 3}px; top:${drop.box.top}px; width:3px; height:${drop.box.height}px;`
+        : `left:${drop.box.left}px; top:${drop.side === 'above' ? drop.box.top - 5 : drop.box.top + drop.box.height + 2}px; width:${drop.box.width}px; height:3px;`)
+    : '';
+
+  // ── Pictures open full screen, as on the Canvas ──────────────────────
+  let lbOpen = false;
+  let lbImages = [];
+  let lbStart = 0;
+
+  function openLightbox(event) {
+    const src = event.detail?.src;
+    if (!src) return;
+    lbImages = [src];
+    lbStart = 0;
+    lbOpen = true;
+  }
+
+  onMount(() => {
+    const closeMenu = event => {
+      if (menu && !event.target.closest?.('.ctx-menu')) menu = null;
+    };
+    window.addEventListener('pointerdown', closeMenu);
+    return () => {
+      stopListening();
+      window.removeEventListener('pointerdown', closeMenu);
+    };
+  });
 </script>
 
-<div class="page-mode">
-  <SimpleNoteMode
-    layout="page"
-    columnCount={1}
-    {openFolder}
-    blocks={shown}
-    {focusedBlockId}
-    bind:canvasRef
-    {canvasColors}
-    {backgroundSettings}
-    {leftControlColors}
-    {library}
-    {nowPlayingId}
-    {isPlaying}
-    on:play
-    on:toggle
-    on:update
-    on:delete
-    on:focusToggle
-    on:swapBlocks={swap}
-    on:takeOff={takeOff}
-  >
-    <div slot="top" class="page-head">
-      {#if renaming}
-        <input
-          class="page-title page-title-input"
-          aria-label="Page name"
-          value={openFolder}
-          bind:this={titleInput}
-          on:keydown={titleKeydown}
-          on:blur={finishRename}
-        />
-      {:else}
-        <button class="page-title" title="Press to rename" on:click={startRename}>{openFolder || 'Untitled'}</button>
-      {/if}
-      {#if !shown.length}
-        <p class="page-empty">Nothing on this page yet. Start writing, or put a block on it: a new one, or one already in this folder.</p>
-      {/if}
-    </div>
-    <div slot="bottom" class="page-add">
-      <button class="page-add-btn" on:click={() => dispatch('addBlock', { type: 'text' })}>＋ Text</button>
-      <button class="page-add-btn" on:click={() => (picking = 'type')}>＋ Block…</button>
-    </div>
-  </SimpleNoteMode>
+<!-- svelte-ignore a11y-click-events-have-key-events -->
+<!-- svelte-ignore a11y-no-static-element-interactions -->
+<div class="page-mode" class:dragging={Boolean(dragging)} bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
+  <ModeWallpaper settings={backgroundSettings} />
 
-  {#if picking === 'type'}
-    <PickerSheet title="Put on the page" items={typeItems} searchable={false} on:pick={pickType} on:close={() => (picking = null)} />
-  {:else if picking}
-    <PickerSheet title={PAGE_BLOCK_TYPES.find(t => t.type === picking)?.label || 'Block'} items={choiceItems} searchable={choiceItems.length > 8} on:pick={pickBlock} on:close={() => (picking = null)} />
+  <div class="page-column">
+    {#if renaming}
+      <input
+        class="page-title page-title-input"
+        aria-label="Page name"
+        value={openFolder}
+        bind:this={titleInput}
+        on:keydown={titleKeydown}
+        on:blur={finishRename}
+      />
+    {:else}
+      <button class="page-title" title="Press to rename" on:click={startRename}>{openFolder || 'Untitled'}</button>
+    {/if}
+
+    {#each shownRows as row (row.key)}
+      <div class="page-row" class:several={row.blocks.length > 1}>
+        {#each row.blocks as block (`${block.id}-${block._version || 0}`)}
+          <div class="page-cell" class:moving={dragging === block.id} data-page-block={block.id}>
+            <button
+              class="page-handle"
+              title="Drag to move, press for the menu"
+              aria-label="Move or open the menu"
+              on:pointerdown|preventDefault={(event) => handleDown(event, block.id)}
+              on:click|stopPropagation
+            >⋮⋮</button>
+            <Block
+              {block}
+              placement="page"
+              focused={block.id === focusedBlockId}
+              fileKey={openFolder}
+              {library}
+              {nowPlayingId}
+              {isPlaying}
+              on:update
+              on:delete
+              on:focusToggle
+              on:lightbox={openLightbox}
+              on:play
+              on:toggle
+            />
+          </div>
+        {/each}
+      </div>
+    {/each}
+
+    <!-- The rest of the page: a click here writes. -->
+    <div class="page-below">
+      {#if !shownRows.length}
+        <p class="page-empty">Click anywhere to write.</p>
+      {/if}
+      <button class="page-add-btn" on:click|stopPropagation={() => (picking = 'type')}>＋ Block…</button>
+    </div>
+  </div>
+
+  {#if drop}
+    <div class="page-drop-line" style={dropLine}></div>
   {/if}
 </div>
+
+{#if picking === 'type'}
+  <div class="page-sheet-host" style={pageVars}>
+    <PickerSheet title="Put on the page" items={typeItems} searchable={false} on:pick={(e) => (picking = e.detail)} on:close={() => (picking = null)} />
+  </div>
+{:else if picking}
+  <div class="page-sheet-host" style={pageVars}>
+    <PickerSheet title={PAGE_BLOCK_TYPES.find(t => t.type === picking)?.label || 'Block'} items={choiceItems} searchable={choiceItems.length > 8} on:pick={pickBlock} on:close={() => (picking = null)} />
+  </div>
+{/if}
+
+{#if menu}
+  <BlockContextMenu
+    x={menu.x}
+    y={menu.y}
+    items={[
+      { id: 'takeOff', label: 'Take off page' },
+      { id: 'delete', label: 'Delete block', variant: 'danger' }
+    ]}
+    on:action={(e) => menuAction(e.detail)}
+    on:close={() => (menu = null)}
+  />
+{/if}
+
+{#if lbOpen}
+  <Lightbox images={lbImages} startIndex={lbStart} on:close={() => (lbOpen = false)} />
+{/if}
 
 <style>
   .page-mode {
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--canvas-inner-bg, #000);
+    color: var(--mode-text-color, #fff);
+    cursor: text;
+    --sb-track: var(--canvas-inner-bg);
+    --sb-thumb: var(--mode-text-color);
+  }
+
+  .page-mode.dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  /* Above the wallpaper, which sits at z-index 0 -- see ModeWallpaper.svelte. */
+  .page-column {
+    position: relative;
+    z-index: 1;
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 28px 44px 0;
+    box-sizing: border-box;
+    min-height: 100%;
     display: flex;
+    flex-direction: column;
   }
 
-  .page-head {
-    padding: 18px 10px 10px;
-    color: var(--mode-text-color, inherit);
-  }
-
-  /* The folder's name, as a page's title: big, and pressed to rename. */
+  /* The folder's name, as the page's title: big, and pressed to rename. */
   .page-title {
     display: block;
     width: 100%;
     box-sizing: border-box;
-    margin: 0;
-    padding: 2px 4px;
+    margin: 0 0 14px;
+    padding: 2px 2px;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 6px;
     background: transparent;
     color: inherit;
     font: inherit;
     font-family: var(--block-header-font, inherit);
-    font-size: 2rem;
+    font-size: 2.2rem;
     font-weight: 700;
     line-height: 1.2;
     text-align: left;
@@ -192,41 +402,125 @@
     overflow-wrap: anywhere;
   }
 
-  .page-title:hover {
-    background: color-mix(in srgb, currentColor 6%, transparent);
-  }
-
   .page-title-input {
     outline: none;
-    border-color: color-mix(in srgb, currentColor 35%, transparent);
+    border-color: color-mix(in srgb, currentColor 30%, transparent);
+  }
+
+  .page-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .page-cell {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 3px 0;
+    cursor: auto;
+  }
+
+  .page-cell.moving {
+    opacity: 0.4;
+  }
+
+  /* Beside a block while the pointer is on it, in the margin to its left. */
+  .page-handle {
+    position: absolute;
+    left: -28px;
+    top: 4px;
+    width: 22px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.9rem;
+    letter-spacing: -2px;
+    line-height: 1;
+    opacity: 0;
+    cursor: grab;
+    touch-action: none;
+    transition: opacity 0.12s;
+  }
+
+  .page-cell:hover > .page-handle,
+  .page-handle:focus-visible {
+    opacity: 0.55;
+  }
+
+  .page-handle:hover {
+    opacity: 1 !important;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  /* Side by side within a row, the handle sits inside the gap. */
+  .page-row.several > .page-cell + .page-cell > .page-handle {
+    left: -24px;
+  }
+
+  .page-below {
+    flex: 1 0 40vh;
+    padding-top: 8px;
   }
 
   .page-empty {
-    margin: 10px 4px 0;
-    opacity: 0.6;
-  }
-
-  .page-add {
-    display: flex;
-    gap: 8px;
-    padding: 6px 10px;
-    color: var(--mode-text-color, inherit);
+    margin: 0 0 10px;
+    opacity: 0.5;
   }
 
   .page-add-btn {
-    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
     border-radius: 999px;
     background: transparent;
     color: inherit;
     font: inherit;
-    font-size: 0.85rem;
-    padding: 5px 14px;
+    font-size: 0.82rem;
+    padding: 4px 12px;
     cursor: pointer;
-    opacity: 0.75;
+    opacity: 0.55;
   }
 
   .page-add-btn:hover {
     opacity: 1;
     background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  .page-drop-line {
+    position: absolute;
+    z-index: 3;
+    border-radius: 2px;
+    background: var(--mode-text-color, #fff);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .page-sheet-host {
+    position: fixed;
+    inset: var(--controls-height, 56px) 0 0 0;
+    z-index: 50;
+  }
+
+  /* A phone has no margin for the handle, and no room for blocks side by
+     side: the handle shows at the block's top right, over it, and a row of
+     several stacks. */
+  @media (max-width: 700px) {
+    .page-column {
+      padding: 18px 14px 0;
+    }
+    .page-row {
+      flex-direction: column;
+      gap: 0;
+    }
+    .page-row > .page-cell {
+      width: 100%;
+    }
+    .page-handle {
+      left: auto;
+      right: 0;
+      opacity: 0.35;
+    }
   }
 </style>

@@ -40,6 +40,8 @@
   export let initialTextColor = '#ffffff';
   export let focused = false;
   export let canvasScale = 1;
+  /** 'canvas' or 'page' -- see BlockShell. */
+  export let placement = 'canvas';
 
   /** How the face reads. Saved with the block, so it reads the same everywhere. */
   export let initialHour12 = false;
@@ -91,6 +93,8 @@
   {initialTextColor}
   {focused}
   {canvasScale}
+  {placement}
+  pageKeepsHeight
   label="Clock"
   fields={{ hour12, showSeconds, showDate, alarmTime, alarmEnabled }}
   minWidth={140}

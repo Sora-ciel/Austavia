@@ -34,6 +34,8 @@
   export let initialTextColor = '#000000';
   export let focused = false;
   export let canvasScale = 1;
+  /** 'canvas' or 'page' -- see BlockShell. */
+  export let placement = 'canvas';
 
   /** Which playlist this block plays. Empty means the whole library. */
   export let initialPlaylistId = ALL_MUSIC;
@@ -60,6 +62,7 @@
   {initialTextColor}
   {focused}
   {canvasScale}
+  {placement}
   {label}
   fields={{ playlistId, trackUrl }}
   minHeight={140}

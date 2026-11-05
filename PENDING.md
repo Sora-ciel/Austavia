@@ -198,8 +198,13 @@ width etc. I'm aiming for a ui and ux like that." So, Notion's page:
   EmbedBlock onto BlockShell (owed anyway, "Blocks and their modes").
 
 Steps: (a) Img, Task, Embed onto BlockShell, nothing visible changes on the
-Canvas -- *done 2026-11-04*; (b) `placement="page"`, rows, writing anywhere; (c) side by side by
-dragging the handle; (d) "/" (step 1/3 below).
+Canvas -- *done 2026-11-04*; (b) `placement="page"`, rows, writing anywhere;
+(c) side by side by dragging the handle -- *(b) and (c) done 2026-11-04*:
+Block.svelte draws any block for the Canvas and the page alike, PageMode
+draws rows of them, utils/pageLayout.js decides. Still owed after them:
+Enter / arrows / Backspace moving between a text block and its neighbours,
+a row's widths dragged (each cell even for now, a `width` on the cell
+would be kept by older builds already), and (d) "/" (step 1/3 below).
 
 ### In order, each landing on its own
 
@@ -219,16 +224,8 @@ dragging the handle; (d) "/" (step 1/3 below).
    already -- headings, lists, checkbox, quote, divider, separator, picture.
    Useful the day it lands. Keys (arrows, Enter, Escape) and touch; on a phone
    a `+` at the start of an empty line opens the same menu.
-2. **Page mode** -- *first version landed 2026-11-04* (PageMode.svelte,
-   utils/pageEntries.js). Asked to start from an existing mode; it is Simple
-   Note's block view in a one-column `layout="page"` rather than a copy, so
-   blocks look, edit, move and sync as there. Has: the title (the folder's
-   name, pressed to rename the folder), `modeSettings.page.entries` (synced,
-   in Undo, kept by older builds), "＋ Text" and "＋ Block…" (a type, then New
-   or one of this folder's blocks not on the page yet -- PickerSheet), "Take
-   off page" in a block's menu, moving cards by swapping as in Simple Note.
-   Still owed here: moving by insertion rather than swap (listReorder),
-   off-screen blocks mounted lazily, and a phone check (PENDING 0).
+2. **Page mode** -- landed 2026-11-04, then redirected the same day; see
+   "Redirected 2026-11-04" above for what it is now.
 3. **`/` places blocks**: the same choice as "＋ Block…", from `/` typed in a
    text block, splitting it where `/` was typed. Moving between blocks with the keys: up at the top of
    a text block goes to the one above, Backspace at the start of one after a
@@ -313,7 +310,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
-| next | **Page mode, first version** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page. "＋ Text" adds writing; "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. A block's menu (right click, or hold on the phone) has "Take off page", which leaves the block in the folder. Undo takes back putting a block on or off. On another device after a sync, the same page. Seen in a browser; check on the phone (holding a card to move it, the picker sheet) and that an older build opening the folder keeps the page. |
+| next | **Page mode** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page, with no frames or colours of their own. Click anywhere on the empty page and write: paragraphs typed together are one text block. "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. The ⋮⋮ beside a block (top right on a phone): drag it onto another block's left or right edge to put them side by side, above or below for a row of its own; press it for "Take off page" (the block stays in the folder) and "Delete block". Undo takes any of it back; another device after a sync shows the same page. A row of several stacks on a phone. Seen in a browser; on the phone check dragging the handle with a finger, and that the task list, picture, clock and music look right on a page.
 | next | **Every block in one frame** (2026-11-04). The image, task and embed blocks now use the same frame as text, clock and music (BlockShell). On the Canvas: drag each by its header, resize from the corner (an image keeps its shape), change both colours, delete, change a picture (⏏), add and tick tasks. All should feel as before; the embed lost its empty ⚙ settings panel. |
 | next | **A task list renamed from its tab** (2026-11-04). In Task mode the name field is gone; pressing the tab of the list already open turns it into its name to type into. Enter or tapping elsewhere keeps it, Escape keeps the old one. On the phone, check the keyboard does not hide it. |
 | next | **New File makes the folder at once** (2026-11-04). Settings, New File, a name, OK: the folder appears in the list straight away, empty, and syncs. It used to appear only once something was put in it. |

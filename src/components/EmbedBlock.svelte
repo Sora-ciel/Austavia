@@ -35,6 +35,7 @@
   {focused}
   {canvasScale}
   {placement}
+  pageKeepsHeight
   label={title}
   fields={{ content, title }}
   on:update

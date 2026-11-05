@@ -17,6 +17,8 @@
   export let initialScrollTop = 0;
   export let focused = false;
   export let canvasScale = 1;
+  /** 'canvas' or 'page' -- see BlockShell. */
+  export let placement = 'canvas';
   /** The folder this block belongs to, for remembering where it was read to. */
   export let fileKey = '';
 
@@ -31,6 +33,7 @@
   {initialTextColor}
   {focused}
   {canvasScale}
+  {placement}
   label="Text"
   fields={{ content }}
   on:update
@@ -43,7 +46,7 @@
     {content}
     {initialScrollTop}
     historyKey={id}
-    placeholder=""
+    placeholder={placement === 'page' ? 'Write something…' : ''}
     on:change={(e) => { content = e.detail; commit(['content'], { pushToHistory: false }); }}
     on:scroll={(e) => {
       // Only while focused. An unfocused block is not scrollable, and the

@@ -150,7 +150,7 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
-  import { putOnPage, samePage } from './utils/pageEntries.js';
+  import { putOnPage, samePage } from './utils/pageLayout.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -3859,7 +3859,7 @@
     if (mode === "page") {
       modeSettings = normalizeModeSettings({
         ...modeSettings,
-        page: { ...modeSettings.page, entries: putOnPage(modeSettings.page.entries, newBlock.id, { afterId, blocks }) }
+        page: { ...modeSettings.page, rows: putOnPage(modeSettings.page.rows, newBlock.id, { afterId, blocks }) }
       });
       focusedBlockId = newBlock.id;
     }
@@ -6284,7 +6284,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       !habitsEqual(modeSettings?.habit?.habits, detail.habit.habits ?? modeSettings?.habit?.habits);
     // What a page shows is made, as habits are: a step for Undo.
     const pageChange = detail.page && typeof detail.page === 'object' &&
-      !samePage(modeSettings?.page?.entries, detail.page.entries);
+      !samePage(modeSettings?.page?.rows, detail.page.rows);
     // Typing not yet in the history gets its own entry first, so undoing the
     // habit change does not also take the typing with it.
     if (habitsChange || pageChange) await ensureCurrentHistorySnapshot();
@@ -7710,7 +7710,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:deleteNoteElsewhere={deleteNoteInFolder}
       {keyboardOpen}
       {taskAddDirection}
-      pageEntries={modeSettings.page.entries}
+      pageRows={modeSettings.page.rows}
       on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
       on:renameFolder={renameFolder}
       {habits}

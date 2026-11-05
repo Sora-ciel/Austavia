@@ -4,12 +4,7 @@
   import ModeBackground from '../components/ModeBackground.svelte';
   import { MIN_CANVAS_WIDTH, MIN_ZOOM, MAX_ZOOM, getInitialCanvasScale, canvasExtent } from '../utils/canvasFit.js';
   import { htmlToText as htmlToPlainText } from '../utils/htmlToText.js';
-  import TextBlock from '../components/TextBlock.svelte';
-  import ImgBlock from '../components/ImgBlock.svelte';
-  import Music from '../components/MusicBlock.svelte';
-  import Embed from '../components/EmbedBlock.svelte';
-  import ClockBlock from '../components/ClockBlock.svelte';
-  import TaskBlock from '../components/TaskBlock.svelte';
+  import Block from '../components/Block.svelte';
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
@@ -669,115 +664,21 @@
       >
       <div class="canvas-content" style:transform={`translateX(${contentOffsetX}px)`}>
       {#each blocks as block (`${block.id}-${block._version || 0}`)}
-        {#if block.type === 'text' || block.type === 'cleantext'}
-          <!-- Scroll comes from this device's memory and nowhere else. It
-               used to fall back to `block.scrollTop`, a field older builds
-               saved into the block -- and the fallback ran whenever nothing
-               was remembered, including after scrolling back to the top, which
-               deletes the entry. A theme change redraws every block, so that
-               was when an old position came back: reported on 2026-09-28 as
-               the scroll being saved "by theme". See utils/scrollMemory.js. -->
-          <TextBlock
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialContent={block.content}
-            initialScrollTop={recallScroll(openFolder, block.id)}
-            fileKey={openFolder}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-
-          />
-        {:else if block.type === 'image'}
-          <ImgBlock
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialSrc={block.src}
-            initialResolvedSrc={block.resolvedSrc}
-            initialAttachmentRequiresAuth={block.attachmentRequiresAuth}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-            on:lightbox={openCanvasLightbox}
-          />
-        {:else if block.type === 'music'}
-          <Music
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialPlaylistId={block.playlistId}
-            initialTrackUrl={block.trackUrl}
-            {library}
-            {nowPlayingId}
-            {isPlaying}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-            on:play
-            on:toggle
-          />
-        {:else if block.type === 'embed'}
-          <Embed
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialContent={block.content}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-          />
-        {:else if block.type === 'task'}
-          <TaskBlock
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialTasks={block.tasks}
-            initialTitle={block.title}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-          />
-        {:else if block.type === 'clock'}
-          <ClockBlock
-            id={block.id}
-            initialPosition={block.position}
-            initialSize={block.size}
-            initialBgColor={block.bgColor}
-            initialTextColor={block.textColor}
-            initialHour12={block.hour12 === true}
-            initialShowSeconds={block.showSeconds === true}
-            initialShowDate={block.showDate !== false}
-            initialAlarmTime={block.alarmTime || ''}
-            initialAlarmEnabled={block.alarmEnabled === true}
-            focused={block.id === focusedBlockId}
-            canvasScale={scale}
-            on:delete={deleteBlockHandler}
-            on:update={updateBlockHandler}
-            on:focusToggle={focusToggleHandler}
-          />
-        {/if}
+        <Block
+          {block}
+          focused={block.id === focusedBlockId}
+          canvasScale={scale}
+          fileKey={openFolder}
+          {library}
+          {nowPlayingId}
+          {isPlaying}
+          on:delete={deleteBlockHandler}
+          on:update={updateBlockHandler}
+          on:focusToggle={focusToggleHandler}
+          on:lightbox={openCanvasLightbox}
+          on:play
+          on:toggle
+        />
       {/each}
       </div>
       </div>
