@@ -97,3 +97,10 @@ test('every part of a note this version adds carries the name an older version k
     assert.ok(marked.includes(`'${name}'`), `${name} is listed as known here, so it is parsed as itself`);
   }
 });
+
+test('a page keeps the entries and fields a newer version gave it', () => {
+  const newer = { page: { entries: [{ blockId: 'a', folderId: 'elsewhere' }, { blockId: 'b', width: 'wide' }], cover: 'x' } };
+  const kept = normalizeModeSettings(newer).page;
+  assert.deepEqual(kept.entries, newer.page.entries);
+  assert.equal(kept.cover, 'x');
+});

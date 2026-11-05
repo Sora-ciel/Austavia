@@ -150,6 +150,7 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
+  import { putOnPage, samePage } from './utils/pageEntries.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -2711,8 +2712,9 @@
   function ensureModeOrders(allBlocks, incomingOrders = {}) {
     const idsInBlockOrder = allBlocks.map(block => block.id);
     const validIds = new Set(idsInBlockOrder);
+    // A mode with an order of its own (Page) keeps none here.
     const modeNames = new Set([
-      ...KNOWN_MODES,
+      ...KNOWN_MODES.filter(name => !MODE_DEFINITIONS[name]?.ownOrder),
       ...Object.keys(incomingOrders || {})
     ]);
 
@@ -3820,7 +3822,7 @@
     singleNoteToOpen = { id, at: Date.now() };
   }
 
-  function addBlock(type = "text") {
+  function addBlock(type = "text", { afterId = null } = {}) {
     // Single Note holds only notes, and as many as you like -- it shows them
     // as tabs. It used to refuse an add whenever one existed, from when it
     // showed exactly one; that made "+ Text" do nothing (2026-10-05).
@@ -3852,6 +3854,15 @@
     });
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
+    // Made on a page, it is put on that page in the same step, so one Undo
+    // takes both back.
+    if (mode === "page") {
+      modeSettings = normalizeModeSettings({
+        ...modeSettings,
+        page: { ...modeSettings.page, entries: putOnPage(modeSettings.page.entries, newBlock.id, { afterId, blocks }) }
+      });
+      focusedBlockId = newBlock.id;
+    }
     pushHistory(blocks, modeOrders);
     if (mode === "single") singleNoteToOpen = { id: newBlock.id, at: Date.now() };
   }
@@ -6271,9 +6282,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     const habitsChange = detail.habit && typeof detail.habit === 'object' &&
       !habitsEqual(modeSettings?.habit?.habits, detail.habit.habits ?? modeSettings?.habit?.habits);
+    // What a page shows is made, as habits are: a step for Undo.
+    const pageChange = detail.page && typeof detail.page === 'object' &&
+      !samePage(modeSettings?.page?.entries, detail.page.entries);
     // Typing not yet in the history gets its own entry first, so undoing the
     // habit change does not also take the typing with it.
-    if (habitsChange) await ensureCurrentHistorySnapshot();
+    if (habitsChange || pageChange) await ensureCurrentHistorySnapshot();
+
+    if (pageChange) {
+      patch = { ...patch, page: { ...patch.page, ...detail.page } };
+    }
 
     if (detail.habit && typeof detail.habit === 'object') {
       // Said in words in the sync log, so a tap that did not stick, or a
@@ -6289,7 +6307,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // A habit added, ticked, renamed or deleted is a step the Undo button can
     // take back. pushHistory saves as well. A settle -- a timer reaching its
     // goal by itself -- is not: nobody did it (as for tasks).
-    if (habitsChange && !detail.settled) {
+    if ((habitsChange && !detail.settled) || pageChange) {
       await pushHistory(blocks, modeOrders);
       return;
     }
@@ -7692,6 +7710,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:deleteNoteElsewhere={deleteNoteInFolder}
       {keyboardOpen}
       {taskAddDirection}
+      pageEntries={modeSettings.page.entries}
+      on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
+      on:renameFolder={renameFolder}
       {habits}
       {mayAddPicture}
       {musicLibrary}

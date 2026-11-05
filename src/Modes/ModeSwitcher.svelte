@@ -6,6 +6,7 @@
   import HabitTrackerMode from './HabitTrackerMode.svelte';
   import TaskMode from './TaskMode.svelte';
   import PlaylistMode from './PlaylistMode.svelte';
+  import PageMode from './PageMode.svelte';
 
   export let mode; // 'default' or 'simple'
   // Which folder is open. Canvas mode uses it to know when to go back to the
@@ -38,6 +39,8 @@
   // utils/modeBackground.js.
   export let canvasBackgroundSettings = {};
   export let taskAddDirection = 'above';
+  /** Which blocks Page mode shows, in order -- modeSettings.page.entries. */
+  export let pageEntries = [];
   export let musicLibrary = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
@@ -121,6 +124,28 @@
       on:swapBlocks={swapBlocksHandler}
     />
 
+  {:else if mode === 'page'}
+    <PageMode
+      {openFolder}
+      {blocks}
+      entries={pageEntries}
+      {focusedBlockId}
+      bind:canvasRef
+      {canvasColors}
+      backgroundSettings={singleNoteSettings}
+      {leftControlColors}
+      library={musicLibrary}
+      {nowPlayingId}
+      {isPlaying}
+      on:play
+      on:toggle
+      on:update={updateBlockHandler}
+      on:delete={deleteBlockHandler}
+      on:focusToggle={focusToggleHandler}
+      on:modeSettingChange
+      on:addBlock
+      on:renameFolder
+    />
   {:else if mode === 'habit'}
     <HabitTrackerMode
       {modeLabels}

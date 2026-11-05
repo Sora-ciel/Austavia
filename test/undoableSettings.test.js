@@ -22,7 +22,7 @@ test('undoing the delete of a habit brings it back, with its days', () => {
 
 test('undo reaches what was made, not how the folder is shown: the wallpaper is never in it', () => {
   const entry = settingsForHistory(folder([read]));
-  assert.deepEqual(Object.keys(entry), ['habits']);
+  assert.deepEqual(Object.keys(entry).sort(), ['habits', 'page']);
   const restored = settingsFromHistory(folder([], { default: { bgOpacity: 80 } }), { settings: entry });
   assert.equal(restored.default.bgOpacity, 80);
 });
@@ -35,4 +35,17 @@ test('a history entry from before this knows nothing of habits, and is not read 
 test('when the habits already match, nothing is replaced', () => {
   const now = folder([read]);
   assert.equal(settingsFromHistory(now, { settings: settingsForHistory(now) }), now);
+});
+
+// Page mode, 2026-11-04: which blocks a page shows rides in the same history.
+test('undoing taking a block off a page puts it back in its place', () => {
+  const page = entries => ({ habit: { habits: [] }, page: { entries } });
+  const before = settingsForHistory(page([{ blockId: 'a' }, { blockId: 'b' }]));
+  const restored = settingsFromHistory(page([{ blockId: 'b' }]), { settings: before });
+  assert.deepEqual(restored.page.entries.map(e => e.blockId), ['a', 'b']);
+});
+
+test('a history entry from before pages is not read as an empty page', () => {
+  const now = { habit: { habits: [] }, page: { entries: [{ blockId: 'a' }] } };
+  assert.equal(settingsFromHistory(now, { settings: { habits: [] } }), now);
 });

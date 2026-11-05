@@ -20,6 +20,7 @@
 import { BACKGROUND_DEFAULTS, normalizeBackgroundSettings, carryNotePictureSettings } from './modeBackground.js';
 import { normalizeHabits } from './habitStore.js';
 import { withUnknown } from './keepUnknown.js';
+import { normalizePageSettings } from './pageEntries.js';
 
 export const DEFAULT_MODE_SETTINGS = {
   simple: {
@@ -38,6 +39,9 @@ export const DEFAULT_MODE_SETTINGS = {
   // devices. It lives here rather than behind its own sync because here it
   // already is one -- see utils/habitStore.js.
   habit: { habits: [] },
+  // Page mode (2026-11-04): which of the folder's blocks the page shows, in
+  // order -- see utils/pageEntries.js.
+  page: { entries: [] },
   // The folder's one wallpaper, drawn by every mode, under
   // Canvas mode's own id -- see hasWallpaper in modeRegistry.js. Single Note
   // had one of its own under `single`; it is no longer kept at all, so a
@@ -51,7 +55,7 @@ export const DEFAULT_MODE_SETTINGS = {
  * so it is dropped here and gone at the next save -- a decision, unlike the
  * accidental dropping this file now prevents.
  */
-const KNOWN = ['simple', 'task', 'blocksFollowTheme', 'playlist', 'habit', 'default', 'single'];
+const KNOWN = ['simple', 'task', 'blocksFollowTheme', 'playlist', 'habit', 'page', 'default', 'single'];
 
 export function normalizeModeSettings(settings, { keepImage = value => value } = {}) {
   const incomingSimple = settings?.simple || {};
@@ -76,6 +80,7 @@ export function normalizeModeSettings(settings, { keepImage = value => value } =
       playlists: Array.isArray(incomingPlaylist.playlists) ? incomingPlaylist.playlists : []
     }, incomingPlaylist, ['tracks', 'playlists']),
     habit: withUnknown({ habits: normalizeHabits(incomingHabit.habits) }, incomingHabit, ['habits']),
+    page: normalizePageSettings(settings?.page),
     // The wallpaper goes through the shared normaliser, so the awkward parts
     // -- the pre-0.8.35 opacity stored as a 0-1 fraction, all the clamping --
     // are written once; it keeps what it does not know already. A theme's own

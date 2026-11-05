@@ -192,13 +192,18 @@ writing, and is no faster than the text blocks it is made of.
    already -- headings, lists, checkbox, quote, divider, separator, picture.
    Useful the day it lands. Keys (arrows, Enter, Escape) and touch; on a phone
    a `+` at the start of an empty line opens the same menu.
-2. **Page mode**: the mode in `modeRegistry.js`, the column, the title (the
-   folder name, renaming the folder), the list of entries, a first text
-   block. Blocks drawn by their own components, laid out full width;
-   reordered with the shared listReorder; off-screen blocks mounted lazily.
-3. **`/` places blocks**: choose a type, then New or an existing one from this
-   folder. Splitting a text block where `/` was typed. Taking a block off the
-   page, or deleting it. Moving between blocks with the keys: up at the top of
+2. **Page mode** -- *first version landed 2026-11-04* (PageMode.svelte,
+   utils/pageEntries.js). Asked to start from an existing mode; it is Simple
+   Note's block view in a one-column `layout="page"` rather than a copy, so
+   blocks look, edit, move and sync as there. Has: the title (the folder's
+   name, pressed to rename the folder), `modeSettings.page.entries` (synced,
+   in Undo, kept by older builds), "＋ Text" and "＋ Block…" (a type, then New
+   or one of this folder's blocks not on the page yet -- PickerSheet), "Take
+   off page" in a block's menu, moving cards by swapping as in Simple Note.
+   Still owed here: moving by insertion rather than swap (listReorder),
+   off-screen blocks mounted lazily, and a phone check (PENDING 0).
+3. **`/` places blocks**: the same choice as "＋ Block…", from `/` typed in a
+   text block, splitting it where `/` was typed. Moving between blocks with the keys: up at the top of
    a text block goes to the one above, Backspace at the start of one after a
    removed block joins the two halves again.
 4. **Nests, first version: folders as tiles.** A `nest` block (so it also
@@ -281,6 +286,8 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Page mode, first version** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page. "＋ Text" adds writing; "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. A block's menu (right click, or hold on the phone) has "Take off page", which leaves the block in the folder. Undo takes back putting a block on or off. On another device after a sync, the same page. Seen in a browser; check on the phone (holding a card to move it, the picker sheet) and that an older build opening the folder keeps the page. |
+| next | **A task list renamed from its tab** (2026-11-04). In Task mode the name field is gone; pressing the tab of the list already open turns it into its name to type into. Enter or tapping elsewhere keeps it, Escape keeps the old one. On the phone, check the keyboard does not hide it. |
 | next | **New File makes the folder at once** (2026-11-04). Settings, New File, a name, OK: the folder appears in the list straight away, empty, and syncs. It used to appear only once something was put in it. |
 | next | **A picture in a note is one character** (2026-10-29). In a note with a picture -- alone on its line, and between words: one arrow press steps over it either way; tapping its left or right half puts the cursor on that side; a cursor shows beside it at the start or end of a line (it was invisible there); Backspace after it removes it. On the phone, with the touch cursor too. |
 | next | **Phone screenshots go to Downloads, and the clipboard** (2026-10-29). Seen on the phone: the button says "Saved to Downloads and copied" and the PNG is in Download at full size (5495 x 2160 for a Canvas board). Still to see: pasting it (it should paste as a picture in a chat), and that it shows in the gallery's Download album. Android before 10 still gets the share sheet. |

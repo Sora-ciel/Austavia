@@ -28,6 +28,17 @@ export const MODE_DEFINITIONS = {
     showRightControls: true,
     settings: { wallpaper: true }
   },
+  // A page like Notion's: the blocks put on it, one under another (PENDING,
+  // "Page mode, and nests"). It keeps its own list of what it shows, in
+  // modeSettings.page, rather than an order of every block (ownOrder).
+  page: {
+    id: 'page',
+    label: 'Page',
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'task'],
+    showRightControls: true,
+    ownOrder: true,
+    settings: { wallpaper: true }
+  },
   habit: {
     id: 'habit',
     label: 'Habit Tracker',
@@ -55,7 +66,7 @@ export const MODE_DEFINITIONS = {
   }
 };
 
-export const MODE_ORDER = ['default', 'simple', 'single', 'habit', 'task', 'playlist'];
+export const MODE_ORDER = ['default', 'simple', 'single', 'page', 'habit', 'task', 'playlist'];
 
 /**
  * Whether a mode draws the folder's wallpaper.

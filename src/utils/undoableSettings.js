@@ -31,10 +31,18 @@
  */
 
 import { normalizeHabits, habitsEqual } from './habitStore.js';
+import { normalizePageEntries, samePage } from './pageEntries.js';
 
-/** What of the mode settings goes into a history entry. */
+/**
+ * What of the mode settings goes into a history entry: the habits, and which
+ * blocks a page shows (2026-11-04) -- putting a block on a page or taking it
+ * off is something made, and Undo puts it back.
+ */
 export function settingsForHistory(modeSettings) {
-  return { habits: normalizeHabits(modeSettings?.habit?.habits) };
+  return {
+    habits: normalizeHabits(modeSettings?.habit?.habits),
+    page: normalizePageEntries(modeSettings?.page?.entries)
+  };
 }
 
 /**
@@ -43,11 +51,15 @@ export function settingsForHistory(modeSettings) {
  */
 export function settingsFromHistory(modeSettings, entry) {
   const saved = entry?.settings;
-  if (!saved || !Array.isArray(saved.habits)) return modeSettings;
-  const current = modeSettings?.habit?.habits;
-  if (habitsEqual(current, saved.habits)) return modeSettings;
-  return {
-    ...modeSettings,
-    habit: { ...(modeSettings?.habit || {}), habits: normalizeHabits(saved.habits) }
-  };
+  if (!saved) return modeSettings;
+  let next = modeSettings;
+  if (Array.isArray(saved.habits) && !habitsEqual(modeSettings?.habit?.habits, saved.habits)) {
+    next = { ...next, habit: { ...(next?.habit || {}), habits: normalizeHabits(saved.habits) } };
+  }
+  // An entry from before pages were in the history says nothing of them, and
+  // is not read as "an empty page".
+  if (Array.isArray(saved.page) && !samePage(modeSettings?.page?.entries, saved.page)) {
+    next = { ...next, page: { ...(next?.page || {}), entries: normalizePageEntries(saved.page) } };
+  }
+  return next;
 }
