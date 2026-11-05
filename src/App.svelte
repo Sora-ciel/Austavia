@@ -150,7 +150,7 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
-  import { putOnPage, samePage } from './utils/pageLayout.js';
+  import { putOnPage, placeOnPage, samePage } from './utils/pageLayout.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -3822,7 +3822,8 @@
     singleNoteToOpen = { id, at: Date.now() };
   }
 
-  function addBlock(type = "text", { afterId = null } = {}) {
+  /** A new block of a kind, as the menu makes it; not yet in the folder. */
+  function makeBlock(type = "text", fields = {}) {
     // Single Note holds only notes, and as many as you like -- it shows them
     // as tabs. It used to refuse an add whenever one existed, from when it
     // showed exactly one; that made "+ Text" do nothing (2026-10-05).
@@ -3850,8 +3851,16 @@
       position,
       size: { width: blockW, height: blockH },
       ...newBlockColors,
+      ...fields,
       _version: 0
     });
+    return newBlock;
+  }
+
+  function addBlock(type = "text", { afterId = null } = {}) {
+    if (mode === "single") type = "text";
+    const newBlock = makeBlock(type);
+
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
     // Made on a page, it is put on that page in the same step, so one Undo
@@ -3865,6 +3874,36 @@
     }
     pushHistory(blocks, modeOrders);
     if (mode === "single") singleNoteToOpen = { id: newBlock.id, at: Date.now() };
+  }
+
+  /**
+   * A block put where "/" was typed on a page (PageMode, utils/slashMenu.js):
+   * a new one or one already in the folder, under the writing, over it, or
+   * between its two halves -- the second half becoming a text block of its
+   * own. The writing has already kept its own half; this is the rest, in one
+   * step, so one Undo takes it all back.
+   */
+  function insertOnPage({ textId, where, afterHtml = '', type = null, existingId = null } = {}) {
+    let next = [...blocks];
+    let placed = existingId;
+    if (!placed) {
+      const made = makeBlock(type || 'text');
+      next.push(made);
+      placed = made.id;
+    }
+    let rows = modeSettings.page.rows;
+    rows = placeOnPage(rows, placed, { targetId: textId, side: where === 'above' ? 'above' : 'below', blocks: next });
+    let carryOn = null;
+    if (where === 'split') {
+      carryOn = makeBlock('text', { content: afterHtml });
+      next.push(carryOn);
+      rows = placeOnPage(rows, carryOn.id, { targetId: placed, side: 'below', blocks: next });
+    }
+    blocks = next;
+    modeOrders = ensureModeOrders(blocks, modeOrders);
+    modeSettings = normalizeModeSettings({ ...modeSettings, page: { ...modeSettings.page, rows } });
+    focusedBlockId = placed;
+    pushHistory(blocks, modeOrders);
   }
 
   // ── Screenshot the whole canvas ───────────────────────────────────
@@ -7712,6 +7751,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       {taskAddDirection}
       pageRows={modeSettings.page.rows}
       on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
+      on:insertOnPage={(e) => insertOnPage(e.detail)}
       on:renameFolder={renameFolder}
       {habits}
       {mayAddPicture}

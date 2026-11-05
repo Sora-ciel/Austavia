@@ -54,6 +54,8 @@
     on:delete
     on:update
     on:focusToggle
+    on:slash
+    on:slashKey
   />
 {:else if block.type === 'image'}
   <ImgBlock

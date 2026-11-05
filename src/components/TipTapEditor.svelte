@@ -23,6 +23,7 @@
   import { Decoration, DecorationSet } from '@tiptap/pm/view';
   import { stepOver, sideOfClick, needsDrawnCaret, isInlineAtom } from '../utils/atomCaret.js';
   import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
+  import { slashAt } from '../utils/slashMenu.js';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -38,6 +39,13 @@
   // lives outside the editor so it survives this component being rebuilt,
   // which happens on a move and on every mode switch.
   export let historyKey = '';
+  /**
+   * "/" opens a menu of blocks (utils/slashMenu.js) -- on a page, where a
+   * block can be put in the writing. The editor only says where the "/" is
+   * (`slash`, null when it closes) and hands over the keys the menu needs
+   * (`slashKey`); the menu itself is the page's.
+   */
+  export let slash = false;
 
   const dispatch = createEventDispatcher();
 
@@ -491,6 +499,57 @@
     caret.setAttribute('aria-hidden', 'true');
     return caret;
   }
+
+  // ── "/" ─────────────────────────────────────────────────────────────
+  let slashFound = null;
+  let slashReported = 'null';
+  // A "/" closed with Escape stays closed until it is typed again.
+  let slashDismissedFrom = null;
+  const SLASH_KEYS = ['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'];
+
+  function reportSlash(view) {
+    let found = null;
+    const { selection } = view.state;
+    if (slash && selection.empty && view.hasFocus()) {
+      const $from = selection.$from;
+      const at = slashAt($from.parent.textBetween(0, $from.parentOffset, '\n', '\ufffc'));
+      if (!at) {
+        slashDismissedFrom = null;
+      } else if ($from.pos - at.length !== slashDismissedFrom) {
+        const box = view.coordsAtPos($from.pos);
+        found = { query: at.query, from: $from.pos - at.length, to: $from.pos, x: box.left, y: box.bottom };
+      }
+    }
+    const key = JSON.stringify(found);
+    if (key === slashReported) return;
+    slashReported = key;
+    slashFound = found;
+    dispatch('slash', found);
+  }
+
+  const SlashTrigger = Extension.create({
+    name: 'slashTrigger',
+    // Ahead of the keymaps, so Enter picks from the menu instead of starting
+    // a new paragraph while it is open.
+    priority: 1000,
+    addProseMirrorPlugins() {
+      return [new Plugin({
+        view: () => ({ update: view => reportSlash(view) }),
+        props: {
+          handleKeyDown(view, event) {
+            if (!slashFound || !SLASH_KEYS.includes(event.key)) return false;
+            if (event.key === 'Escape') {
+              slashDismissedFrom = slashFound.from;
+              reportSlash(view);
+            } else {
+              dispatch('slashKey', event.key);
+            }
+            return true;
+          }
+        }
+      })];
+    }
+  });
 
   const AtomCaret = Extension.create({
     name: 'atomCaret',
@@ -955,6 +1014,7 @@
         KeptBlock,
         KeptInline,
         AtomCaret,
+        SlashTrigger,
         AggregateMarkdown,
         Placeholder.configure({ placeholder }),
       ],
@@ -978,6 +1038,7 @@
         // otherwise still be waiting, and whoever listens for a blur wants the
         // writing as it now stands.
         updates.flush();
+        if (slashFound) { slashFound = null; slashReported = 'null'; dispatch('slash', null); }
         dispatch('blur', event);
       },
     });

@@ -46,7 +46,10 @@
     {content}
     {initialScrollTop}
     historyKey={id}
-    placeholder={placement === 'page' ? 'Write something…' : ''}
+    placeholder={placement === 'page' ? 'Write, or type / for a block…' : ''}
+    slash={placement === 'page'}
+    on:slash
+    on:slashKey
     on:change={(e) => { content = e.detail; commit(['content'], { pushToHistory: false }); }}
     on:scroll={(e) => {
       // Only while focused. An unfocused block is not scrollable, and the

@@ -143,6 +143,7 @@
       on:focusToggle={focusToggleHandler}
       on:modeSettingChange
       on:addBlock
+      on:insertOnPage
       on:renameFolder
     />
   {:else if mode === 'habit'}

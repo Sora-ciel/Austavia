@@ -1,0 +1,174 @@
+<script>
+  /**
+   * The menu of blocks to put on a page: a new one of each kind, then the
+   * folder's blocks not on the page yet. Opened by "/" in the writing, where
+   * what is typed after the "/" filters it and the editor hands over the
+   * arrows, Enter and Escape; or by the "＋ Block…" button, with a search
+   * field of its own. The rows are utils/slashMenu.js's slashItems.
+   *
+   * Asked 2026-11-04: "i want the typing to insert a block and the if you
+   * want to add a block that already exist."
+   *
+   * Pressing a row keeps the focus where it was (pointerdown is cancelled),
+   * so the writing the "/" was typed in is still there to split.
+   */
+  import { createEventDispatcher, onMount, tick } from 'svelte';
+  import { portal } from '../utils/portal.js';
+
+  export let items = [];
+  export let active = 0;
+  export let x = 0;
+  export let y = 0;
+  /** The menu's own search field, for when it was opened by a button. */
+  export let search = false;
+  export let query = '';
+  /** The colours of the page it opens over. */
+  export let themeStyle = '';
+
+  const dispatch = createEventDispatcher();
+  let menuEl;
+  let searchEl;
+
+  // Kept on screen: under the caret, or above it when there is no room below.
+  let left = x;
+  let top = y;
+  async function place() {
+    await tick();
+    if (!menuEl) return;
+    const box = menuEl.getBoundingClientRect();
+    left = Math.max(8, Math.min(x, window.innerWidth - box.width - 8));
+    top = y + 6 + box.height > window.innerHeight - 8 ? Math.max(8, y - box.height - 28) : y + 6;
+  }
+  $: x, y, items.length, place();
+
+  // The highlighted row stays in view as the arrows move it.
+  $: if (menuEl) menuEl.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' });
+
+  function onSearchKey(event) {
+    if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab', 'Escape'].includes(event.key)) {
+      event.preventDefault();
+      dispatch('key', event.key);
+    }
+  }
+
+  onMount(() => {
+    if (search) searchEl?.focus();
+  });
+</script>
+
+<div
+  class="slash-menu"
+  role="listbox"
+  aria-label="Blocks"
+  bind:this={menuEl}
+  use:portal
+  style="{themeStyle} left:{left}px; top:{top}px;"
+>
+  {#if search}
+    <input
+      class="slash-search"
+      placeholder="Search blocks…"
+      aria-label="Search blocks"
+      bind:this={searchEl}
+      bind:value={query}
+      on:input={() => dispatch('query', query)}
+      on:keydown={onSearchKey}
+    />
+  {/if}
+  {#each items as item, i (item.id)}
+    {#if i === 0 || item.kind !== items[i - 1].kind}
+      <div class="slash-group">{item.kind === 'new' ? 'New' : 'Already in this folder'}</div>
+    {/if}
+    <button
+      class="slash-row"
+      class:active={i === active}
+      role="option"
+      aria-selected={i === active}
+      data-index={i}
+      on:pointerdown|preventDefault
+      on:mouseenter={() => dispatch('hover', i)}
+      on:click={() => dispatch('pick', item)}
+    >
+      <span class="slash-name">{item.name}</span>
+      {#if item.kind === 'existing'}<span class="slash-hint">{item.hint}</span>{/if}
+    </button>
+  {:else}
+    <div class="slash-none">No block matches</div>
+  {/each}
+</div>
+
+<style>
+  .slash-menu {
+    position: fixed;
+    z-index: 1000;
+    width: 260px;
+    max-height: min(340px, 60vh);
+    overflow-y: auto;
+    padding: 6px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 22%, transparent);
+    background: var(--canvas-inner-bg, #111);
+    color: var(--mode-text-color, #fff);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --sb-thumb: var(--mode-text-color, #fff);
+    --sb-track: var(--canvas-inner-bg, #111);
+  }
+
+  .slash-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 4px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    background: color-mix(in srgb, currentColor 6%, transparent);
+    color: inherit;
+    font: inherit;
+    outline: none;
+  }
+
+  .slash-group {
+    padding: 6px 8px 2px;
+    font-size: 0.72rem;
+    opacity: 0.55;
+  }
+
+  .slash-row {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .slash-row.active {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  .slash-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .slash-hint {
+    flex: none;
+    font-size: 0.75rem;
+    opacity: 0.55;
+  }
+
+  .slash-none {
+    padding: 8px;
+    opacity: 0.55;
+  }
+</style>

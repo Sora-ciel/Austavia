@@ -16,13 +16,19 @@
    * moves it -- onto another's side to share its row, above or below for a
    * row of its own -- and opens its menu. A click on the empty page writes.
    *
+   * "/" in the writing (or "＋ Block…") opens one menu of new blocks and the
+   * folder's blocks not on the page yet (SlashMenu, utils/slashMenu.js); the
+   * one chosen goes where the "/" was, splitting the writing around it.
+   *
    * What is the page's own is only its rows: utils/pageLayout.js decides,
-   * this acts. "/" in the writing comes next (PENDING).
+   * this acts.
    */
   import { createEventDispatcher, tick, onMount } from 'svelte';
   import Block from '../components/Block.svelte';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
-  import PickerSheet from '../components/PickerSheet.svelte';
+  import SlashMenu from '../components/SlashMenu.svelte';
+  import { slashItems, stepChoice, slashSplit } from '../utils/slashMenu.js';
+  import { splitWritingAt } from '../utils/editorSplit.js';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import Lightbox from '../components/Lightbox.svelte';
   import { htmlToText } from '../utils/htmlToText.js';
@@ -72,7 +78,7 @@
   }
 
   function onPageClick(event) {
-    if (event.target.closest?.('.page-cell, button, input, a, .page-title, .picker-sheet')) return;
+    if (event.target.closest?.('.page-cell, button, input, a, .page-title')) return;
     const answer = clickBelow(shownRows);
     if (answer.focus) {
       caretAtEnd(answer.focus);
@@ -113,31 +119,68 @@
     else if (event.key === 'Escape') { event.preventDefault(); finishRename(event, false); }
   }
 
-  // ── Adding: a type, then New or one of the folder's blocks of it ─────
-  let picking = null; // null | 'type' | a block type
-  const ofType = (block, type) => block.type === type || (type === 'text' && block.type === 'cleantext');
+  // ── Adding: "/" in the writing, or the "＋ Block…" button ─────────────
+  // One menu either way: a new block of each kind, then the folder's blocks
+  // not on the page yet, filtered by what is typed.
+  let slashMenu = null; // { source: 'text' | 'button', textId, from, to, x, y, query }
+  let slashActive = 0;
 
-  $: typeItems = PAGE_BLOCK_TYPES.map(({ type, label }) => ({
-    id: type,
-    name: label,
-    count: blocksOffPage(rows, blocks).filter(block => ofType(block, type)).length || undefined
+  $: offPage = blocksOffPage(rows, blocks).map(block => ({
+    id: block.id,
+    type: block.type === 'cleantext' ? 'text' : block.type,
+    name: blockPickName(block, htmlToText)
   }));
+  $: slashRows = slashMenu ? slashItems({ query: slashMenu.query, types: PAGE_BLOCK_TYPES, existing: offPage }) : [];
+  $: if (slashActive >= slashRows.length) slashActive = Math.max(0, slashRows.length - 1);
 
-  $: choiceItems = picking && picking !== 'type'
-    ? [
-        { id: '__new', name: `New ${PAGE_BLOCK_TYPES.find(t => t.type === picking)?.label.toLowerCase() || 'block'}` },
-        ...blocksOffPage(rows, blocks)
-          .filter(block => ofType(block, picking))
-          .map(block => ({ id: block.id, name: blockPickName(block, htmlToText) }))
-      ]
-    : [];
+  function onSlash(textId, found) {
+    if (!found) {
+      if (slashMenu?.source === 'text' && slashMenu.textId === textId) slashMenu = null;
+      return;
+    }
+    if (!slashMenu || slashMenu.query !== found.query) slashActive = 0;
+    slashMenu = { source: 'text', textId, ...found };
+  }
 
-  function pickBlock(event) {
-    const id = event.detail;
-    const type = picking;
-    picking = null;
-    if (id === '__new') dispatch('addBlock', { type });
-    else changePage(putOnPage(rows, id, { blocks }));
+  function openAddMenu(event) {
+    const box = event.currentTarget.getBoundingClientRect();
+    slashMenu = { source: 'button', x: box.left, y: box.bottom, query: '' };
+    slashActive = 0;
+  }
+
+  function onSlashKey(key) {
+    if (!slashMenu) return;
+    if (key === 'ArrowUp' || key === 'ArrowDown') slashActive = stepChoice(slashActive, slashRows.length, key);
+    else if (key === 'Enter' || key === 'Tab') pickSlash(slashRows[slashActive]);
+    else if (key === 'Escape') slashMenu = null;
+  }
+
+  function pickSlash(item) {
+    const opened = slashMenu;
+    slashMenu = null;
+    if (!item || !opened) return;
+    if (opened.source === 'button') {
+      if (item.kind === 'new') dispatch('addBlock', { type: item.type });
+      else changePage(putOnPage(rows, item.blockId, { blocks }));
+      return;
+    }
+    const editor = editorOf(opened.textId);
+    if (!editor) return;
+    // The "/" and what was typed after it go; the writing is cut where they
+    // were, and keeps its own part -- sent by its own update, flushed by the
+    // blur -- before the page changes round it.
+    editor.chain().deleteRange({ from: opened.from, to: opened.to }).run();
+    const parts = splitWritingAt(editor, opened.from);
+    const where = slashSplit(parts);
+    editor.commands.setContent(where === 'above' ? parts.afterHtml : parts.beforeHtml, { emitUpdate: true });
+    editor.commands.blur();
+    dispatch('insertOnPage', {
+      textId: opened.textId,
+      where,
+      afterHtml: parts.afterHtml,
+      type: item.kind === 'new' ? item.type : null,
+      existingId: item.kind === 'existing' ? item.blockId : null
+    });
   }
 
   // ── A block's handle: its menu, and moving it ────────────────────────
@@ -249,6 +292,7 @@
   onMount(() => {
     const closeMenu = event => {
       if (menu && !event.target.closest?.('.ctx-menu')) menu = null;
+      if (slashMenu?.source === 'button' && !event.target.closest?.('.slash-menu')) slashMenu = null;
     };
     window.addEventListener('pointerdown', closeMenu);
     return () => {
@@ -300,6 +344,8 @@
               on:delete
               on:focusToggle
               on:lightbox={openLightbox}
+              on:slash={(e) => onSlash(block.id, e.detail)}
+              on:slashKey={(e) => onSlashKey(e.detail)}
               on:play
               on:toggle
             />
@@ -313,7 +359,7 @@
       {#if !shownRows.length}
         <p class="page-empty">Click anywhere to write.</p>
       {/if}
-      <button class="page-add-btn" on:click|stopPropagation={() => (picking = 'type')}>＋ Block…</button>
+      <button class="page-add-btn" on:click|stopPropagation={openAddMenu}>＋ Block…</button>
     </div>
   </div>
 
@@ -322,14 +368,19 @@
   {/if}
 </div>
 
-{#if picking === 'type'}
-  <div class="page-sheet-host" style={pageVars}>
-    <PickerSheet title="Put on the page" items={typeItems} searchable={false} on:pick={(e) => (picking = e.detail)} on:close={() => (picking = null)} />
-  </div>
-{:else if picking}
-  <div class="page-sheet-host" style={pageVars}>
-    <PickerSheet title={PAGE_BLOCK_TYPES.find(t => t.type === picking)?.label || 'Block'} items={choiceItems} searchable={choiceItems.length > 8} on:pick={pickBlock} on:close={() => (picking = null)} />
-  </div>
+{#if slashMenu}
+  <SlashMenu
+    items={slashRows}
+    active={slashActive}
+    x={slashMenu.x}
+    y={slashMenu.y}
+    search={slashMenu.source === 'button'}
+    themeStyle={pageVars}
+    on:hover={(e) => (slashActive = e.detail)}
+    on:pick={(e) => pickSlash(e.detail)}
+    on:key={(e) => onSlashKey(e.detail)}
+    on:query={(e) => { slashMenu = { ...slashMenu, query: e.detail }; slashActive = 0; }}
+  />
 {/if}
 
 {#if menu}
@@ -495,12 +546,6 @@
     background: var(--mode-text-color, #fff);
     opacity: 0.7;
     pointer-events: none;
-  }
-
-  .page-sheet-host {
-    position: fixed;
-    inset: var(--controls-height, 56px) 0 0 0;
-    z-index: 50;
   }
 
   /* A phone has no margin for the handle, and no room for blocks side by

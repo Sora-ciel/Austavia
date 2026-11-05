@@ -204,7 +204,15 @@ Block.svelte draws any block for the Canvas and the page alike, PageMode
 draws rows of them, utils/pageLayout.js decides. Still owed after them:
 Enter / arrows / Backspace moving between a text block and its neighbours,
 a row's widths dragged (each cell even for now, a `width` on the cell
-would be kept by older builds already), and (d) "/" (step 1/3 below).
+would be kept by older builds already). (d) "/" -- *done 2026-11-04* for
+blocks: "/" in the writing on a page opens one menu (SlashMenu,
+utils/slashMenu.js) of a new block of each kind and the folder's blocks not
+on the page yet, filtered by what is typed after it; the one chosen goes
+under, over or between the two halves of the writing (App insertOnPage, one
+Undo). "＋ Block…" opens the same menu with a search field. Still owed from
+step 1: the text kinds (headings, lists, checkbox, quote, divider) in the
+same menu, the "/" menu in Single Note and on the Canvas, and a `+` at the
+start of an empty line on a phone.
 
 ### In order, each landing on its own
 
@@ -310,6 +318,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **"/" on a page** (2026-11-04). In the writing on a page, type / (at the start of a line or after a space): a menu opens under the cursor with a new block of each kind, then the folder's blocks not on the page yet; typing after the / filters it ("/cour" finds a list called Courses), arrows and Enter pick, Escape closes. Picked at the end of the writing, the block goes under it; at the start, over it; in the middle, the writing is cut in two around it. One Undo takes it all back. "＋ Block…" opens the same menu with a search field. On the phone, check the menu opens above the keyboard and a tap picks. |
 | next | **Page mode** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page, with no frames or colours of their own. Click anywhere on the empty page and write: paragraphs typed together are one text block. "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. The ⋮⋮ beside a block (top right on a phone): drag it onto another block's left or right edge to put them side by side, above or below for a row of its own; press it for "Take off page" (the block stays in the folder) and "Delete block". Undo takes any of it back; another device after a sync shows the same page. A row of several stacks on a phone. Seen in a browser; on the phone check dragging the handle with a finger, and that the task list, picture, clock and music look right on a page.
 | next | **Every block in one frame** (2026-11-04). The image, task and embed blocks now use the same frame as text, clock and music (BlockShell). On the Canvas: drag each by its header, resize from the corner (an image keeps its shape), change both colours, delete, change a picture (⏏), add and tick tasks. All should feel as before; the embed lost its empty ⚙ settings panel. |
 | next | **A task list renamed from its tab** (2026-11-04). In Task mode the name field is gone; pressing the tab of the list already open turns it into its name to type into. Enter or tapping elsewhere keeps it, Escape keeps the old one. On the phone, check the keyboard does not hide it. |
