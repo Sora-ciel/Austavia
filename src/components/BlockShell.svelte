@@ -31,7 +31,8 @@
     canvasPoint,
     grabOffset,
     draggedPosition,
-    resizedSize
+    resizedSize,
+    aspectSize
   } from '../utils/blockGeometry.js';
   import ColorField from './ColorField.svelte';
 
@@ -56,6 +57,17 @@
   export let minHeight = MIN_HEIGHT;
   /** Extra classes for a type that styles its own frame. */
   export let className = '';
+  /**
+   * A block that keeps its content's shape as it is resized -- a picture --
+   * gives the shape here, width over height; the header is added on top.
+   */
+  export let aspect = null;
+  /**
+   * 'canvas': placed where it was dragged, framed, with a header. 'page': in
+   * the flow of a page, as wide as its place, nothing drawn round it (PENDING,
+   * "Page mode").
+   */
+  export let placement = 'canvas';
 
   const dispatch = createEventDispatcher();
 
@@ -80,9 +92,14 @@
   let hasDragged = false;
   let hasResized = false;
 
-  function commit(changedKeys, { pushToHistory } = {}) {
+  /**
+   * Sends the block's update. `extra` is for a body calling from its script
+   * straight after changing a field, so the update carries the new value
+   * whatever the timing of `fields`.
+   */
+  export function commit(changedKeys, { pushToHistory } = {}, extra = {}) {
     const keys = Array.isArray(changedKeys) && changedKeys.length ? changedKeys : [];
-    const detail = { id, position, size, bgColor, textColor, ...fields };
+    const detail = { id, position, size, bgColor, textColor, ...fields, ...extra };
 
     if (keys.length) detail.changedKeys = keys;
     if (pushToHistory !== undefined) detail.pushToHistory = pushToHistory;
@@ -93,9 +110,21 @@
   /** The block's own element, for finding the writing slotted inside it. */
   let rootEl;
 
-  function ensureFocus() {
+  export function ensureFocus() {
     if (!focused) dispatch('focusToggle', { id });
   }
+
+  /** For a body that sizes the block itself -- a picture fitting its frame to what was loaded. */
+  export function setSize(next) {
+    size = { width: next.width, height: next.height };
+  }
+
+  /** How tall the header is drawn, for a body that sizes the block round its content. */
+  export function headerHeight() {
+    return headerEl?.offsetHeight || 30;
+  }
+
+  let headerEl;
 
   function settle() {
     suppressClick = true;
@@ -166,7 +195,14 @@
 
   function onResizeMove(e) {
     if (!resizing) return;
-    size = resizedSize(canvasPoint(e, canvasScale), resizeStart, { minWidth, minHeight });
+    const point = canvasPoint(e, canvasScale);
+    if (aspect > 0) {
+      const next = aspectSize(resizeStart.width + (point.x - resizeStart.x), aspect, headerHeight());
+      if (!next) return;
+      size = next;
+    } else {
+      size = resizedSize(point, resizeStart, { minWidth, minHeight });
+    }
     hasResized = true;
     if (e.cancelable) e.preventDefault();
   }
@@ -259,6 +295,7 @@
 >
   <div
     class="header"
+    bind:this={headerEl}
     on:mousedown={onDragStart}
     on:pointerdown={onDragStart}
     on:touchstart={onDragStart}

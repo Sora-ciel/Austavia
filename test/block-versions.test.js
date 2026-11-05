@@ -69,11 +69,19 @@ describe('undo and redo', () => {
 // follow them after it is built. Read from the components themselves.
 describe('every block follows its colours after it is built', () => {
   const read = file => readFileSync(new URL(`../src/components/${file}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  for (const file of ['BlockShell.svelte', 'ImgBlock.svelte', 'TaskBlock.svelte', 'EmbedBlock.svelte']) {
-    it(`${file} keeps following its colour props`, () => {
+  it('BlockShell keeps following its colour props', () => {
+    const source = read('BlockShell.svelte');
+    assert.match(source, /\$: bgColor = initialBgColor;/, 'BlockShell must follow initialBgColor, or a theme change will not reach it without a rebuild');
+    assert.match(source, /\$: textColor = initialTextColor/, 'BlockShell must follow initialTextColor');
+  });
+  // Every block is drawn in BlockShell (2026-11-04), and hands it its colours
+  // as they change rather than keeping a copy of its own.
+  for (const file of ['TextBlock.svelte', 'ClockBlock.svelte', 'MusicBlock.svelte', 'ImgBlock.svelte', 'TaskBlock.svelte', 'EmbedBlock.svelte']) {
+    it(`${file} is drawn in BlockShell, which follows its colours`, () => {
       const source = read(file);
-      assert.match(source, /\$: bgColor = initialBgColor;/, `${file} must follow initialBgColor, or a theme change will not reach it without a rebuild`);
-      assert.match(source, /\$: textColor = initialTextColor/, `${file} must follow initialTextColor`);
+      assert.match(source, /<BlockShell/, `${file} must use BlockShell`);
+      assert.match(source, /initialBgColor/, `${file} must pass its colours on`);
+      assert.doesNotMatch(source, /let bgColor = initialBgColor/, `${file} must not keep its own copy of the colours`);
     });
   }
 });

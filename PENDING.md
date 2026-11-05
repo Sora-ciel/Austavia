@@ -119,11 +119,6 @@ Checked against "a block works on its own; a mode only shows blocks" on
   (2026-10-27): they stay in their modes' settings as the two accepted
   exceptions. So "a page holds every kind of block" means every block; the
   Habit Tracker and the Playlist are not blocks.
-- **Owed: the task block moves and resizes itself** with its own copy of the
-  code every other block gets from `BlockShell.svelte` (TextBlock, ClockBlock
-  and MusicBlock use it; TaskBlock has its own onDragStart, onResizeStart and
-  pointer listeners). Move it onto BlockShell, so a fix to moving blocks
-  reaches it too.
 
 ## Planned 2026-10-27: Page mode, and nests
 
@@ -173,6 +168,38 @@ writing, and is no faster than the text blocks it is made of.
   can be in any number of nests, and deleting a nest deletes nothing in it.
 - **`/page` makes a folder and links it where you typed** -- Notion's
   sub-page, as a new folder plus a link.
+
+### Redirected 2026-11-04, after the first version
+
+Asked, on seeing the first version: "text blocks and other blocks and all
+won't have the colors on the borders. second. the page wherever you click,
+it's basically a line and you can directly write something and it will be
+considered a block of text. though paragraphs and other things you write
+without putting a block in between it's only one block of text. another thing
+is that on one line or multiple lines we can have multiple blocks sharing the
+width etc. I'm aiming for a ui and ux like that." So, Notion's page:
+
+- **No frames.** On a page a block has no border, no glow, no header and no
+  background of its own: it sits on the page, in the page's writing colour.
+  Its own colours stay in the block (the Canvas still draws them). A handle
+  (⋮⋮) shows beside a block under the pointer, for moving it and its menu.
+- **Writing anywhere.** Clicking the page's empty space puts the caret in
+  writing: the text block there, or a new one at the end. Writing with no
+  block between is one text block; blocks split it (later, "/").
+- **Rows.** The page is rows, a row is one block or several side by side
+  sharing the width: `page.rows: [{ cells: [{ blockId }] }]` (replaces
+  `entries`, which never shipped). Dragging a block by its handle onto
+  another's left or right edge puts it beside it; onto a gap between rows
+  puts it on a row of its own. On a phone, a row of several stacks.
+- **One frame for every block.** Page placement is a mode of `BlockShell`
+  (`placement="page"`: in the flow, full width of its cell, its own height,
+  nothing drawn round it), so a block is the same component on the Canvas
+  and on a page -- which first means moving ImgBlock, TaskBlock and
+  EmbedBlock onto BlockShell (owed anyway, "Blocks and their modes").
+
+Steps: (a) Img, Task, Embed onto BlockShell, nothing visible changes on the
+Canvas -- *done 2026-11-04*; (b) `placement="page"`, rows, writing anywhere; (c) side by side by
+dragging the handle; (d) "/" (step 1/3 below).
 
 ### In order, each landing on its own
 
@@ -287,6 +314,7 @@ list below with what was observed.
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
 | next | **Page mode, first version** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page. "＋ Text" adds writing; "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. A block's menu (right click, or hold on the phone) has "Take off page", which leaves the block in the folder. Undo takes back putting a block on or off. On another device after a sync, the same page. Seen in a browser; check on the phone (holding a card to move it, the picker sheet) and that an older build opening the folder keeps the page. |
+| next | **Every block in one frame** (2026-11-04). The image, task and embed blocks now use the same frame as text, clock and music (BlockShell). On the Canvas: drag each by its header, resize from the corner (an image keeps its shape), change both colours, delete, change a picture (⏏), add and tick tasks. All should feel as before; the embed lost its empty ⚙ settings panel. |
 | next | **A task list renamed from its tab** (2026-11-04). In Task mode the name field is gone; pressing the tab of the list already open turns it into its name to type into. Enter or tapping elsewhere keeps it, Escape keeps the old one. On the phone, check the keyboard does not hide it. |
 | next | **New File makes the folder at once** (2026-11-04). Settings, New File, a name, OK: the folder appears in the list straight away, empty, and syncs. It used to appear only once something was put in it. |
 | next | **A picture in a note is one character** (2026-10-29). In a note with a picture -- alone on its line, and between words: one arrow press steps over it either way; tapping its left or right half puts the cursor on that side; a cursor shows beside it at the start or end of a line (it was invisible there); Backspace after it removes it. On the phone, with the touch cursor too. |
@@ -764,9 +792,6 @@ card). Only that would be the app's to fix.
 - **Snapshot limits** (10 copies or 8MB per folder) want revisiting once
   pictures are references — at that point ten copies costs less than one does
   now.
-- **`ImgBlock`, `TaskBlock` and `EmbedBlock` are not on `BlockShell`.** Only
-  Text and Music are. Directly the reuse philosophy in
-  `project-content-architecture`.
 - **EB Garamond and Cormorant themes fall back to system serif** — the fonts
   were never bundled, unlike Inter.
 - **The alarm and the timer only ring while the app is open on their folder.** It is a

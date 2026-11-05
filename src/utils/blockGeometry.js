@@ -66,3 +66,16 @@ export function resizedSize(point, resizeStart, { minWidth = MIN_WIDTH, minHeigh
     height: Math.max(minHeight, resizeStart.height + (point.y - resizeStart.y))
   };
 }
+
+/**
+ * The size of a block that keeps its picture's shape: as wide as dragged, and
+ * as tall as the picture is at that width plus the header above it. `aspect`
+ * is the picture's width over its height. Null when the picture would be
+ * shorter than 20px, which leaves the block as it was.
+ */
+export function aspectSize(width, aspect, headerHeight = 0, { minWidth = 50 } = {}) {
+  const w = Math.max(minWidth, width);
+  const content = w / aspect;
+  if (!(content >= 20)) return null;
+  return { width: w, height: content + headerHeight };
+}

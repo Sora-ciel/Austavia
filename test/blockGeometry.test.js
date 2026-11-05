@@ -64,3 +64,10 @@ test('a block type may ask for a larger floor of its own', () => {
   const out = resizedSize({ x: -900, y: -900 }, start, { minWidth: 240, minHeight: 160 });
   assert.deepEqual(out, { width: 240, height: 160 });
 });
+
+import { aspectSize } from '../src/utils/blockGeometry.js';
+
+test('a picture block keeps the picture\'s shape as it is resized, with the header on top', () => {
+  assert.deepEqual(aspectSize(400, 2, 30), { width: 400, height: 230 });
+  assert.equal(aspectSize(30, 4, 30), null);
+});
