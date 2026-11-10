@@ -429,9 +429,14 @@
     font-weight: 400;
     line-height: 1.6;
   }
+  /* The first line starts at the top of its letters rather than of its
+     line box, so writing beside a picture starts level with the picture's
+     top edge (asked 2026-11-10). Where text-box-trim is unknown, the line
+     box's top is close enough. */
   :global(.note.on-page .tiptap-inner) {
-    padding: 2px 2px;
-    text-box-trim: none;
+    padding: 0 2px 2px;
+    text-box-trim: trim-start;
+    text-box-edge: cap alphabetic;
   }
   .header {
     padding: 6px 10px;

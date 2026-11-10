@@ -131,6 +131,20 @@
 
   $: autoFitFromExistingSource();
 
+  // On a page the picture's own shape sets the box, whatever size the block
+  // was left at on the Canvas: a box of another shape drew the picture
+  // centred inside it, lower than the writing beside it (asked 2026-11-10,
+  // "make the upper part of the first line of text start at the same place
+  // as the start of the image").
+  let naturalAspect = 0;
+  function noteNaturalSize(event) {
+    const el = event.currentTarget;
+    const w = el.naturalWidth || el.videoWidth;
+    const h = el.naturalHeight || el.videoHeight;
+    if (w > 0 && h > 0) naturalAspect = w / h;
+  }
+  $: pageAspect = naturalAspect || aspectRatio;
+
   // Click on the media content:
   //   - When NOT focused: focus the block (next click will open lightbox)
   //   - When focused: open lightbox if there's a source
@@ -172,8 +186,9 @@
        place, and never taller than most of the screen. -->
   <div
     class="media-container"
-    style={placement === 'page' && aspectRatio > 0
-      ? `flex: none; aspect-ratio: ${aspectRatio}; width: min(100%, calc(70vh * ${aspectRatio}));`
+    class:on-page={placement === 'page'}
+    style={placement === 'page' && pageAspect > 0
+      ? `flex: none; aspect-ratio: ${pageAspect}; width: min(100%, calc(70vh * ${pageAspect}));`
       : ''}
   >
     {#if mediaSrc}
@@ -185,6 +200,7 @@
           src={mediaSrc}
           class:clickable={true}
           autoplay loop muted playsinline
+          on:loadedmetadata={noteNaturalSize}
           on:click|stopPropagation={handleMediaClick}
         ></video>
       {:else}
@@ -194,6 +210,7 @@
           src={mediaSrc}
           alt=""
           class:clickable={true}
+          on:load={noteNaturalSize}
           on:click|stopPropagation={handleMediaClick}
         />
       {/if}
@@ -244,6 +261,13 @@
     object-fit: contain;
     display: block;
     cursor: default;
+  }
+
+  /* Top edge to the top edge of the box, so it lines up with the writing
+     beside it even before its own shape is known. */
+  .media-container.on-page img,
+  .media-container.on-page video {
+    object-position: left top;
   }
 
   .media-container img.clickable,
