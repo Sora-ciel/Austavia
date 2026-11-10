@@ -50,10 +50,15 @@ export function writeHourHeight(storage, big, height) {
   writeAll(storage, HOUR_KEY, all);
 }
 
-/** The height after one turn of the wheel with Ctrl held: a tenth more or less, never past the limits. */
+/**
+ * The height after one turn of the wheel with Ctrl held: a tenth more or
+ * less, never past the limits. Turning the wheel down (towards you) makes
+ * the hours taller, up makes them shorter -- the first version had it the
+ * other way, and it was reported the same day as backwards.
+ */
 export function zoomedHour(height, deltaY) {
   if (!deltaY) return clampHour(height);
-  const factor = deltaY < 0 ? 1.1 : 1 / 1.1;
+  const factor = deltaY > 0 ? 1.1 : 1 / 1.1;
   return clampHour(height * factor);
 }
 

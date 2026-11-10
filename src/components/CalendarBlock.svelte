@@ -294,7 +294,12 @@
     };
   });
 
-  const top = minutes => (minutes / 60) * hourHeight;
+  // Reactive, not a plain function: a template only redraws what it reads,
+  // and a function that reads hourHeight inside it is not redrawn when the
+  // height changes. Blocks stayed where they were in pixels while the hours
+  // grew under them, so something at 11:00 showed at 6:00 (reported
+  // 2026-11-10, after Ctrl and the wheel were added).
+  $: top = minutes => (minutes / 60) * hourHeight;
   // A block's own colour as its fill, with the writing's colour round it.
   const fill = color => (color
     ? `color-mix(in srgb, ${color} 55%, transparent)`
