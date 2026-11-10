@@ -275,6 +275,27 @@
     opacity: 1;
   }
 
+  /* On a page on a computer, bigger tiles: asked 2026-11-10, "the default
+     size of each nest block is a bit bigger than that for pcs. right now
+     it's a bit small". A phone keeps the smaller ones, two to a row. */
+  @media (min-width: 701px) {
+    .nest.on-page .nest-tiles {
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 14px;
+    }
+    .nest.on-page .nest-tile,
+    .nest.on-page .nest-open {
+      min-height: 190px;
+    }
+    .nest.on-page .nest-cover {
+      min-height: 140px;
+    }
+    .nest.on-page .nest-name {
+      font-size: 1rem;
+      padding: 9px 11px;
+    }
+  }
+
   /* No hover on a phone: the remove button is always there, faintly. */
   @media (hover: none) {
     .nest-remove {
