@@ -468,7 +468,7 @@
      list's name, colours and Delete on the rest of the row. */
   .task-header {
     flex-shrink: 0;
-    padding: 6px 12px 0;
+    padding: 6px 8px 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -561,7 +561,7 @@
   .task-body {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 10px 12px 4px;
+    padding: 6px 6px 4px;
     color: var(--text, var(--mode-text-color, inherit));
     --sb-track: transparent;
     --sb-thumb: var(--text, var(--mode-text-color, rgba(255,255,255,.18)));
@@ -577,7 +577,7 @@
   .task-columns {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 8px;
   }
 
   .task-section {
@@ -589,7 +589,7 @@
        sits straight on its page; the card is only its outline. (On 2026-10-25
        it took the theme's dial, which left it solid on every solid theme.) */
     background: transparent;
-    padding: 12px 12px 8px;
+    padding: 8px 8px 6px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -721,8 +721,8 @@
     word-break: break-word;
     white-space: normal;
     line-height: 1.45;
-    padding: 8px 2px 4px;
-    font-size: 0.9rem;
+    padding: 6px 2px 3px;
+    font-size: 0.95rem;
   }
 
   /* Markdown rendered inside a task */
@@ -809,7 +809,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px 10px;
+    padding: 6px 8px 8px;
     border-top: 1px solid color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 10%, transparent);
     background: transparent;
   }
@@ -823,7 +823,7 @@
     background: color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 8%, transparent);
     color: var(--text, var(--mode-text-color, inherit));
     font-family: var(--block-body-font, inherit);
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
   .add-input::placeholder { color: var(--text, var(--mode-text-color, inherit)); opacity: 0.45; }
 
@@ -869,7 +869,7 @@
     justify-content: center;
     gap: 12px;
     opacity: 0.6;
-    font-size: 0.95rem;
+    font-size: 1rem;
     padding: 32px;
     text-align: center;
   }
@@ -877,11 +877,11 @@
   /* ── Responsive ─────────────────────────────────────────────────── */
   @media (max-width: 600px) {
     .task-columns { grid-template-columns: 1fr; }
-    .task-header { padding: 8px 10px 0; }
-    .task-body { padding: 8px 10px 4px; }
-    .task-add-bar { padding: 7px 10px 9px; }
+    .task-header { padding: 8px 6px 0; }
+    .task-body { padding: 5px 5px 4px; }
+    .task-add-bar { padding: 6px 6px 8px; }
     .task-tab { padding: 8px 14px; font-size: 0.85rem; }
-    .task-text { font-size: 0.9rem; }
+    .task-text { font-size: 0.95rem; }
     .drag-handle { display: none; }
 
     /* Reorder by press-and-hold + slide (no handle on mobile). Allow vertical
