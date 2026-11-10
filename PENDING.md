@@ -109,19 +109,19 @@ moment, archive instead of delete) after these, in an order to be agreed.
 
 ## Now, asked 2026-11-10 (second list), in this order
 
-1. **Task mode: margins halved again, text 5-10% bigger again.**
-2. **Page mode: writing beside a picture starts a little lower** -- "the
+1. *Done 2026-11-10.* **Task mode: margins halved again, text 5-10% bigger again.**
+2. *Done 2026-11-10.* **Page mode: writing beside a picture starts a little lower** -- "the
    uppercase letters are still a bit higher than where the image starts".
-3. **Page mode: no big gap between a picture and the writing beside it**
+3. *Done 2026-11-10.* **Page mode: no big gap between a picture and the writing beside it**
    -- the picture's cell kept half the row while the picture was narrower.
-4. **Page mode: close to the full width on a computer**, not 72rem.
-5. **Calendar: Ctrl + wheel changes the height of an hour**, kept per
+4. *Done 2026-11-10.* **Page mode: close to the full width on a computer**, not 72rem.
+5. *Done 2026-11-10.* **Calendar: Ctrl + wheel changes the height of an hour**, kept per
    device.
-6. **Calendar: a 7-day view**, beside the day one.
-7. **Calendar: a colour per block**, the last one chosen used for the next
+6. *Done 2026-11-10.* **Calendar: a 7-day view**, beside the day one.
+7. *Done 2026-11-10.* **Calendar: a colour per block**, the last one chosen used for the next
    block made.
-8. **Calendar: blocks outlined all round in the writing colour.**
-9. **Calendar: the block editor and whole-day pop-up as opaque as the right
+8. *Done 2026-11-10.* **Calendar: blocks outlined all round in the writing colour.**
+9. *Done 2026-11-10.* **Calendar: the block editor and whole-day pop-up as opaque as the right
    controls' panel.**
 10. **Nests: a page shows its first picture** as its tile's cover.
 11. **The Linux app's copies of songs in /tmp** (the entry below): stop
@@ -401,6 +401,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Calendar, second round** (2026-11-10). "Day" and "7 days" at the top right (Monday first; a day's name opens it as a day; "+" under a day blocks it whole). Ctrl and the mouse wheel make the hours taller or shorter, and the height is still there after a restart on that computer (Calendar mode and blocks each keep their own). In the 7-day view a block can be dragged to another day. A block's pop-up has colours (and a field for any colour); the next block made takes the last colour chosen. Blocks are outlined all round in the writing's colour. The pop-up is as solid as the right panel. |
 | next | **Calendar** (2026-11-10). Mode, Calendar ("＋ Make a calendar" when the folder has none), or "+ Calendar" on the Canvas, in Simple Note and on a page ("/cal"). A day at a time, ‹ › to change day, the date to come back to today. Click an empty hour: an hour from the quarter clicked. Drag down the day: any length, to 5 minutes. Then type what it is. Drag a block's middle to move it, its top or bottom edge to stretch it; press it to type the times to the minute (10:48 to 11:00 shows "12 min"), pick 15 min to 2 h, make it Whole day, or Delete. "＋ Whole day" blocks the day. The red line is now. Seen in a browser; on the phone check a tap makes an hour while a finger drag scrolls the day, and that moving a block with a finger works. |
 | next | **Pages in pages, back and forward, a phone's own layout** (2026-11-10). In a nest, "＋ Add" offers New page and New folder (each asks a name), this folder's pages and the other folders. A page opens in Page mode in place of the folder's page, with its own title (press to rename) and its own blocks; "/page" puts one straight on a page as a line that opens it; on the Canvas "+ Page" is a card with Open page. The arrows top left go back and forward through what was opened. On a phone, moving a block changes only the phone's layout and not the computer's; putting a block on or taking it off changes both. A page uses most of a computer's width. Seen in a browser at 1200 and 390 px wide; check on the phone itself. |
 | next | **Nests** (2026-11-04). "+ Nest" on the Canvas, or "/nest" on a page: "＋ Folder" lists this device's other folders; a tile shows the folder's name over its wallpaper (or first picture) and opens it; × takes it out of the nest without touching the folder. Rename a linked folder: the tile follows the new name (seen in a browser). Duplicate it: the copy is a separate folder, not the linked one. On a second device after a sync the same tiles. Check on the phone, and that an older build keeps both the nest and the folder ids. |

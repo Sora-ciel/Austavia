@@ -117,12 +117,12 @@
     border-color: currentColor;
   }
 
-  /* The calendar fills the mode, as wide as reads well. */
+  /* The calendar fills the mode, the whole width on a computer, as a page
+     does (asked 2026-11-10 for Page mode, and wanted most of all for 7 days). */
   .calendar-body {
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
-    max-width: 60rem;
     margin: 0 auto;
     padding: 4px 8px 0;
     box-sizing: border-box;

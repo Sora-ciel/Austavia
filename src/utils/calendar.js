@@ -58,7 +58,9 @@ export function normalizeEvent(event) {
     start,
     end,
     title: String(event.title ?? ''),
-    allDay: event.allDay === true
+    allDay: event.allDay === true,
+    // Its colour (asked 2026-11-10), any CSS colour; '' for the writing's.
+    color: typeof event.color === 'string' ? event.color : ''
   };
   return withUnknown(known, event, Object.keys(known));
 }
@@ -205,4 +207,38 @@ export function withTypedTime(event, edge, text) {
   }
   if (at <= event.start) return null;
   return { ...event, end: at };
+}
+
+/**
+ * The seven days of the week holding `key`, Monday first: the 7-day view
+ * (asked 2026-11-10, "For the calendar add a 7 day layout").
+ */
+export function weekOf(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const weekday = (new Date(y, m - 1, d).getDay() + 6) % 7; // Monday 0
+  return Array.from({ length: 7 }, (_, i) => addDays(key, i - weekday));
+}
+
+/** A day's name in the 7-day view: "Tue 10". */
+export function shortDayLabel(key, { locale } = {}) {
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return `${date.toLocaleDateString(locale, { weekday: 'short' })} ${d}`;
+}
+
+/** The week, to read: "9 – 15 November". */
+export function weekLabel(days, { locale } = {}) {
+  const [first, last] = [days[0], days[days.length - 1]].map(key => {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  });
+  const sameMonth = first.getMonth() === last.getMonth();
+  const start = first.toLocaleDateString(locale, sameMonth ? { day: 'numeric' } : { day: 'numeric', month: 'short' });
+  const end = last.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+  return `${start} – ${end}`;
+}
+
+/** An event moved to another day, its times unchanged. */
+export function onDay(event, key) {
+  return { ...event, date: key };
 }

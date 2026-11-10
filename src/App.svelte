@@ -2699,7 +2699,7 @@
     task: ['tasks', 'title'],
     nest: ['position', 'size', 'bgColor', 'textColor', 'links', 'title'],
     page: ['position', 'size', 'bgColor', 'textColor', 'title', 'rows', 'narrowRows'],
-    calendar: ['position', 'size', 'bgColor', 'textColor', 'title', 'events'],
+    calendar: ['position', 'size', 'bgColor', 'textColor', 'title', 'events', 'nextColor'],
     clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate', 'alarmTime', 'alarmEnabled'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };

@@ -81,3 +81,39 @@ test('days follow on across a month', () => {
   assert.equal(addDays('2026-11-30', 1), '2026-12-01');
   assert.equal(addDays('2026-01-01', -1), '2025-12-31');
 });
+
+// Asked 2026-11-10: "For the calendar add a 7 day layout", and Ctrl to change
+// the height of an hour, "saved per device".
+import { weekOf } from '../src/utils/calendar.js';
+import { readHourHeight, writeHourHeight, zoomedHour, readView, writeView, MIN_HOUR, MAX_HOUR } from '../src/utils/calendarView.js';
+
+function memoryStorage() {
+  const map = new Map();
+  return { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)) };
+}
+
+test('the 7-day view is the week holding the day, Monday first', () => {
+  assert.deepEqual(weekOf('2026-11-10'), ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']);
+  assert.equal(weekOf('2026-11-15')[0], '2026-11-09');
+  assert.equal(weekOf('2026-11-16')[0], '2026-11-16');
+});
+
+test('Ctrl and the wheel change the height of an hour, and this device keeps it', () => {
+  const storage = memoryStorage();
+  assert.equal(readHourHeight(storage, true), 64);
+  const taller = zoomedHour(64, -100);
+  assert.ok(taller > 64);
+  writeHourHeight(storage, true, taller);
+  assert.equal(readHourHeight(storage, true), taller);
+  assert.equal(readHourHeight(storage, false), 44, 'a block keeps its own');
+  assert.equal(zoomedHour(MAX_HOUR, -100), MAX_HOUR);
+  assert.equal(zoomedHour(MIN_HOUR, 100), MIN_HOUR);
+});
+
+test('day or 7 days is kept per calendar on this device', () => {
+  const storage = memoryStorage();
+  assert.equal(readView(storage, 'c1'), 'day');
+  writeView(storage, 'c1', 'week');
+  assert.equal(readView(storage, 'c1'), 'week');
+  assert.equal(readView(storage, 'c2'), 'day');
+});

@@ -118,6 +118,7 @@
     {...common}
     initialEvents={block.events}
     initialTitle={block.title}
+    initialNextColor={block.nextColor}
     {big}
     on:delete
     on:update
