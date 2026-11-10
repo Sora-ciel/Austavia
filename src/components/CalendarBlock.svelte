@@ -97,7 +97,7 @@
     });
   }
 
-  const headerHeight = () => (view === 'week' ? (dayHeadEl?.offsetHeight || 0) : 0);
+  const headerHeight = () => 0;
 
   // ── The time now, as a line across today ─────────────────────────────
   let now = new Date();
@@ -323,8 +323,12 @@
   on:focusToggle
 >
   <div class="cal" class:big class:week={view === 'week'} bind:this={calEl}>
+    <!-- The arrows either side of the date, at its height (asked 2026-11-10:
+         "the arrows to change days or week are not inline with the date"). -->
     <div class="cal-head">
-      <button class="cal-nav" title={view === 'week' ? 'Previous week' : 'Previous day'} aria-label="Previous" on:click|stopPropagation={() => step(-1)}>‹</button>
+      <button class="cal-nav" title={view === 'week' ? 'Previous week' : 'Previous day'} aria-label="Previous" on:click|stopPropagation={() => step(-1)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+      </button>
       <button class="cal-day-label" title="Back to today" on:click|stopPropagation={() => (day = today)}>
         {#if view === 'week'}
           {weekLabel(days)}
@@ -332,37 +336,44 @@
           {day === today ? 'Today · ' : ''}{dayLabel(day, { today })}
         {/if}
       </button>
-      <button class="cal-nav" title={view === 'week' ? 'Next week' : 'Next day'} aria-label="Next" on:click|stopPropagation={() => step(1)}>›</button>
+      <button class="cal-nav" title={view === 'week' ? 'Next week' : 'Next day'} aria-label="Next" on:click|stopPropagation={() => step(1)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+      </button>
+      <span class="cal-head-gap"></span>
       <div class="cal-views" role="group" aria-label="Days shown">
         <button class:on={view === 'day'} on:click|stopPropagation={() => setView('day')}>Day</button>
         <button class:on={view === 'week'} on:click|stopPropagation={() => setView('week')}>7 days</button>
       </div>
     </div>
 
+    <!-- The days' names and whole-day blocks stay above the hours rather
+         than scrolling over them, so they need no background of their own
+         (asked 2026-11-10: the 7-day row's background "destroys the
+         styling"). -->
+    {#if view === 'week'}
+      <div class="cal-day-heads" bind:this={dayHeadEl}>
+        <div class="cal-gutter-space"></div>
+        {#each columns as col (col.key)}
+          <div class="cal-day-head" class:today={col.key === today}>
+            <button class="cal-day-name" on:click|stopPropagation={() => { day = col.key; setView('day'); }}>{shortDayLabel(col.key)}</button>
+            {#each col.allDay as e (e.id)}
+              <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
+            {/each}
+            <button class="cal-allday-add small" title="Block the whole day" on:click|stopPropagation={() => addWholeDay(col.key)}>＋</button>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <div class="cal-allday">
+        {#each columns[0].allDay as e (e.id)}
+          <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
+        {/each}
+        <button class="cal-allday-add" on:click|stopPropagation={() => addWholeDay(day)}>＋ Whole day</button>
+      </div>
+    {/if}
+
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div class="cal-scroll" bind:this={scrollEl} on:wheel={onWheel}>
-      {#if view === 'week'}
-        <div class="cal-day-heads" bind:this={dayHeadEl}>
-          <div class="cal-gutter-space"></div>
-          {#each columns as col (col.key)}
-            <div class="cal-day-head" class:today={col.key === today}>
-              <button class="cal-day-name" on:click|stopPropagation={() => { day = col.key; setView('day'); }}>{shortDayLabel(col.key)}</button>
-              {#each col.allDay as e (e.id)}
-                <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
-              {/each}
-              <button class="cal-allday-add small" title="Block the whole day" on:click|stopPropagation={() => addWholeDay(col.key)}>＋</button>
-            </div>
-          {/each}
-        </div>
-      {:else}
-        <div class="cal-allday">
-          {#each columns[0].allDay as e (e.id)}
-            <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
-          {/each}
-          <button class="cal-allday-add" on:click|stopPropagation={() => addWholeDay(day)}>＋ Whole day</button>
-        </div>
-      {/if}
-
       <div class="cal-day" style="height: {24 * hourHeight}px;">
         <div class="cal-gutter">
           {#each Array(24) as _, h}
@@ -416,7 +427,9 @@
             {/if}
 
             {#if col.key === today}
-              <div class="cal-now" style="top: {top(nowMinutes)}px;"></div>
+              <div class="cal-now" style="top: {top(nowMinutes)}px;">
+                <span class="cal-now-time">{formatTime(nowMinutes)}</span>
+              </div>
             {/if}
           </div>
         {/each}
@@ -504,25 +517,44 @@
     color: inherit;
     font: inherit;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 
   .cal-nav {
-    width: 28px;
-    height: 28px;
-    font-size: 1.2rem;
-    line-height: 1;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cal-nav svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .cal-day-label {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
-    padding: 4px 6px;
+    height: 30px;
+    padding: 0 8px;
     font-weight: 700;
+    line-height: 30px;
     text-align: left;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .cal-head-gap {
+    flex: 1;
   }
 
   .cal.big .cal-day-label {
@@ -568,7 +600,7 @@
 
   .cal-allday-chip,
   .cal-allday-add {
-    border-radius: 6px;
+    border-radius: 999px;
     padding: 3px 8px;
     font: inherit;
     font-size: 0.8rem;
@@ -605,15 +637,16 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
-  /* The days' names and whole-day blocks stay at the top as the hours scroll. */
+  /* Above the hours, outside their scroll, with room kept for the hours'
+     scrollbar so the days line up with their columns. */
   .cal-day-heads {
-    position: sticky;
-    top: 0;
-    z-index: 3;
+    flex: none;
     display: flex;
-    background: var(--canvas-inner-bg, transparent);
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
     border-bottom: 1px solid var(--line);
   }
 
@@ -704,8 +737,8 @@
   .cal-event {
     position: absolute;
     box-sizing: border-box;
-    padding: 2px 6px;
-    border-radius: 6px;
+    padding: 3px 7px;
+    border-radius: 10px;
     border: 1.5px solid var(--text);
     overflow: hidden;
     cursor: grab;
@@ -765,23 +798,36 @@
   .cal-edge.top { top: 0; }
   .cal-edge.bottom { bottom: 0; }
 
+  /* Now, in the app's own colours rather than an agenda's red (asked
+     2026-11-10): a line in the writing's colour, and the time on a pill of
+     it, written in the colour behind -- the writing's opposite. */
   .cal-now {
     position: absolute;
     left: 0;
     right: 0;
-    border-top: 2px solid var(--calendar-now, #e5484d);
+    border-top: 2px solid var(--calendar-now, var(--text));
     pointer-events: none;
+    z-index: 2;
   }
 
-  .cal-now::before {
-    content: '';
+  /* In the hours' margin on a day; inside the column among 7 days, where
+     the margin belongs to Monday. */
+  .cal.week .cal-now-time {
+    left: 2px;
+  }
+
+  .cal-now-time {
     position: absolute;
-    left: -5px;
-    top: -6px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: var(--calendar-now, #e5484d);
+    left: -46px;
+    top: -9px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--calendar-now, var(--text));
+    color: var(--canvas-inner-bg, #000);
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
   }
 
   /* As the right controls' panel: the same colour and opacity (asked
@@ -893,7 +939,7 @@
   }
 
   .cal-delete {
-    color: var(--calendar-now, #e5484d) !important;
-    border-color: color-mix(in srgb, var(--calendar-now, #e5484d) 50%, transparent) !important;
+    color: var(--danger-color, #e5484d) !important;
+    border-color: color-mix(in srgb, var(--danger-color, #e5484d) 50%, transparent) !important;
   }
 </style>

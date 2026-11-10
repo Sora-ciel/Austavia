@@ -109,12 +109,12 @@ moment, archive instead of delete) after these, in an order to be agreed.
 
 ## Now, asked 2026-11-10 (third list): look and feel
 
-1. **Calendar, 7 days: the days' row has a background of its own** -- "it
+1. *Done 2026-11-10.* **Calendar, 7 days: the days' row has a background of its own** -- "it
    destroys the styling". No background; it stays put above the hours
    instead of scrolling over them.
-2. **Calendar: the arrows inline with the date**, at its height -- they sat
+2. *Done 2026-11-10.* **Calendar: the arrows inline with the date**, at its height -- they sat
    apart from it and slightly lower.
-3. **Calendar: in the app's style rather than Outlook's**; the now line not
+3. *Done 2026-11-10.* **Calendar: in the app's style rather than Outlook's**; the now line not
    red -- "maybe the opposite of the text's colour".
 4. **Page mode: the ⋮⋮ handle a little further right, and better drawn** --
    easier to take a block that sits to the right of another.
