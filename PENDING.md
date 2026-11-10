@@ -125,9 +125,9 @@ moment, archive instead of delete) after these, in an order to be agreed.
    another (`under`), kept by older builds as an unknown field.
 6. *Done 2026-11-10.* **Page mode: the arrows and the edit button no longer push the page
    down** -- into the control bar, before the music and the timer.
-7. **Habit tracker, below computer width: the day buttons square**, not
+7. *Done 2026-11-10.* **Habit tracker, below computer width: the day buttons square**, not
    stretched as the screen widens.
-8. **Habit tracker on a computer: no dot on a day not pressed**; and
+8. *Done 2026-11-10.* **Habit tracker on a computer: no dot on a day not pressed**; and
    bigger buttons, and the space used better.
 
 ## Now, asked 2026-11-10 (second list), in this order
@@ -430,6 +430,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Look and feel, third round** (2026-11-10). Calendar: the 7-day row has no background of its own and stays above the hours; the arrows sit either side of the date; now is a line and a time pill in the writing's colour; Ctrl + wheel down makes hours taller, and blocks stay on their hours. Page mode: back, forward and edit are in the control bar; the six-dot handle sits closer; beside a longer block, a drop goes beside (edges), under it in its column (lower half, or the empty space under a column), or below the whole row (the row's last few pixels). Habit tracker: days are squares at every width (today the biggest), no dot on a day not pressed, bigger names, Rename and Delete only on the habit the pointer is on. |
 | next | **Page mode, second round** (2026-11-10). Writing beside a picture starts just below its top edge; the picture's cell is as wide as the picture (at most half the row), so no gap; the page takes the whole width of a computer. The pencil beside the arrows turns on edit mode: each picture outlined, a grip on its right edge to size it (a share of the row, kept separately on a phone and a computer), "Crop" to keep part of it (the Canvas shows the crop too), "Natural size" to undo the size. A page in a nest shows its first picture. On Linux, /tmp no longer fills with copies of music (check `du -sh /tmp` after a day of tagging). |
 | next | **Task mode, again** (2026-11-10). Margins halved a second time, a task's writing at 1.03rem. |
 | next | **Calendar, second round** (2026-11-10). "Day" and "7 days" at the top right (Monday first; a day's name opens it as a day; "+" under a day blocks it whole). Ctrl and the mouse wheel make the hours taller or shorter, and the height is still there after a restart on that computer (Calendar mode and blocks each keep their own). In the 7-day view a block can be dragged to another day. A block's pop-up has colours (and a field for any colour); the next block made takes the last colour chosen. Blocks are outlined all round in the writing's colour. The pop-up is as solid as the right panel. |

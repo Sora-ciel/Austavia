@@ -530,9 +530,25 @@
     box-shadow: var(--block-shadow, none);
     display: grid;
     /* The handle, the name, the days, the buttons. */
-    grid-template-columns: auto minmax(140px, 200px) 1fr auto;
-    gap: 12px;
+    grid-template-columns: auto minmax(160px, 240px) 1fr auto;
+    gap: 14px;
     align-items: center;
+  }
+
+  /* On a computer the buttons show on the habit the pointer is on, rather
+     than taking room on every row (asked 2026-11-10: "buttons ... at places
+     that are not optimized for a better use of space"). Rename is also a
+     double press on the name; Delete also the right-click menu. */
+  .habit-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+
+  .habit-row:hover .habit-actions,
+  .habit-actions:focus-within {
+    opacity: 1;
   }
 
   .habit-name {
@@ -542,7 +558,7 @@
   }
 
   .habit-name strong {
-    font-size: 1.05rem;
+    font-size: 1.15rem;
   }
 
   /* The name opens the habit's page. */
@@ -567,27 +583,49 @@
        half as much again. Agreed 2026-10-26: "today stands out -- a bigger
        square for today, the past days smaller", because most visits are to
        tick today. --past-days is set on the element from how many are shown. */
-    grid-template-columns: repeat(var(--past-days, 6), minmax(0, 1fr)) minmax(0, 1.5fr);
-    gap: 6px;
+    /* Squares of a set size from the left, rather than stretched across the
+       row (asked 2026-11-10: they "elongate as the screen becomes wider and it
+       gives off a weird styling"). Shrinking when there is less room, never
+       growing past it. A wider screen gets somewhat bigger squares. */
+    --day: clamp(48px, 3.8vw, 72px);
+    --gap: 6px;
+    /* Shares of the width, today's 1.3 times the others', so it stays the
+       biggest when there is little room; capped at --day a square. */
+    grid-template-columns: repeat(var(--past-days, 6), minmax(0, 1fr)) minmax(0, 1.3fr);
+    width: 100%;
+    max-width: calc(var(--past-days, 6) * (var(--day) + var(--gap)) + 1.3 * var(--day));
+    justify-self: start;
+    align-items: end;
+    gap: var(--gap);
   }
 
   .calendar-header {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     opacity: 0.75;
     text-align: center;
   }
 
   .day-button {
+    aspect-ratio: 1;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 0;
+    /* Square whatever is written in it: without this the three lines inside
+       set a taller minimum than the width. */
+    min-height: 0;
+    overflow: hidden;
+    font-size: 0.9rem;
     border-radius: var(--block-control-radius, 10px);
-    padding: 6px 4px;
+    padding: 2px;
     border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 15%, transparent));
     background: var(--block-media-button-bg, color-mix(in srgb, var(--mode-text-color, #ffffff) 7%, transparent));
     color: inherit;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 1px;
     cursor: pointer;
+    line-height: 1.1;
   }
 
   .day-button.done {
@@ -603,8 +641,10 @@
   }
 
   .day-status {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 600;
+    min-height: 1.05em;
+    line-height: 1.05;
   }
 
   /* Today: found at a glance, and the easiest square to hit. */
@@ -615,7 +655,7 @@
   }
 
   .day-button.is-today .day-status {
-    font-size: 1.35rem;
+    font-size: 1.2rem;
   }
 
   /* ── A phone ────────────────────────────────────────────────────
@@ -708,8 +748,11 @@
     .calendar {
       /* Never wrapping: the columns are fixed by the rule above (the past
          days, then today wider), not handed out by auto-fit, which is what made
-         them wrap onto a second line. */
-      gap: 3px;
+         them wrap onto a second line. Squares up to 40px, kept to the right
+         beside the name, rather than stretched as the screen widens. */
+      --day: 40px;
+      --gap: 3px;
+      justify-self: end;
     }
 
     .day-button {
@@ -965,6 +1008,8 @@
               >
                 <span class="calendar-header">{day.label}</span>
                 <span>{day.number}</span>
+                <!-- Nothing on a day not pressed (asked 2026-11-10: the dot
+                     was "ugly"); the square keeps its size without it. -->
                 <span class="day-status">
                   {habit.log?.[day.key] === "done"
                     ? "✓"
@@ -972,7 +1017,7 @@
                     ? "✕"
                     : habit.log?.[day.key] === "skipped"
                     ? "–"
-                    : "•"}
+                    : ""}
                 </span>
               </button>
             {/each}
