@@ -45,8 +45,8 @@
   export let pageTitle = '';
   /** The page block shown, or null for the folder's own page. */
   export let pageId = null;
-  export let canGoBack = false;
-  export let canGoForward = false;
+  /** Page mode's edit mode, switched from the control bar. */
+  export let pageEditMode = false;
   export let musicLibrary = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
@@ -137,8 +137,7 @@
       {page}
       title={pageTitle}
       {pageId}
-      {canGoBack}
-      {canGoForward}
+      editMode={pageEditMode}
       {focusedBlockId}
       bind:canvasRef
       {canvasColors}
@@ -156,8 +155,7 @@
       on:insertOnPage
       on:pageChange
       on:renamePage
-      on:placeBack
-      on:placeForward
+
     />
   {:else if mode === 'habit'}
     <HabitTrackerMode

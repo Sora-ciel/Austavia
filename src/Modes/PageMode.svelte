@@ -49,8 +49,8 @@
   export let title = '';
   /** The page block shown, or null for the folder's own page. */
   export let pageId = null;
-  export let canGoBack = false;
-  export let canGoForward = false;
+  /** Edit mode, switched from the control bar (App.svelte). */
+  export let editMode = false;
   export let focusedBlockId = null;
   export let canvasColors = {};
   export let backgroundSettings = {};
@@ -78,7 +78,6 @@
   // size even crop it and other things we'll be able to do." A picture's
   // share of its row is its cell's, in the layout in use (pageLayout.js
   // setCellWidth); its crop is the picture's own (utils/crop.js).
-  let editMode = false;
   let liveWidth = null; // { id, width } while a picture's edge is dragged
   let cropping = null;  // the picture block being cropped
 
@@ -93,7 +92,7 @@
   function startWidthDrag(event, blockId) {
     event.preventDefault();
     event.stopPropagation();
-    const cell = event.currentTarget.closest('.page-cell');
+    const cell = event.currentTarget.closest('.page-col');
     const row = cell?.parentElement;
     if (!cell || !row) return;
     const measure = clientX => widthFromDrag({
@@ -271,6 +270,8 @@
   // dropSide (pageLayout.js): near a block's left or right edge is beside
   // it, anywhere else above or below it.
   const DRAG_THRESHOLD = 5;
+  // Within this many pixels of a row's bottom, a drop goes below the whole row.
+  const ROW_EDGE = 14;
   let press = null;    // { blockId, x, y }
   let dragging = null; // blockId
   let drop = null;     // { targetId, side, box }
@@ -290,24 +291,73 @@
       dragging = press.blockId;
     }
     event.preventDefault();
+    // What is under the pointer: a block, else a column's empty space under
+    // its last block, else the rest of the page below everything.
     let target = null;
+    let column = null;
+    let pageEnd = false;
     for (const el of document.elementsFromPoint(event.clientX, event.clientY)) {
       const cell = el.closest?.('[data-page-block]');
       if (cell) { target = cell; break; }
+      if (!column) column = el.closest?.('.page-col');
+      if (el.closest?.('.page-below')) pageEnd = true;
     }
-    if (!target || target.dataset.pageBlock === dragging) { drop = null; return; }
-    const rect = target.getBoundingClientRect();
     const pageRect = canvasRef.getBoundingClientRect();
-    drop = {
-      targetId: target.dataset.pageBlock,
-      side: dropSide({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, x: event.clientX, y: event.clientY }),
-      box: {
-        left: rect.left - pageRect.left + canvasRef.scrollLeft,
-        top: rect.top - pageRect.top + canvasRef.scrollTop,
-        width: rect.width,
-        height: rect.height
+    const inPage = r => ({
+      left: r.left - pageRect.left + canvasRef.scrollLeft,
+      top: r.top - pageRect.top + canvasRef.scrollTop,
+      width: r.width,
+      height: r.height
+    });
+
+    // Asked 2026-11-10, for a block beside a longer one: "i want to have those
+    // three solutions" -- beside it (its left or right edge), under it in its
+    // column (its lower half, or the empty space under the column), or below
+    // the whole row (the last few pixels of the row, or the next row's top).
+    if (target && target.dataset.pageBlock !== dragging) {
+      const rect = target.getBoundingClientRect();
+      const rowEl = target.closest('.page-row');
+      const rowRect = rowEl.getBoundingClientRect();
+      const several = rowEl.classList.contains('several');
+      let side = dropSide({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, x: event.clientX, y: event.clientY });
+      let box = inPage(rect);
+      if (several && (side === 'above' || side === 'below')) {
+        if (side === 'below' && event.clientY > rowRect.bottom - ROW_EDGE) {
+          box = inPage(rowRect);
+        } else {
+          side = side === 'above' ? 'over' : 'under';
+        }
       }
-    };
+      drop = { targetId: target.dataset.pageBlock, side, box };
+      return;
+    }
+    if (column) {
+      const cells = column.querySelectorAll('[data-page-block]');
+      const last = cells[cells.length - 1];
+      const rowEl = column.closest('.page-row');
+      const rowRect = rowEl.getBoundingClientRect();
+      // Near the row's bottom edge: below the whole row, as over a block.
+      if (last && event.clientY > rowRect.bottom - ROW_EDGE) {
+        const anchor = [...rowEl.querySelectorAll('[data-page-block]')].find(el => el.dataset.pageBlock !== dragging);
+        if (anchor) {
+          drop = { targetId: anchor.dataset.pageBlock, side: 'below', box: inPage(rowRect) };
+          return;
+        }
+      }
+      if (last && last.dataset.pageBlock !== dragging) {
+        drop = { targetId: last.dataset.pageBlock, side: 'under', box: inPage(last.getBoundingClientRect()) };
+        return;
+      }
+    }
+    if (pageEnd) {
+      const rows = canvasRef.querySelectorAll('.page-row');
+      const lastRow = rows[rows.length - 1];
+      if (lastRow) {
+        drop = { targetId: null, side: 'end', box: inPage(lastRow.getBoundingClientRect()) };
+        return;
+      }
+    }
+    drop = null;
   }
 
   function stopListening() {
@@ -321,7 +371,9 @@
     if (dragging && drop) {
       const { targetId, side } = drop;
       const moving = dragging;
-      changeLayout(r => placeOnPage(r, moving, { targetId, side, blocks }));
+      changeLayout(r => (side === 'end'
+        ? placeOnPage(r, moving, { blocks })
+        : placeOnPage(r, moving, { targetId, side, blocks })));
     } else if (!dragging && press) {
       // A press without a move is a click: the menu.
       const handle = canvasRef?.querySelector(`[data-page-block="${press.blockId}"] .page-handle`);
@@ -343,7 +395,7 @@
   $: dropLine = drop
     ? (drop.side === 'left' || drop.side === 'right'
         ? `left:${drop.side === 'left' ? drop.box.left - 6 : drop.box.left + drop.box.width + 3}px; top:${drop.box.top}px; width:3px; height:${drop.box.height}px;`
-        : `left:${drop.box.left}px; top:${drop.side === 'above' ? drop.box.top - 5 : drop.box.top + drop.box.height + 2}px; width:${drop.box.width}px; height:3px;`)
+        : `left:${drop.box.left}px; top:${drop.side === 'above' || drop.side === 'over' ? drop.box.top - 5 : drop.box.top + drop.box.height + 2}px; width:${drop.box.width}px; height:3px;`)
     : '';
 
   // ── Pictures open full screen, as on the Canvas ──────────────────────
@@ -379,26 +431,6 @@
 <div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
-  <!-- Back and forward through the pages and folders opened from nests
-       (utils/pagePlaces.js), in the mode's own colours. Asked 2026-11-10. -->
-  <div class="page-nav">
-    <button class="page-nav-btn" title="Back" aria-label="Back" disabled={!canGoBack} on:click|stopPropagation={() => dispatch('placeBack')}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
-    </button>
-    <button class="page-nav-btn" title="Forward" aria-label="Forward" disabled={!canGoForward} on:click|stopPropagation={() => dispatch('placeForward')}>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
-    </button>
-    <button
-      class="page-nav-btn page-edit-btn"
-      class:on={editMode}
-      title={editMode ? 'Done editing' : 'Edit: size and crop pictures'}
-      aria-pressed={editMode}
-      on:click|stopPropagation={() => (editMode = !editMode)}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg>
-    </button>
-  </div>
-
   <div class="page-column">
     {#if renaming}
       <input
@@ -414,50 +446,59 @@
     {/if}
 
     {#each shownRows as row (row.key)}
-      <div class="page-row" class:several={row.blocks.length > 1}>
-        {#each row.blocks as block (`${block.id}-${block._version || 0}`)}
+      <div class="page-row" class:several={row.columns.length > 1}>
+        {#each row.columns as col (col.key)}
+          <!-- A column: a block, and any stacked under it (pageLayout.js). -->
           <div
-            class="page-cell"
-            class:moving={dragging === block.id}
-            class:fits-picture={block.type === 'image' && row.blocks.length > 1 && !widthOf(block.id)}
-            class:sized={Boolean(widthOf(block.id))}
-            style={widthOf(block.id) ? `flex: 0 1 ${widthOf(block.id) * 100}%; max-width: ${widthOf(block.id) * 100}%;` : ''}
-            data-page-block={block.id}
+            class="page-col"
+            class:fits-picture={row.columns.length > 1 && col.blocks.length === 1 && col.blocks[0].type === 'image' && !widthOf(col.key)}
+            class:sized={Boolean(widthOf(col.key))}
+            style={widthOf(col.key) ? `flex: 0 1 ${widthOf(col.key) * 100}%; max-width: ${widthOf(col.key) * 100}%;` : ''}
           >
-            <button
-              class="page-handle"
-              title="Drag to move, press for the menu"
-              aria-label="Move or open the menu"
-              on:pointerdown|preventDefault={(event) => handleDown(event, block.id)}
-              on:click|stopPropagation
-            >⋮⋮</button>
-            <Block
-              {block}
-              placement="page"
-              focused={block.id === focusedBlockId}
-              fileKey={openFolder}
-              {library}
-              {nowPlayingId}
-              {isPlaying}
-              on:update
-              on:delete
-              on:focusToggle
-              on:lightbox={openLightbox}
-              on:slash={(e) => onSlash(block.id, e.detail)}
-              on:slashKey={(e) => onSlashKey(e.detail)}
-              on:play
-              on:toggle
-            />
-            {#if editMode && block.type === 'image'}
-              <div class="page-edit-tools">
-                <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
-                {#if widthOf(block.id)}
-                  <button on:click|stopPropagation={() => changeLayout(r => setCellWidth(r, block.id, null))}>Natural size</button>
+            {#each col.blocks as block (`${block.id}-${block._version || 0}`)}
+              <div class="page-cell" class:moving={dragging === block.id} data-page-block={block.id}>
+                <button
+                  class="page-handle"
+                  title="Drag to move, press for the menu"
+                  aria-label="Move or open the menu"
+                  on:pointerdown|preventDefault={(event) => handleDown(event, block.id)}
+                  on:click|stopPropagation
+                >
+                  <svg viewBox="0 0 10 16" aria-hidden="true">
+                    <circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" />
+                    <circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" />
+                    <circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" />
+                  </svg>
+                </button>
+                <Block
+                  {block}
+                  placement="page"
+                  focused={block.id === focusedBlockId}
+                  fileKey={openFolder}
+                  {library}
+                  {nowPlayingId}
+                  {isPlaying}
+                  on:update
+                  on:delete
+                  on:focusToggle
+                  on:lightbox={openLightbox}
+                  on:slash={(e) => onSlash(block.id, e.detail)}
+                  on:slashKey={(e) => onSlashKey(e.detail)}
+                  on:play
+                  on:toggle
+                />
+                {#if editMode && block.type === 'image'}
+                  <div class="page-edit-tools">
+                    <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
+                    {#if widthOf(col.key)}
+                      <button on:click|stopPropagation={() => changeLayout(r => setCellWidth(r, block.id, null))}>Natural size</button>
+                    {/if}
+                  </div>
+                  <!-- svelte-ignore a11y-no-static-element-interactions -->
+                  <div class="page-width-grip" title="Drag to size" on:pointerdown={(e) => startWidthDrag(e, col.key)}></div>
                 {/if}
               </div>
-              <!-- svelte-ignore a11y-no-static-element-interactions -->
-              <div class="page-width-grip" title="Drag to size" on:pointerdown={(e) => startWidthDrag(e, block.id)}></div>
-            {/if}
+            {/each}
           </div>
         {/each}
       </div>
@@ -532,52 +573,6 @@
     user-select: none;
   }
 
-  /* At the top left, over the page and with it as it scrolls. */
-  .page-nav {
-    position: sticky;
-    top: 0;
-    z-index: 4;
-    display: flex;
-    gap: 2px;
-    width: max-content;
-    padding: 8px 10px 0;
-    height: 0;
-    overflow: visible;
-  }
-
-  .page-nav-btn {
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: none;
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 70%, transparent);
-    color: var(--mode-text-color, #fff);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .page-nav-btn svg {
-    width: 18px;
-    height: 18px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .page-nav-btn:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--mode-text-color, #fff) 12%, transparent);
-  }
-
-  .page-nav-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-
   /* Above the wallpaper, which sits at z-index 0 -- see ModeWallpaper.svelte.
      On a computer the page takes most of the width (asked 2026-11-10, "on
      pc use more of the width than on phone"). */
@@ -586,7 +581,7 @@
     z-index: 1;
     max-width: 100%;
     margin: 0 auto;
-    padding: 44px max(40px, 3vw) 0;
+    padding: 14px max(40px, 3vw) 0;
     box-sizing: border-box;
     min-height: 100%;
     display: flex;
@@ -619,15 +614,23 @@
     border-color: color-mix(in srgb, currentColor 30%, transparent);
   }
 
+  /* Columns as tall as the row, so the space under a shorter one is its own
+     -- a drop there goes under its last block. */
   .page-row {
     display: flex;
     gap: 14px;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .page-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .page-cell {
     position: relative;
-    flex: 1 1 0;
     min-width: 0;
     padding: 3px 0;
     cursor: auto;
@@ -638,18 +641,14 @@
      (asked 2026-11-10: "when a text is on the side of the image it creates
      a big space in between"). At most half the row, and as tall as most of
      the screen allows (ImgBlock sizes it). */
-  .page-cell.fits-picture {
+  .page-col.fits-picture {
     flex: 0 1 auto;
     max-width: 50%;
   }
 
   /* A picture given a size takes it in full. */
-  .page-cell.sized :global(.media-container) {
+  .page-col.sized :global(.media-container) {
     width: 100% !important;
-  }
-
-  .page-nav-btn.on {
-    background: color-mix(in srgb, var(--mode-text-color, #fff) 18%, transparent);
   }
 
   /* Edit mode: each picture outlined, with its tools and a grip on its right
@@ -707,40 +706,50 @@
     opacity: 0.4;
   }
 
-  /* Beside a block while the pointer is on it, in the margin to its left. */
+  /* Beside a block while the pointer is on it, just left of it: close
+     enough to reach a block that sits to the right of another (asked
+     2026-11-10: "make it be a little more on the right and style a bit
+     better the dots"). Six dots, drawn, in a pill that shows on hover. */
   .page-handle {
     position: absolute;
-    left: -28px;
-    top: 4px;
-    width: 22px;
-    height: 26px;
+    left: -20px;
+    top: 3px;
+    width: 18px;
+    height: 24px;
     padding: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
     background: transparent;
     color: inherit;
-    font-size: 0.9rem;
-    letter-spacing: -2px;
-    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     opacity: 0;
     cursor: grab;
     touch-action: none;
-    transition: opacity 0.12s;
+    transition: opacity 0.12s, background 0.12s;
+    z-index: 2;
+  }
+
+  .page-handle svg {
+    width: 9px;
+    height: 15px;
+    fill: currentColor;
   }
 
   .page-cell:hover > .page-handle,
   .page-handle:focus-visible {
-    opacity: 0.55;
+    opacity: 0.6;
   }
 
   .page-handle:hover {
     opacity: 1 !important;
-    background: color-mix(in srgb, currentColor 10%, transparent);
+    background: color-mix(in srgb, currentColor 12%, transparent);
   }
 
-  /* Side by side within a row, the handle sits inside the gap. */
-  .page-row.several > .page-cell + .page-cell > .page-handle {
-    left: -24px;
+  /* Between two columns the handle sits in the gap, not over the left one. */
+  .page-row.several > .page-col + .page-col .page-handle {
+    left: -16px;
   }
 
   .page-below {
@@ -783,7 +792,7 @@
      right, over it. Its rows are its own layout (pageLayout.js): stacked
      until something is moved on a phone, side by side if put so. */
   .page-mode.narrow .page-column {
-    padding: 42px 14px 0;
+    padding: 12px 14px 0;
   }
   .page-mode.narrow .page-row {
     gap: 10px;

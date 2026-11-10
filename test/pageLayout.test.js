@@ -105,7 +105,7 @@ test('an existing block is offered under its title or first line', () => {
 
 // Asked 2026-11-10: "if i change for the blocks to be a certain way in phone,
 // it won't change it for pc too."
-import { rowsFor, editPage, stacked, isNarrow, samePageLayouts } from '../src/utils/pageLayout.js';
+import { rowsFor, editPage, stacked, isNarrow, samePageLayouts, setCellWidth } from '../src/utils/pageLayout.js';
 
 test('a phone shows the computer\'s rows one block under another until it has a layout of its own', () => {
   const page = { rows: rowsOf(['a', 'b'], ['c']) };
@@ -148,4 +148,33 @@ test('the phone\'s layout is kept by the mode settings', () => {
   const settings = normalizeModeSettings({ page: { rows: rowsOf(['a']), narrowRows: rowsOf(['a']) } });
   assert.deepEqual(shape(settings.page.narrowRows), ['a']);
   assert.equal('narrowRows' in normalizeModeSettings({ page: { rows: [] } }).page, false);
+});
+
+// Asked 2026-11-10: "if i want to put a block just after the end of another
+// block when they are both on the right side of another longer block, it
+// should be possible ... i want to have those three solutions."
+test('next to a block beside a longer one, a block can go beside it, below the whole row, or under it in its column', () => {
+  const page = rowsOf(['long', 'b']);
+  const cols = rows => blocksOnPage(rows, [{ id: 'long' }, { id: 'b' }, { id: 'c' }, { id: 'd' }])
+    .map(row => row.columns.map(col => col.blocks.map(b => b.id).join('/')).join('+'));
+  assert.deepEqual(cols(placeOnPage(page, 'c', { targetId: 'b', side: 'right' })), ['long+b+c']);
+  assert.deepEqual(cols(placeOnPage(page, 'c', { targetId: 'b', side: 'below' })), ['long+b', 'c']);
+  const stackedUnder = placeOnPage(page, 'c', { targetId: 'b', side: 'under' });
+  assert.deepEqual(cols(stackedUnder), ['long+b/c']);
+  assert.deepEqual(cols(placeOnPage(stackedUnder, 'd', { targetId: 'c', side: 'over' })), ['long+b/d/c']);
+});
+
+test('a column\'s blocks come and go as any block does', () => {
+  const page = [{ cells: [{ blockId: 'long' }, { blockId: 'b', under: [{ blockId: 'c' }], width: 0.3 }] }];
+  assert.deepEqual(takeOffPage(page, 'b')[0].cells[1], { blockId: 'c', width: 0.3 });
+  assert.deepEqual(blocksOffPage(page, [{ id: 'long' }, { id: 'b' }, { id: 'c' }, { id: 'x' }]).map(b => b.id), ['x']);
+  assert.deepEqual(shape(stacked(page)), ['long', 'b', 'c']);
+  assert.deepEqual(setCellWidth(page, 'c', 0.5)[0].cells[1].width, 0.5);
+  const moved = placeOnPage(page, 'c', { targetId: 'long', side: 'below' });
+  assert.deepEqual(moved.map(r => r.cells.map(c => [c.blockId, ...(c.under || []).map(u => u.blockId)].join('/')).join('+')), ['long+b', 'c']);
+});
+
+test('an older build reads the column\'s top block, and keeps the rest as a field it does not know', () => {
+  const page = [{ cells: [{ blockId: 'b', under: [{ blockId: 'c', newer: 1 }] }] }];
+  assert.deepEqual(normalizePageRows(page), page);
 });

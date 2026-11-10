@@ -42,6 +42,33 @@ const isCell = cell => cell && typeof cell === 'object' && typeof cell.blockId =
 const isLocal = cell => isCell(cell) && !cell.folderId;
 const cellKey = cell => `${cell.folderId || ''}\u0000${cell.blockId}`;
 
+// ── Columns ──────────────────────────────────────────────────────────────
+//
+// Asked 2026-11-10: "if i want to put a block just after the end of another
+// block when they are both on the right side of another longer block, it
+// should be possible. right now it's whether the block stays below both or
+// it puts itself on the side again. i want to have those three solutions."
+//
+// So a cell is a column: its own block, and blocks stacked under it in the
+// same column (`under: [{ blockId }]`). A build from before this reads the
+// cell's own block and keeps `under` whole as a field it does not know.
+// A column's `width` (edit mode) is the cell's, whichever block heads it.
+
+/** A cell's blocks, top to bottom: its own, then those stacked under it. */
+const stackOf = cell => [cell, ...(Array.isArray(cell?.under) ? cell.under : [])].filter(isCell);
+const localIdsOf = cell => stackOf(cell).filter(isLocal).map(c => c.blockId);
+const plain = entry => withUnknown({ blockId: entry.blockId }, entry, ['blockId', 'under', 'width']);
+
+/** A cell made of these entries, top to bottom, keeping the column's own fields from `from`; null when none are left. */
+function cellOf(entries, from) {
+  if (!entries.length) return null;
+  const [first, ...rest] = entries;
+  const head = plain(first);
+  if (from && from.width != null) head.width = from.width;
+  if (rest.length) head.under = rest.map(plain);
+  return head;
+}
+
 /** The rows as stored, cleaned: anything not a cell dropped, a block on the page once, no empty rows, unknown fields kept. */
 export function normalizePageRows(rows) {
   if (!Array.isArray(rows)) return [];
@@ -51,9 +78,17 @@ export function normalizePageRows(rows) {
     if (!row || typeof row !== 'object' || !Array.isArray(row.cells)) continue;
     const cells = [];
     for (const cell of row.cells) {
-      if (!isCell(cell) || seen.has(cellKey(cell))) continue;
-      seen.add(cellKey(cell));
-      cells.push(withUnknown({ blockId: cell.blockId }, cell, ['blockId']));
+      if (!cell || typeof cell !== 'object') continue;
+      const entries = stackOf(cell).filter(entry => {
+        if (seen.has(cellKey(entry))) return false;
+        seen.add(cellKey(entry));
+        return true;
+      });
+      const made = cellOf(entries, cell);
+      if (!made) continue;
+      // What a newer build put on the cell itself stays with it.
+      const extra = withUnknown({}, cell, ['blockId', 'under', 'width', 'folderId']);
+      cells.push(entries[0] === cell ? made : { ...made, ...extra });
     }
     if (cells.length) out.push(withUnknown({ cells }, row, ['cells']));
   }
@@ -87,7 +122,7 @@ export const isNarrow = width => Number(width) > 0 && Number(width) <= NARROW_MA
 
 /** The computer's rows, one block to a row, in reading order: what a phone shows until it has a layout of its own. */
 export function stacked(rows) {
-  return normalizePageRows(rows).flatMap(row => row.cells.map(cell => ({ cells: [cell] })));
+  return normalizePageRows(rows).flatMap(row => row.cells.flatMap(cell => stackOf(cell).map(entry => ({ cells: [plain(entry)] }))));
 }
 
 /** The rows of a page as shown at this width. */
@@ -122,13 +157,21 @@ export function samePageLayouts(a, b) {
     (!Array.isArray(a?.narrowRows) || samePage(a.narrowRows, b.narrowRows));
 }
 
-/** The rows the page shows, each `{ key, blocks }`, in its order; a row with nothing to show is left out. */
+/**
+ * The rows the page shows, each `{ key, columns, blocks }` -- its columns,
+ * each `{ key, blocks, width }` top to bottom, and all its blocks in reading
+ * order; anything with nothing to show is left out.
+ */
 export function blocksOnPage(rows, blocks = []) {
   const byId = new Map((blocks || []).map(block => [block.id, block]));
   const out = [];
   for (const row of rows || []) {
-    const shown = (row.cells || []).filter(isLocal).map(cell => byId.get(cell.blockId)).filter(Boolean);
-    if (shown.length) out.push({ key: shown[0].id, blocks: shown });
+    const columns = [];
+    for (const cell of row.cells || []) {
+      const shown = localIdsOf(cell).map(id => byId.get(id)).filter(Boolean);
+      if (shown.length) columns.push({ key: shown[0].id, blocks: shown, width: cell.width });
+    }
+    if (columns.length) out.push({ key: columns[0].key, columns, blocks: columns.flatMap(c => c.blocks) });
   }
   return out;
 }
@@ -136,49 +179,59 @@ export function blocksOnPage(rows, blocks = []) {
 /** The folder's blocks that are not on the page, in the folder's order: what is offered as existing. */
 export function blocksOffPage(rows, blocks = []) {
   const on = new Set();
-  for (const row of rows || []) for (const cell of row.cells || []) if (isLocal(cell)) on.add(cell.blockId);
+  for (const row of rows || []) for (const cell of row.cells || []) for (const id of localIdsOf(cell)) on.add(id);
   return (blocks || []).filter(block => !on.has(block.id));
 }
 
-/** The rows without the local cells whose block is gone; other folders' cells stay. */
-export function tidyPage(rows, blocks = []) {
-  const ids = new Set((blocks || []).map(block => block.id));
-  return normalizePageRows((rows || []).map(row => ({
+/** The rows with only the entries `keep` says yes to, columns and rows left empty gone. */
+function keepEntries(rows, keep) {
+  return normalizePageRows(normalizePageRows(rows).map(row => ({
     ...row,
-    cells: (row.cells || []).filter(cell => !isLocal(cell) || ids.has(cell.blockId))
+    cells: row.cells.map(cell => cellOf(stackOf(cell).filter(keep), cell)).filter(Boolean)
   })));
 }
 
-const rowOf = (rows, blockId) => rows.findIndex(row => (row.cells || []).some(cell => isLocal(cell) && cell.blockId === blockId));
+/** The rows without the local entries whose block is gone; other folders' stay. */
+export function tidyPage(rows, blocks = []) {
+  const ids = new Set((blocks || []).map(block => block.id));
+  return keepEntries(rows, entry => !isLocal(entry) || ids.has(entry.blockId));
+}
+
+const rowOf = (rows, blockId) => rows.findIndex(row => (row.cells || []).some(cell => localIdsOf(cell).includes(blockId)));
 
 /** The page with a block taken off it. The block itself stays in the folder. */
 export function takeOffPage(rows, blockId, { blocks = null } = {}) {
   const list = blocks ? tidyPage(rows, blocks) : normalizePageRows(rows);
-  return normalizePageRows(list.map(row => ({
-    ...row,
-    cells: row.cells.filter(cell => !(isLocal(cell) && cell.blockId === blockId))
-  })));
+  return keepEntries(list, entry => !(isLocal(entry) && entry.blockId === blockId));
 }
 
 /**
- * The page with a block placed by another one: `side` 'above' or 'below' puts
- * it on a row of its own there, 'left' or 'right' beside it in its row. A
- * block already on the page moves; one not on it yet is put on. With no
+ * The page with a block placed by another one. `side`:
+ * - 'left' or 'right': a column of its own beside the target's column;
+ * - 'above' or 'below': a row of its own above or below the target's row;
+ * - 'over' or 'under': in the target's column, just before or after it.
+ * A block already on the page moves; one not on it yet is put on. With no
  * `targetId` (or one not on the page) it goes on a row of its own at the end.
  */
 export function placeOnPage(rows, blockId, { targetId = null, side = 'below', blocks = null } = {}) {
   if (blockId === targetId) return normalizePageRows(blocks ? tidyPage(rows, blocks) : rows);
+  const existing = normalizePageRows(rows).flatMap(row => row.cells.flatMap(stackOf)).find(c => isLocal(c) && c.blockId === blockId);
+  const moved = existing ? plain(existing) : { blockId };
   const kept = takeOffPage(rows, blockId, { blocks });
-  const cell = { blockId };
-  const existing = (rows || []).flatMap(row => row.cells || []).find(c => isLocal(c) && c.blockId === blockId);
-  const moved = existing ? withUnknown(cell, existing, ['blockId']) : cell;
   const at = targetId ? rowOf(kept, targetId) : -1;
   if (at === -1) return [...kept, { cells: [moved] }];
+  const row = kept[at];
+  const i = row.cells.findIndex(cell => localIdsOf(cell).includes(targetId));
   if (side === 'left' || side === 'right') {
-    const row = kept[at];
-    const i = row.cells.findIndex(c => isLocal(c) && c.blockId === targetId);
     const cells = [...row.cells];
     cells.splice(side === 'left' ? i : i + 1, 0, moved);
+    return kept.map((r, k) => (k === at ? { ...r, cells } : r));
+  }
+  if (side === 'over' || side === 'under') {
+    const stack = stackOf(row.cells[i]);
+    const j = stack.findIndex(entry => isLocal(entry) && entry.blockId === targetId);
+    stack.splice(side === 'over' ? j : j + 1, 0, moved);
+    const cells = row.cells.map((cell, k) => (k === i ? cellOf(stack, cell) : cell));
     return kept.map((r, k) => (k === at ? { ...r, cells } : r));
   }
   const next = [...kept];
@@ -256,7 +309,7 @@ export function setCellWidth(rows, blockId, width) {
   return normalizePageRows(rows).map(row => ({
     ...row,
     cells: row.cells.map(cell => {
-      if (cell.folderId || cell.blockId !== blockId) return cell;
+      if (!localIdsOf(cell).includes(blockId)) return cell;
       const { width: _old, ...rest } = cell;
       return width == null ? rest : { ...rest, width: Math.max(0.15, Math.min(1, Number(width))) };
     })

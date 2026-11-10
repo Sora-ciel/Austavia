@@ -19,7 +19,7 @@ const usable = src => typeof src === 'string' && /^(data:image\/|https?:|blob:)/
 export function pageCover(page, blocks = []) {
   const byId = new Map((blocks || []).map(block => [block.id, block]));
   for (const row of page?.rows || []) {
-    for (const cell of row?.cells || []) {
+    for (const cell of (row?.cells || []).flatMap(c => [c, ...(Array.isArray(c?.under) ? c.under : [])])) {
       const block = byId.get(cell?.blockId);
       if (block?.type !== 'image') continue;
       const src = usable(block.src) ? block.src : usable(block.resolvedSrc) ? block.resolvedSrc : '';

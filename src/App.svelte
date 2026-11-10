@@ -3872,6 +3872,9 @@
   // history (utils/pagePlaces.js).
   let pageAt = null;
   let places = NO_PLACES;
+  // Page mode's edit mode: pictures sized and cropped. Its button is in the
+  // control bar, so its state is here.
+  let pageEditMode = false;
   $: openPageBlock = pageAt ? blocks.find(b => b.id === pageAt && b.type === 'page') || null : null;
   // A page block deleted, or a folder changed under it: back to the folder's
   // own page. A function, so pageAt is read here without the check feeding
@@ -7038,6 +7041,38 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 .screenshot-btn:hover:not(:disabled) { filter: brightness(1.18); }
 
+/* Page mode's back, forward and edit: the bar's own buttons, narrower. */
+.page-nav-bar {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.page-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--controls-border, #333);
+  background: var(--controls-bg, #333);
+  color: var(--controls-button-text, var(--controls-text, #fff));
+  cursor: pointer;
+}
+.page-bar-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.page-bar-btn:hover:not(:disabled) { filter: brightness(1.18); }
+.page-bar-btn:disabled { opacity: 0.35; cursor: default; }
+.page-bar-btn.on { box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff)); }
+
 /* Wide enough for the words while it is saying them, and back to an icon
    afterwards. Colours stay the button's own -- see the theme rule in
    CLAUDE.md. */
@@ -7610,6 +7645,29 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:moveDown={moveFocusedBlockDown}
       on:modeSettingChange={handleModeSettingChange}
     />
+    <!-- Page mode's back, forward and edit, in the bar rather than over the
+         page (asked 2026-11-10: they made "the page start a lot lower than
+         where the buttons start ... or put them in the buttons on controls
+         before the music and timer"). -->
+    {#if mode === 'page'}
+      <div class="page-nav-bar" role="group" aria-label="Page">
+        <button class="page-bar-btn" title="Back" aria-label="Back" disabled={!places.back.length} on:click={() => stepPlace(-1)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <button class="page-bar-btn" title="Forward" aria-label="Forward" disabled={!places.forward.length} on:click={() => stepPlace(1)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+        <button
+          class="page-bar-btn"
+          class:on={pageEditMode}
+          title={pageEditMode ? 'Done editing' : 'Edit: size and crop pictures'}
+          aria-pressed={pageEditMode}
+          on:click={() => (pageEditMode = !pageEditMode)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg>
+        </button>
+      </div>
+    {/if}
     <!-- A timer in use, reachable from any mode, just before the mini player
          (asked for on 2026-09-29) -- see utils/timerChip.js. On a phone it is
          a notification instead. -->
@@ -7900,12 +7958,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       page={pageNow}
       {pageTitle}
       pageId={pageAt}
-      canGoBack={places.back.length > 0}
-      canGoForward={places.forward.length > 0}
+      {pageEditMode}
       on:pageChange={(e) => changePageShown(e.detail.page)}
       on:renamePage={(e) => renamePageShown(e.detail.title)}
-      on:placeBack={() => stepPlace(-1)}
-      on:placeForward={() => stepPlace(1)}
+
       on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
       on:insertOnPage={(e) => insertOnPage(e.detail)}
       {habits}

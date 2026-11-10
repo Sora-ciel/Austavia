@@ -116,14 +116,14 @@ moment, archive instead of delete) after these, in an order to be agreed.
    apart from it and slightly lower.
 3. *Done 2026-11-10.* **Calendar: in the app's style rather than Outlook's**; the now line not
    red -- "maybe the opposite of the text's colour".
-4. **Page mode: the ⋮⋮ handle a little further right, and better drawn** --
+4. *Done 2026-11-10.* **Page mode: the ⋮⋮ handle a little further right, and better drawn** --
    easier to take a block that sits to the right of another.
-5. **Page mode: three ways to drop next to a block that is beside a longer
+5. *Done 2026-11-10.* **Page mode: three ways to drop next to a block that is beside a longer
    one** -- beside it, below the whole row, or "just after the end of
    another block when they are both on the right side of another longer
    block": stacked in that column. A cell can hold blocks one under
    another (`under`), kept by older builds as an unknown field.
-6. **Page mode: the arrows and the edit button no longer push the page
+6. *Done 2026-11-10.* **Page mode: the arrows and the edit button no longer push the page
    down** -- into the control bar, before the music and the timer.
 7. **Habit tracker, below computer width: the day buttons square**, not
    stretched as the screen widens.
