@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy, tick, setContext } from 'svelte';
   import { writable } from 'svelte/store';
-  import { folderCard } from './utils/folderDirectory.js';
+  import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
@@ -2995,7 +2995,7 @@
   }
   $: refreshFolderDirectory(savedList, currentSaveName);
   const folderPages = writable([]);
-  $: folderPages.set(blocks.filter(b => b.type === 'page').map(b => ({ id: b.id, title: b.title || '' })));
+  $: folderPages.set(blocks.filter(b => b.type === 'page').map(b => ({ id: b.id, title: b.title || '', cover: pageCover(b, blocks) })));
   setContext('folders', {
     directory: folderDirectory,
     current: openFolderName,

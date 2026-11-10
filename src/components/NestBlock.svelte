@@ -174,7 +174,9 @@
             disabled={!tile.found}
             on:click|stopPropagation={() => openTile(tile)}
           >
-            {#if tile.link.pageId}
+            {#if tile.link.pageId && tile.page?.cover}
+              <span class="nest-cover" style={`background-image: url("${tile.page.cover.replace(/"/g, '%22')}")`}></span>
+            {:else if tile.link.pageId}
               <span class="nest-cover nest-page-cover" aria-hidden="true">▤</span>
             {:else}
               <span class="nest-cover" style={tile.folder?.cover ? `background-image: url("${tile.folder.cover.replace(/"/g, '%22')}")` : ''}></span>

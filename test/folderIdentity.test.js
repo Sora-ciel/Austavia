@@ -52,3 +52,12 @@ test('a folder\'s tile shows its wallpaper, or else its first picture', () => {
   assert.equal(folderCard('C', { blocks: [{ type: 'image', src: { type: 'storage' } }] }).cover, '');
   assert.equal(folderCard('D', {}).id, 'legacy:D');
 });
+
+import { pageCover } from '../src/utils/folderDirectory.js';
+
+test('a page in a nest shows the first picture on it', () => {
+  const blocks = [{ id: 't', type: 'text' }, { id: 'i', type: 'image', src: 'https://x/a.png' }, { id: 'j', type: 'image', src: 'https://x/b.png' }];
+  const page = { rows: [{ cells: [{ blockId: 't' }] }, { cells: [{ blockId: 'j' }, { blockId: 'i' }] }] };
+  assert.equal(pageCover(page, blocks), 'https://x/b.png');
+  assert.equal(pageCover({ rows: [] }, blocks), '');
+});

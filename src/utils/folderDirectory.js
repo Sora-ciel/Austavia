@@ -11,6 +11,24 @@ import { folderIdOf } from './folderIdentity.js';
 
 const usable = src => typeof src === 'string' && /^(data:image\/|https?:|blob:)/.test(src);
 
+/**
+ * A page block's cover: the first picture on it, in the order a computer
+ * shows it (asked 2026-11-10: "I think the first image of the page should
+ * be shown in the nest"). `blocks` are the folder's.
+ */
+export function pageCover(page, blocks = []) {
+  const byId = new Map((blocks || []).map(block => [block.id, block]));
+  for (const row of page?.rows || []) {
+    for (const cell of row?.cells || []) {
+      const block = byId.get(cell?.blockId);
+      if (block?.type !== 'image') continue;
+      const src = usable(block.src) ? block.src : usable(block.resolvedSrc) ? block.resolvedSrc : '';
+      if (src) return src;
+    }
+  }
+  return '';
+}
+
 /** One folder's card, from its stored payload. */
 export function folderCard(name, payload) {
   const settings = payload?.modeSettings || {};
