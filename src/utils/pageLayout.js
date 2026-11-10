@@ -62,7 +62,64 @@ export function normalizePageRows(rows) {
 
 /** The page's settings as stored: `{ rows }`, plus whatever a newer build added. */
 export function normalizePageSettings(page) {
-  return withUnknown({ rows: normalizePageRows(page?.rows) }, page || {}, ['rows']);
+  const out = { rows: normalizePageRows(page?.rows) };
+  if (Array.isArray(page?.narrowRows)) out.narrowRows = normalizePageRows(page.narrowRows);
+  return withUnknown(out, page || {}, ['rows', 'narrowRows']);
+}
+
+// ── A layout for a computer, and one for a phone ─────────────────────────
+//
+// Asked 2026-11-10: "Page mode will on pc use more of the width than on
+// phone. between pc width and phone width you'll be able to put the blocks in
+// different positions etc. making it so that if i change for the blocks to be
+// a certain way in phone, it won't change it for pc too."
+//
+// So a page has `rows`, as a computer shows it, and `narrowRows`, as a phone
+// does. Until something is moved on a phone there is no `narrowRows`, and a
+// phone shows the computer's rows one block under another (`stacked`).
+// Putting a block on a page or taking it off is the page's content and
+// changes both; moving a block is how it is laid out and changes only the
+// layout it was moved in (`editPage`).
+
+/** Up to this width a page is laid out as on a phone. */
+export const NARROW_MAX = 700;
+export const isNarrow = width => Number(width) > 0 && Number(width) <= NARROW_MAX;
+
+/** The computer's rows, one block to a row, in reading order: what a phone shows until it has a layout of its own. */
+export function stacked(rows) {
+  return normalizePageRows(rows).flatMap(row => row.cells.map(cell => ({ cells: [cell] })));
+}
+
+/** The rows of a page as shown at this width. */
+export function rowsFor(page, narrow) {
+  if (!narrow) return normalizePageRows(page?.rows);
+  return Array.isArray(page?.narrowRows) ? normalizePageRows(page.narrowRows) : stacked(page?.rows);
+}
+
+/**
+ * The page after an edit made at this width: `op` turns rows into rows.
+ * `content` (putting on, taking off) is done to both layouts; anything else
+ * (moving) only to the one in use, a phone's starting from the stacked
+ * rows the first time.
+ */
+export function editPage(page, { narrow = false, op, content = false } = {}) {
+  const base = page || {};
+  const next = { ...base };
+  if (content) {
+    next.rows = op(normalizePageRows(base.rows));
+    if (Array.isArray(base.narrowRows)) next.narrowRows = op(normalizePageRows(base.narrowRows));
+    return next;
+  }
+  if (narrow) next.narrowRows = op(rowsFor(base, true));
+  else next.rows = op(normalizePageRows(base.rows));
+  return next;
+}
+
+/** Whether two pages are the same in both layouts. */
+export function samePageLayouts(a, b) {
+  return samePage(a?.rows, b?.rows) &&
+    Array.isArray(a?.narrowRows) === Array.isArray(b?.narrowRows) &&
+    (!Array.isArray(a?.narrowRows) || samePage(a.narrowRows, b.narrowRows));
 }
 
 /** The rows the page shows, each `{ key, blocks }`, in its order; a row with nothing to show is left out. */
@@ -170,7 +227,8 @@ export const PAGE_BLOCK_TYPES = [
   { type: 'clock', label: 'Clock' },
   { type: 'music', label: 'Music' },
   { type: 'embed', label: 'Embed' },
-  { type: 'nest', label: 'Nest' }
+  { type: 'nest', label: 'Nest' },
+  { type: 'page', label: 'Page' }
 ];
 
 /** How an existing block is named in the list to pick from: its title, or its first line. */
@@ -182,6 +240,7 @@ export function blockPickName(block, htmlToText = value => String(value || '')) 
   if (block.type === 'embed') return String(block.content || '').trim() || 'Embed';
   if (block.type === 'music') return (block.title || '').trim() || 'Music';
   if (block.type === 'nest') return (block.title || '').trim() || 'Nest';
+  if (block.type === 'page') return (block.title || '').trim() || 'Untitled page';
   const first = htmlToText(block.content || '').split('\n').map(line => line.trim()).find(Boolean);
   return first ? (first.length > 60 ? `${first.slice(0, 60)}…` : first) : 'Empty text';
 }

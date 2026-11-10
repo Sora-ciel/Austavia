@@ -11,7 +11,7 @@ export const MODE_DEFINITIONS = {
     // It lands here and in Simple Note because those are the two that
     // hold blocks; Single Note is one piece of writing and Habit Tracker is a
     // list of habits, and neither has anywhere to put a block.
-    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'nest'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'nest', 'page'],
     showRightControls: true
   },
   simple: {
@@ -34,7 +34,7 @@ export const MODE_DEFINITIONS = {
   page: {
     id: 'page',
     label: 'Page',
-    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'task', 'nest'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'task', 'nest', 'page'],
     showRightControls: true,
     ownOrder: true,
     settings: { wallpaper: true }

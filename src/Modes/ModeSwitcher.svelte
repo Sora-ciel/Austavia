@@ -39,8 +39,13 @@
   // utils/modeBackground.js.
   export let canvasBackgroundSettings = {};
   export let taskAddDirection = 'above';
-  /** What Page mode shows, row by row -- modeSettings.page.rows. */
-  export let pageRows = [];
+  /** The page Page mode shows: the folder's own, or a page block's -- `{ rows, narrowRows }`. */
+  export let page = { rows: [] };
+  export let pageTitle = '';
+  /** The page block shown, or null for the folder's own page. */
+  export let pageId = null;
+  export let canGoBack = false;
+  export let canGoForward = false;
   export let musicLibrary = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
@@ -128,7 +133,11 @@
     <PageMode
       {openFolder}
       {blocks}
-      rows={pageRows}
+      {page}
+      title={pageTitle}
+      {pageId}
+      {canGoBack}
+      {canGoForward}
       {focusedBlockId}
       bind:canvasRef
       {canvasColors}
@@ -144,7 +153,10 @@
       on:modeSettingChange
       on:addBlock
       on:insertOnPage
-      on:renameFolder
+      on:pageChange
+      on:renamePage
+      on:placeBack
+      on:placeForward
     />
   {:else if mode === 'habit'}
     <HabitTrackerMode

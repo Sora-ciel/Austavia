@@ -31,17 +31,24 @@
  */
 
 import { normalizeHabits, habitsEqual } from './habitStore.js';
-import { normalizePageRows, samePage } from './pageLayout.js';
+import { normalizePageRows, normalizePageSettings, samePageLayouts } from './pageLayout.js';
 
 /**
  * What of the mode settings goes into a history entry: the habits, and which
  * blocks a page shows (2026-11-04) -- putting a block on a page or taking it
  * off is something made, and Undo puts it back.
  */
+// Both layouts, a computer's and a phone's (2026-11-10), without what this
+// build does not know.
+function pageForHistory(page) {
+  const { rows, narrowRows } = normalizePageSettings(page);
+  return narrowRows ? { rows, narrowRows } : { rows };
+}
+
 export function settingsForHistory(modeSettings) {
   return {
     habits: normalizeHabits(modeSettings?.habit?.habits),
-    page: normalizePageRows(modeSettings?.page?.rows)
+    page: pageForHistory(modeSettings?.page)
   };
 }
 
@@ -58,8 +65,18 @@ export function settingsFromHistory(modeSettings, entry) {
   }
   // An entry from before pages were in the history says nothing of them, and
   // is not read as "an empty page".
-  if (Array.isArray(saved.page) && !samePage(modeSettings?.page?.rows, saved.page)) {
-    next = { ...next, page: { ...(next?.page || {}), rows: normalizePageRows(saved.page) } };
+  // Entries written before a phone had its own layout held the rows alone.
+  const savedPage = Array.isArray(saved.page) ? { rows: saved.page } : saved.page;
+  if (savedPage && typeof savedPage === 'object' && !samePageLayouts(pageForHistory(modeSettings?.page), pageForHistory(savedPage))) {
+    const { narrowRows, ...rest } = next?.page || {};
+    next = {
+      ...next,
+      page: {
+        ...rest,
+        rows: normalizePageRows(savedPage.rows),
+        ...(Array.isArray(savedPage.narrowRows) ? { narrowRows: normalizePageRows(savedPage.narrowRows) } : {})
+      }
+    };
   }
   return next;
 }

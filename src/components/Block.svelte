@@ -15,6 +15,7 @@
   import ClockBlock from './ClockBlock.svelte';
   import TaskBlock from './TaskBlock.svelte';
   import NestBlock from './NestBlock.svelte';
+  import PageBlock from './PageBlock.svelte';
   import { recallScroll } from '../utils/scrollMemory.js';
 
   export let block;
@@ -105,6 +106,15 @@
     {...common}
     initialLinks={block.links}
     initialTitle={block.title}
+    on:delete
+    on:update
+    on:focusToggle
+  />
+{:else if block.type === 'page'}
+  <PageBlock
+    {...common}
+    initialTitle={block.title}
+    initialRows={block.rows}
     on:delete
     on:update
     on:focusToggle

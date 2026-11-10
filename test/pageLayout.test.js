@@ -102,3 +102,50 @@ test('an existing block is offered under its title or first line', () => {
   assert.equal(blockPickName({ type: 'text', content: '\n  Accueil \nsecond' }), 'Accueil');
   assert.equal(blockPickName({ type: 'text', content: '' }), 'Empty text');
 });
+
+// Asked 2026-11-10: "if i change for the blocks to be a certain way in phone,
+// it won't change it for pc too."
+import { rowsFor, editPage, stacked, isNarrow, samePageLayouts } from '../src/utils/pageLayout.js';
+
+test('a phone shows the computer\'s rows one block under another until it has a layout of its own', () => {
+  const page = { rows: rowsOf(['a', 'b'], ['c']) };
+  assert.deepEqual(shape(rowsFor(page, true)), ['a', 'b', 'c']);
+  assert.deepEqual(shape(rowsFor(page, false)), ['a+b', 'c']);
+  assert.deepEqual(shape(stacked(page.rows)), ['a', 'b', 'c']);
+});
+
+test('moving a block on a phone changes the phone\'s layout and not the computer\'s', () => {
+  const page = { rows: rowsOf(['a', 'b'], ['c']) };
+  const moved = editPage(page, { narrow: true, op: rows => placeOnPage(rows, 'c', { targetId: 'a', side: 'above' }) });
+  assert.deepEqual(shape(rowsFor(moved, true)), ['c', 'a', 'b']);
+  assert.deepEqual(shape(rowsFor(moved, false)), ['a+b', 'c']);
+});
+
+test('moving a block on a computer leaves a phone\'s own layout alone', () => {
+  const page = { rows: rowsOf(['a'], ['b']), narrowRows: rowsOf(['b'], ['a']) };
+  const moved = editPage(page, { narrow: false, op: rows => placeOnPage(rows, 'b', { targetId: 'a', side: 'right' }) });
+  assert.deepEqual(shape(rowsFor(moved, false)), ['a+b']);
+  assert.deepEqual(shape(rowsFor(moved, true)), ['b', 'a']);
+});
+
+test('putting a block on a page, or taking it off, shows on both', () => {
+  const page = { rows: rowsOf(['a']), narrowRows: rowsOf(['a']) };
+  const put = editPage(page, { content: true, op: rows => putOnPage(rows, 'b') });
+  assert.deepEqual(shape(rowsFor(put, false)), ['a', 'b']);
+  assert.deepEqual(shape(rowsFor(put, true)), ['a', 'b']);
+  const off = editPage(put, { content: true, op: rows => takeOffPage(rows, 'a') });
+  assert.deepEqual(shape(rowsFor(off, true)), ['b']);
+  assert.equal(samePageLayouts(off, off), true);
+  assert.equal(samePageLayouts(page, put), false);
+});
+
+test('a phone is up to 700px wide', () => {
+  assert.equal(isNarrow(390), true);
+  assert.equal(isNarrow(1280), false);
+});
+
+test('the phone\'s layout is kept by the mode settings', () => {
+  const settings = normalizeModeSettings({ page: { rows: rowsOf(['a']), narrowRows: rowsOf(['a']) } });
+  assert.deepEqual(shape(settings.page.narrowRows), ['a']);
+  assert.equal('narrowRows' in normalizeModeSettings({ page: { rows: [] } }).page, false);
+});

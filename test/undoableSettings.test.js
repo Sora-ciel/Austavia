@@ -49,3 +49,17 @@ test('a history entry from before pages is not read as an empty page', () => {
   const now = { habit: { habits: [] }, page: { rows: [{ cells: [{ blockId: 'a' }] }] } };
   assert.equal(settingsFromHistory(now, { settings: { habits: [] } }), now);
 });
+
+test('undo reaches a phone\'s own layout of a page too', () => {
+  const rows = ids => ids.map(blockId => ({ cells: [{ blockId }] }));
+  const page = (narrow) => ({ habit: { habits: [] }, page: { rows: rows(['a', 'b']), narrowRows: rows(narrow) } });
+  const before = settingsForHistory(page(['a', 'b']));
+  const restored = settingsFromHistory(page(['b', 'a']), { settings: before });
+  assert.deepEqual(restored.page.narrowRows.map(r => r.cells[0].blockId), ['a', 'b']);
+});
+
+test('an entry from before phone layouts holds the rows alone, and still undoes them', () => {
+  const now = { habit: { habits: [] }, page: { rows: [{ cells: [{ blockId: 'b' }] }] } };
+  const restored = settingsFromHistory(now, { settings: { habits: [], page: [{ cells: [{ blockId: 'a' }] }] } });
+  assert.deepEqual(restored.page.rows.map(r => r.cells[0].blockId), ['a']);
+});

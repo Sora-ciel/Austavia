@@ -112,24 +112,24 @@ moment, archive instead of delete) after these, in an order to be agreed.
 Asked in one message; small ones first, the calendar last because it is the
 biggest, the Linux pop-ups after everything.
 
-1. **Task mode: smaller margins, text about 5% bigger** -- "make margins and
+1. *Done 2026-11-10.* **Task mode: smaller margins, text about 5% bigger** -- "make margins and
    the other style of margin smaller to have more space for text".
-2. **Page mode: nests bigger on a computer** -- "the default size of each nest
+2. *Done 2026-11-10.* **Page mode: nests bigger on a computer** -- "the default size of each nest
    block is a bit bigger than that for pcs. right now it's a bit small".
-3. **Page mode: a picture and writing on one row start at the same height**
+3. *Done 2026-11-10.* **Page mode: a picture and writing on one row start at the same height**
    -- "make the upper part of the first line of text start at the same place
    as the start of the image. right now the text starts slightly higher".
-4. **Nests: New folder and New page** -- "you should be able to choose new
+4. *Done 2026-11-10.* **Nests: New folder and New page** -- "you should be able to choose new
    folder or new page too. so that pages can be nested in pages instead of
    always being a different folder." A page that is not a folder is a
    **page block** (`type: 'page'`, its own `title` and `rows`), so it works
    on its own (CLAUDE.md); Page mode opens it in place of the folder's own
    page. A nest links it as `{ pageId, name }` beside folder links.
-5. **Page mode: back and forward arrows**, top left, in the mode's colours
+5. *Done 2026-11-10* (utils/pagePlaces.js). **Page mode: back and forward arrows**, top left, in the mode's colours
    -- "so that if you click and enter a nest you can easily go back or the
    other way around". A history of places (a folder's page, or a page
    block in a folder) kept for the session on this device.
-6. **Page mode: wider on a computer, and its own layout on a phone** -- "on
+6. *Done 2026-11-10* (pageLayout.js editPage). **Page mode: wider on a computer, and its own layout on a phone** -- "on
    pc use more of the width than on phone ... if i change for the blocks to
    be a certain way in phone, it won't change it for pc too." Two layouts per
    page, `rows` (wide) and `narrowRows` (phone), the narrow one following the
@@ -376,6 +376,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Pages in pages, back and forward, a phone's own layout** (2026-11-10). In a nest, "＋ Add" offers New page and New folder (each asks a name), this folder's pages and the other folders. A page opens in Page mode in place of the folder's page, with its own title (press to rename) and its own blocks; "/page" puts one straight on a page as a line that opens it; on the Canvas "+ Page" is a card with Open page. The arrows top left go back and forward through what was opened. On a phone, moving a block changes only the phone's layout and not the computer's; putting a block on or taking it off changes both. A page uses most of a computer's width. Seen in a browser at 1200 and 390 px wide; check on the phone itself. |
 | next | **Nests** (2026-11-04). "+ Nest" on the Canvas, or "/nest" on a page: "＋ Folder" lists this device's other folders; a tile shows the folder's name over its wallpaper (or first picture) and opens it; × takes it out of the nest without touching the folder. Rename a linked folder: the tile follows the new name (seen in a browser). Duplicate it: the copy is a separate folder, not the linked one. On a second device after a sync the same tiles. Check on the phone, and that an older build keeps both the nest and the folder ids. |
 | next | **"/" on a page** (2026-11-04). In the writing on a page, type / (at the start of a line or after a space): a menu opens under the cursor with a new block of each kind, then the folder's blocks not on the page yet; typing after the / filters it ("/cour" finds a list called Courses), arrows and Enter pick, Escape closes. Picked at the end of the writing, the block goes under it; at the start, over it; in the middle, the writing is cut in two around it. One Undo takes it all back. "＋ Block…" opens the same menu with a search field. On the phone, check the menu opens above the keyboard and a tap picks. |
 | next | **Page mode** (2026-11-04). Mode, Page: the folder's name as a big title (press it to rename the folder), and only the blocks put on the page, with no frames or colours of their own. Click anywhere on the empty page and write: paragraphs typed together are one text block. "＋ Block…" offers a type, then New or one of the folder's blocks not on the page yet. The ⋮⋮ beside a block (top right on a phone): drag it onto another block's left or right edge to put them side by side, above or below for a row of its own; press it for "Take off page" (the block stays in the folder) and "Delete block". Undo takes any of it back; another device after a sync shows the same page. A row of several stacks on a phone. Seen in a browser; on the phone check dragging the handle with a finger, and that the task list, picture, clock and music look right on a page.

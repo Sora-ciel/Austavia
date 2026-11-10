@@ -152,7 +152,9 @@
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
   import { normalizeHabits, habitsEqual, mergeDeviceHabits, describeHabitChange } from './utils/habitStore.js';
   import { settingsForHistory, settingsFromHistory } from './utils/undoableSettings.js';
-  import { putOnPage, placeOnPage, samePage } from './utils/pageLayout.js';
+  import { putOnPage, placeOnPage, samePage, editPage, isNarrow, normalizePageSettings } from './utils/pageLayout.js';
+  import { NO_PLACES, visit, goBack, goForward, placesStillThere } from './utils/pagePlaces.js';
+  import { folderIdOf } from './utils/folderIdentity.js';
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
@@ -2696,6 +2698,7 @@
     embed: ['position', 'size', 'bgColor', 'textColor', 'content'],
     task: ['tasks', 'title'],
     nest: ['position', 'size', 'bgColor', 'textColor', 'links', 'title'],
+    page: ['position', 'size', 'bgColor', 'textColor', 'title', 'rows', 'narrowRows'],
     clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate', 'alarmTime', 'alarmEnabled'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };
@@ -2990,7 +2993,17 @@
     folderDirectory.set(cards.sort((a, b) => a.name.localeCompare(b.name)));
   }
   $: refreshFolderDirectory(savedList, currentSaveName);
-  setContext('folders', { directory: folderDirectory, current: openFolderName, open: name => load(name) });
+  const folderPages = writable([]);
+  $: folderPages.set(blocks.filter(b => b.type === 'page').map(b => ({ id: b.id, title: b.title || '' })));
+  setContext('folders', {
+    directory: folderDirectory,
+    current: openFolderName,
+    pages: folderPages,
+    open: name => goToPlace({ folder: name, pageId: null }),
+    openPage: id => goToPlace({ folder: currentSaveName, pageId: id }),
+    newFolder: name => makeFolderNamed(name),
+    newPage: title => makePageNamed(title)
+  });
 
   $: leftTheme = controlColors.left || CONTROL_COLOR_DEFAULTS.left;
   // The toolbar's buttons are coloured with buttonText, not textColor, and on
@@ -3851,6 +3864,99 @@
     singleNoteToOpen = { id, at: Date.now() };
   }
 
+  // ── Which page Page mode shows, and where it has been ─────────────────
+  // The folder's own page (modeSettings.page), or a page block in it
+  // (PageBlock.svelte, 2026-11-10) -- `pageAt`, how this device is moving
+  // around, so it stays on the device. `places` is the back and forward
+  // history (utils/pagePlaces.js).
+  let pageAt = null;
+  let places = NO_PLACES;
+  $: openPageBlock = pageAt ? blocks.find(b => b.id === pageAt && b.type === 'page') || null : null;
+  // A page block deleted, or a folder changed under it: back to the folder's
+  // own page. A function, so pageAt is read here without the check feeding
+  // itself.
+  function dropMissingPage(list, opening) {
+    if (pageAt && !opening && !list.some(b => b.id === pageAt && b.type === 'page')) pageAt = null;
+  }
+  $: dropMissingPage(blocks, folderOpening);
+  $: pageNow = openPageBlock
+    ? normalizePageSettings({ rows: openPageBlock.rows, ...(Array.isArray(openPageBlock.narrowRows) ? { narrowRows: openPageBlock.narrowRows } : {}) })
+    : modeSettings.page;
+  $: pageTitle = openPageBlock ? (openPageBlock.title || 'Untitled page') : currentSaveName;
+
+  /** The page shown now, replaced -- in the page block or the folder's settings. Not yet pushed to history. */
+  function putPageInPlace(page) {
+    const { rows, narrowRows } = normalizePageSettings(page);
+    if (openPageBlock) {
+      const id = openPageBlock.id;
+      blocks = blocks.map(b => (b.id === id
+        ? { ...b, rows, ...(narrowRows ? { narrowRows } : {}) }
+        : b));
+    } else {
+      modeSettings = normalizeModeSettings({ ...modeSettings, page: { ...modeSettings.page, rows, ...(narrowRows ? { narrowRows } : {}) } });
+    }
+  }
+
+  /** A change to the page shown, from Page mode: one step for Undo. */
+  async function changePageShown(page) {
+    await ensureCurrentHistorySnapshot();
+    putPageInPlace(page);
+    await pushHistory(blocks, modeOrders);
+  }
+
+  async function renamePageShown(title) {
+    if (!openPageBlock) return renameFolder({ detail: { to: title } });
+    const id = openPageBlock.id;
+    blocks = blocks.map(b => (b.id === id ? { ...b, title } : b));
+    await pushHistory(blocks, modeOrders);
+  }
+
+  const hereNow = () => ({ folder: currentSaveName, pageId: pageAt });
+
+  async function showPlace(place) {
+    if (place.folder !== currentSaveName) {
+      if (!savedList.includes(place.folder)) return false;
+      await load(place.folder);
+    }
+    pageAt = place.pageId || null;
+    // A page block is only ever shown by Page mode.
+    if (pageAt && mode !== 'page') setMode('page');
+    return true;
+  }
+
+  async function goToPlace(place) {
+    const from = hereNow();
+    if (await showPlace(place)) places = visit(places, from, place);
+  }
+
+  async function stepPlace(direction) {
+    places = placesStillThere(places, p => savedList.includes(p.folder));
+    const step = direction < 0 ? goBack(places, hereNow()) : goForward(places, hereNow());
+    if (!step) return;
+    places = step.history;
+    await showPlace(step.to);
+  }
+
+  /** A new, empty folder beside this one, made from a nest without opening it. */
+  async function makeFolderNamed(name) {
+    const target = savedList.includes(name) ? uniqueName(name, savedList) : name;
+    const empty = [];
+    await saveBlocks(target, { blocks: empty, modeOrders: ensureModeOrders(empty, {}), modeSettings: normalizeModeSettings() });
+    savedList = await listSavedBlocks();
+    logSync('save', target, 'made from a nest');
+    autoSyncDirty = true;
+    return { name: target, id: folderIdOf(target, {}) };
+  }
+
+  /** A new page block in this folder, made from a nest; its id. */
+  function makePageNamed(title) {
+    const page = makeBlock('page', { title });
+    blocks = [...blocks, page];
+    modeOrders = ensureModeOrders(blocks, modeOrders);
+    pushHistory(blocks, modeOrders);
+    return page.id;
+  }
+
   /** A new block of a kind, as the menu makes it; not yet in the folder. */
   function makeBlock(type = "text", fields = {}) {
     // Single Note holds only notes, and as many as you like -- it shows them
@@ -3860,7 +3966,7 @@
     // A clock is read at a glance, so it starts the size of one rather than the
     // size of a note.
     const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : 300;
-    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : 200;
+    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 140 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
     const position = mode === 'default'
@@ -3873,6 +3979,7 @@
       src: "",
       ...(type === "task" ? { tasks: [], title: "Task List" } : {}),
       ...(type === "nest" ? { links: [], title: "Nest" } : {}),
+      ...(type === "page" ? { title: "Untitled page", rows: [] } : {}),
       // 24-hour by default: the owner is in France, and the setting is one
       // click away for anyone who is not.
       // The alarm starts at seven and off: a time to change rather than a blank
@@ -3894,12 +4001,9 @@
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
     // Made on a page, it is put on that page in the same step, so one Undo
-    // takes both back.
+    // takes both back -- on both of its layouts, since it is content.
     if (mode === "page") {
-      modeSettings = normalizeModeSettings({
-        ...modeSettings,
-        page: { ...modeSettings.page, rows: putOnPage(modeSettings.page.rows, newBlock.id, { afterId, blocks }) }
-      });
+      putPageInPlace(editPage(pageNow, { content: true, op: rows => putOnPage(rows, newBlock.id, { afterId, blocks }) }));
       focusedBlockId = newBlock.id;
     }
     pushHistory(blocks, modeOrders);
@@ -3921,17 +4025,22 @@
       next.push(made);
       placed = made.id;
     }
-    let rows = modeSettings.page.rows;
-    rows = placeOnPage(rows, placed, { targetId: textId, side: where === 'above' ? 'above' : 'below', blocks: next });
     let carryOn = null;
     if (where === 'split') {
       carryOn = makeBlock('text', { content: afterHtml });
       next.push(carryOn);
-      rows = placeOnPage(rows, carryOn.id, { targetId: placed, side: 'below', blocks: next });
     }
+    const page = editPage(pageNow, {
+      content: true,
+      op: rows => {
+        let out = placeOnPage(rows, placed, { targetId: textId, side: where === 'above' ? 'above' : 'below', blocks: next });
+        if (carryOn) out = placeOnPage(out, carryOn.id, { targetId: placed, side: 'below', blocks: next });
+        return out;
+      }
+    });
     blocks = next;
+    putPageInPlace(page);
     modeOrders = ensureModeOrders(blocks, modeOrders);
-    modeSettings = normalizeModeSettings({ ...modeSettings, page: { ...modeSettings.page, rows } });
     focusedBlockId = placed;
     pushHistory(blocks, modeOrders);
   }
@@ -7786,10 +7895,17 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:deleteNoteElsewhere={deleteNoteInFolder}
       {keyboardOpen}
       {taskAddDirection}
-      pageRows={modeSettings.page.rows}
+      page={pageNow}
+      {pageTitle}
+      pageId={pageAt}
+      canGoBack={places.back.length > 0}
+      canGoForward={places.forward.length > 0}
+      on:pageChange={(e) => changePageShown(e.detail.page)}
+      on:renamePage={(e) => renamePageShown(e.detail.title)}
+      on:placeBack={() => stepPlace(-1)}
+      on:placeForward={() => stepPlace(1)}
       on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
       on:insertOnPage={(e) => insertOnPage(e.detail)}
-      on:renameFolder={renameFolder}
       {habits}
       {mayAddPicture}
       {musicLibrary}

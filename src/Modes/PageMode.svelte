@@ -36,12 +36,19 @@
   import { isPrimaryPointer } from '../utils/pointer.js';
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, dropSide,
-    PAGE_BLOCK_TYPES, blockPickName
+    PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow
   } from '../utils/pageLayout.js';
 
   export let openFolder = '';
   export let blocks = [];
-  export let rows = [];
+  /** The page shown: the folder's own or a page block's, `{ rows, narrowRows }`. */
+  export let page = { rows: [] };
+  /** Its title: the folder's name, or the page block's title. */
+  export let title = '';
+  /** The page block shown, or null for the folder's own page. */
+  export let pageId = null;
+  export let canGoBack = false;
+  export let canGoForward = false;
   export let focusedBlockId = null;
   export let canvasColors = {};
   export let backgroundSettings = {};
@@ -56,10 +63,22 @@
   $: modeTextColor = modeTextColorFor(canvasTheme);
   $: pageVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor};`;
 
-  $: shownRows = blocksOnPage(rows, blocks);
+  // A computer's layout and a phone's are kept apart (pageLayout.js,
+  // asked 2026-11-10): which one is in use goes by this window's width.
+  let innerWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  $: narrow = isNarrow(innerWidth);
+  $: rows = rowsFor(page, narrow);
+  // A page block never shows itself, which would open it inside itself.
+  $: shownRows = blocksOnPage(rows, blocks.filter(block => block.id !== pageId));
 
-  function changePage(next) {
-    dispatch('modeSettingChange', { page: { rows: next } });
+  /** Putting on or taking off -- the page's content, both layouts. */
+  function changeContent(op) {
+    dispatch('pageChange', { page: editPage(page, { narrow, content: true, op }) });
+  }
+
+  /** Moving -- the layout in use only. */
+  function changeLayout(op) {
+    dispatch('pageChange', { page: editPage(page, { narrow, op }) });
   }
 
   // ── Writing anywhere ─────────────────────────────────────────────────
@@ -111,7 +130,7 @@
     if (!renaming) return;
     renaming = false;
     const to = event.target.value.trim();
-    if (keep && to && to !== openFolder) dispatch('renameFolder', { to });
+    if (keep && to && to !== title) dispatch('renamePage', { title: to });
   }
 
   function titleKeydown(event) {
@@ -125,7 +144,7 @@
   let slashMenu = null; // { source: 'text' | 'button', textId, from, to, x, y, query }
   let slashActive = 0;
 
-  $: offPage = blocksOffPage(rows, blocks).map(block => ({
+  $: offPage = blocksOffPage(rows, blocks.filter(block => block.id !== pageId)).map(block => ({
     id: block.id,
     type: block.type === 'cleantext' ? 'text' : block.type,
     name: blockPickName(block, htmlToText)
@@ -161,7 +180,7 @@
     if (!item || !opened) return;
     if (opened.source === 'button') {
       if (item.kind === 'new') dispatch('addBlock', { type: item.type });
-      else changePage(putOnPage(rows, item.blockId, { blocks }));
+      else changeContent(r => putOnPage(r, item.blockId, { blocks }));
       return;
     }
     const editor = editorOf(opened.textId);
@@ -195,7 +214,7 @@
     const blockId = menu?.blockId;
     menu = null;
     if (!blockId) return;
-    if (id === 'takeOff') changePage(takeOffPage(rows, blockId, { blocks }));
+    if (id === 'takeOff') changeContent(r => takeOffPage(r, blockId, { blocks }));
     else if (id === 'delete') dispatch('delete', { id: blockId });
   }
 
@@ -251,7 +270,9 @@
   function handleUp() {
     stopListening();
     if (dragging && drop) {
-      changePage(placeOnPage(rows, dragging, { targetId: drop.targetId, side: drop.side, blocks }));
+      const { targetId, side } = drop;
+      const moving = dragging;
+      changeLayout(r => placeOnPage(r, moving, { targetId, side, blocks }));
     } else if (!dragging && press) {
       // A press without a move is a click: the menu.
       const handle = canvasRef?.querySelector(`[data-page-block="${press.blockId}"] .page-handle`);
@@ -304,21 +325,34 @@
 
 <!-- svelte-ignore a11y-click-events-have-key-events -->
 <!-- svelte-ignore a11y-no-static-element-interactions -->
-<div class="page-mode" class:dragging={Boolean(dragging)} bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
+<svelte:window bind:innerWidth />
+
+<div class="page-mode" class:dragging={Boolean(dragging)} class:narrow bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
+
+  <!-- Back and forward through the pages and folders opened from nests
+       (utils/pagePlaces.js), in the mode's own colours. Asked 2026-11-10. -->
+  <div class="page-nav">
+    <button class="page-nav-btn" title="Back" aria-label="Back" disabled={!canGoBack} on:click|stopPropagation={() => dispatch('placeBack')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+    </button>
+    <button class="page-nav-btn" title="Forward" aria-label="Forward" disabled={!canGoForward} on:click|stopPropagation={() => dispatch('placeForward')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+    </button>
+  </div>
 
   <div class="page-column">
     {#if renaming}
       <input
         class="page-title page-title-input"
         aria-label="Page name"
-        value={openFolder}
+        value={title}
         bind:this={titleInput}
         on:keydown={titleKeydown}
         on:blur={finishRename}
       />
     {:else}
-      <button class="page-title" title="Press to rename" on:click={startRename}>{openFolder || 'Untitled'}</button>
+      <button class="page-title" title="Press to rename" on:click={startRename}>{title || 'Untitled'}</button>
     {/if}
 
     {#each shownRows as row (row.key)}
@@ -419,13 +453,61 @@
     user-select: none;
   }
 
-  /* Above the wallpaper, which sits at z-index 0 -- see ModeWallpaper.svelte. */
+  /* At the top left, over the page and with it as it scrolls. */
+  .page-nav {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    gap: 2px;
+    width: max-content;
+    padding: 8px 10px 0;
+    height: 0;
+    overflow: visible;
+  }
+
+  .page-nav-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 70%, transparent);
+    color: var(--mode-text-color, #fff);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .page-nav-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .page-nav-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--mode-text-color, #fff) 12%, transparent);
+  }
+
+  .page-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  /* Above the wallpaper, which sits at z-index 0 -- see ModeWallpaper.svelte.
+     On a computer the page takes most of the width (asked 2026-11-10, "on
+     pc use more of the width than on phone"). */
   .page-column {
     position: relative;
     z-index: 1;
-    max-width: 46rem;
+    max-width: min(72rem, 100%);
     margin: 0 auto;
-    padding: 28px 44px 0;
+    padding: 44px 56px 0;
     box-sizing: border-box;
     min-height: 100%;
     display: flex;
@@ -548,24 +630,18 @@
     pointer-events: none;
   }
 
-  /* A phone has no margin for the handle, and no room for blocks side by
-     side: the handle shows at the block's top right, over it, and a row of
-     several stacks. */
-  @media (max-width: 700px) {
-    .page-column {
-      padding: 18px 14px 0;
-    }
-    .page-row {
-      flex-direction: column;
-      gap: 0;
-    }
-    .page-row > .page-cell {
-      width: 100%;
-    }
-    .page-handle {
-      left: auto;
-      right: 0;
-      opacity: 0.35;
-    }
+  /* A phone has no margin for the handle: it shows at the block's top
+     right, over it. Its rows are its own layout (pageLayout.js): stacked
+     until something is moved on a phone, side by side if put so. */
+  .page-mode.narrow .page-column {
+    padding: 42px 14px 0;
+  }
+  .page-mode.narrow .page-row {
+    gap: 10px;
+  }
+  .page-mode.narrow .page-handle {
+    left: auto;
+    right: 0;
+    opacity: 0.35;
   }
 </style>

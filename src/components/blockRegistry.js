@@ -6,7 +6,9 @@ export const BLOCK_DEFINITIONS = {
   task: { type: 'task', label: 'Task List', icon: '+' },
   clock: { type: 'clock', label: 'Clock & alarm', icon: '+' },
   // Links to folders, as tiles (NestBlock.svelte).
-  nest: { type: 'nest', label: 'Nest', icon: '+' }
+  nest: { type: 'nest', label: 'Nest', icon: '+' },
+  // A page inside the folder (PageBlock.svelte).
+  page: { type: 'page', label: 'Page', icon: '+' }
 };
 
 export function getBlockDefinition(type) {

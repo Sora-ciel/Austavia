@@ -18,7 +18,13 @@
    * from the folders themselves (the 'folders' context, App.svelte).
    *
    * A block like any other: on the Canvas, and on a page, where "/" offers it.
-   * Holding page blocks and pictures, then web links, is PENDING step 6.
+   *
+   * It also holds pages of this folder (2026-11-10: "you should be able to
+   * choose new folder or new page too. so that pages can be nested in pages
+   * instead of always being a different folder"): a link `{ pageId, name }`
+   * to a page block (PageBlock.svelte). "＋ Add" offers a new folder, a new
+   * page, this folder's pages and the other folders. Pictures and web links
+   * are PENDING step 6.
    */
   import { getContext } from 'svelte';
   import { readable } from 'svelte/store';
@@ -38,39 +44,62 @@
   export let canvasScale = 1;
   export let placement = 'canvas';
 
-  const folders = getContext('folders') || { directory: readable([]), current: readable(''), open: () => {} };
+  const appDialogs = getContext('appDialogs');
+  const folders = getContext('folders') || {
+    directory: readable([]), current: readable(''), pages: readable([]),
+    open: () => {}, openPage: () => {}, newFolder: async () => null, newPage: () => null
+  };
   const directory = folders.directory;
   const currentFolder = folders.current;
+  const pages = folders.pages;
 
   let shell;
-  let links = Array.isArray(initialLinks) ? initialLinks.filter(link => link?.folderId) : [];
+  const linkKey = link => (link.pageId ? `page:${link.pageId}` : link.folderId);
+  let links = Array.isArray(initialLinks) ? initialLinks.filter(link => link?.folderId || link?.pageId) : [];
   let title = initialTitle || 'Nest';
 
-  $: tiles = links.map(link => ({ link, folder: followLink(link, $directory) }));
+  // What each link leads to now, looked up each time: a folder by its id, a
+  // page by its block in this folder.
+  $: tiles = links.map(link => {
+    if (link.pageId) {
+      const page = $pages.find(p => p.id === link.pageId);
+      return { link, key: linkKey(link), page, name: page?.title || link.name || 'Page', found: Boolean(page) };
+    }
+    const folder = followLink(link, $directory);
+    return { link, key: linkKey(link), folder, name: folder?.name || link.name || 'Folder', found: Boolean(folder) };
+  });
 
   function save(next) {
     links = next;
     shell?.commit(['links'], {}, { links, title });
   }
 
-  function removeLink(folderId) {
-    save(links.filter(link => link.folderId !== folderId));
+  function removeLink(key) {
+    save(links.filter(link => linkKey(link) !== key));
   }
 
   function openTile(tile) {
-    if (tile.folder) folders.open(tile.folder.name);
+    if (tile.page) folders.openPage(tile.page.id);
+    else if (tile.folder) folders.open(tile.folder.name);
   }
 
   // ── Adding a folder: the same menu as "/" on a page, listing folders ──
   let picker = null; // { x, y, query }
   let pickerActive = 0;
 
-  $: linked = new Set(links.map(link => link.folderId));
+  $: linked = new Set(links.map(linkKey));
+  const matches = (name, query) => !query || name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
   $: pickerRows = picker
-    ? $directory
-        .filter(folder => folder.name !== $currentFolder && !linked.has(folder.id))
-        .filter(folder => !picker.query || folder.name.toLocaleLowerCase().includes(picker.query.toLocaleLowerCase()))
-        .map(folder => ({ id: folder.id, kind: 'folder', group: 'Folders', name: folder.name, hint: folder.blocks ? `${folder.blocks}` : '' }))
+    ? [
+        { id: '__newPage', kind: 'make', group: 'New', name: 'New page' },
+        { id: '__newFolder', kind: 'make', group: 'New', name: 'New folder' },
+        ...$pages
+          .filter(page => !linked.has(`page:${page.id}`) && matches(page.title || 'Untitled page', picker.query))
+          .map(page => ({ id: `page:${page.id}`, pageId: page.id, kind: 'page', group: 'Pages in this folder', name: page.title || 'Untitled page' })),
+        ...$directory
+          .filter(folder => folder.name !== $currentFolder && !linked.has(folder.id) && matches(folder.name, picker.query))
+          .map(folder => ({ id: folder.id, kind: 'folder', group: 'Folders', name: folder.name, hint: folder.blocks ? `${folder.blocks}` : '' }))
+      ]
     : [];
 
   function openPicker(event) {
@@ -80,10 +109,25 @@
     pickerActive = 0;
   }
 
-  function pick(item) {
+  async function pick(item) {
     picker = null;
     if (!item) return;
-    save([...links, { folderId: item.id, name: item.name }]);
+    if (item.id === '__newPage' || item.id === '__newFolder') {
+      const isPage = item.id === '__newPage';
+      const typed = await appDialogs?.prompt(isPage ? 'Name of the new page:' : 'Name of the new folder:', '');
+      const name = String(typed ?? '').trim();
+      if (!name) return;
+      if (isPage) {
+        const pageId = folders.newPage(name);
+        if (pageId) save([...links, { pageId, name }]);
+      } else {
+        const made = await folders.newFolder(name);
+        if (made) save([...links, { folderId: made.id, name: made.name }]);
+      }
+      return;
+    }
+    if (item.kind === 'page') save([...links, { pageId: item.pageId, name: item.name }]);
+    else save([...links, { folderId: item.id, name: item.name }]);
   }
 
   function pickerKey(key) {
@@ -122,22 +166,26 @@
       <div class="nest-title">{title}</div>
     {/if}
     <div class="nest-tiles">
-      {#each tiles as tile (tile.link.folderId)}
-        <div class="nest-tile" class:missing={!tile.folder}>
+      {#each tiles as tile (tile.key)}
+        <div class="nest-tile" class:missing={!tile.found} class:is-page={Boolean(tile.link.pageId)}>
           <button
             class="nest-open"
-            title={tile.folder ? `Open ${tile.folder.name}` : 'This folder was deleted, or is not on this device'}
-            disabled={!tile.folder}
+            title={tile.found ? `Open ${tile.name}` : (tile.link.pageId ? 'This page was deleted' : 'This folder was deleted, or is not on this device')}
+            disabled={!tile.found}
             on:click|stopPropagation={() => openTile(tile)}
           >
-            <span class="nest-cover" style={tile.folder?.cover ? `background-image: url("${tile.folder.cover.replace(/"/g, '%22')}")` : ''}></span>
-            <span class="nest-name">{tile.folder?.name || tile.link.name || 'Folder'}</span>
-            {#if !tile.folder}<span class="nest-note">Not found</span>{/if}
+            {#if tile.link.pageId}
+              <span class="nest-cover nest-page-cover" aria-hidden="true">▤</span>
+            {:else}
+              <span class="nest-cover" style={tile.folder?.cover ? `background-image: url("${tile.folder.cover.replace(/"/g, '%22')}")` : ''}></span>
+            {/if}
+            <span class="nest-name">{tile.name}</span>
+            {#if !tile.found}<span class="nest-note">Not found</span>{/if}
           </button>
-          <button class="nest-remove" title="Take out of this nest" aria-label="Take out of this nest" on:click|stopPropagation={() => removeLink(tile.link.folderId)}>×</button>
+          <button class="nest-remove" title="Take out of this nest" aria-label="Take out of this nest" on:click|stopPropagation={() => removeLink(tile.key)}>×</button>
         </div>
       {/each}
-      <button class="nest-tile nest-add" on:click|stopPropagation={openPicker}>＋ Folder</button>
+      <button class="nest-tile nest-add" on:click|stopPropagation={openPicker}>＋ Add</button>
     </div>
   </div>
 </BlockShell>
@@ -149,8 +197,8 @@
     x={picker.x}
     y={picker.y}
     search
-    searchLabel="Search folders…"
-    emptyLabel="No other folder"
+    searchLabel="Search pages and folders…"
+    emptyLabel="Nothing else to add"
     on:hover={(e) => (pickerActive = e.detail)}
     on:pick={(e) => pick(e.detail)}
     on:key={(e) => pickerKey(e.detail)}
@@ -231,6 +279,14 @@
     padding: 0 9px 7px;
     font-size: 0.75rem;
     opacity: 0.6;
+  }
+
+  .nest-page-cover {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    opacity: 0.55;
   }
 
   .nest-tile.missing {
