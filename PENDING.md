@@ -147,6 +147,14 @@ biggest, the Linux pop-ups after everything.
    a day blocked. On the Canvas, Simple Note and pages like any block;
    Calendar mode shows the folder's calendar full size. 4 days, week, month
    and year come later.
+8. **The Linux app leaks a copy of every song into /tmp.** Found 2026-11-10:
+   3005 files `/tmp/Blob-*`, 6.2 GB, MP3s, made in one day, held open by no
+   process -- /tmp (a 7.7 GB tmpfs) filled up and nothing could write, the
+   dev server included. They look like WebKitGTK spilling large Blobs to
+   disk (the Playlist library hands the player a Blob per track) and never
+   removing them. Not yet traced to the line: check whether object URLs
+   made for tracks are revoked, and whether the player's source can be the
+   stored file rather than a fresh Blob each time. Cleared by hand that day.
 8. **Later: the pop-ups of the timer and timed objectives in Task mode do not
    show on Linux** (the desktop pop-ups are the Windows app's only, PENDING
    3b).
