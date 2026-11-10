@@ -2699,6 +2699,7 @@
     task: ['tasks', 'title'],
     nest: ['position', 'size', 'bgColor', 'textColor', 'links', 'title'],
     page: ['position', 'size', 'bgColor', 'textColor', 'title', 'rows', 'narrowRows'],
+    calendar: ['position', 'size', 'bgColor', 'textColor', 'title', 'events'],
     clock: ['position', 'size', 'bgColor', 'textColor', 'hour12', 'showSeconds', 'showDate', 'alarmTime', 'alarmEnabled'],
     __default: ['position', 'size', 'bgColor', 'textColor', 'content', 'src', 'trackUrl', 'title']
   };
@@ -3965,8 +3966,8 @@
     if (mode === "single") type = "text";
     // A clock is read at a glance, so it starts the size of one rather than the
     // size of a note.
-    const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : 300;
-    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 140 : 200;
+    const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : type === 'calendar' ? 340 : 300;
+    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 140 : type === 'calendar' ? 480 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
     const position = mode === 'default'
@@ -3980,6 +3981,7 @@
       ...(type === "task" ? { tasks: [], title: "Task List" } : {}),
       ...(type === "nest" ? { links: [], title: "Nest" } : {}),
       ...(type === "page" ? { title: "Untitled page", rows: [] } : {}),
+      ...(type === "calendar" ? { title: "Calendar", events: [] } : {}),
       // 24-hour by default: the owner is in France, and the setting is one
       // click away for anyone who is not.
       // The alarm starts at seven and off: a time to change rather than a blank

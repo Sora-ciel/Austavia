@@ -26,6 +26,7 @@
   import ClockAlarm from '../components/ClockAlarm.svelte';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
+  import Block from '../components/Block.svelte';
 
   export let openFolder = '';
   export let blocks = [];
@@ -1068,6 +1069,13 @@ input[type="text"] {
 }
 
 
+/* A block drawn by its own component inside the card: in the card's colours. */
+.simple-any {
+  --mode-text-color: var(--text);
+  color: var(--text);
+  padding: 2px;
+}
+
 /* Above the wallpaper, which sits at z-index 0 between this mode's own
    background and its content -- see ModeWallpaper.svelte. */
 .simple-wrapper > .simple-column {
@@ -1291,6 +1299,26 @@ input[type="text"] {
               {:else}
                 <div class="task-item">No tasks yet</div>
               {/if}
+            </div>
+          {:else}
+            <!-- Every other kind -- a calendar, a nest, a page -- drawn by its
+                 own component (Block.svelte) without a frame of its own, in
+                 this card, so every block Simple Note holds is seen here
+                 (asked 2026-11-10 for the calendar: "you will be able to see
+                 the calendar on other modes"). -->
+            <div class="simple-any" data-focus-guard>
+              <Block
+                {block}
+                placement="page"
+                focused={block.id === focusedBlockId}
+                fileKey={openFolder}
+                {library}
+                {nowPlayingId}
+                {isPlaying}
+                on:update
+                on:delete
+                on:focusToggle
+              />
             </div>
           {/if}
 

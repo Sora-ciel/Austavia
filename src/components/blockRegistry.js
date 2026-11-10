@@ -8,7 +8,9 @@ export const BLOCK_DEFINITIONS = {
   // Links to folders, as tiles (NestBlock.svelte).
   nest: { type: 'nest', label: 'Nest', icon: '+' },
   // A page inside the folder (PageBlock.svelte).
-  page: { type: 'page', label: 'Page', icon: '+' }
+  page: { type: 'page', label: 'Page', icon: '+' },
+  // Time blocks on days (CalendarBlock.svelte).
+  calendar: { type: 'calendar', label: 'Calendar', icon: '+' }
 };
 
 export function getBlockDefinition(type) {

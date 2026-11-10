@@ -11,13 +11,13 @@ export const MODE_DEFINITIONS = {
     // It lands here and in Simple Note because those are the two that
     // hold blocks; Single Note is one piece of writing and Habit Tracker is a
     // list of habits, and neither has anywhere to put a block.
-    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'nest', 'page'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'calendar', 'nest', 'page'],
     showRightControls: true
   },
   simple: {
     id: 'simple',
     label: 'Simple Note',
-    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'calendar'],
     showRightControls: true,
     settings: { simpleColumns: true, wallpaper: true }
   },
@@ -34,7 +34,7 @@ export const MODE_DEFINITIONS = {
   page: {
     id: 'page',
     label: 'Page',
-    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'task', 'nest', 'page'],
+    addBlockTypes: ['text', 'image', 'music', 'embed', 'clock', 'calendar', 'task', 'nest', 'page'],
     showRightControls: true,
     ownOrder: true,
     settings: { wallpaper: true }
@@ -57,6 +57,15 @@ export const MODE_DEFINITIONS = {
     showRightControls: true,
     settings: { wallpaper: true }
   },
+  // The folder's calendar blocks, full size, a day at a time (asked
+  // 2026-11-10). It only shows calendar blocks; the block is the calendar.
+  calendar: {
+    id: 'calendar',
+    label: 'Calendar',
+    addBlockTypes: ['calendar'],
+    showRightControls: true,
+    settings: { wallpaper: true }
+  },
   playlist: {
     id: 'playlist',
     label: 'Playlist',
@@ -66,7 +75,7 @@ export const MODE_DEFINITIONS = {
   }
 };
 
-export const MODE_ORDER = ['default', 'simple', 'single', 'page', 'habit', 'task', 'playlist'];
+export const MODE_ORDER = ['default', 'simple', 'single', 'page', 'habit', 'task', 'calendar', 'playlist'];
 
 /**
  * Whether a mode draws the folder's wallpaper.

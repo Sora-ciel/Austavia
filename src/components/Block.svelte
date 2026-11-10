@@ -16,6 +16,7 @@
   import TaskBlock from './TaskBlock.svelte';
   import NestBlock from './NestBlock.svelte';
   import PageBlock from './PageBlock.svelte';
+  import CalendarBlock from './CalendarBlock.svelte';
   import { recallScroll } from '../utils/scrollMemory.js';
 
   export let block;
@@ -27,6 +28,8 @@
   export let library = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
+  /** Drawn full size by a mode of its own (a calendar in Calendar mode). */
+  export let big = false;
 
   $: common = {
     id: block.id,
@@ -106,6 +109,16 @@
     {...common}
     initialLinks={block.links}
     initialTitle={block.title}
+    on:delete
+    on:update
+    on:focusToggle
+  />
+{:else if block.type === 'calendar'}
+  <CalendarBlock
+    {...common}
+    initialEvents={block.events}
+    initialTitle={block.title}
+    {big}
     on:delete
     on:update
     on:focusToggle

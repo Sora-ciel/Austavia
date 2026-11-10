@@ -7,6 +7,7 @@
   import TaskMode from './TaskMode.svelte';
   import PlaylistMode from './PlaylistMode.svelte';
   import PageMode from './PageMode.svelte';
+  import CalendarMode from './CalendarMode.svelte';
 
   export let mode; // 'default' or 'simple'
   // Which folder is open. Canvas mode uses it to know when to go back to the
@@ -180,6 +181,19 @@
       on:delete={deleteBlockHandler}
       on:focusToggle={focusToggleHandler}
       on:modeSettingChange
+    />
+  {:else if mode === 'calendar'}
+    <CalendarMode
+      {blocks}
+      {focusedBlockId}
+      {openFolder}
+      bind:canvasRef
+      {canvasColors}
+      backgroundSettings={singleNoteSettings}
+      on:update={updateBlockHandler}
+      on:delete={deleteBlockHandler}
+      on:focusToggle={focusToggleHandler}
+      on:addBlock
     />
   {:else if mode === 'playlist'}
     <PlaylistMode

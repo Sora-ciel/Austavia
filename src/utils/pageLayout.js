@@ -225,6 +225,7 @@ export const PAGE_BLOCK_TYPES = [
   { type: 'image', label: 'Image' },
   { type: 'task', label: 'Task list' },
   { type: 'clock', label: 'Clock' },
+  { type: 'calendar', label: 'Calendar' },
   { type: 'music', label: 'Music' },
   { type: 'embed', label: 'Embed' },
   { type: 'nest', label: 'Nest' },
@@ -240,6 +241,7 @@ export function blockPickName(block, htmlToText = value => String(value || '')) 
   if (block.type === 'embed') return String(block.content || '').trim() || 'Embed';
   if (block.type === 'music') return (block.title || '').trim() || 'Music';
   if (block.type === 'nest') return (block.title || '').trim() || 'Nest';
+  if (block.type === 'calendar') return (block.title || '').trim() || 'Calendar';
   if (block.type === 'page') return (block.title || '').trim() || 'Untitled page';
   const first = htmlToText(block.content || '').split('\n').map(line => line.trim()).find(Boolean);
   return first ? (first.length > 60 ? `${first.slice(0, 60)}…` : first) : 'Empty text';
