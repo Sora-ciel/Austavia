@@ -123,8 +123,8 @@ moment, archive instead of delete) after these, in an order to be agreed.
 8. *Done 2026-11-10.* **Calendar: blocks outlined all round in the writing colour.**
 9. *Done 2026-11-10.* **Calendar: the block editor and whole-day pop-up as opaque as the right
    controls' panel.**
-10. **Nests: a page shows its first picture** as its tile's cover.
-11. **The Linux app's copies of songs in /tmp** (the entry below): stop
+10. *Done 2026-11-10.* **Nests: a page shows its first picture** as its tile's cover.
+11. *Done 2026-11-10.* **The Linux app's copies of songs in /tmp** (the entry below): stop
     leaving them.
 12. **Page mode: an edit mode** -- "activate an edit mode for that mode
     where you can change the images size even crop it and other things we'll
@@ -172,7 +172,13 @@ biggest, the Linux pop-ups after everything.
    a day blocked. On the Canvas, Simple Note and pages like any block;
    Calendar mode shows the folder's calendar full size. 4 days, week, month
    and year come later.
-8. **The Linux app leaks a copy of every song into /tmp.** Found 2026-11-10:
+8. *Cleared away since 2026-11-10* (src-tauri/src/temp_blobs.rs): at start for
+   what earlier runs left, and every half hour for copies left alone for 30
+   minutes -- only `Blob-XXXXXX` files of this user that no process has open.
+   The engine still makes them; if they turn out to matter while the app runs
+   (6 GB in a day of tagging is 30 minutes' worth at most now), the next step
+   is writing the library's tracks without a Blob each time.
+   **The Linux app leaks a copy of every song into /tmp.** Found 2026-11-10:
    3005 files `/tmp/Blob-*`, 6.2 GB, MP3s, made in one day, held open by no
    process -- /tmp (a 7.7 GB tmpfs) filled up and nothing could write, the
    dev server included. They look like WebKitGTK spilling large Blobs to

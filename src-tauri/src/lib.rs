@@ -2,6 +2,7 @@ mod audio_server;
 mod external_links;
 mod local_http;
 mod sign_in_window;
+mod temp_blobs;
 
 // `dragDropEnabled: false` in tauri.conf.json, and why, since JSON cannot say
 // so itself and the next person to read that file will find a bare `false`.
@@ -89,6 +90,8 @@ fn let_kde_draw_the_title_bar() {}
 pub fn run() {
   keep_playing_while_minimised();
   let_kde_draw_the_title_bar();
+  // Copies of music the web engine leaves in /tmp (src/temp_blobs.rs).
+  temp_blobs::start();
 
   let builder = tauri::Builder::default();
 
