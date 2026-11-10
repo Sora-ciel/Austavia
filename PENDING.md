@@ -107,6 +107,50 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Now, asked 2026-11-10, in this order
+
+Asked in one message; small ones first, the calendar last because it is the
+biggest, the Linux pop-ups after everything.
+
+1. **Task mode: smaller margins, text about 5% bigger** -- "make margins and
+   the other style of margin smaller to have more space for text".
+2. **Page mode: nests bigger on a computer** -- "the default size of each nest
+   block is a bit bigger than that for pcs. right now it's a bit small".
+3. **Page mode: a picture and writing on one row start at the same height**
+   -- "make the upper part of the first line of text start at the same place
+   as the start of the image. right now the text starts slightly higher".
+4. **Nests: New folder and New page** -- "you should be able to choose new
+   folder or new page too. so that pages can be nested in pages instead of
+   always being a different folder." A page that is not a folder is a
+   **page block** (`type: 'page'`, its own `title` and `rows`), so it works
+   on its own (CLAUDE.md); Page mode opens it in place of the folder's own
+   page. A nest links it as `{ pageId, name }` beside folder links.
+5. **Page mode: back and forward arrows**, top left, in the mode's colours
+   -- "so that if you click and enter a nest you can easily go back or the
+   other way around". A history of places (a folder's page, or a page
+   block in a folder) kept for the session on this device.
+6. **Page mode: wider on a computer, and its own layout on a phone** -- "on
+   pc use more of the width than on phone ... if i change for the blocks to
+   be a certain way in phone, it won't change it for pc too." Two layouts per
+   page, `rows` (wide) and `narrowRows` (phone), the narrow one following the
+   wide one, stacked, until something is moved on a phone. Putting a block on
+   or taking it off a page changes both; moving it, only the one in use.
+7. **Calendar: a block, then a mode** -- "put time blocks easily of what you
+   will do at a certain hour ... maybe 12min till the next hour, maybe a
+   clean 1h block, or 30. be able to have the day blocked. focus on the day
+   by day way of showing the calendar for now. and you will be able to see
+   the calendar on other modes, the ones that share all the other blocks".
+   A `calendar` block holds `events: [{ id, date, start, end, title,
+   allDay }]` (minutes from midnight), day view: hours down the side, drag
+   on the empty day to make one (snapped to 5 minutes), drag its edges or
+   type the times to make it exactly 12 minutes or an hour, "Whole day" for
+   a day blocked. On the Canvas, Simple Note and pages like any block;
+   Calendar mode shows the folder's calendar full size. 4 days, week, month
+   and year come later.
+8. **Later: the pop-ups of the timer and timed objectives in Task mode do not
+   show on Linux** (the desktop pop-ups are the Windows app's only, PENDING
+   3b).
+
 ## Blocks and their modes (rule in CLAUDE.md, asked 2026-10-27)
 
 Checked against "a block works on its own; a mode only shows blocks" on
