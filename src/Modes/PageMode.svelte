@@ -27,6 +27,8 @@
   import Block from '../components/Block.svelte';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
   import SlashMenu from '../components/SlashMenu.svelte';
+  import CropEditor from '../components/CropEditor.svelte';
+  import { widthFromDrag } from '../utils/crop.js';
   import { slashItems, stepChoice, slashSplit } from '../utils/slashMenu.js';
   import { splitWritingAt } from '../utils/editorSplit.js';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
@@ -36,7 +38,7 @@
   import { isPrimaryPointer } from '../utils/pointer.js';
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, dropSide,
-    PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow
+    PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth
   } from '../utils/pageLayout.js';
 
   export let openFolder = '';
@@ -70,6 +72,53 @@
   $: rows = rowsFor(page, narrow);
   // A page block never shows itself, which would open it inside itself.
   $: shownRows = blocksOnPage(rows, blocks.filter(block => block.id !== pageId));
+
+  // ── Edit mode: pictures sized and cropped (asked 2026-11-10) ─────────
+  // "activate an edit mode for that mode. where you can change the images
+  // size even crop it and other things we'll be able to do." A picture's
+  // share of its row is its cell's, in the layout in use (pageLayout.js
+  // setCellWidth); its crop is the picture's own (utils/crop.js).
+  let editMode = false;
+  let liveWidth = null; // { id, width } while a picture's edge is dragged
+  let cropping = null;  // the picture block being cropped
+
+  $: widths = new Map(rows.flatMap(row => row.cells).filter(cell => cell.width).map(cell => [cell.blockId, cell.width]));
+  const widthOf = id => (liveWidth?.id === id ? liveWidth.width : widths.get(id));
+
+  function sourceOf(block) {
+    if (typeof block?.src === 'string' && block.src) return block.src;
+    return block?.resolvedSrc || '';
+  }
+
+  function startWidthDrag(event, blockId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const cell = event.currentTarget.closest('.page-cell');
+    const row = cell?.parentElement;
+    if (!cell || !row) return;
+    const measure = clientX => widthFromDrag({
+      rowWidth: row.getBoundingClientRect().width,
+      cellLeft: cell.getBoundingClientRect().left,
+      x: clientX
+    });
+    const onMove = e => { liveWidth = { id: blockId, width: measure(e.clientX) }; };
+    const onUp = e => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      const width = measure(e.clientX);
+      liveWidth = null;
+      changeLayout(r => setCellWidth(r, blockId, width));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  function applyCrop(crop) {
+    const block = cropping;
+    cropping = null;
+    if (!block) return;
+    dispatch('update', { id: block.id, crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true });
+  }
 
   /** Putting on or taking off -- the page's content, both layouts. */
   function changeContent(op) {
@@ -327,7 +376,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:narrow bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <!-- Back and forward through the pages and folders opened from nests
@@ -338,6 +387,15 @@
     </button>
     <button class="page-nav-btn" title="Forward" aria-label="Forward" disabled={!canGoForward} on:click|stopPropagation={() => dispatch('placeForward')}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+    </button>
+    <button
+      class="page-nav-btn page-edit-btn"
+      class:on={editMode}
+      title={editMode ? 'Done editing' : 'Edit: size and crop pictures'}
+      aria-pressed={editMode}
+      on:click|stopPropagation={() => (editMode = !editMode)}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></svg>
     </button>
   </div>
 
@@ -361,7 +419,9 @@
           <div
             class="page-cell"
             class:moving={dragging === block.id}
-            class:fits-picture={block.type === 'image' && row.blocks.length > 1}
+            class:fits-picture={block.type === 'image' && row.blocks.length > 1 && !widthOf(block.id)}
+            class:sized={Boolean(widthOf(block.id))}
+            style={widthOf(block.id) ? `flex: 0 1 ${widthOf(block.id) * 100}%; max-width: ${widthOf(block.id) * 100}%;` : ''}
             data-page-block={block.id}
           >
             <button
@@ -388,6 +448,16 @@
               on:play
               on:toggle
             />
+            {#if editMode && block.type === 'image'}
+              <div class="page-edit-tools">
+                <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
+                {#if widthOf(block.id)}
+                  <button on:click|stopPropagation={() => changeLayout(r => setCellWidth(r, block.id, null))}>Natural size</button>
+                {/if}
+              </div>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <div class="page-width-grip" title="Drag to size" on:pointerdown={(e) => startWidthDrag(e, block.id)}></div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -433,6 +503,10 @@
     on:action={(e) => menuAction(e.detail)}
     on:close={() => (menu = null)}
   />
+{/if}
+
+{#if cropping}
+  <CropEditor src={sourceOf(cropping)} crop={cropping.crop} on:apply={(e) => applyCrop(e.detail)} on:close={() => (cropping = null)} />
 {/if}
 
 {#if lbOpen}
@@ -567,6 +641,66 @@
   .page-cell.fits-picture {
     flex: 0 1 auto;
     max-width: 50%;
+  }
+
+  /* A picture given a size takes it in full. */
+  .page-cell.sized :global(.media-container) {
+    width: 100% !important;
+  }
+
+  .page-nav-btn.on {
+    background: color-mix(in srgb, var(--mode-text-color, #fff) 18%, transparent);
+  }
+
+  /* Edit mode: each picture outlined, with its tools and a grip on its right
+     edge to size it. */
+  .page-mode.edit-mode .page-cell:has(.page-width-grip) {
+    outline: 1px dashed color-mix(in srgb, var(--mode-text-color, #fff) 55%, transparent);
+    outline-offset: 2px;
+  }
+
+  .page-edit-tools {
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    z-index: 3;
+    display: flex;
+    gap: 6px;
+  }
+
+  .page-edit-tools button {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 45%, transparent);
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 80%, transparent);
+    color: var(--mode-text-color, #fff);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .page-width-grip {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -7px;
+    width: 14px;
+    z-index: 3;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  .page-width-grip::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    width: 4px;
+    height: 44px;
+    transform: translateY(-50%);
+    border-radius: 2px;
+    background: var(--mode-text-color, #fff);
+    opacity: 0.8;
   }
 
   .page-cell.moving {

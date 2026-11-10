@@ -246,3 +246,19 @@ export function blockPickName(block, htmlToText = value => String(value || '')) 
   const first = htmlToText(block.content || '').split('\n').map(line => line.trim()).find(Boolean);
   return first ? (first.length > 60 ? `${first.slice(0, 60)}…` : first) : 'Empty text';
 }
+
+/**
+ * The rows with one block's share of its row set (a fraction, 0.15 to 1) or
+ * cleared (null) -- Page mode's edit mode, asked 2026-11-10 ("change the
+ * images size"). On the cell, so each layout keeps its own (editPage).
+ */
+export function setCellWidth(rows, blockId, width) {
+  return normalizePageRows(rows).map(row => ({
+    ...row,
+    cells: row.cells.map(cell => {
+      if (cell.folderId || cell.blockId !== blockId) return cell;
+      const { width: _old, ...rest } = cell;
+      return width == null ? rest : { ...rest, width: Math.max(0.15, Math.min(1, Number(width))) };
+    })
+  }));
+}

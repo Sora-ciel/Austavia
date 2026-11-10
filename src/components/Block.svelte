@@ -68,6 +68,7 @@
     initialSrc={block.src}
     initialResolvedSrc={block.resolvedSrc}
     initialAttachmentRequiresAuth={block.attachmentRequiresAuth}
+    initialCrop={block.crop}
     on:delete
     on:update
     on:focusToggle

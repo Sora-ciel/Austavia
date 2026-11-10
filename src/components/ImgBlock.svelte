@@ -9,6 +9,7 @@
    */
   import { getContext, createEventDispatcher } from 'svelte';
   import BlockShell from './BlockShell.svelte';
+  import { normalizeCrop, croppedAspect } from '../utils/crop.js';
 
   const appDialogs = getContext('appDialogs');
   const dispatch = createEventDispatcher();
@@ -24,6 +25,13 @@
   export let focused = false;
   export let canvasScale = 1;
   export let placement = 'canvas';
+  /**
+   * The part of the picture kept, `{ x, y, w, h }` as fractions, or none --
+   * set in Page mode's edit mode (utils/crop.js, asked 2026-11-10), shown
+   * wherever the picture is.
+   */
+  export let initialCrop = null;
+  $: crop = normalizeCrop(initialCrop);
 
   const HEADER_HEIGHT = 30;
   const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
@@ -137,13 +145,20 @@
   // "make the upper part of the first line of text start at the same place
   // as the start of the image").
   let naturalAspect = 0;
+  let natural = { w: 0, h: 0 };
   function noteNaturalSize(event) {
     const el = event.currentTarget;
     const w = el.naturalWidth || el.videoWidth;
     const h = el.naturalHeight || el.videoHeight;
-    if (w > 0 && h > 0) naturalAspect = w / h;
+    if (w > 0 && h > 0) {
+      naturalAspect = w / h;
+      natural = { w, h };
+    }
   }
-  $: pageAspect = naturalAspect || aspectRatio;
+  $: pageAspect = croppedAspect(naturalAspect || aspectRatio, crop);
+  // Cropped, a picture is drawn as the part of it kept, fitted to the box the
+  // way the whole one is -- an SVG viewBox does exactly that, on every engine.
+  $: showCrop = Boolean(crop && natural.w && mediaSrc && !mediaSrc.startsWith('data:video'));
 
   // Click on the media content:
   //   - When NOT focused: focus the block (next click will open lightbox)
@@ -210,9 +225,22 @@
           src={mediaSrc}
           alt=""
           class:clickable={true}
+          class:hidden-under-crop={showCrop}
           on:load={noteNaturalSize}
           on:click|stopPropagation={handleMediaClick}
         />
+        {#if showCrop}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <svg
+            class="cropped clickable"
+            viewBox="{crop.x * natural.w} {crop.y * natural.h} {crop.w * natural.w} {crop.h * natural.h}"
+            preserveAspectRatio={placement === 'page' ? 'xMinYMin meet' : 'xMidYMid meet'}
+            on:click|stopPropagation={handleMediaClick}
+          >
+            <image href={mediaSrc} width={natural.w} height={natural.h} />
+          </svg>
+        {/if}
       {/if}
     {:else if hasStorageAttachment}
       <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; color:#777; text-align:center; padding: 8px;">
@@ -268,6 +296,18 @@
   .media-container.on-page img,
   .media-container.on-page video {
     object-position: left top;
+  }
+
+  .media-container img.hidden-under-crop {
+    visibility: hidden;
+  }
+
+  .media-container svg.cropped {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: zoom-in;
   }
 
   .media-container img.clickable,

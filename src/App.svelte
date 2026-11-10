@@ -2693,7 +2693,7 @@
   const DEFAULT_HISTORY_TRIGGERS = {
     text: ['position', 'size', 'bgColor', 'textColor'],
     cleantext: ['position', 'size', 'bgColor', 'textColor'],
-    image: ['position', 'size', 'bgColor', 'textColor', 'src'],
+    image: ['position', 'size', 'bgColor', 'textColor', 'src', 'crop'],
     music: ['position', 'size', 'bgColor', 'textColor', 'playlistId', 'trackUrl', 'title', 'content'],
     embed: ['position', 'size', 'bgColor', 'textColor', 'content'],
     task: ['tasks', 'title'],
