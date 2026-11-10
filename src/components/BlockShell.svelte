@@ -433,8 +433,11 @@
      line box, so writing beside a picture starts level with the picture's
      top edge (asked 2026-11-10). Where text-box-trim is unknown, the line
      box's top is close enough. */
+  /* A little below the trimmed top (asked again 2026-11-10: "the
+     uppercase letters are still a bit higher than where the image starts"):
+     the capitals' flat tops are drawn just above the cap line. */
   :global(.note.on-page .tiptap-inner) {
-    padding: 0 2px 2px;
+    padding: 0.14em 2px 2px;
     text-box-trim: trim-start;
     text-box-edge: cap alphabetic;
   }

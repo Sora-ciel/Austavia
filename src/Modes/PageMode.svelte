@@ -358,7 +358,12 @@
     {#each shownRows as row (row.key)}
       <div class="page-row" class:several={row.blocks.length > 1}>
         {#each row.blocks as block (`${block.id}-${block._version || 0}`)}
-          <div class="page-cell" class:moving={dragging === block.id} data-page-block={block.id}>
+          <div
+            class="page-cell"
+            class:moving={dragging === block.id}
+            class:fits-picture={block.type === 'image' && row.blocks.length > 1}
+            data-page-block={block.id}
+          >
             <button
               class="page-handle"
               title="Drag to move, press for the menu"
@@ -505,9 +510,9 @@
   .page-column {
     position: relative;
     z-index: 1;
-    max-width: min(72rem, 100%);
+    max-width: 100%;
     margin: 0 auto;
-    padding: 44px 56px 0;
+    padding: 44px max(40px, 3vw) 0;
     box-sizing: border-box;
     min-height: 100%;
     display: flex;
@@ -542,7 +547,7 @@
 
   .page-row {
     display: flex;
-    gap: 20px;
+    gap: 14px;
     align-items: flex-start;
   }
 
@@ -552,6 +557,16 @@
     min-width: 0;
     padding: 3px 0;
     cursor: auto;
+  }
+
+  /* A picture beside other blocks takes the width of the picture, not an
+     equal share of the row, so the writing beside it starts right after it
+     (asked 2026-11-10: "when a text is on the side of the image it creates
+     a big space in between"). At most half the row, and as tall as most of
+     the screen allows (ImgBlock sizes it). */
+  .page-cell.fits-picture {
+    flex: 0 1 auto;
+    max-width: 50%;
   }
 
   .page-cell.moving {

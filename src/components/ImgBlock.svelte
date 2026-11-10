@@ -188,7 +188,7 @@
     class="media-container"
     class:on-page={placement === 'page'}
     style={placement === 'page' && pageAspect > 0
-      ? `flex: none; aspect-ratio: ${pageAspect}; width: min(100%, calc(70vh * ${pageAspect}));`
+      ? `flex: none; aspect-ratio: ${pageAspect}; width: calc(70vh * ${pageAspect}); max-width: 100%;`
       : ''}
   >
     {#if mediaSrc}
