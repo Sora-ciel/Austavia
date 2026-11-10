@@ -107,6 +107,31 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Now, asked 2026-11-10 (second list), in this order
+
+1. **Task mode: margins halved again, text 5-10% bigger again.**
+2. **Page mode: writing beside a picture starts a little lower** -- "the
+   uppercase letters are still a bit higher than where the image starts".
+3. **Page mode: no big gap between a picture and the writing beside it**
+   -- the picture's cell kept half the row while the picture was narrower.
+4. **Page mode: close to the full width on a computer**, not 72rem.
+5. **Calendar: Ctrl + wheel changes the height of an hour**, kept per
+   device.
+6. **Calendar: a 7-day view**, beside the day one.
+7. **Calendar: a colour per block**, the last one chosen used for the next
+   block made.
+8. **Calendar: blocks outlined all round in the writing colour.**
+9. **Calendar: the block editor and whole-day pop-up as opaque as the right
+   controls' panel.**
+10. **Nests: a page shows its first picture** as its tile's cover.
+11. **The Linux app's copies of songs in /tmp** (the entry below): stop
+    leaving them.
+12. **Page mode: an edit mode** -- "activate an edit mode for that mode
+    where you can change the images size even crop it and other things we'll
+    be able to do". A toggle; in it a picture on a page can be resized (its
+    share of the row, kept per layout on the cell) and cropped (kept on the
+    picture block, so the Canvas shows the crop too).
+
 ## Now, asked 2026-11-10, in this order
 
 Asked in one message; small ones first, the calendar last because it is the
