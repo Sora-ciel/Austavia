@@ -16,10 +16,15 @@ import {
 // The sizing is CSS. What is testable is the window itself, which was pointing
 // the wrong way, and the day key, which was in the wrong timezone.
 
-test('a phone shows the last week, a computer the last fortnight', () => {
+// Asked 2026-11-10: "there's still plenty of space sometimes. i think we
+// should show more days as there are more space to slowly the amount phone
+// have."
+test('a phone shows the last week, and a wider screen more days as it widens', () => {
   assert.equal(daysToShow({ width: 390 }), DAYS_ON_PHONE);
-  assert.equal(daysToShow({ width: 1024 }), DAYS_ON_PHONE, 'the breakpoint itself is compact');
-  assert.equal(daysToShow({ width: 1440 }), DAYS_ON_DESKTOP);
+  assert.ok(daysToShow({ width: 800 }) > DAYS_ON_PHONE, 'a tablet has room for more than a week');
+  assert.ok(daysToShow({ width: 1920 }) > daysToShow({ width: 1400 }), 'more width, more days');
+  assert.ok(daysToShow({ width: 1400 }) >= DAYS_ON_DESKTOP, 'a computer still shows at least a fortnight');
+  assert.ok(daysToShow({ width: 5000 }) <= 31, 'never more than a month');
   assert.equal(daysToShow(), DAYS_ON_DESKTOP, 'an unknown width is not a small one');
 });
 

@@ -558,7 +558,7 @@
   }
 
   .habit-name strong {
-    font-size: 1.15rem;
+    font-size: 1.25rem;
   }
 
   /* The name opens the habit's page. */
@@ -579,28 +579,27 @@
 
   .calendar {
     display: grid;
-    /* The past days share the width evenly and today, the last square, gets
-       half as much again. Agreed 2026-10-26: "today stands out -- a bigger
-       square for today, the past days smaller", because most visits are to
-       tick today. --past-days is set on the element from how many are shown. */
-    /* Squares of a set size from the left, rather than stretched across the
-       row (asked 2026-11-10: they "elongate as the screen becomes wider and it
-       gives off a weird styling"). Shrinking when there is less room, never
-       growing past it. A wider screen gets somewhat bigger squares. */
-    --day: clamp(48px, 3.8vw, 72px);
+    /* Today used to be a bigger square (agreed 2026-10-26, "today stands
+       out"); on 2026-11-10 that was found ugly and today stands out by its
+       outline instead. Squares of a set size from the left, rather than
+       stretched across the row (asked the same day: they "elongate as the
+       screen becomes wider"), shrinking when there is less room, never
+       growing past it. --days is set on the element from how many are shown. */
+    /* Every day the same square, today included (asked 2026-11-10: a bigger
+       today "is ugly" -- it has a wider outline instead), and more days
+       rather than bigger squares on a wider screen (utils/habitDays.js). */
+    --day: 52px;
     --gap: 6px;
-    /* Shares of the width, today's 1.3 times the others', so it stays the
-       biggest when there is little room; capped at --day a square. */
-    grid-template-columns: repeat(var(--past-days, 6), minmax(0, 1fr)) minmax(0, 1.3fr);
+    grid-template-columns: repeat(var(--days, 7), minmax(0, 1fr));
     width: 100%;
-    max-width: calc(var(--past-days, 6) * (var(--day) + var(--gap)) + 1.3 * var(--day));
+    max-width: calc(var(--days, 7) * (var(--day) + var(--gap)));
     justify-self: start;
     align-items: end;
     gap: var(--gap);
   }
 
   .calendar-header {
-    font-size: 0.7rem;
+    font-size: 0.74rem;
     opacity: 0.75;
     text-align: center;
   }
@@ -614,7 +613,7 @@
        set a taller minimum than the width. */
     min-height: 0;
     overflow: hidden;
-    font-size: 0.9rem;
+    font-size: 1rem;
     border-radius: var(--block-control-radius, 10px);
     padding: 2px;
     border: var(--block-border-width, 1px) solid var(--block-border-color, color-mix(in srgb, var(--mode-text-color, #ffffff) 15%, transparent));
@@ -649,14 +648,12 @@
 
   /* Today: found at a glance, and the easiest square to hit. */
   .day-button.is-today {
-    border-width: 2px;
+    border-width: 3px;
     border-color: var(--block-focus-outline, color-mix(in srgb, var(--mode-text-color, #ffffff) 60%, transparent));
     font-weight: 700;
   }
 
-  .day-button.is-today .day-status {
-    font-size: 1.2rem;
-  }
+
 
   /* ── A phone ────────────────────────────────────────────────────
      Asked for: "one habit just takes around the height of two lines, and the
@@ -996,7 +993,7 @@
               <span class="habit-streak quiet">Best: {streaks[habit.id].best} {streaks[habit.id].best === 1 ? streaks[habit.id].unit.slice(0, -1) : streaks[habit.id].unit}</span>
             {/if}
           </div>
-          <div class="calendar" style="--past-days: {Math.max(0, days.length - 1)}">
+          <div class="calendar" style="--days: {days.length}">
             {#each days as day}
               <button
                 class="day-button {habit.log?.[day.key] ?? 'none'}"

@@ -33,18 +33,34 @@
  * local parts of the date and never from an instant in UTC.
  */
 
-/** A phone has room for a week; anything wider gets a fortnight. */
+/** A phone has room for a week, and never fewer; a wide screen up to a month. */
 export const DAYS_ON_PHONE = 7;
 export const DAYS_ON_DESKTOP = 14;
+export const MOST_DAYS = 31;
 
-/** The width at or under which a week is all that fits — the app's own breakpoint. */
+/** The width at or under which the row is laid out as on a phone -- the app's own breakpoint. */
 export const COMPACT_WIDTH = 1024;
 
-/** How many days belong on screen at this width. */
+// What the rest of a habit's row takes, and a day's square with its gap, in
+// each layout -- HabitTrackerMode.svelte's sizes, so the days fill the row.
+const COMPACT_REST = 150;
+const COMPACT_DAY = 44;
+const WIDE_REST = 520;
+const WIDE_DAY = 58;
+
+/**
+ * How many days belong on screen at this width: as many as fit, from a
+ * phone's week up. Asked 2026-11-10: "there's still plenty of space
+ * sometimes. i think we should show more days as there are more space to
+ * slowly the amount phone have."
+ */
 export function daysToShow({ width } = {}) {
   const measured = Number(width);
-  if (!Number.isFinite(measured)) return DAYS_ON_DESKTOP;
-  return measured <= COMPACT_WIDTH ? DAYS_ON_PHONE : DAYS_ON_DESKTOP;
+  if (!Number.isFinite(measured) || measured <= 0) return DAYS_ON_DESKTOP;
+  const fit = measured <= COMPACT_WIDTH
+    ? Math.floor((measured - COMPACT_REST) / COMPACT_DAY)
+    : Math.floor((measured - WIDE_REST) / WIDE_DAY);
+  return Math.max(DAYS_ON_PHONE, Math.min(MOST_DAYS, fit));
 }
 
 /**

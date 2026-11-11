@@ -109,14 +109,14 @@ moment, archive instead of delete) after these, in an order to be agreed.
 
 ## Now, asked 2026-11-10 (fourth list)
 
-1. **Calendar: a thicker line under the days and whole-day row, and a
+1. *Done 2026-11-10.* **Calendar: a thicker line under the days and whole-day row, and a
    thicker now line** -- it is the colour of the blocks' outlines.
-2. **Habit tracker: more days as the width allows** (from a phone's 7 up),
+2. *Done 2026-11-10.* **Habit tracker: more days as the width allows** (from a phone's 7 up),
    **today no bigger -- a wider outline instead** ("it's ugly"), and the
    writing in habits bigger.
-3. **Checkboxes** (the ones in notes, habits, Single Note, the Canvas...):
+3. *Done 2026-11-10.* **Checkboxes** (the ones in notes, habits, Single Note, the Canvas...):
    outlined in the writing's colour, a little thicker.
-4. **Cobalt Wire: the blue a little more cyan.**
+4. *Done 2026-11-10.* **Cobalt Wire: the blue a little more cyan.**
 5. **Page edit mode: the size of a nest's tiles**, per layout like a
    picture's size.
 6. **Page mode: a crop per layout** -- a phone and a computer crop a picture

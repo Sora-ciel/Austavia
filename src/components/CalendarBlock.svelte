@@ -504,6 +504,9 @@
     flex-direction: column;
     color: var(--text);
     --line: color-mix(in srgb, var(--text) 14%, transparent);
+    /* The line between the days and the hours, thicker than the hours' own
+       so it reads as a different thing (asked 2026-11-10). */
+    --cal-divide: 2px solid color-mix(in srgb, var(--text) 55%, transparent);
     --sb-thumb: var(--text);
     --sb-track: transparent;
   }
@@ -600,7 +603,7 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 0 6px 6px 50px;
-    border-bottom: 1px solid var(--line);
+    border-bottom: var(--cal-divide);
   }
 
   .cal-allday-chip,
@@ -652,7 +655,7 @@
     display: flex;
     overflow-y: hidden;
     scrollbar-gutter: stable;
-    border-bottom: 1px solid var(--line);
+    border-bottom: var(--cal-divide);
   }
 
   .cal-gutter-space {
@@ -810,7 +813,9 @@
     position: absolute;
     left: 0;
     right: 0;
-    border-top: 2px solid var(--calendar-now, var(--text));
+    /* Thicker than a block's outline, which is the same colour, so it is not
+       taken for one (asked 2026-11-10). */
+    border-top: 3px solid var(--calendar-now, var(--text));
     pointer-events: none;
     z-index: 2;
   }
@@ -824,7 +829,7 @@
   .cal-now-time {
     position: absolute;
     left: -46px;
-    top: -9px;
+    top: -10px;
     padding: 1px 5px;
     border-radius: 999px;
     background: var(--calendar-now, var(--text));

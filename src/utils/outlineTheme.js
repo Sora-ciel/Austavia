@@ -194,7 +194,9 @@ export const LILAC_WIRE_PRESET = wire('lilac-wire', 'Lilac Wire', '#cdb4ff', '#0
 export const LIME_WIRE_PRESET = wire('lime-wire', 'Lime Wire', '#d4ff5c', '#0c1200',
   'Electric lime writing and edges -- loud on purpose, and readable over almost anything.');
 
-export const COBALT_WIRE_PRESET = wire('cobalt-wire', 'Cobalt Wire', '#7aa2ff', '#030a1f',
+// The blue a little towards cyan (asked 2026-11-10, "so that it's an easier
+// blue to depict"): it was #7aa2ff.
+export const COBALT_WIRE_PRESET = wire('cobalt-wire', 'Cobalt Wire', '#5fb8ff', '#030a1f',
   'Vivid cobalt-blue writing and edges, with midnight pop-ups.');
 
 /**

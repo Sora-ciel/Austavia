@@ -238,7 +238,10 @@ input[type="checkbox"] {
   height: 15px;
   flex: 0 0 auto;
   margin: 0;
-  border: 1.5px solid color-mix(in srgb, currentColor 60%, transparent);
+  /* The writing's own colour, not a faded one, and a little thicker (asked
+     2026-11-10: they "don't have the same color as the text on their
+     outline ... and their outline could be just a bit thicker"). */
+  border: 2px solid currentColor;
   border-radius: 4px;
   background: transparent;
   display: inline-grid;
@@ -248,7 +251,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:hover {
-  border-color: currentColor;
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
 input[type="checkbox"]:checked {
