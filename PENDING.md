@@ -126,8 +126,15 @@ moment, archive instead of delete) after these, in an order to be agreed.
 8. *Done 2026-11-10.* **Page mode: the title moves like a block.**
 9. *Done 2026-11-10.* **Page mode: a handle that does not look like Notion's.**
 10. *Done 2026-11-10.* **Page mode on a phone: blocks move only in edit mode.**
-11. **Music dropped on the app goes into the library**, and opens Playlist
+11. *Done 2026-11-10.* **Music dropped on the app goes into the library**, and opens Playlist
     mode if another mode is open.
+13. **The player's timeline is hard to grab**: only the thin line takes the
+    finger, and a press just off it lands on the strip, which opens Playlist
+    mode and closes the player. In the app's player and in the phone's music
+    notification.
+14. **Pop-ups: none on the Linux app** (the timer's and timed objectives'
+    pop-ups are the Windows app's only), and **the phone's timer
+    notification is not styled like the pop-up** nor in the theme.
 12. **Waiting on a decision: how modes are changed**, on a phone and a
     computer, as modes multiply -- asked for an opinion -- and with it, the
     page buttons crowding a phone's bar while music plays.

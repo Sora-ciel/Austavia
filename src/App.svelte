@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick, setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
+  import { splitDrop } from './utils/dropKinds.js';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
@@ -4671,10 +4672,18 @@
     await pushHistory(blocks, modeOrders);
   }
 
+  // Music dropped anywhere goes into the library, in Playlist mode (asked
+  // 2026-11-10); utils/dropKinds.js tells it from pictures and videos.
+  let incomingMusic = null;
+
   async function handleModeDrop(event) {
     event.preventDefault();
     const files = Array.from(event.dataTransfer?.files || []);
-    const mediaFiles = files.filter(file => file.type?.startsWith('image/') || file.type?.startsWith('video/'));
+    const { music, media: mediaFiles } = splitDrop(files);
+    if (music.length) {
+      if (mode !== 'playlist') setMode('playlist');
+      incomingMusic = { files: music, at: Date.now() };
+    }
     if (!mediaFiles.length) return;
 
     // Dropped onto writing, the picture goes *into* the writing.
@@ -7958,6 +7967,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       page={pageNow}
       {pageTitle}
       pageId={pageAt}
+      {incomingMusic}
+      on:incomingTaken={() => (incomingMusic = null)}
       {pageEditMode}
       on:pageChange={(e) => changePageShown(e.detail.page)}
       on:renamePage={(e) => renamePageShown(e.detail.title)}

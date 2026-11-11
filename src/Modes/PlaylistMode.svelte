@@ -53,6 +53,20 @@
   export let nowPlayingId = null;
   export let isPlaying = false;
   export let shuffle = false;
+  /**
+   * Music dropped on the app (App.svelte, asked 2026-11-10: "slide music in
+   * the app and it adds it in playlist"): `{ files, at }`, added once each,
+   * the same way as files chosen with the button.
+   */
+  export let incomingFiles = null;
+  let lastIncoming = 0;
+  $: if (incomingFiles && incomingFiles.at !== lastIncoming) {
+    lastIncoming = incomingFiles.at;
+    const files = incomingFiles.files;
+    // Taken: App lets go of them, so opening the mode again never adds them twice.
+    dispatch('incomingTaken');
+    importFiles(files);
+  }
 
   const dispatch = createEventDispatcher();
   const appDialogs = getContext('appDialogs');
@@ -435,7 +449,12 @@
     // silently dropped before they ever reached the parser.
     const files = [...(event.target?.files || [])].filter(isSupportedAudioFile);
     event.target.value = '';
-    if (!files.length) return;
+    await importFiles(files);
+  }
+
+  /** Files put into the library: chosen with the button, or dropped on the app. */
+  async function importFiles(files) {
+    if (!files?.length) return;
 
     const added = [];
     const failures = [];

@@ -47,6 +47,8 @@
   export let pageId = null;
   /** Page mode's edit mode, switched from the control bar. */
   export let pageEditMode = false;
+  /** Music dropped on the app, for Playlist mode to add: `{ files, at }`. */
+  export let incomingMusic = null;
   export let musicLibrary = { tracks: [], playlists: [] };
   export let nowPlayingId = null;
   export let isPlaying = false;
@@ -199,6 +201,8 @@
   {:else if mode === 'playlist'}
     <PlaylistMode
       bind:canvasRef
+      incomingFiles={incomingMusic}
+      on:incomingTaken
       {canvasColors}
       {blocks}
       backgroundSettings={singleNoteSettings}
