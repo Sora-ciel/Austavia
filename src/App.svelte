@@ -3938,13 +3938,31 @@
   // What opens from the bar -- Settings, Menu, the mode list, the timer's and
   // the player's panels -- is not the bar: a finger in them never starts a
   // gesture (asked 2026-11-10, after the sheet opened from inside Settings).
-  const OPENED_FROM_BAR = '.dropdown-content, .left-controls, .mode-ladder, .add-block-list, .timer-panel, .player-panel, .mini-player, input, [role="dialog"]';
+  const OPENED_FROM_BAR = '.dropdown-content, .left-controls, .mode-ladder, .add-block-list, .timer-panel, .player-panel, .mini-player, [role="dialog"]';
+
+  // Which touches are the bar's: one that starts on the bar, or -- for the
+  // slide up -- in a band half the bar's height above it (asked 2026-11-10:
+  // some phones keep the very bottom for their own swipe between apps). The
+  // band was first a layer over the mode, which swallowed taps there (Task
+  // mode's "Add a task" stopped answering); it is only a test of where the
+  // touch began now, and only a finger going on upwards makes it anything.
+  function startsOnBar(touch, target) {
+    if (!controlsRef) return false;
+    if (controlsRef.contains(target)) return true;
+    if (controlsLayout.modeGesture !== 'sheet') return false;
+    const bar = controlsRef.getBoundingClientRect();
+    return touch.clientY >= bar.top - bar.height / 2 && touch.clientY < bar.top;
+  }
 
   function barTouchStart(event) {
     barGesture = null;
-    if (event.touches?.length !== 1 || window.innerWidth > 700 || controlsLayout.phone !== 'bottom') return;
+    if (event.touches?.length !== 1 || window.innerWidth > 700 || controlsLayout.phone !== 'bottom' || keyboardOpen) return;
     if (event.target.closest?.(OPENED_FROM_BAR)) return;
-    barGesture = { kind: null, startX: event.touches[0].clientX, startY: event.touches[0].clientY };
+    // A field in the bar is for typing in, not sliding from.
+    if (controlsRef?.contains(event.target) && event.target.closest?.('input, textarea')) return;
+    const touch = event.touches[0];
+    if (!startsOnBar(touch, event.target)) return;
+    barGesture = { kind: null, startX: touch.clientX, startY: touch.clientY };
   }
   function barTouchMove(event) {
     if (!barGesture) return;
@@ -7336,25 +7354,6 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     left: 56px;
   }
 }
-/* The band above the phone's bar that also starts the slide up. */
-.bar-reach {
-  display: none;
-}
-@media (max-width: 700px) {
-  .app.phone-bar-bottom .bar-reach {
-    display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: var(--controls-height, 56px);
-    height: calc(var(--controls-height, 56px) / 2);
-    z-index: 999;
-  }
-  .app.phone-bar-bottom.keyboard-up .bar-reach {
-    display: none;
-  }
-}
-
 /* The column is a computer's; a phone has the sheet and the swipe. After the
    rules that draw it: Svelte weighs both the same, so the later one wins. */
 @media (max-width: 700px) {
@@ -8009,7 +8008,17 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
      frames its folders in them (2026-10-05). -->
 <!-- The dialog colours (--dlg-*) are set here too, so a dialog a mode opens
      (components/AppDialog.svelte) is in the theme's pop-up colours. -->
-<svelte:window on:keydown={modeShortcut} />
+<!-- The bar's finger gestures are listened for on the window, never on a
+     layer of their own, and never stop a touch: a tap anywhere -- in the
+     band above the bar too -- reaches what is under it. barTouchStart says
+     which touches are the bar's. -->
+<svelte:window
+  on:keydown={modeShortcut}
+  on:touchstart|passive={barTouchStart}
+  on:touchmove|passive={barTouchMove}
+  on:touchend|passive={barTouchEnd}
+  on:touchcancel|passive={cancelBarGesture}
+/>
 
 <div
   class="app"
@@ -8024,13 +8033,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   {#if channelBadgeText}
     <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
   {/if}
-  <!-- Above the bar, half its height, a band that also starts the slide up
-     (asked 2026-11-10): some phones keep the very bottom for their own swipe
-     between apps, so the slide is given room above it. -->
-  {#if controlsLayout.phone === 'bottom' && controlsLayout.modeGesture === 'sheet'}
-    <div class="bar-reach" on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}></div>
-  {/if}
-  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:pointerdown={closeLayoutFromBar} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}>
+  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:pointerdown={closeLayoutFromBar}>
     <LeftControls
       modeIds={offered}
       bind:currentSaveName
