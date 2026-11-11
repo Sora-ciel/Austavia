@@ -56,6 +56,7 @@
     signOutUser,
     loadRemoteFile,
     loadRemoteIndexEntry,
+    loadIndexStamp,
     loadRemoteIndex,
     saveRemoteFile,
     isSyncableFileId,
@@ -162,6 +163,7 @@
   import { folderIdOf } from './utils/folderIdentity.js';
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
   import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen, seenFor } from './utils/syncConflict.js';
+  import { backstopNeedsFullRead } from './utils/syncBackstop.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -5925,10 +5927,32 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       // attempt after it, so the tick that keeps sync honest is also the one
       // that lets go of it.
       releaseStalledSyncLocks();
-      pullRemoteUpdatesIfNeeded().catch(error => {
+      backstopTick().catch(error => {
         console.error('Auto sync download backstop failed:', error);
       });
     }, 30_000);
+  }
+
+  // One small number first, the whole index only when it moved, or every ten
+  // minutes regardless (utils/syncBackstop.js): reading the whole index every
+  // thirty seconds on every open device was nine tenths of the database's
+  // downloads (measured 2026-11-11).
+  let backstopStamp = null;
+  let backstopFullReadAt = 0;
+  async function backstopTick() {
+    if (!autoSyncEnabled || !firebaseReady || !authUser) return;
+    let stamp = null;
+    try { stamp = await loadIndexStamp(); } catch { /* unknown: read in full */ }
+    const now = Date.now();
+    if (!backstopNeedsFullRead({ stamp, lastStamp: backstopStamp, lastFullReadAt: backstopFullReadAt, now })) return;
+    // Only counted as read when the pull really ran; one turned away (another
+    // in flight, an upload, the launch sync) is tried again next tick.
+    const free = !pullInFlight && !uploadInProgress && !cloudBootstrapInProgress;
+    await pullRemoteUpdatesIfNeeded();
+    if (free) {
+      backstopStamp = stamp;
+      backstopFullReadAt = now;
+    }
   }
 
   // Coming back to the app is the moment a phone is most likely to be holding a

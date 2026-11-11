@@ -126,6 +126,16 @@ describe('write is scoped to files and index', () => {
   // The README calls this out as deliberate: granting write at the user node
   // would let any signed-in account park arbitrary data under it and use the
   // database as free storage.
+  // The index's stamp (2026-11-11): one number beside it, so a device's
+  // thirty-second backstop can tell nothing changed without reading the whole
+  // index (src/utils/syncBackstop.js). Its owner's, and only ever a number.
+  it('accepts the index stamp as a number from its owner, and nothing else', async () => {
+    await reset();
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/indexStamp`), 1700000000000));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/indexStamp`), { big: 'payload' }));
+    await assertFails(set(ref(db(BOB), `${userPath(ALICE)}/indexStamp`), 1700000000000));
+  });
+
   it('refuses a write anywhere else under the user node', async () => {
     await reset();
     await assertFails(

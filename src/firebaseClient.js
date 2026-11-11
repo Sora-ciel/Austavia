@@ -544,6 +544,31 @@ export async function loadRemoteIndex() {
 }
 
 /**
+ * One small number that moves with every write to the index, so the
+ * thirty-second backstop can see that nothing changed without reading the
+ * whole index (utils/syncBackstop.js). Written after the index; never allowed
+ * to fail what it follows -- a lost stamp is caught by the backstop's full
+ * read every ten minutes.
+ */
+async function touchIndexStamp(ctx, uid) {
+  try {
+    await ctx.dbApi.set(ctx.dbApi.ref(ctx.db, getUserPath(uid, 'indexStamp')), Date.now());
+  } catch (error) {
+    console.warn('Could not mark the index as changed:', error);
+  }
+}
+
+/** The index's stamp, or null when there is none yet. */
+export async function loadIndexStamp() {
+  if (!isFirebaseConfigured()) return null;
+  const ctx = await getFirebaseContext();
+  const user = requireUser(ctx.auth.currentUser);
+  const snapshot = await ctx.dbApi.get(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, 'indexStamp')));
+  const value = snapshot.exists() ? Number(snapshot.val()) : null;
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
  * One folder's entry in the cloud's index -- its stamps -- or null. What an
  * upload checks first, so it does not overwrite a folder another device
  * changed meanwhile (utils/syncConflict.js).
@@ -633,6 +658,7 @@ export async function saveRemoteFile(fileId, payload, options = {}) {
       schemaVersion: SYNC_SCHEMA_VERSION
     }
   );
+  await touchIndexStamp(ctx, user.uid);
 
   return { fileId, updatedAt };
 }
@@ -665,6 +691,7 @@ export async function binRemoteFile(fileId, binnedAt = Date.now()) {
   const snapshot = await ctx.dbApi.get(entryRef);
   if (!snapshot.exists() || Number(snapshot.val()?.deletedAt) > 0) return null;
   await ctx.dbApi.update(entryRef, { binnedAt: Number(binnedAt), schemaVersion: SYNC_SCHEMA_VERSION });
+  await touchIndexStamp(ctx, user.uid);
   return { fileId, binnedAt };
 }
 
@@ -687,6 +714,7 @@ export async function deleteRemoteFile(fileId) {
     ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`)),
     { fileId, updatedAt: deletedAt, deletedAt, schemaVersion: SYNC_SCHEMA_VERSION }
   );
+  await touchIndexStamp(ctx, user.uid);
   await ctx.dbApi.remove(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `files/${fileId}`)));
 
   // The note's images and other attachments used to be left behind here,

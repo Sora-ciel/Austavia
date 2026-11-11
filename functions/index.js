@@ -281,6 +281,9 @@ exports.emptyCloudBins = onSchedule(
         await db.ref(`${userPath}/index/${fileId}`).remove();
         forgotten += 1;
       }
+      // The index moved: its stamp moves too, so the devices' backstop reads
+      // it (src/utils/syncBackstop.js).
+      if (empty.length || forget.length) await db.ref(`${userPath}/indexStamp`).set(now);
     }
     logger.info('empty-cloud-bins', { accounts: uids.length, emptied, forgotten });
   }

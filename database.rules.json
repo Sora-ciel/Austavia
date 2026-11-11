@@ -31,6 +31,11 @@
               }
             },
 
+            "indexStamp": {
+              ".write": "auth !== null && auth.uid === $uid && root.child('sync/' + $ns + '/users/' + $uid + '/blocked').val() !== true",
+              ".validate": "newData.isNumber()"
+            },
+
             "themes": {
               ".write": "auth !== null && auth.uid === $uid && root.child('sync/' + $ns + '/users/' + $uid + '/blocked').val() !== true",
               "$themeId": {
