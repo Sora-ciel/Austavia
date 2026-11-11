@@ -8,7 +8,7 @@
    */
   import { createEventDispatcher, onMount } from 'svelte';
   import { portal } from '../utils/portal.js';
-  import { normalizeCrop, movedCrop, resizedCrop } from '../utils/crop.js';
+  import { normalizeCrop, movedCrop, resizedCrop, startFrame } from '../utils/crop.js';
 
   export let src = '';
   export let crop = null;
@@ -20,7 +20,8 @@
   export let actions = [];
 
   const dispatch = createEventDispatcher();
-  let frame = normalizeCrop(crop) || { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
+  // The picture's crop, or round the whole of it (utils/crop.js).
+  let frame = startFrame(crop);
   let imgEl;
   let drag = null; // { kind: 'move' | corner, x, y, start }
 
@@ -84,7 +85,7 @@
     <!-- The frame back round the whole picture, to start again or keep it
          whole; nothing is saved until one of the buttons after it (asked
          2026-11-10). -->
-    <button on:click={() => (frame = { x: 0, y: 0, w: 1, h: 1 })}>Reset</button>
+    <button on:click={() => (frame = startFrame(null))}>Reset</button>
     <span class="crop-gap"></span>
     <button on:click={() => dispatch('close')}>Cancel</button>
     {#if actions.length}
@@ -107,7 +108,11 @@
     z-index: 9500;
     display: flex;
     flex-direction: column;
-    background: rgba(0, 0, 0, 0.82);
+    /* Solid: the picture viewer under it shows the same picture, a little
+       bigger and to one side, and through a see-through backdrop it looked
+       like a part of the picture left out -- before cropping, and after
+       Reset (2026-11-11). */
+    background: #000;
     color: var(--app-text, #fff);
   }
 

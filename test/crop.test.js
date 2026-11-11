@@ -34,3 +34,16 @@ test('a picture on a page is sized as a share of its row, and that size is kept 
   assert.deepEqual(setCellWidth(rows, 'img', 0.4)[0].cells[0], { blockId: 'img', width: 0.4 });
   assert.deepEqual(setCellWidth(rows, 'img', null)[0].cells[0], { blockId: 'img' });
 });
+
+// Reported 2026-11-11: opening the crop on a picture showed it cropped
+// already, and after Reset it still looked cropped a bit.
+import { startFrame } from '../src/utils/crop.js';
+
+test('a picture with no crop opens in the crop editor with the frame round the whole of it', () => {
+  assert.deepEqual(startFrame(null), { x: 0, y: 0, w: 1, h: 1 });
+  assert.deepEqual(startFrame({ x: 0.2, y: 0.1, w: 0.5, h: 0.5 }), { x: 0.2, y: 0.1, w: 0.5, h: 0.5 });
+});
+
+test('Reset gives back the whole picture, which is saved as no crop at all', () => {
+  assert.equal(normalizeCrop(startFrame(null)), null);
+});

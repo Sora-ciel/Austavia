@@ -31,6 +31,16 @@ export function normalizeCrop(crop) {
   return { x, y, w, h };
 }
 
+/**
+ * Where the crop editor's frame starts: the crop the picture has, or round
+ * the whole picture when it has none -- it started a tenth in from every
+ * edge, which read as cropped already (2026-11-11). Also what Reset goes
+ * back to.
+ */
+export function startFrame(crop) {
+  return normalizeCrop(crop) || { x: 0, y: 0, w: 1, h: 1 };
+}
+
 /** The shape of what is kept: the picture's width over height, times the crop's. */
 export function croppedAspect(naturalAspect, crop) {
   const c = normalizeCrop(crop);
