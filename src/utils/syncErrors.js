@@ -40,14 +40,28 @@ function oversizedValue(error) {
 }
 
 /**
+ * What a version too old to save is told: at launch, and once more if it
+ * tries to send anything (App.svelte stops sending after that).
+ */
+export const TOO_OLD_MESSAGE = 'This version of the app is too old to sync with your account. '
+  + 'Your changes are staying on this device. Please update to continue syncing.';
+
+/**
  * A sentence to show someone whose sync just failed.
+ *
+ * `tooOld`: the cloud says this version is older than it accepts
+ * (checkSyncCompatibility). Its saves are refused by the rules, which reads
+ * exactly like the daily limit -- both are a plain permission_denied -- and
+ * the rehearsal of 0.8.67 on staging showed an old app saying "today's sync
+ * limit" on an account nowhere near it (2026-11-11). Known to be too old, it
+ * says so instead.
  *
  * `storageUsage` is the server's own record for the account. It is what
  * separates "you are out of space" from "something else refused this", which
  * the error alone cannot tell you — both arrive as an identical
  * storage/unauthorized.
  */
-export function explainSyncFailure(error, { storageUsage } = {}) {
+export function explainSyncFailure(error, { storageUsage, tooOld = false } = {}) {
   const tooLarge = oversizedValue(error);
   if (tooLarge) {
     // Refused by the SDK before anything was sent: one value in the folder is
@@ -78,6 +92,7 @@ export function explainSyncFailure(error, { storageUsage } = {}) {
   // set — the daily bandwidth ceiling. It clears itself overnight, which is
   // the part worth saying, because otherwise this looks permanent.
   if (code === 'permission_denied') {
+    if (tooOld) return TOO_OLD_MESSAGE;
     return 'You have reached today\'s sync limit, so changes are staying on this '
       + 'device for now. It resets at midnight UTC and everything syncs then.';
   }

@@ -106,3 +106,16 @@ describe('a value too large for the database', () => {
     assert.match(message, /nothing else in it syncs/i);
   });
 });
+
+// The rehearsal of 0.8.67 on staging, 2026-11-11: an app too old to save was
+// refused and said "today's sync limit" on an account nowhere near it. A
+// version that knows it is too old says that instead.
+import { TOO_OLD_MESSAGE } from '../src/utils/syncErrors.js';
+describe('a version too old to save', () => {
+  it('is told it is too old, not that it reached the sync limit', () => {
+    const err = { code: 'PERMISSION_DENIED', message: 'PERMISSION_DENIED: Permission denied' };
+    assert.equal(explainSyncFailure(err, { tooOld: true }), TOO_OLD_MESSAGE);
+    assert.doesNotMatch(explainSyncFailure(err, { tooOld: true }), /limit/i);
+    assert.match(explainSyncFailure(err, { tooOld: false }), /limit/i, 'an up-to-date one keeps the limit');
+  });
+});

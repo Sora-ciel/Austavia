@@ -131,6 +131,13 @@ update. Deleting still works from an old app.
    which only runs once a day (found 2026-11-11). Either run that job now
    (Cloud Scheduler, "Force run"), or:
    `firebase database:set /sync/default/meta/schemaVersion --data '{"latest":2,"minSupported":2}' --project default`
+   **What an old device says** (rehearsed on staging 2026-11-11 with b11):
+   "too old ... please update" at launch, then, when it tries to save,
+   "You have reached today's sync limit" -- its own wording for any refusal,
+   which cannot be changed in a version already installed. The release
+   notes should say: if an old device says the sync limit is reached, it is
+   too old; update it. From 0.8.67 on a version that is too old says so and
+   stops sending (syncTooOld). Downloading still works on an old device.
 3. Staging the same way, `--project staging` -- and rehearsed there first: the staging builds from before this commit write
    schema 1 and are refused once staging's rules are deployed.
 

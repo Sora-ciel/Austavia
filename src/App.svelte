@@ -126,7 +126,7 @@
   import { nextSaveDelay, saveVerdict } from './utils/saveScheduling.js';
   // Turns an SDK failure into something a person can act on. See
   // utils/syncErrors.js.
-  import { explainSyncFailure } from './utils/syncErrors.js';
+  import { explainSyncFailure, TOO_OLD_MESSAGE } from './utils/syncErrors.js';
   import { describeStorageUsage } from './utils/storageUsage.js';
   import { storageAnnouncement } from './utils/storageAlerts.js';
   import { attachmentVerdict, inlinePictureVerdict, freeSpaceBeforeSaving } from './utils/uploadAllowance.js';
@@ -3103,6 +3103,10 @@
   // running the packaged app can see it, which is how an account could stop
   // syncing without anything looking wrong.
   let syncFailureNotice = '';
+  // The cloud accepts nothing from this version any more (checkSyncCompatibility):
+  // it still downloads, but stops sending -- every send would be refused, and
+  // was reported as the daily limit (2026-11-11). Said once, then quiet.
+  let syncTooOld = false;
   // The worst storage state this account has been told about since it was last
   // comfortable. Kept so a record that is rewritten on every upload does not
   // put the same banner back every few seconds -- see utils/storageAlerts.js.
@@ -5896,6 +5900,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       return;
     }
 
+    if (syncTooOld) {
+      if (syncFailureNotice !== TOO_OLD_MESSAGE) {
+        syncFailureNotice = TOO_OLD_MESSAGE;
+        logSync('skip', '', 'not uploaded: this version is too old for the cloud');
+      }
+      autoSyncDirty = false;
+      return;
+    }
+
     // Only now, and only for these, is a folder actually opened -- the
     // attachment summary is the one part that needs to see the content.
     await Promise.all(
@@ -5935,6 +5948,17 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }
     if (failures.length) {
       const [{ fileName, error }] = failures;
+      // A refusal may be the cloud having moved past this version while it
+      // was open: asked again before it is explained, so it is not called the
+      // daily limit.
+      if (!syncTooOld && /permission/i.test(String(error?.code || error?.message || error))) {
+        try { syncTooOld = !(await checkSyncCompatibility()).compatible; } catch { /* explained as it is */ }
+      }
+      if (syncTooOld) {
+        syncFailureNotice = TOO_OLD_MESSAGE;
+        autoSyncDirty = false;
+        return;
+      }
       // The account's own record is passed in because the error cannot tell
       // "you are out of space" from "something else refused this" — both
       // arrive as an identical storage/unauthorized.
@@ -6959,7 +6983,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       checkSyncCompatibility()
         .then(result => {
           if (!result.compatible) {
-            appAlert('This version of the app is too old to sync with your account. Please update to continue syncing.');
+            syncTooOld = true;
+            appAlert(TOO_OLD_MESSAGE);
           }
         })
         .catch(() => {});
