@@ -12,7 +12,7 @@
    * So a block here is the same component as on the Canvas (Block.svelte),
    * drawn with BlockShell's `placement="page"`: no frame, no header, no
    * colours of its own, as wide as its place. The page is rows of them, a
-   * row being one block or several side by side; a ⋮⋮ handle beside each one
+   * row being one block or several side by side; a handle beside each one (a dot)
    * moves it -- onto another's side to share its row, above or below for a
    * row of its own -- and opens its menu. A click on the empty page writes.
    *
@@ -471,12 +471,12 @@
                   on:pointerdown|preventDefault={(event) => handleDown(event, block.id)}
                   on:click|stopPropagation
                 >
-                  <!-- Four arrows: moving, in the app's own drawing rather
-                       than Notion's six dots (asked 2026-11-10). -->
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 3v18M3 12h18" />
-                    <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
-                  </svg>
+                  <!-- A small dot in a wider place to hold: asked 2026-11-11,
+                       "maybe a kind of dot or circle pretty small one but the
+                       space that you can click to move is wider than the dot
+                       so that it's not hard to hold onto it". It was four
+                       arrows, and Notion's six dots before that. -->
+                  <span class="page-handle-dot" aria-hidden="true"></span>
                 </button>
                 {#if block.id === TITLE_ID}
                   {#if renaming}
@@ -757,13 +757,15 @@
   /* Beside a block while the pointer is on it, just left of it: close
      enough to reach a block that sits to the right of another (asked
      2026-11-10: "make it be a little more on the right and style a bit
-     better the dots"). Six dots, drawn, in a pill that shows on hover. */
+     better the dots"). A dot, in a pill that shows on hover. */
+  /* The place to hold is wider than the dot drawn in it (2026-11-11), its
+     middle where the old handle's was. */
   .page-handle {
     position: absolute;
-    left: -20px;
-    top: 3px;
-    width: 18px;
-    height: 24px;
+    left: -23px;
+    top: 1px;
+    width: 24px;
+    height: 28px;
     padding: 0;
     border: none;
     border-radius: 6px;
@@ -779,14 +781,11 @@
     z-index: 2;
   }
 
-  .page-handle svg {
-    width: 15px;
-    height: 15px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+  .page-handle-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
   }
 
   /* On a phone, blocks are moved in edit mode only (asked 2026-11-10), so a
@@ -819,7 +818,7 @@
 
   /* Between two columns the handle sits in the gap, not over the left one. */
   .page-row.several > .page-col + .page-col .page-handle {
-    left: -16px;
+    left: -19px;
   }
 
   .page-below {
