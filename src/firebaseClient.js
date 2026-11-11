@@ -543,6 +543,21 @@ export async function loadRemoteIndex() {
   return snapshot.exists() ? snapshot.val() : {};
 }
 
+/**
+ * One folder's entry in the cloud's index -- its stamps -- or null. What an
+ * upload checks first, so it does not overwrite a folder another device
+ * changed meanwhile (utils/syncConflict.js).
+ */
+export async function loadRemoteIndexEntry(fileId) {
+  if (!isFirebaseConfigured()) return null;
+  const ctx = await getFirebaseContext();
+  const user = requireUser(ctx.auth.currentUser);
+  const snapshot = await ctx.dbApi.get(
+    ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`))
+  );
+  return snapshot.exists() ? snapshot.val() : null;
+}
+
 // Push-based replacement for polling loadRemoteIndex() on a timer: RTDB only
 // sends bytes when the index actually changes, instead of a full get() every tick.
 export function subscribeRemoteIndex(callback) {

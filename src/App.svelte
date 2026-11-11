@@ -55,6 +55,7 @@
     prewarmGoogleSignIn,
     signOutUser,
     loadRemoteFile,
+    loadRemoteIndexEntry,
     loadRemoteIndex,
     saveRemoteFile,
     isSyncableFileId,
@@ -160,6 +161,7 @@
   import { NO_PLACES, visit, goBack, goForward, placesStillThere } from './utils/pagePlaces.js';
   import { folderIdOf } from './utils/folderIdentity.js';
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
+  import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen } from './utils/syncConflict.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -3144,6 +3146,23 @@
   let lastAutoSyncAttachmentFingerprintByFile = {};
   let lastRemoteSyncFingerprint = '';
 
+  // The cloud's stamp for each folder the last time this device saw the
+  // cloud's copy -- downloaded, or its own uploaded -- kept across restarts,
+  // per account. An upload that finds the cloud has moved on since is a
+  // conflict, and keeps both versions (utils/syncConflict.js).
+  let cloudSeen = {};
+  let cloudSeenFor = null;
+  $: if (authUser?.uid && authUser.uid !== cloudSeenFor) {
+    cloudSeenFor = authUser.uid;
+    cloudSeen = readSeen(typeof localStorage === 'undefined' ? null : localStorage, authUser.uid);
+  }
+  function noteCloudSeen(fileName, modifiedAt) {
+    const at = Number(modifiedAt) || 0;
+    if (!at || !authUser?.uid) return;
+    cloudSeen = { ...cloudSeen, [fileName]: at };
+    writeSeen(typeof localStorage === 'undefined' ? null : localStorage, authUser.uid, cloudSeen);
+  }
+
   function rememberCloudSyncForFile(fileName, syncedAt = Date.now()) {
     cloudSyncMemoryByFile = {
       ...cloudSyncMemoryByFile,
@@ -5404,6 +5423,7 @@
       const uploadedNames = [];
       const failures = [];
       const unsyncable = [];
+      const conflicted = [];
       for (const fileName of names) {
         // A name the database cannot use is not a failure to retry — it will
         // never succeed, and retrying it every ten seconds only replaces the
@@ -5415,10 +5435,32 @@
         }
         try {
           const localPayload = await loadBlocks(fileName);
+          const localModifiedAt = Number(localPayload?.modifiedAt || localPayload?.updatedAt || 0);
+          // Changed on another device since this one last saw it? Then it is
+          // not overwritten: both are kept (utils/syncConflict.js). Asked with
+          // a time limit -- offline, the answer may never come, and then this
+          // folder simply waits for the next pass.
+          const remoteEntry = await Promise.race([
+            loadRemoteIndexEntry(fileName),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('the cloud did not answer')), 8000))
+          ]);
+          const verdict = remoteEntry?.deletedAt || remoteEntry?.binnedAt
+            ? 'upload'
+            : uploadVerdict({
+              seen: cloudSeen[fileName] ?? null,
+              remoteModifiedAt: remoteEntry?.modifiedAt || remoteEntry?.updatedAt || 0,
+              localModifiedAt
+            });
+          if (verdict === 'conflict') {
+            await keepBothVersions(fileName, localPayload, remoteEntry);
+            conflicted.push(fileName);
+            continue;
+          }
           const uploadAttachments = options.shouldUploadAttachments
             ? options.shouldUploadAttachments(fileName)
             : true;
           await saveRemoteFileWithMemory(fileName, localPayload, { uploadAttachments });
+          noteCloudSeen(fileName, localModifiedAt);
           uploadedNames.push(fileName);
         } catch (error) {
           failures.push({ fileName, error });
@@ -5431,11 +5473,54 @@
           lockProgressed('upload');
         }
       }
+      if (conflicted.includes(currentSaveName)) await remountCurrentSaveIfLoaded();
       return { uploadedCount: uploadedNames.length, uploadedNames, failures, unsyncable };
     } finally {
       uploadInProgress = false;
       releaseLock('upload');
     }
+  }
+
+  /**
+   * A folder changed here and, meanwhile, on another device: this device's
+   * version becomes a folder of its own -- "Notes (from phone, 11 Nov)", its
+   * pictures its own, as Duplicate makes them -- and the folder takes the
+   * cloud's version. Both sync; nothing is overwritten (utils/syncConflict.js).
+   * Throws, leaving everything as it was, when the copy cannot be made; the
+   * next pass tries again.
+   */
+  /** This device's version of a folder in conflict, saved as a folder of its own. Returns its name. */
+  async function saveConflictCopy(fileName, localPayload) {
+    const copyName = conflictCopyName(fileName, await listSavedBlocks(), {
+      kind: deviceKind({ nativeAndroid: onAndroidApp(), desktopApp: typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__) }),
+      at: new Date()
+    });
+    const { payload, failed } = await embedCloudFiles(localPayload, { audio: true });
+    if (failed) throw new Error('the pictures for the copy could not be fetched');
+    await saveBlocks(copyName, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: settingsForCopy(payload.modeSettings) });
+    logSync('save', copyName, `this device's version of "${fileName}", changed on another device meanwhile`);
+    // Owed an upload whatever marks the sync clean meanwhile -- the launch
+    // sync does, at its end.
+    owedSinceLaunch = new Set([...owedSinceLaunch, copyName]);
+    appAlert(`"${fileName}" was changed on another device while this one had changes of its own. Both are kept: "${fileName}" has the other device's version, and this device's is in "${copyName}".`);
+    return copyName;
+  }
+
+  async function keepBothVersions(fileName, localPayload, remoteEntry) {
+    const copyName = await saveConflictCopy(fileName, localPayload);
+
+    const remotePayload = await loadRemoteFile(fileName);
+    if (!remotePayload) throw new Error('the cloud copy could not be read');
+    await keepReplacedCopy(fileName, localPayload, remotePayload, `changed on another device meanwhile; this device's version is now "${copyName}"`);
+    await saveBlocks(fileName, remotePayload);
+    rememberCloudSyncForFile(fileName, Number(remotePayload?.lastSyncedAt || Date.now()));
+    noteCloudSeen(fileName, remoteEntry?.modifiedAt || remotePayload?.modifiedAt || remotePayload?.updatedAt);
+    lastAutoSyncFingerprintByFile[fileName] = Number((await loadSaveMeta(fileName))?.updatedAt || receivedFromCloud(remotePayload));
+    delete lastAutoSyncAttachmentFingerprintByFile[fileName];
+
+    savedList = await listSavedBlocks();
+    autoSyncDirty = true;
+    logSync('upload', fileName, 'changed on another device meanwhile: both versions kept', { copy: copyName });
   }
 
   async function uploadAllLocalToCloud(showInfo = true, options = {}) {
@@ -5701,6 +5786,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         );
         await saveBlocks(fileName, remotePayload);
         rememberCloudSyncForFile(fileName, Number(remoteMeta?.lastSyncedAt || Date.now()));
+        noteCloudSeen(fileName, remoteModifiedAt);
 
         // A copy that was just taken from the cloud owes the cloud nothing.
         //
@@ -6186,6 +6272,23 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       for (const remoteName of behind) {
         const remotePayload = await loadRemoteFile(remoteName);
         if (remotePayload) {
+          // Changed here since this device last saw the cloud, and changed
+          // there too: this device's version is kept as a folder of its own
+          // before the cloud's comes in (utils/syncConflict.js). Unknown when
+          // nothing was recorded -- the first launch of this version -- and
+          // then the copy below is what is kept, as before.
+          const seenAt = cloudSeen[remoteName];
+          const localAt = Number(localMeta[remoteName]?.modifiedAt || localMeta[remoteName]?.updatedAt || 0);
+          if (localMeta[remoteName] && seenAt && localAt > seenAt) {
+            try {
+              await saveConflictCopy(remoteName, await loadBlocks(remoteName));
+              autoSyncDirty = true;
+            } catch (error) {
+              // Not taken over, then: kept as it is, and asked about again next launch.
+              logSync('error', remoteName, 'could not keep this device\'s version, so the cloud\'s was not taken', { error: String(error?.message || error) });
+              continue;
+            }
+          }
           // A device that had work of its own is exactly where "the cloud wins"
           // hurts, so what it had is kept before the cloud takes over.
           await keepReplacedCopy(
@@ -6195,6 +6298,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           );
           await saveBlocks(remoteName, remotePayload);
           rememberCloudSyncForFile(remoteName, Number(remotePayload?.lastSyncedAt || Date.now()));
+          noteCloudSeen(remoteName, remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt);
           // As above: what was just fetched is not owed back.
           lastAutoSyncFingerprintByFile[remoteName] =
             Number((await loadSaveMeta(remoteName))?.updatedAt || receivedFromCloud(remotePayload));
@@ -6213,6 +6317,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         );
         if (remoteAt && remoteAt >= Number(times?.modifiedAt || 0)) {
           lastAutoSyncFingerprintByFile[fileName] = Number(times?.updatedAt || 0);
+          // In step with the cloud: this is what it was seen to hold.
+          noteCloudSeen(fileName, remoteAt);
         }
       }
 
@@ -6222,7 +6328,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       const owed = aheadOfCloud(afterFetch, remoteIndex);
       if (owed.length) {
         logSync('upload', '', 'ahead of the cloud since before this launch', { folders: owed.join(', ') });
-        owedSinceLaunch = new Set(owed);
+        owedSinceLaunch = new Set([...owedSinceLaunch, ...owed]);
       }
 
       savedList = await listSavedBlocks();
