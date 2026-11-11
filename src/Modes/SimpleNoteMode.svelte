@@ -28,6 +28,7 @@
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
   import Block from '../components/Block.svelte';
   import { galleryOf } from '../utils/gallery.js';
+  import { cropBlockUpdate } from '../utils/cropImage.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -1366,7 +1367,10 @@ input[type="text"] {
     blockIds={gallery.blockIds}
     crops={gallery.crops}
     on:close={() => (lbOpen = false)}
-    on:cropBlock={(e) => dispatch('update', { id: e.detail.blockId, crop: e.detail.crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true })}
+    on:cropBlock={async (e) => {
+      const block = blocks.find(b => b.id === e.detail.blockId);
+      if (block) dispatch('update', await cropBlockUpdate(block, e.detail.crop));
+    }}
     on:newImage={(e) => dispatch('addImage', { src: e.detail.src })}
   />
 {/if}

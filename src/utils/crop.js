@@ -47,6 +47,33 @@ export function croppedAspect(naturalAspect, crop) {
   return c ? naturalAspect * (c.w / c.h) : naturalAspect;
 }
 
+/**
+ * How tall a block's header is on the Canvas: its 24px controls and 6px above
+ * and below them (BlockShell, since 2026-11-11).
+ */
+export const CANVAS_HEADER_HEIGHT = 36;
+
+/**
+ * A picture block's size on the Canvas once it is cropped: the box takes the
+ * shape of the part kept -- asked 2026-11-11, "after crop on canvas, the image
+ * block size and format should be recalculated ... right now it keeps the same
+ * as before". Its longer side stays as long as the box's was, so a block
+ * keeps its place on the board; Reset (no crop) gives back the whole
+ * picture's shape the same way.
+ *
+ * `natural` is the picture's own size in pixels. Null when it is not known.
+ */
+export function sizeAfterCrop({ size, natural, crop, headerHeight = CANVAS_HEADER_HEIGHT }) {
+  if (!size || !natural?.w || !natural?.h) return null;
+  const aspect = croppedAspect(natural.w / natural.h, crop);
+  if (!(aspect > 0)) return null;
+  const longest = Math.max(Number(size.width) || 0, (Number(size.height) || 0) - headerHeight);
+  if (!(longest > 0)) return null;
+  const width = aspect >= 1 ? longest : longest * aspect;
+  const height = aspect >= 1 ? longest / aspect : longest;
+  return { width: Math.round(width), height: Math.round(height + headerHeight) };
+}
+
 /** The crop moved by a fraction of the picture, staying inside it. */
 export function movedCrop(crop, dx, dy) {
   const c = crop || { x: 0, y: 0, w: 1, h: 1 };

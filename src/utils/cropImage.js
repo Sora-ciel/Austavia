@@ -9,7 +9,39 @@
  * the cloud is another origin, and drawing it straight would taint the
  * canvas and refuse to give anything back.
  */
-import { normalizeCrop } from './crop.js';
+import { normalizeCrop, sizeAfterCrop } from './crop.js';
+import { pictureSource } from './gallery.js';
+
+/** A picture's own size in pixels, `{ w, h }`, once it has loaded. */
+export function naturalSizeOf(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error('the picture would not load'));
+    img.src = src;
+  });
+}
+
+/**
+ * The update for "Crop this picture" in the picture viewer, for every mode
+ * that offers it: the crop, and the block's box in the shape of the part
+ * kept (sizeAfterCrop) -- one step, so one Undo takes back both. Without
+ * its size when the picture cannot be read: the crop alone, as before.
+ */
+export async function cropBlockUpdate(block, crop) {
+  let size = null;
+  try {
+    size = sizeAfterCrop({ size: block?.size, natural: await naturalSizeOf(pictureSource(block)), crop });
+  } catch { /* the crop alone */ }
+  return {
+    id: block.id,
+    crop,
+    ...(size ? { size } : {}),
+    changedKeys: size ? ['crop', 'size'] : ['crop'],
+    pushToHistory: true,
+    bumpVersion: true
+  };
+}
 
 export async function croppedBlob(src, crop) {
   const response = await fetch(src);

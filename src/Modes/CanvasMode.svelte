@@ -6,6 +6,7 @@
   import { htmlToText as htmlToPlainText } from '../utils/htmlToText.js';
   import Block from '../components/Block.svelte';
   import { galleryOf } from '../utils/gallery.js';
+  import { cropBlockUpdate } from '../utils/cropImage.js';
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
@@ -682,7 +683,10 @@
     blockIds={gallery.blockIds}
     crops={gallery.crops}
     on:close={() => (lbOpen = false)}
-    on:cropBlock={(e) => dispatch('update', { id: e.detail.blockId, crop: e.detail.crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true })}
+    on:cropBlock={async (e) => {
+      const block = blocks.find(b => b.id === e.detail.blockId);
+      if (block) dispatch('update', await cropBlockUpdate(block, e.detail.crop));
+    }}
     on:newImage={(e) => dispatch('addImage', { src: e.detail.src })}
   />
 {/if}
