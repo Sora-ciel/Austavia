@@ -128,8 +128,11 @@ update. Deleting still works from an old app.
 3. Staging the same way: the staging builds from before this commit write
    schema 1 and are refused once staging's rules are deployed.
 
-Still to do before it: the Linux pop-ups (item 8 of the first list), the
-device checks explained to Sora in plain words.
+Still to do before it (2026-11-11): the Linux pop-ups and the device checks
+are done. Left: one look on the phone at a fresh staging APK (it has had none
+of the changes since b12 -- headers, crop, the page dot), and the Windows
+installer, which is built on Windows (`npx tauri build --bundles msi,nsis`):
+the sound and the habit pop-ups changed there too and have not been seen on it.
 
 ## Now, asked 2026-11-10 (fourth list)
 
