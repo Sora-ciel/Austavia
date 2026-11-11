@@ -11,7 +11,14 @@
 // A cost guard, not a product. It caps how much a single account can write in
 // a day so a runaway client or a script cannot run up the bill; it is not what
 // anyone is sold, and it is deliberately far above normal use.
-const DAILY_BYTE_LIMIT = 250 * 1024 * 1024; // per user, per UTC day
+//
+// 50 MB since 2026-11-11, from 250. Measured from `usage/` that day: since the
+// sync fixes of late September an account writes 0.64 MB on a typical day and
+// 2.6 MB on a busy one (90th percentile); one day in fifty went past 25 MB --
+// 69 MB, most likely a first sync or an import, which is exactly what a new
+// account does on its first day. So 50 MB: twenty times a busy day, with room
+// for that day. Sora asked for 25 MB; 50 was agreed for the import.
+const DAILY_BYTE_LIMIT = 50 * 1024 * 1024; // per user, per UTC day
 
 // --- Stored bytes ------------------------------------------------------
 //

@@ -133,6 +133,23 @@ Agreed with Sora after 0.8.67 shipped. Each step before the next:
    around "aruku", a project of Sora's, with tweaks. What aruku does is still
    to be said.
 
+## The bill is the thirty-second check (measured 2026-11-11)
+
+Realtime Database, Oct 12 to Nov 11: **366 MB downloaded**, against about
+38 MB written (`usage/`), 6 to 19 MB every day whatever was edited. What
+downloads steadily is the download backstop in App.svelte
+(startAutoSyncDownloadBackstop): every open device reads the whole index
+every 30 s -- a few KB, 2,880 times a day -- about nine tenths of the bill.
+Far under the free 10 GB a month today; per paying user it is what decides
+the break-even, about $0.10 to $0.35 a month per active device past the free
+amount.
+
+To make it cheap without giving up what it is for (CLAUDE.md: something must
+recompute): read one small number -- a stamp written with every upload,
+`sync/{ns}/users/{uid}/indexStamp` -- and the whole index only when it moved;
+or keep 30 s while the live connection is known down (`.info/connected`) and
+go to a few minutes while it is up. Measure the Usage tab again after.
+
 ## Releasing 0.8.67 (decided 2026-11-10)
 
 The first full release since 0.8.66. **Older devices are refused, on
