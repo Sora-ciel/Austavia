@@ -53,13 +53,13 @@
       "runtimeArgs": [
         "-m",
         "http.server",
-        "5060",
+        "8090",
         "--bind",
         "::",
         "--directory",
         "site"
       ],
-      "port": 5060
+      "port": 8090
     }
   ]
 }
