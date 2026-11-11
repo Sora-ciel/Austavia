@@ -141,9 +141,23 @@ moment, archive instead of delete) after these, in an order to be agreed.
 14. **Pop-ups: none on the Linux app** (the timer's and timed objectives'
     pop-ups are the Windows app's only), and **the phone's timer
     notification is not styled like the pop-up** nor in the theme.
-12. **Waiting on a decision: how modes are changed**, on a phone and a
-    computer, as modes multiply -- asked for an opinion -- and with it, the
-    page buttons crowding a phone's bar while music plays.
+12. **How modes are changed** -- decided 2026-11-10: "I think all your
+    ideas are great if executed well. For the phone especially I was hoping
+    a way that also doesn't take too much more space on the screen,
+    especially height." In stages, each landing on its own:
+    a. **Phone: the bar moves to the bottom, at the height it has** -- nothing
+       added, the top given back to the content, everything in thumb's
+       reach. What opened under the bar (Mode, Menu, Settings, the timer's
+       pop-up) opens above it.
+    b. **Phone: the mode button opens a sheet of every mode** (an icon and a
+       name each) rising from the bar, and a swipe along the bar goes to the
+       next or previous mode.
+    c. **Phone: the bar makes room** -- a mode's own buttons (Page's back,
+       forward, edit) sit in it, and the mini player shrinks to its cover and
+       play button when the bar is short of width.
+    d. **Computer: a column of mode icons down the left edge**, the name on
+       hover, every mode one click away; Ctrl+1 to Ctrl+9.
+    e. **Both: modes can be put in order or hidden**, per device.
 
 ## Now, asked 2026-11-10 (third list): look and feel
 
