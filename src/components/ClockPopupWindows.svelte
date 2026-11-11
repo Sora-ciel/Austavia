@@ -1,7 +1,7 @@
 <script>
   /**
    * Opens and closes the always-on-top pop-ups for the open folder's clock
-   * blocks, on the Windows app only. Which ones should exist, and where, is
+   * blocks, in the desktop apps (Windows and Linux). Which ones should exist, and where, is
    * decided in utils/clockPopups.js; this looks once a second and makes the
    * windows match -- afresh each time, so one that failed to open is opened on
    * the next look and one left over is closed.
@@ -10,6 +10,7 @@
    * ringer to stay quiet about.
    */
   import { onMount, onDestroy } from 'svelte';
+  import { logSync } from '../utils/syncLog.js';
   import { clockDevices, peekClockDevice } from '../utils/clockDeviceStore.js';
   import {
     popupsWanted,
@@ -30,6 +31,30 @@
   let api = null;
   let tick = null;
   let busy = false;
+  let stopFocusWatch = null;
+
+  // What happened, in the sync log ("Copy diagnostics"), once per change
+  // rather than every second: the pop-ups never appeared on the Linux app
+  // (reported 2026-11-10), and nothing could say why.
+  let lastNote = '';
+  function note(message) {
+    if (message === lastNote) return;
+    lastNote = message;
+    logSync('popup', '', message);
+  }
+
+  /**
+   * Whether Austavia's own window has the focus -- asked of the window system
+   * through Tauri rather than the page's document.hasFocus(), which the Linux
+   * app's web engine (WebKitGTK) does not keep true to the window: with the
+   * app always "in front", no pop-up was ever wanted there.
+   */
+  async function appHasFocus() {
+    try {
+      if (api?.currentWindow) return await api.currentWindow.isFocused();
+    } catch { /* fall back to the page's own idea */ }
+    return typeof document !== 'undefined' && document.hasFocus();
+  }
 
   function readMarks(prefix) {
     const marks = new Set();
@@ -89,8 +114,9 @@
 
       // Looked at afresh each second as well as on focus and blur, so a
       // missed event costs a second at most.
-      const appInFront = typeof document !== 'undefined' && document.hasFocus();
+      const appInFront = await appHasFocus();
       const wanted = popupsWanted({ blocks, devices, now, hidden, kept, appInFront });
+      note(`app ${appInFront ? 'in front' : 'behind'}; pop-ups wanted: ${wanted.map(p => p.kind).join(', ') || 'none'}`);
       const wantedLabels = new Set(wanted.map(popup => popup.label));
 
       const existing = (await api.getAllWebviewWindows())
@@ -117,7 +143,7 @@
           ...(popup.kind === 'alarm' ? { time: popup.time, hour12: popup.hour12 ? '1' : '0' } : {})
         });
         try {
-          new api.WebviewWindow(popup.label, {
+          const created = new api.WebviewWindow(popup.label, {
             url: `index.html?${query}`,
             title: popup.kind === 'alarm' ? 'Alarm' : 'Timer',
             width: POPUP_WIDTH,
@@ -133,8 +159,11 @@
             // Not taking the keyboard from whatever is being typed into.
             focus: false
           });
+          created.once?.('tauri://created', () => logSync('popup', '', `opened the ${popup.kind} pop-up`));
+          created.once?.('tauri://error', event => logSync('popup', '', `the ${popup.kind} pop-up would not open: ${JSON.stringify(event?.payload ?? event)}`));
         } catch (error) {
           console.warn('Could not open the timer pop-up:', error);
+          logSync('popup', '', `the ${popup.kind} pop-up could not be made: ${error?.message || error}`);
         }
         index += 1;
       }
@@ -151,11 +180,16 @@
     const isDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
     if (!isDesktop) return;
     try {
-      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor }] = await Promise.all([
+      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor, getCurrentWindow }] = await Promise.all([
         import('@tauri-apps/api/webviewWindow'),
         import('@tauri-apps/api/window')
       ]);
-      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor };
+      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor, currentWindow: getCurrentWindow() };
+      // The window system says when the app goes behind or comes back, so a
+      // pop-up opens at once rather than waiting for the page to notice.
+      try {
+        stopFocusWatch = await api.currentWindow.onFocusChanged(() => reconcile());
+      } catch { /* the once-a-second look still catches it */ }
       reconcile();
       tick = setInterval(reconcile, 1000);
       window.addEventListener('focus', reconcile);
@@ -171,6 +205,7 @@
 
   onDestroy(() => {
     clearInterval(tick);
+    stopFocusWatch?.();
     window.removeEventListener('focus', reconcile);
     window.removeEventListener('blur', reconcile);
   });

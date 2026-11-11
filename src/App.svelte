@@ -8508,7 +8508,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <!-- Rings the open folder's alarms in every mode, not only where the clock is
      drawn. -->
 <AlarmRinger {blocks} {habits} themeStyle={overlayThemeStyle} quiet={popupLabelsOpen} />
-<!-- The always-on-top timer and alarm windows, on the Windows app only --
+<!-- The always-on-top timer and alarm windows, in the desktop apps --
      see utils/clockPopups.js. -->
 <ClockPopupWindows {blocks} bind:open={popupLabelsOpen} />
 
