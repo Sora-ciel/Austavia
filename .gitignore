@@ -42,3 +42,6 @@ release/
 # before it was pushed.
 src let's say version 4/
 version 5 src/
+
+# Sora's original screenshots for the website: private, the cropped copies are in site/img
+site-images/

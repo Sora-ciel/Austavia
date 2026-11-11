@@ -46,6 +46,20 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "austavia-site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5060",
+        "--bind",
+        "::",
+        "--directory",
+        "site"
+      ],
+      "port": 5060
     }
   ]
 }
