@@ -1,3 +1,11 @@
+/* No flash of colour on a press. Phones paint a tap with a highlight of
+   their own -- a blue tint on Android -- over whatever was pressed; asked
+   2026-11-10 to be "completely transparent or inexistent". A button that
+   should show it was pressed says so with its own styles. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── The app's typeface ───────────────────────────────────────────
    Inter, carried with the app rather than fetched.
 
