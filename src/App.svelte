@@ -3107,6 +3107,11 @@
   // it still downloads, but stops sending -- every send would be refused, and
   // was reported as the daily limit (2026-11-11). Said once, then quiet.
   let syncTooOld = false;
+  // Folders found ahead of the cloud at launch (aheadOfCloud), owed an upload
+  // whatever else marks the sync clean meanwhile: opening the folder after
+  // the launch sync did, and cancelled it (2026-11-11). Cleared once the
+  // upload pass has been through them.
+  let owedSinceLaunch = new Set();
   // The worst storage state this account has been told about since it was last
   // comfortable. Kept so a record that is rewritten on every upload does not
   // put the same banner back every few seconds -- see utils/storageAlerts.js.
@@ -5877,7 +5882,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   async function autoSyncUploadTick(options = {}) {
     if (!autoSyncEnabled || !firebaseReady || !authUser || uploadInProgress || cloudBootstrapInProgress) return;
     const force = options.force === true;
-    if (!autoSyncDirty && !force) return;
+    const owed = owedSinceLaunch.size > 0;
+    if (!autoSyncDirty && !force && !owed) return;
+    owedSinceLaunch = new Set();
 
     const perFile = await buildLocalSyncFingerprint();
     const fileNames = Object.keys(perFile);
@@ -6212,7 +6219,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       const owed = aheadOfCloud(afterFetch, remoteIndex);
       if (owed.length) {
         logSync('upload', '', 'ahead of the cloud since before this launch', { folders: owed.join(', ') });
-        autoSyncDirty = true;
+        owedSinceLaunch = new Set(owed);
       }
 
       savedList = await listSavedBlocks();

@@ -201,17 +201,21 @@ export function gestureStart(dx, dy, { min = 12, toward = 'up' } = {}) {
 }
 
 /**
- * Whether a touch that began at `y` is the bar's: on it, or in a band half
- * its height on the screen's side of it -- above a bar at the bottom, below
- * one at the top -- so a slide can start just off it (asked 2026-11-10 for
- * the bottom, 2026-11-11 for the top: "still make a band so that you can
- * slide easier even a bit out of the controls").
+ * Whether a touch that began at `y` is the bar's: on it, and for a bar at the
+ * bottom also in a band half its height above it, so a slide can start just
+ * off it (asked 2026-11-10).
+ *
+ * Not under a bar at the top. It was given one on 2026-11-11 and taken off
+ * the same day: "remove the band when the bar is up, it actually makes things
+ * hard to move in canvas mode" -- the top of a mode is where blocks are
+ * picked up, and the band took those touches.
  */
 export function inBarBand(y, bar, at = 'bottom') {
   if (!bar) return false;
   if (y >= bar.top && y <= bar.bottom) return true;
+  if (at === 'top') return false;
   const band = (bar.bottom - bar.top) / 2;
-  return at === 'top' ? y > bar.bottom && y <= bar.bottom + band : y < bar.top && y >= bar.top - band;
+  return y < bar.top && y >= bar.top - band;
 }
 
 /**
