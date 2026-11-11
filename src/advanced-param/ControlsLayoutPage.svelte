@@ -38,6 +38,7 @@
   ];
   const COMPUTER = [
     { id: 'rail', title: 'Modes in a column on the left', note: 'Every mode one click away; Ctrl+1 to Ctrl+9.' },
+    { id: 'auto', title: 'The column, hidden until needed', note: 'Out of the way; it slides out when the pointer reaches the left edge.' },
     { id: 'top', title: 'Modes in the bar only', note: 'As it was before.' }
   ];
 </script>
@@ -127,12 +128,12 @@
     --sb-track: var(--app-bg, #0b0b0d);
   }
 
+  /* The way back at the left edge of the page, as in the app's other pages
+     (asked 2026-11-10). */
   .layout-head {
     display: flex;
     align-items: center;
     gap: 12px;
-    max-width: 980px;
-    margin: 0 auto;
   }
 
   .layout-head h2 {

@@ -17,7 +17,9 @@
  * modes are changed", says when it becomes the account's default.
  *
  * - `phone`: 'bottom' (the bar at the bottom, the new way) or 'top' (as it was).
- * - `computer`: 'rail' (the column of modes, the new way) or 'top' (as it was).
+ * - `computer`: 'rail' (the column of modes, the new way), 'auto' (the column
+ *   hidden until the pointer reaches the left edge -- asked 2026-11-10) or
+ *   'top' (as it was).
  * - `order`: the modes in the order chosen; modes this list does not name
  *   (one added later) come after, in their own order.
  * - `hidden`: modes left out of the column, the sheet and the swipe. The mode
@@ -30,7 +32,7 @@
 
 export const LAYOUT_KEY = 'austavia.controlsLayout';
 export const PHONE_LAYOUTS = ['bottom', 'top'];
-export const COMPUTER_LAYOUTS = ['rail', 'top'];
+export const COMPUTER_LAYOUTS = ['rail', 'auto', 'top'];
 export const STATUS_BAR = ['shown', 'hidden'];
 /**
  * How a finger on the phone's bar changes mode -- two to compare, asked
@@ -144,16 +146,39 @@ export function modeAfterSteps(allModes, layout, current, steps) {
 }
 
 /**
- * The strip of modes (modeGesture 'strip'): each mode a slot `slot` pixels
- * wide, the open one under where the finger started -- so going back there
- * keeps it, and every mode is always the same distance away (asked
- * 2026-11-10: "always at the same place each mode and if you went back to
- * the middle you stay on the mode you were"). The index chosen, kept within
- * the strip, and where the strip's left edge is drawn.
+ * The strip of modes (modeGesture 'strip'): every mode always at the same
+ * place, in their order, across the width -- whichever mode is open -- with
+ * a space in the middle where letting go keeps the mode you are in. Asked
+ * 2026-11-10, correcting the first strip, which slid so the open mode sat
+ * under the finger: "every mode should always be at the same place. it
+ * should show all modes at all time and not slide ... it should separate the
+ * modes so that there's a space in the middle so that if you go back you
+ * stay on the mode you were at."
+ *
+ * The first half of the modes (rounded up) to the left of the space, the
+ * rest to its right. Returns each slot's left edge and the space's edges.
  */
-export function stripChoice({ startX, x, currentIndex, count, slot }) {
-  const index = Math.max(0, Math.min(count - 1, currentIndex + Math.round((x - startX) / slot)));
-  return { index, left: startX - (currentIndex + 0.5) * slot };
+export function stripLayout(count, width, { margin = 8, gap = 1.2 } = {}) {
+  const usable = Math.max(0, width - 2 * margin);
+  const slot = count > 0 ? usable / (count + gap) : 0;
+  const leftCount = Math.ceil(count / 2);
+  const slots = Array.from({ length: count }, (_, i) => ({
+    index: i,
+    left: margin + (i < leftCount ? i : i + gap) * slot,
+    width: slot
+  }));
+  const spaceLeft = margin + leftCount * slot;
+  return { slot, slots, space: { left: spaceLeft, right: spaceLeft + gap * slot } };
+}
+
+/** The mode under a finger at `x` in the strip: its index, or null over the space (stay). */
+export function stripPick(x, layout) {
+  if (x >= layout.space.left && x < layout.space.right) return null;
+  const hit = layout.slots.find(s => x >= s.left && x < s.left + s.width);
+  if (hit) return hit.index;
+  // Past either end: the mode at that end.
+  if (!layout.slots.length) return null;
+  return x < layout.slots[0].left ? 0 : layout.slots.length - 1;
 }
 
 /** Which way a finger set off from the bar: 'across' (the strip), 'up' (the sheet), or null while it has not gone far. */

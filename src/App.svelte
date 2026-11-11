@@ -3,7 +3,7 @@
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
-  import { readLayout, writeLayout, offeredModes, stripChoice, gestureStart } from './utils/controlsLayout.js';
+  import { readLayout, writeLayout, offeredModes, stripLayout, stripPick, gestureStart } from './utils/controlsLayout.js';
   import ModeIcon from './components/ModeIcon.svelte';
   import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
@@ -3915,26 +3915,35 @@
   }
   $: offered = offeredModes(MODE_ORDER, controlsLayout, mode);
   // The Controls layout page, over the whole mode area, from Advanced settings.
+  // A press on the bar or the column -- outside the page -- closes it (asked
+  // 2026-11-10).
   let showControlsLayout = false;
+  function closeLayoutFromBar() {
+    if (showControlsLayout) showControlsLayout = false;
+  }
 
   // A finger on the phone's bar changes mode, one of two ways to compare
   // (Controls layout, modeGesture; asked 2026-11-10):
   // - 'strip': sliding along the bar shows every mode in a strip above it,
-  //   each at its own place, the open one where the finger started;
+  //   each always at its own place in its order, a space in the middle that
+  //   keeps the open one;
   // - 'sheet': sliding up from the bar opens every mode, and letting go on
   //   one opens it.
-  // utils/controlsLayout.js decides (gestureStart, stripChoice).
-  const STRIP_SLOT = 52;
+  // utils/controlsLayout.js decides (gestureStart, stripLayout, stripPick).
   let barGesture = null; // { kind: null | 'strip' | 'sheet', startX, startY }
-  let stripIndex = -1;
-  let stripLeft = 0;
+  let strip = null;      // stripLayout() while the strip shows
+  let stripIndex = null; // the mode under the finger, null over the middle space
   let sheetPick = null;
-  $: stripSlot = typeof window !== 'undefined' ? Math.min(STRIP_SLOT, Math.floor((window.innerWidth - 16) / Math.max(1, offered.length))) : STRIP_SLOT;
+
+  // What opens from the bar -- Settings, Menu, the mode list, the timer's and
+  // the player's panels -- is not the bar: a finger in them never starts a
+  // gesture (asked 2026-11-10, after the sheet opened from inside Settings).
+  const OPENED_FROM_BAR = '.dropdown-content, .left-controls, .mode-ladder, .add-block-list, .timer-panel, .player-panel, .mini-player, input, [role="dialog"]';
 
   function barTouchStart(event) {
     barGesture = null;
     if (event.touches?.length !== 1 || window.innerWidth > 700 || controlsLayout.phone !== 'bottom') return;
-    if (event.target.closest?.('input, .mini-player, .player-panel')) return;
+    if (event.target.closest?.(OPENED_FROM_BAR)) return;
     barGesture = { kind: null, startX: event.touches[0].clientX, startY: event.touches[0].clientY };
   }
   function barTouchMove(event) {
@@ -3947,11 +3956,10 @@
       const wanted = controlsLayout.modeGesture === 'sheet' ? 'up' : 'across';
       if (way !== wanted) { barGesture = null; return; }
       barGesture = { ...barGesture, kind: controlsLayout.modeGesture };
+      if (barGesture.kind === 'strip') strip = stripLayout(offered.length, window.innerWidth);
     }
     if (barGesture.kind === 'strip') {
-      const choice = stripChoice({ startX: barGesture.startX, x: t.clientX, currentIndex: Math.max(0, offered.indexOf(mode)), count: offered.length, slot: stripSlot });
-      stripIndex = choice.index;
-      stripLeft = choice.left;
+      stripIndex = stripPick(t.clientX, strip);
     } else {
       const hit = document.elementFromPoint(t.clientX, t.clientY)?.closest?.('[data-gesture-mode]');
       sheetPick = hit ? hit.dataset.gestureMode : null;
@@ -3959,13 +3967,14 @@
   }
   function barTouchEnd() {
     const g = barGesture;
-    const target = g?.kind === 'strip' ? offered[stripIndex] : g?.kind === 'sheet' ? sheetPick : null;
+    const target = g?.kind === 'strip' ? (stripIndex === null ? null : offered[stripIndex]) : g?.kind === 'sheet' ? sheetPick : null;
     cancelBarGesture();
     if (target && target !== mode) setMode(target);
   }
   function cancelBarGesture() {
     barGesture = null;
-    stripIndex = -1;
+    strip = null;
+    stripIndex = null;
     sheetPick = null;
   }
 
@@ -7193,46 +7202,63 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
 }
 @media (min-width: 701px) {
-  .app.has-rail .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
+  .app.has-rail .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
     padding-left: 56px !important;
     box-sizing: border-box;
   }
 }
 @media (max-width: 700px) {
-  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
+  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
     padding-top: var(--safe-top, 0px) !important;
     box-sizing: border-box;
   }
 }
-/* The strip of modes while sliding along the bar (modeGesture 'strip'). */
+/* The strip of modes while sliding along the bar (modeGesture 'strip'):
+   across the width, every mode at its own place. */
 .mode-strip {
   position: fixed;
+  left: 0;
+  right: 0;
   bottom: calc(var(--controls-height, 56px) + 14px);
+  height: 56px;
   z-index: 1500;
-  display: flex;
-  align-items: flex-end;
   pointer-events: none;
 }
-.strip-slot {
-  position: relative;
-  width: var(--slot);
+.strip-slot,
+.strip-space {
+  position: absolute;
+  bottom: 0;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+}
+.strip-slot {
   border-radius: 10px;
   background: var(--controls-bg, #111);
   border: 1px solid var(--controls-border, #333);
   color: var(--controls-button-text, var(--controls-text, #fff));
-  opacity: 0.75;
-  box-sizing: border-box;
+  opacity: 0.8;
 }
 .strip-slot.open { border-style: dashed; }
 .strip-slot.chosen {
   opacity: 1;
-  height: 56px;
+  height: 54px;
   box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff)), 0 6px 18px rgba(0, 0, 0, 0.4);
   z-index: 1;
+}
+/* The middle: letting go here keeps the mode you are in. */
+.strip-space {
+  color: var(--controls-button-text, var(--controls-text, #fff));
+}
+.strip-space::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
 }
 .strip-name {
   position: absolute;
@@ -7244,6 +7270,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   border-radius: 999px;
   background: var(--controls-bg, #111);
   border: 1px solid var(--controls-border, #333);
+  color: var(--controls-button-text, var(--controls-text, #fff));
   font-weight: 700;
   font-size: 0.85rem;
 }
@@ -7282,6 +7309,50 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 .gesture-mode.chosen {
   box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
   transform: scale(1.05);
+}
+
+/* The column that hides: off the left edge until the pointer reaches it. */
+.rail-edge {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 961;
+}
+.app.rail-auto .mode-rail {
+  z-index: 960;
+  transform: translateX(-100%);
+  transition: transform 0.18s ease;
+}
+.app.rail-auto .rail-edge:hover + .mode-rail,
+.app.rail-auto .mode-rail:hover,
+.app.rail-auto .mode-rail:focus-within {
+  transform: none;
+}
+/* The layout page starts after a column that stays. */
+@media (min-width: 701px) {
+  .app.has-rail .modes > :global(.layout-page) {
+    left: 56px;
+  }
+}
+/* The band above the phone's bar that also starts the slide up. */
+.bar-reach {
+  display: none;
+}
+@media (max-width: 700px) {
+  .app.phone-bar-bottom .bar-reach {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--controls-height, 56px);
+    height: calc(var(--controls-height, 56px) / 2);
+    z-index: 999;
+  }
+  .app.phone-bar-bottom.keyboard-up .bar-reach {
+    display: none;
+  }
 }
 
 /* The column is a computer's; a phone has the sheet and the swipe. After the
@@ -7945,6 +8016,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   class:keyboard-up={keyboardOpen}
   class:phone-bar-bottom={controlsLayout.phone === 'bottom'}
   class:has-rail={controlsLayout.computer === 'rail'}
+  class:rail-auto={controlsLayout.computer === 'auto'}
   class:crowded-bar={mode === 'page' || Boolean(nowPlayingTrack)}
   style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
   <!-- Which Austavia this is, when it is not the real one: inside .app so it
@@ -7952,7 +8024,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   {#if channelBadgeText}
     <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
   {/if}
-  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}>
+  <!-- Above the bar, half its height, a band that also starts the slide up
+     (asked 2026-11-10): some phones keep the very bottom for their own swipe
+     between apps, so the slide is given room above it. -->
+  {#if controlsLayout.phone === 'bottom' && controlsLayout.modeGesture === 'sheet'}
+    <div class="bar-reach" on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}></div>
+  {/if}
+  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:pointerdown={closeLayoutFromBar} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}>
     <LeftControls
       modeIds={offered}
       bind:currentSaveName
@@ -8275,8 +8353,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   >
     <!-- The modes, a click away, down the left edge on a computer (PENDING,
          "How modes are changed", stage d); Ctrl+1 to 9 in the same order. -->
-    {#if controlsLayout.computer === 'rail'}
-      <nav class="mode-rail" aria-label="Modes" style={controlsStyle}>
+    {#if controlsLayout.computer !== 'top'}
+      {#if controlsLayout.computer === 'auto'}
+        <!-- The column hidden, shown while the pointer is at the left edge or
+             on it (Controls layout, asked 2026-11-10). -->
+        <div class="rail-edge" aria-hidden="true"></div>
+      {/if}
+      <nav class="mode-rail" aria-label="Modes" style={controlsStyle} on:pointerdown={closeLayoutFromBar}>
         {#each offered as id, i (id)}
           <button
             class="mode-rail-btn"
@@ -8291,14 +8374,18 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         {/each}
       </nav>
     {/if}
-    {#if barGesture?.kind === 'strip' && stripIndex >= 0}
-      <!-- Every mode at its own place above the bar, the one the finger is
-           over raised with its name. In the bar's colours. -->
-      <div class="mode-strip" style="{controlsStyle} left: {stripLeft}px; --slot: {stripSlot}px;" aria-hidden="true">
+    {#if barGesture?.kind === 'strip' && strip}
+      <!-- Every mode, always at the same place in its order, a space in the
+           middle that keeps the open one; the one under the finger raised
+           with its name. In the bar's colours. -->
+      <div class="mode-strip" style={controlsStyle} aria-hidden="true">
+        <div class="strip-space" class:chosen={stripIndex === null} style="left: {strip.space.left}px; width: {strip.space.right - strip.space.left}px;">
+          {#if stripIndex === null}<span class="strip-name">Stay: {MODE_LABELS[mode] || mode}</span>{/if}
+        </div>
         {#each offered as id, i (id)}
-          <div class="strip-slot" class:chosen={i === stripIndex} class:open={id === mode}>
+          <div class="strip-slot" class:chosen={i === stripIndex} class:open={id === mode} style="left: {strip.slots[i].left}px; width: {strip.slots[i].width}px;">
             {#if i === stripIndex}<span class="strip-name">{MODE_LABELS[id] || id}</span>{/if}
-            <ModeIcon mode={id} size={i === stripIndex ? 26 : 20} />
+            <ModeIcon mode={id} size={i === stripIndex ? 24 : 18} />
           </div>
         {/each}
       </div>
