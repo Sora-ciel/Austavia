@@ -1604,6 +1604,29 @@
     return `${mins}:${String(secs).padStart(2, '0')}`;
   }
 
+  /** A press on the timeline's row but off its line: seek to that point, and follow the drag. */
+  function seekFromRow(event) {
+    if (event.target?.closest?.('input') || !musicDuration) return;
+    const range = event.currentTarget.querySelector('.pp-seek-range');
+    if (!range) return;
+    event.preventDefault();
+    const at = clientX => {
+      const box = range.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - box.left) / box.width));
+      seekMusic(ratio * musicDuration);
+    };
+    at(event.clientX);
+    const move = e => at(e.clientX);
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
+
   function seekMusic(value) {
     const next = Number(value);
     if (!audioEl || !Number.isFinite(next)) return;
@@ -7219,7 +7242,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   white-space: nowrap;
 }
 
-.pp-seek { display: flex; align-items: center; gap: 8px; }
+.pp-seek {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Room above and below the line that still counts as the line. */
+  padding: 12px 0;
+  margin: -12px 0;
+  cursor: pointer;
+  touch-action: none;
+}
 .pp-seek-range { flex: 1; min-width: 0; }
 .pp-seek-range:disabled { opacity: 0.45; cursor: default; }
 .pp-time {
@@ -7782,7 +7814,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
             </div>
 
             <!-- Where you are in the track, and a handle to move it. -->
-            <div class="pp-seek">
+            <!-- The whole row is the timeline, with room above and below it:
+                 a press anywhere in it moves to that point and a drag keeps
+                 moving, rather than missing the thin line and landing on the
+                 way to Playlist mode (reported 2026-11-10). -->
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div class="pp-seek" data-player-control on:pointerdown={seekFromRow}>
               <span class="pp-time">{formatClock(musicPosition)}</span>
               <input
                 class="pp-seek-range filled"

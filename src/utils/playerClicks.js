@@ -17,8 +17,13 @@
  * a slider, a field, a link, a label that works one.
  */
 
-/** Everything that counts as a control inside either player. */
-export const PLAYER_CONTROLS = 'button, input, select, textarea, label, a, [role="button"], [role="slider"]';
+/**
+ * Everything that counts as a control inside either player. The timeline's
+ * whole row is one (`data-player-control`): reported 2026-11-10, "the area
+ * to change the timeline is very thin ... it clicks on the back and puts
+ * you on playlist and closes the music player."
+ */
+export const PLAYER_CONTROLS = 'button, input, select, textarea, label, a, [role="button"], [role="slider"], [data-player-control]';
 
 /**
  * Whether a click landed on a control, rather than on the surface around the

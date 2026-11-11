@@ -14,13 +14,15 @@ import { playerClickAction, landsOnControl } from '../src/utils/playerClicks.js'
 
 // Just enough of an element: `closest` answers with whichever ancestor
 // matches, the way the DOM does.
-function element(tag, { role = null, parent = null } = {}) {
+function element(tag, { role = null, parent = null, control = false } = {}) {
   const node = {
     tag,
     role,
     parent,
+    control,
     closest(selector) {
       for (let at = node; at; at = at.parent) {
+        if (at.control && selector.includes('[data-player-control]')) return at;
         const controlTag = ['button', 'input', 'select', 'textarea', 'label', 'a'].includes(at.tag);
         const controlRole = at.role === 'button' || at.role === 'slider';
         if (selector.includes(at.tag) && controlTag) return at;
@@ -76,4 +78,18 @@ describe('the player', () => {
 it('treats a missing or odd target as not a control', () => {
   assert.equal(landsOnControl(null), false);
   assert.equal(landsOnControl({}), false);
+});
+
+// Reported 2026-11-10: "the area to change the timeline is very thin ... very
+// easily it clicks on the back and puts you on playlist and closes the music
+// player." The timeline's whole row is the timeline's.
+describe('the timeline', () => {
+  it('a press beside the thin line still belongs to the timeline, not to the way to Playlist mode', () => {
+    const player = element('div');
+    const row = element('div', { parent: player, control: true });
+    const time = element('span', { parent: row });
+    assert.equal(playerClickAction('player', row, player), null);
+    assert.equal(playerClickAction('player', time, player), null);
+    assert.equal(playerClickAction('player', element('div', { parent: player }), player), 'open-playlist');
+  });
 });

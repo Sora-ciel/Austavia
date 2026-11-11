@@ -128,10 +128,16 @@ moment, archive instead of delete) after these, in an order to be agreed.
 10. *Done 2026-11-10.* **Page mode on a phone: blocks move only in edit mode.**
 11. *Done 2026-11-10.* **Music dropped on the app goes into the library**, and opens Playlist
     mode if another mode is open.
-13. **The player's timeline is hard to grab**: only the thin line takes the
+13. *Done in the app's player 2026-11-10* (the whole timeline row, with room
+    above and below, seeks; utils/playerClicks.js). **The phone's music
+    notification cannot be done from the app**: it is Android's MediaStyle
+    control, built by the system from the media session (Android 13+), and
+    its seek bar and what a press beside it does are the system's. The
+    nearest thing is making a press on it open the app as it was rather than
+    anything that loses the player -- to look at on the phone.
+    **The player's timeline is hard to grab**: only the thin line takes the
     finger, and a press just off it lands on the strip, which opens Playlist
-    mode and closes the player. In the app's player and in the phone's music
-    notification.
+    mode and closes the player.
 14. **Pop-ups: none on the Linux app** (the timer's and timed objectives'
     pop-ups are the Windows app's only), and **the phone's timer
     notification is not styled like the pop-up** nor in the theme.
