@@ -18,8 +18,6 @@
    * this one instead of only the one that is here.
    */
   import { createEventDispatcher } from 'svelte';
-  import ModeIcon from '../components/ModeIcon.svelte';
-  import { normalizeLayout, orderedModes, movedMode, withModeHidden } from '../utils/controlsLayout.js';
   import {
     DEFAULT_SCALES,
     MIN_SCALE,
@@ -31,20 +29,10 @@
   /** The replaced copies kept for the folder that is open, newest first. */
   export let folderSnapshots = [];
   export let currentSaveName = '';
-  /** How the controls are laid out on this device (utils/controlsLayout.js). */
-  export let controlsLayout = { phone: 'bottom', computer: 'rail', order: [], hidden: [] };
-  /** Every mode, by id, and its name. */
-  export let allModes = [];
-  export let modeLabels = {};
 
   const dispatch = createEventDispatcher();
 
-  // ── Controls layout (asked 2026-11-10) ─────────────────────────────────
-  // "for phone and pc we can change the layout and basically go back to the
-  // way things were before our update ... saved per device for now."
-  let showLayout = false;
-  $: layoutModes = orderedModes(allModes, controlsLayout);
-  const setLayout = next => dispatch('controlsLayoutChange', normalizeLayout(next));
+
 
   // Which of the two numbers this window is currently using, so the page can
   // mark it. Read from the window rather than assumed, and the same breakpoint
@@ -96,53 +84,26 @@
 <svelte:window bind:innerWidth={viewportWidth} />
 
 <div class="advanced-page">
-  <button class="back-btn" type="button" on:click={() => dispatch('back')}>
-    ‹ Settings
-  </button>
+  <header class="adv-head">
+    <button class="back-btn" type="button" on:click={() => dispatch('back')} aria-label="Back to Settings">‹</button>
+    <h3>Advanced settings</h3>
+  </header>
 
-  <div class="tab-section">
-    <h4>🧭 Controls</h4>
-    <button class="create-theme-btn" type="button" aria-expanded={showLayout} on:click={() => (showLayout = !showLayout)}>
-      Controls layout {showLayout ? '▾' : '›'}
+  <div class="tab-section adv-card">
+    <h4>Controls</h4>
+    <!-- A page of its own over the whole mode area (asked 2026-11-10): it
+         will hold many settings. ControlsLayoutPage.svelte. -->
+    <button class="settings-row" type="button" on:click={() => dispatch('openControlsLayout')}>
+      <span>
+        <span class="row-title">Controls layout</span>
+        <span class="row-note">Where the bar and the modes are, on a phone and a computer</span>
+      </span>
+      <span class="row-chevron" aria-hidden="true">›</span>
     </button>
-    {#if showLayout}
-      <p class="advanced-note">
-        Where the controls are on this device. The new way is the default; the
-        way it was before is still here. Kept on this device.
-      </p>
-      <div class="layout-group" role="radiogroup" aria-label="On a phone">
-        <span class="scale-name">Phone</span>
-        <label><input type="radio" name="phone-layout" checked={controlsLayout.phone === 'bottom'} on:change={() => setLayout({ ...controlsLayout, phone: 'bottom' })} /> The bar at the bottom</label>
-        <label><input type="radio" name="phone-layout" checked={controlsLayout.phone === 'top'} on:change={() => setLayout({ ...controlsLayout, phone: 'top' })} /> The bar at the top, as before</label>
-      </div>
-      <div class="layout-group" role="radiogroup" aria-label="On a computer">
-        <span class="scale-name">Computer</span>
-        <label><input type="radio" name="computer-layout" checked={controlsLayout.computer === 'rail'} on:change={() => setLayout({ ...controlsLayout, computer: 'rail' })} /> Modes in a column on the left</label>
-        <label><input type="radio" name="computer-layout" checked={controlsLayout.computer === 'top'} on:change={() => setLayout({ ...controlsLayout, computer: 'top' })} /> Modes in the bar only, as before</label>
-      </div>
-      <span class="scale-name">Modes: their order, and which are shown</span>
-      <ul class="layout-modes">
-        {#each layoutModes as id, i (id)}
-          <li class:hidden-mode={controlsLayout.hidden.includes(id)}>
-            <label class="layout-mode-name">
-              <input
-                type="checkbox"
-                checked={!controlsLayout.hidden.includes(id)}
-                on:change={(e) => setLayout(withModeHidden(allModes, controlsLayout, id, !e.target.checked))}
-              />
-              <ModeIcon mode={id} size={18} />
-              {modeLabels[id] || id}
-            </label>
-            <button type="button" title="Up" aria-label="Move {modeLabels[id] || id} up" disabled={i === 0} on:click={() => setLayout(movedMode(allModes, controlsLayout, id, -1))}>↑</button>
-            <button type="button" title="Down" aria-label="Move {modeLabels[id] || id} down" disabled={i === layoutModes.length - 1} on:click={() => setLayout(movedMode(allModes, controlsLayout, id, 1))}>↓</button>
-          </li>
-        {/each}
-      </ul>
-    {/if}
   </div>
 
-  <div class="tab-section">
-    <h4>🔠 Text size</h4>
+  <div class="tab-section adv-card">
+    <h4>Text size</h4>
     <p class="advanced-note">
       The size of the writing, in every mode at once. 100% is the size each kind
       of screen is meant to be read at, so it is the same starting point on
@@ -192,8 +153,8 @@
     </button>
   </div>
 
-  <div class="tab-section">
-    <h4>⏮️ Replaced copies</h4>
+  <div class="tab-section adv-card">
+    <h4>Replaced copies</h4>
     <p class="advanced-note">
       When a folder is replaced by a copy from the cloud, what was here is kept.
       {#if currentSaveName}
@@ -261,82 +222,92 @@
 </div>
 
 <style>
-  .layout-group {
+  /* Each group a card, its name a small heading above what it holds. */
+  .adv-head {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 6px 0 10px;
-  }
-
-  .layout-group label {
-    display: flex;
+    align-items: center;
     gap: 8px;
-    align-items: center;
-    font-size: 0.85rem;
-    cursor: pointer;
   }
 
-  .layout-modes {
-    list-style: none;
-    margin: 6px 0 0;
-    padding: 0;
+  .adv-head h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .adv-card {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+    background: color-mix(in srgb, currentColor 5%, transparent);
   }
 
-  .layout-modes li {
+  .adv-card h4 {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  /* A setting that opens a page of its own: the whole row, a chevron at the end. */
+  .settings-row {
     display: flex;
     align-items: center;
-    gap: 4px;
-  }
-
-  .layout-modes li.hidden-mode .layout-mode-name {
-    opacity: 0.5;
-  }
-
-  .layout-mode-name {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
-    cursor: pointer;
-  }
-
-  .layout-modes button {
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border-radius: 6px;
-    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
     background: transparent;
     color: inherit;
+    font: inherit;
+    text-align: left;
     cursor: pointer;
   }
 
-  .layout-modes button:disabled {
-    opacity: 0.3;
-    cursor: default;
+  .settings-row:hover {
+    background: color-mix(in srgb, currentColor 8%, transparent);
   }
 
-  /* Every colour here is taken rather than chosen: the writing is whatever the
-     panel's writing is, and the surfaces are that colour mixed into nothing.
-     A theme moves all of it without this file being told. */
+  .row-title {
+    display: block;
+    font-weight: 600;
+    font-size: 0.88rem;
+  }
+
+  .row-note {
+    display: block;
+    font-size: 0.72rem;
+    opacity: 0.65;
+  }
+
+  .row-chevron {
+    font-size: 1.2rem;
+    opacity: 0.6;
+  }
+
   .advanced-page {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
   }
 
   .back-btn {
-    align-self: flex-start;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
     background: transparent;
-    border: none;
     color: inherit;
     font: inherit;
-    opacity: 0.75;
-    padding: 2px 0;
+    font-size: 1.2rem;
+    line-height: 1;
     cursor: pointer;
   }
   .back-btn:hover {

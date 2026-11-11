@@ -22,12 +22,17 @@
  *   (one added later) come after, in their own order.
  * - `hidden`: modes left out of the column, the sheet and the swipe. The mode
  *   open now is always offered, so nobody is stranded in a hidden one.
+ * - `statusBar`: the phone's own status bar (time, battery) 'shown', with the
+ *   mode reaching up under it and its content kept clear of it, or 'hidden'
+ *   (asked 2026-11-10: "maybe make the phone's info disappear? and being able
+ *   to disable it in layout").
  */
 
 export const LAYOUT_KEY = 'austavia.controlsLayout';
 export const PHONE_LAYOUTS = ['bottom', 'top'];
 export const COMPUTER_LAYOUTS = ['rail', 'top'];
-export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'rail', order: [], hidden: [] });
+export const STATUS_BAR = ['shown', 'hidden'];
+export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'rail', order: [], hidden: [], statusBar: 'shown' });
 
 const strings = list => (Array.isArray(list) ? list.filter(item => typeof item === 'string' && item) : []);
 
@@ -38,7 +43,8 @@ export function normalizeLayout(raw) {
     phone: PHONE_LAYOUTS.includes(value.phone) ? value.phone : DEFAULT_LAYOUT.phone,
     computer: COMPUTER_LAYOUTS.includes(value.computer) ? value.computer : DEFAULT_LAYOUT.computer,
     order: [...new Set(strings(value.order))],
-    hidden: [...new Set(strings(value.hidden))]
+    hidden: [...new Set(strings(value.hidden))],
+    statusBar: STATUS_BAR.includes(value.statusBar) ? value.statusBar : DEFAULT_LAYOUT.statusBar
   };
 }
 
@@ -102,4 +108,27 @@ export function withModeHidden(allModes, layout, id, hide) {
 export function swipeDirection(dx, dy, { min = 60 } = {}) {
   if (Math.abs(dx) < min || Math.abs(dx) < Math.abs(dy) * 1.5) return 0;
   return dx < 0 ? 1 : -1;
+}
+
+/**
+ * How many modes a slide along the bar has gone through: one for every
+ * `step` pixels across, positive for the next ones (sliding left), or null
+ * while the finger is going more down than across. Asked 2026-11-10: "we
+ * should be able to slide through multiple modes in one movement if we do it
+ * slow. and show the name of the mode we'll use with its icon while we
+ * slide."
+ */
+export function slideSteps(dx, dy, { step = 64 } = {}) {
+  if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) return null;
+  const steps = Math.trunc(Math.abs(dx) / step);
+  return dx < 0 ? steps : -steps;
+}
+
+/** The mode so many places on from the open one, among those offered, going round. */
+export function modeAfterSteps(allModes, layout, current, steps) {
+  const offered = offeredModes(allModes, layout, current);
+  if (!offered.length || !steps) return current;
+  const at = Math.max(0, offered.indexOf(current));
+  const n = offered.length;
+  return offered[(((at + steps) % n) + n) % n];
 }

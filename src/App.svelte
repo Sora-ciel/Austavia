@@ -3,8 +3,9 @@
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
-  import { readLayout, writeLayout, offeredModes, neighbourMode, swipeDirection } from './utils/controlsLayout.js';
+  import { readLayout, writeLayout, offeredModes, slideSteps, modeAfterSteps } from './utils/controlsLayout.js';
   import ModeIcon from './components/ModeIcon.svelte';
+  import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
@@ -3905,20 +3906,39 @@
     controlsLayout = next;
     writeLayout(typeof localStorage !== 'undefined' ? localStorage : null, next);
   }
+  // The phone's status bar, shown or hidden as chosen (SystemBarsPlugin.java);
+  // nothing anywhere else.
+  $: applyStatusBar(controlsLayout.statusBar);
+  function applyStatusBar(choice) {
+    const plugin = typeof window !== 'undefined' ? window.Capacitor?.Plugins?.SystemBars : null;
+    plugin?.setStatusBarHidden?.({ hidden: choice === 'hidden' }).catch?.(() => {});
+  }
   $: offered = offeredModes(MODE_ORDER, controlsLayout, mode);
+  // The Controls layout page, over the whole mode area, from Advanced settings.
+  let showControlsLayout = false;
 
-  // A swipe along the bar on a phone: the next or previous mode.
+  // A slide along the bar on a phone: through as many modes as it goes,
+  // the one it will open shown above the bar while sliding (asked
+  // 2026-11-10; slideSteps and modeAfterSteps in utils/controlsLayout.js).
   let barSwipe = null;
+  let slidePreview = null; // the mode a slide would open, while sliding
   function barTouchStart(event) {
-    if (event.touches?.length !== 1 || event.target.closest?.('input, .mini-player, .player-panel')) { barSwipe = null; return; }
+    if (event.touches?.length !== 1 || window.innerWidth > 700 || event.target.closest?.('input, .mini-player, .player-panel')) { barSwipe = null; return; }
     barSwipe = { x: event.touches[0].clientX, y: event.touches[0].clientY };
   }
-  function barTouchEnd(event) {
-    if (!barSwipe || window.innerWidth > 700) { barSwipe = null; return; }
-    const t = event.changedTouches?.[0];
-    const direction = t ? swipeDirection(t.clientX - barSwipe.x, t.clientY - barSwipe.y) : 0;
+  function barTouchMove(event) {
+    if (!barSwipe) return;
+    const t = event.touches?.[0];
+    if (!t) return;
+    const steps = slideSteps(t.clientX - barSwipe.x, t.clientY - barSwipe.y);
+    if (steps === null) { barSwipe = null; slidePreview = null; return; }
+    slidePreview = steps ? modeAfterSteps(MODE_ORDER, controlsLayout, mode, steps) : null;
+  }
+  function barTouchEnd() {
+    const target = slidePreview;
     barSwipe = null;
-    if (direction) setMode(neighbourMode(MODE_ORDER, controlsLayout, mode, direction));
+    slidePreview = null;
+    if (target && target !== mode) setMode(target);
   }
 
   // Ctrl+1 to Ctrl+9 on a computer: the modes, in the order shown.
@@ -7071,6 +7091,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    steps aside (keyboardOpen). PENDING, "How modes are changed", stage a. */
 @media (max-width: 700px) {
   .app.phone-bar-bottom {
+    /* The phone's own status bar: the mode reaches up under it, so its
+       background and wallpaper show there, and its content starts below it
+       (asked 2026-11-10). */
+    --safe-top: env(safe-area-inset-top, 0px);
     --bar-top: 0px;
     --bar-bottom: var(--controls-height, 56px);
     --popup-top: auto;
@@ -7095,46 +7119,82 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 
 /* ── A computer: the modes in a column on the left ─────────────────── */
+/* Over the mode rather than beside it, see-through, so the mode's own
+   background and wallpaper show behind it; its buttons are the bar's own
+   (asked 2026-11-10: "the left side bar should follow the style of the app
+   and the background should show behind"). The mode keeps its content clear
+   of it. */
+.modes { position: relative; }
 .mode-rail {
-  flex: 0 0 auto;
-  width: 52px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: 8px 0;
+  box-sizing: border-box;
   overflow-y: auto;
   scrollbar-width: none;
-  background: var(--controls-bg, #111);
-  border-right: 1px solid var(--controls-border, #333);
-  position: relative;
+  background: color-mix(in srgb, var(--controls-bg, #111) 45%, transparent);
+  backdrop-filter: blur(6px);
+  border-right: 1px solid color-mix(in srgb, var(--controls-border, #333) 70%, transparent);
   z-index: 900;
 }
 .mode-rail-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: transparent;
+  border-radius: 8px;
+  border: 1px solid var(--controls-border, #333);
+  background: var(--controls-bg, #333);
   color: var(--controls-button-text, var(--controls-text, #fff));
-  opacity: 0.6;
   cursor: pointer;
+  transition: filter 0.15s ease;
 }
-.mode-rail-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+.mode-rail-btn:hover { filter: brightness(1.18); }
 .mode-rail-btn.active {
-  opacity: 1;
-  background: var(--controls-bg-active, color-mix(in srgb, currentColor 16%, transparent));
-  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
 }
 @media (min-width: 701px) {
-  /* What is placed on the screen rather than in the flow (the Canvas) starts
-     after the column. */
-  .app.has-rail { --bar-left: 52px; }
+  .app.has-rail .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.slide-preview)) {
+    padding-left: 56px !important;
+    box-sizing: border-box;
+  }
 }
+@media (max-width: 700px) {
+  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.slide-preview)) {
+    padding-top: var(--safe-top, 0px) !important;
+    box-sizing: border-box;
+  }
+}
+/* While sliding along the bar: the mode it will open, above the bar, in the
+   bar's own colours. */
+.slide-preview {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--controls-height, 56px) + 18px);
+  transform: translateX(-50%);
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--controls-border, #333);
+  background: var(--controls-bg, #111);
+  color: var(--controls-button-text, var(--controls-text, #fff));
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
 /* The column is a computer's; a phone has the sheet and the swipe. After the
    rules that draw it: Svelte weighs both the same, so the later one wins. */
 @media (max-width: 700px) {
@@ -7803,7 +7863,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   {#if channelBadgeText}
     <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
   {/if}
-  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchend|passive={barTouchEnd}>
+  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={() => { barSwipe = null; slidePreview = null; }}>
     <LeftControls
       modeIds={offered}
       bind:currentSaveName
@@ -8046,10 +8106,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     {#if showRightControls}
     <div class="right-controls">
       <RightControls
-        {controlsLayout}
-        allModes={MODE_ORDER}
-        modeLabels={MODE_LABELS}
-        on:controlsLayoutChange={(e) => changeControlsLayout(e.detail)}
+        on:openControlsLayout={() => (showControlsLayout = true)}
         {collectDiagnostics}
         {typeScales}
         {folderSnapshots}
@@ -8144,6 +8201,22 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           </button>
         {/each}
       </nav>
+    {/if}
+    {#if slidePreview}
+      <!-- The mode a slide along the bar will open, while sliding. -->
+      <div class="slide-preview" aria-live="polite">
+        <ModeIcon mode={slidePreview} size={26} />
+        <span>{MODE_LABELS[slidePreview] || slidePreview}</span>
+      </div>
+    {/if}
+    {#if showControlsLayout}
+      <ControlsLayoutPage
+        layout={controlsLayout}
+        allModes={MODE_ORDER}
+        modeLabels={MODE_LABELS}
+        on:change={(e) => changeControlsLayout(e.detail)}
+        on:close={() => (showControlsLayout = false)}
+      />
     {/if}
     {#if workspaceHeld}
       <div class="sync-lock-banner" style={overlayThemeStyle}>{gateMessage}</div>

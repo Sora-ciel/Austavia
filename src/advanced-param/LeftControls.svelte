@@ -959,7 +959,9 @@ onMount(() => {
       bottom: var(--popup-bottom, auto);
       left: 8px;
       right: auto;
-      width: min(120px, calc(100vw - 16px));
+      /* Wide enough for the buttons' words and the folder's name (asked
+         2026-11-10: "the menu settings area isn't wide enough"). */
+      width: min(200px, calc(100vw - 16px));
       max-height: calc(100dvh - var(--controls-height, 56px) - 16px);
       overflow: auto;
       z-index: 1002;
@@ -984,6 +986,18 @@ onMount(() => {
 
     .left-controls > input {
       max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* The folder's name, as wide as the buttons and no wider: the field sat
+       in a label the rule above never reached. */
+    .left-controls > .file-name-field {
+      width: 100%;
+      min-width: 0;
+    }
+    .left-controls > .file-name-field input {
+      width: 100%;
+      min-width: 0;
       box-sizing: border-box;
     }
 

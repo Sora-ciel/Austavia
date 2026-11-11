@@ -50,3 +50,18 @@ test('a swipe along the bar goes to the next or previous mode, round the ends, s
   assert.equal(swipeDirection(30, 5), 0, 'too short');
   assert.equal(swipeDirection(70, 60), 0, 'more down than across');
 });
+
+import { slideSteps, modeAfterSteps } from '../src/utils/controlsLayout.js';
+
+// Asked 2026-11-10: "slide through multiple modes in one movement if we do it
+// slow. and show the name of the mode we'll use with its icon while we slide."
+test('a slide along the bar goes through a mode for every step of it, either way', () => {
+  assert.equal(slideSteps(-30, 2), 0);
+  assert.equal(slideSteps(-70, 2), 1);
+  assert.equal(slideSteps(-200, 5), 3);
+  assert.equal(slideSteps(140, 5), -2);
+  assert.equal(slideSteps(-20, 80), null, 'more down than across is not a slide');
+  assert.equal(modeAfterSteps(MODES, {}, 'default', 3), 'page');
+  assert.equal(modeAfterSteps(MODES, {}, 'default', -1), 'playlist');
+  assert.equal(modeAfterSteps(MODES, {}, 'task', 0), 'task');
+});

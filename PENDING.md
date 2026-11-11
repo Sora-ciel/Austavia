@@ -129,14 +129,14 @@ moment, archive instead of delete) after these, in an order to be agreed.
 11. *Done 2026-11-10.* **Music dropped on the app goes into the library**, and opens Playlist
     mode if another mode is open.
 15. **Asked 2026-11-10, after trying the new controls:**
-    a. **Phone: the content starts under the phone's own status bar** (time,
+    a. *Done 2026-11-10.* **Phone: the content starts under the phone's own status bar** (time,
        battery) now the bar is at the bottom -- room for it above the mode,
        or the status bar hidden, chosen in Controls layout.
-    b. **Phone: a slow slide along the bar goes through several modes**,
+    b. *Done 2026-11-10.* **Phone: a slow slide along the bar goes through several modes**,
        showing the mode it will open, icon and name, while sliding.
-    c. **Phone: the Menu panel wider**; the folder's name field was wider
+    c. *Done 2026-11-10.* **Phone: the Menu panel wider**; the folder's name field was wider
        than the buttons.
-    d. **Advanced settings: a better page**, and **Controls layout a page of
+    d. *Done 2026-11-10.* **Advanced settings: a better page**, and **Controls layout a page of
        its own taking the whole mode area** -- it will hold many settings.
 13. *Done in the app's player 2026-11-10* (the whole timeline row, with room
     above and below, seeks; utils/playerClicks.js). **The phone's music
@@ -498,6 +498,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Controls, second round** (2026-11-10). Phone: the mode reaches up under the phone's status bar (wallpaper behind the time and battery) with its writing kept clear of them; or, in Controls layout, the status bar hidden (a swipe down from the top shows it for a moment) -- check both on the Samsung. A slow slide along the bar goes through several modes, a pill above the bar showing the one it will open. The Menu panel is wider and the folder's name fits it. Advanced settings is in cards, and Controls layout opens as a page over the whole mode area. Computer: the mode column floats over the mode, see-through, its buttons the bar's own. |
 | next | **Changing modes** (2026-11-10). Phone: Mode opens a sheet of every mode, three to a row with icons; a swipe left or right along the bar goes to the next or previous mode; in Page mode or with music playing, Mode and Menu show as icons only, and Page's forward shows only when there is somewhere to go. Computer: a column of mode icons down the left, names on hover, Ctrl+1 to Ctrl+9. Advanced settings, Controls layout: the bar at the top on a phone, or no column on a computer, as before; modes in order and hidden; kept on that device. The player's shuffle is filled when on, and a tap no longer leaves a tint that looks on. |
 | next | **The bar at the bottom on a phone** (2026-11-10). Up to 700px wide the bar is at the bottom, the same height; Mode, Menu, Settings and the timer's and player's pop-ups open upwards from it; the Canvas fills from the top. While typing (keyboard up) the bar steps aside. Check on the phone: the bar clears the gesture line at the bottom, nothing is hidden behind it, and typing in a note gives the full height. |
 | next | **The phone's timer notification, restyled** (2026-11-10). A rounded panel in the theme's pop-up colour, the time big in the theme's writing, the three buttons round on faint backs as in the pop-up, the stop in the accent -- instead of a flat dark box inside the phone's card. Check on the Samsung with a timer running, in a dark and a light theme. Before Android 12 the panel keeps its drawn colour. |
