@@ -18,9 +18,10 @@
  *
  * ## Nothing is offered until there is something to sell
  *
- * `POLAR_CHECKOUT_LINK` is empty until a product exists in Polar. Everything
- * here returns "do not show" while it is, so a half-finished paywall shows a
- * button that goes nowhere to nobody.
+ * `POLAR_CHECKOUT_LINK` was empty until a product existed in Polar, and
+ * everything here returns "do not show" while it is, so a half-finished
+ * paywall shows a button that goes nowhere to nobody. The live product,
+ * Austavia Pro, and its portal were set on 2026-11-11.
  */
 
 /**
@@ -44,7 +45,7 @@ const env = (typeof import.meta !== 'undefined' && import.meta.env) || {};
 export const POLAR_CHECKOUT_LINK =
   typeof env.VITE_POLAR_CHECKOUT_LINK === 'string' && env.VITE_POLAR_CHECKOUT_LINK.length > 0
     ? env.VITE_POLAR_CHECKOUT_LINK
-    : '';
+    : 'https://buy.polar.sh/polar_cl_HfWDRLjqZx0ati5H6CFrLsI6ShFDrhJGgCFIH0EErmy';
 
 /**
  * Polar's customer portal for this organisation — `polar.sh/<org>/portal`.
@@ -61,7 +62,7 @@ export const POLAR_CHECKOUT_LINK =
 export const POLAR_PORTAL_LINK =
   typeof env.VITE_POLAR_PORTAL_LINK === 'string' && env.VITE_POLAR_PORTAL_LINK.length > 0
     ? env.VITE_POLAR_PORTAL_LINK
-    : '';
+    : 'https://polar.sh/austavia/portal';
 
 /**
  * The portal URL, or null when there is nothing to open.
