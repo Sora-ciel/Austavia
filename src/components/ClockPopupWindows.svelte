@@ -20,6 +20,7 @@
     hiddenToForget,
     keptToForget,
     popupPosition,
+    popupWindowSize,
     goalPopupLabel,
     GOALS_KEY,
     GOAL_ACTION_KEY,
@@ -157,50 +158,41 @@
       let index = 0;
       for (const popup of wanted) {
         if (existingLabels.has(popup.label)) { index += 1; continue; }
-        const { x, y } = popupPosition({ workArea: area, index, saved });
+        const size = popupWindowSize(onLinux);
+        const { x, y } = popupPosition({ workArea: area, index, saved, size });
         const query = new URLSearchParams({
           popup: 'clock',
           ...(popup.kind === 'goal' ? { goal: popup.goalKey } : { block: popup.blockId }),
           kind: popup.kind,
           label: popup.label,
+          ...(onLinux ? { framed: '1' } : {}),
           ...(popup.kind === 'alarm' ? { time: popup.time, hour12: popup.hour12 ? '1' : '0' } : {})
         });
         try {
           const created = new api.WebviewWindow(popup.label, {
             url: `index.html?${query}`,
             title: popup.kind === 'alarm' ? 'Alarm' : popup.kind === 'goal' ? 'Objective' : 'Timer',
-            width: POPUP_WIDTH,
-            height: POPUP_HEIGHT,
+            width: size.width,
+            height: size.height,
             x,
             y,
             alwaysOnTop: true,
             decorations: false,
             transparent: true,
             shadow: false,
-            // On Linux a window that cannot be resized is sized by GTK to its
-            // content, not to the size asked for: the pop-up opened about
-            // 210 by 235 rather than one row (reported 2026-11-10). There
-            // it stays resizable and is held to the size by a minimum and a
-            // maximum instead; it has no frame to be resized by anyway.
-            resizable: !onLinux,
-            ...(onLinux ? { minWidth: POPUP_WIDTH, minHeight: POPUP_HEIGHT, maxWidth: POPUP_WIDTH, maxHeight: POPUP_HEIGHT } : {}),
+            resizable: false,
             skipTaskbar: true,
             // Not taking the keyboard from whatever is being typed into.
             focus: false
           });
           created.once?.('tauri://created', async () => {
-            let size = '';
-            // And asked again once it exists, for a window system that took
-            // no notice of the size it was made with.
-            if (onLinux) {
-              try { await created.setSize(new api.LogicalSize(POPUP_WIDTH, POPUP_HEIGHT)); } catch { /* the log says what it got */ }
-            }
+            let got = '';
             try {
               const inner = await created.innerSize();
               const scale = await created.scaleFactor();
-              size = ` at ${Math.round(inner.width / scale)}x${Math.round(inner.height / scale)}`;
+              got = ` at ${Math.round(inner.width / scale)}x${Math.round(inner.height / scale)}`;
             } catch { /* the size is only for the log */ }
-            logSync('popup', '', `opened the ${popup.kind} pop-up${size} (asked ${POPUP_WIDTH}x${POPUP_HEIGHT})`);
+            logSync('popup', '', `opened the ${popup.kind} pop-up${got} (window ${size.width}x${size.height}, card ${POPUP_WIDTH}x${POPUP_HEIGHT})`);
           });
           created.once?.('tauri://error', event => logSync('popup', '', `the ${popup.kind} pop-up would not open: ${JSON.stringify(event?.payload ?? event)}`));
         } catch (error) {
@@ -221,11 +213,11 @@
     const isDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
     if (!isDesktop) return;
     try {
-      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor, getCurrentWindow, LogicalSize }] = await Promise.all([
+      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor, getCurrentWindow }] = await Promise.all([
         import('@tauri-apps/api/webviewWindow'),
         import('@tauri-apps/api/window')
       ]);
-      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor, LogicalSize, currentWindow: getCurrentWindow() };
+      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor, currentWindow: getCurrentWindow() };
       window.addEventListener('storage', onGoalAction);
       // The window system says when the app goes behind or comes back, so a
       // pop-up opens at once rather than waiting for the page to notice.

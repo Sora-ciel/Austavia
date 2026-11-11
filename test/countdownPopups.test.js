@@ -71,3 +71,18 @@ test('a finished timer sounds until it is stopped, or for two minutes', () => {
   assert.equal(stillSounding(t0, t0 - SEC), false, 'not before it has finished');
   assert.equal(stillSounding(0, t0), false);
 });
+
+// Linux made no window smaller than 200 by 200 (measured 2026-11-10), so the
+// pop-up there is that window, see-through, with the card in its corner.
+import { popupPosition, popupWindowSize, POPUP_WIDTH, POPUP_HEIGHT, POPUP_MARGIN } from '../src/utils/clockPopups.js';
+
+test('on Linux the pop-up\'s card still sits in the bottom-right corner, where it does elsewhere', () => {
+  const workArea = { x: 0, y: 0, width: 1920, height: 1040 };
+  const plain = popupPosition({ workArea, size: popupWindowSize(false) });
+  const size = popupWindowSize(true);
+  const linux = popupPosition({ workArea, size });
+  // The card is the window's bottom-right corner, so its edges land where the plain window's do.
+  assert.equal(linux.x + size.width, plain.x + POPUP_WIDTH);
+  assert.equal(linux.y + size.height, plain.y + POPUP_HEIGHT);
+  assert.equal(plain.y + POPUP_HEIGHT, workArea.height - POPUP_MARGIN);
+});

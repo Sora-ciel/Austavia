@@ -58,11 +58,92 @@ function primeOnFirstTouch() {
   window.addEventListener('keydown', wake, true);
 }
 
+/**
+ * The two beeps as a WAV file: 880Hz, each 0.18s, the second 0.22s after the
+ * first, rising in 20ms and dying away -- what the Web Audio version below
+ * plays, written out as samples so an ordinary <audio> can play it.
+ *
+ * Why a file at all: on the Linux app Web Audio made no sound at "Time's up"
+ * even with the app clicked in, while music played through an <audio> was
+ * heard (2026-11-10). So the ring goes the way the music goes, and Web Audio
+ * is what is tried when that is refused.
+ */
+export function beepWav(sampleRate = 22050) {
+  const length = Math.round(sampleRate * 0.42);
+  const data = new Int16Array(length);
+  for (const offset of [0, 0.22]) {
+    const from = Math.round(offset * sampleRate);
+    const count = Math.round(0.18 * sampleRate);
+    for (let i = 0; i < count && from + i < length; i += 1) {
+      const t = i / sampleRate;
+      const rise = Math.min(1, t / 0.02);
+      const fall = t < 0.02 ? 1 : Math.exp(-(t - 0.02) / 0.025);
+      data[from + i] = Math.round(Math.sin(2 * Math.PI * 880 * t) * rise * fall * 0.3 * 32767);
+    }
+  }
+  const bytes = new Uint8Array(44 + data.length * 2);
+  const view = new DataView(bytes.buffer);
+  const text = (at, word) => { for (let i = 0; i < word.length; i += 1) bytes[at + i] = word.charCodeAt(i); };
+  text(0, 'RIFF'); view.setUint32(4, 36 + data.length * 2, true); text(8, 'WAVE');
+  text(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  text(36, 'data'); view.setUint32(40, data.length * 2, true);
+  for (let i = 0; i < data.length; i += 1) view.setInt16(44 + i * 2, data[i], true);
+  return bytes;
+}
+
+// As a data: address, made once. Not a blob: the Linux app's web engine
+// cannot rewind a blob (utils/audioAddress.js), and each beep is a fresh
+// <audio> from the start, so nothing is ever rewound anyway.
+let beepAddress = null;
+function beepUrl() {
+  if (beepAddress) return beepAddress;
+  const bytes = beepWav();
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  beepAddress = `data:audio/wav;base64,${btoa(binary)}`;
+  return beepAddress;
+}
+
+// Which way the sound went, written to the sync log once (Copy diagnostics),
+// since nobody can see from outside why a ring is silent.
+let reported = '';
+function report(how) {
+  if (how === reported) return;
+  reported = how;
+  import('./syncLog.js').then(({ logSync }) => logSync('ring', '', how)).catch(() => {});
+}
+
 export function createRinger() {
   let beeper = null;
   primeOnFirstTouch();
 
   function beep() {
+    let element = null;
+    try {
+      element = new Audio(beepUrl());
+    } catch {
+      element = null;
+    }
+    if (!element) {
+      synthBeep();
+    } else {
+      element.play().then(
+        () => report('rang through an audio element'),
+        error => {
+          report(`the audio element was refused (${error?.name || error}); rang through Web Audio`);
+          synthBeep();
+        }
+      );
+    }
+    try {
+      navigator.vibrate?.([180, 60, 180]);
+    } catch {
+      // Not a device that vibrates.
+    }
+  }
+
+  function synthBeep() {
     try {
       const audio = openAudio();
       if (!audio) throw new Error('no audio');
@@ -81,11 +162,6 @@ export function createRinger() {
       }
     } catch {
       // No audio here; whatever is showing the ring still shows it.
-    }
-    try {
-      navigator.vibrate?.([180, 60, 180]);
-    } catch {
-      // Not a device that vibrates.
     }
   }
 

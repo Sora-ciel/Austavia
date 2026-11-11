@@ -25,13 +25,18 @@
     oneMoreMinute
   } from '../utils/countdown.js';
   import { isRinging, dismissed, snoozed, alarmReading } from '../utils/alarm.js';
-  import { timerFractionLeft, popupTimerReading, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY, GOALS_KEY, GOAL_ACTION_KEY } from '../utils/clockPopups.js';
+  import { timerFractionLeft, popupTimerReading, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY, GOALS_KEY, GOAL_ACTION_KEY, POPUP_WIDTH, POPUP_HEIGHT } from '../utils/clockPopups.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
 
   const params = new URLSearchParams(location.search);
   const blockId = params.get('block') || '';
   const kind = ['alarm', 'goal'].includes(params.get('kind')) ? params.get('kind') : 'timer';
   const goalKey = params.get('goal') || '';
+  // On Linux the window is bigger than the card (LINUX_POPUP_WINDOW in
+  // utils/clockPopups.js): the card is drawn in its bottom-right corner and
+  // the rest of it lets the pointer through.
+  const framed = params.get('framed') === '1';
+  let cardRef;
   const label = params.get('label') || '';
   const alarmTime = params.get('time') || '';
   const hour12 = params.get('hour12') === '1';
@@ -191,6 +196,28 @@
 
   let stopMoved = null;
 
+  // The see-through part of a Linux window must not catch clicks meant for
+  // what is behind it. A window takes the pointer or does not, as a whole;
+  // so it is told to let it through except while the pointer is over the
+  // card, which is looked at ten times a second from where the pointer is on
+  // the screen -- a window that lets the pointer through hears nothing of it.
+  let throughTimer = null;
+  let lettingThrough = null;
+  async function followPointer(cursorPosition) {
+    if (!win || !cardRef) return;
+    try {
+      const [pointer, place, scale] = await Promise.all([cursorPosition(), win.outerPosition(), win.scaleFactor()]);
+      const rect = cardRef.getBoundingClientRect();
+      const x = (pointer.x - place.x) / scale;
+      const y = (pointer.y - place.y) / scale;
+      const overCard = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+      if (lettingThrough !== !overCard) {
+        lettingThrough = !overCard;
+        await win.setIgnoreCursorEvents(lettingThrough);
+      }
+    } catch { /* stays as it was */ }
+  }
+
   onMount(async () => {
     tick = setInterval(() => { now = Date.now(); }, 250);
     window.addEventListener('storage', onStorage);
@@ -198,8 +225,12 @@
     window.addEventListener('keyup', onKey, true);
 
     try {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      const { getCurrentWindow, cursorPosition } = await import('@tauri-apps/api/window');
       win = getCurrentWindow();
+      if (framed) {
+        followPointer(cursorPosition);
+        throughTimer = setInterval(() => followPointer(cursorPosition), 100);
+      }
       // Where it was dragged to, so the next one opens there.
       stopMoved = await win.onMoved(async ({ payload }) => {
         try {
@@ -214,6 +245,7 @@
 
   onDestroy(() => {
     clearInterval(tick);
+    clearInterval(throughTimer);
     stopMoved?.();
     window.removeEventListener('storage', onStorage);
     window.removeEventListener('keydown', onKey, true);
@@ -224,10 +256,12 @@
 <!-- The whole card is the handle for dragging the window; its buttons are
      not, and keep their clicks. -->
 <div
+  bind:this={cardRef}
   class="card"
+  class:framed
   class:ringing
   data-tauri-drag-region
-  style="--pp-bg: {theme.bg || 'rgba(12, 12, 14, 0.9)'}; --pp-text: {theme.text || '#ffffff'}; --pp-accent: {theme.accent || theme.text || '#ffffff'}; --pp-border: {theme.border || 'rgba(255, 255, 255, 0.25)'};"
+  style="--pp-bg: {theme.bg || 'rgba(12, 12, 14, 0.9)'}; --pp-text: {theme.text || '#ffffff'}; --pp-accent: {theme.accent || theme.text || '#ffffff'}; --pp-border: {theme.border || 'rgba(255, 255, 255, 0.25)'}; --card-w: {POPUP_WIDTH}px; --card-h: {POPUP_HEIGHT}px;"
   on:dblclick={openApp}
   role="timer"
   aria-label={kind === 'alarm' ? 'Alarm' : kind === 'goal' ? (goal?.title || 'Objective') : 'Timer'}
@@ -342,6 +376,15 @@
     user-select: none;
     cursor: default;
     overflow: hidden;
+  }
+
+  /* In a Linux window bigger than itself: its own size, in the corner. */
+  .card.framed {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    width: var(--card-w);
+    height: var(--card-h);
   }
 
   .top {
