@@ -30,10 +30,9 @@
     snoozed,
     alarmReading
   } from '../utils/alarm.js';
-  import { timerState, resetTimer, oneMoreMinute, msUntilTimerRingChange } from '../utils/countdown.js';
+  import { timerState, timerEndsAt, resetTimer, oneMoreMinute, msUntilTimerRingChange } from '../utils/countdown.js';
   import { clockDevices, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
-  import { createRinger } from '../utils/ringTone.js';
-  import { popupLabel } from '../utils/clockPopups.js';
+  import { createRinger, stillSounding, RING_SOUND_MS } from '../utils/ringTone.js';
   // Finished objectives ring here too, in the same banner and with the same
   // sound -- asked 2026-10-26. When and for how long: utils/taskGoalRings.js.
   import { goalRings, msUntilGoalRingChange, readAnswered, answerRing } from '../utils/taskGoalRings.js';
@@ -44,11 +43,6 @@
   export let habits = [];
   /** The dialog palette App hands its other popups, so this reads as one of them. */
   export let themeStyle = '';
-  /**
-   * Pop-up windows that are open, by label, on the Windows app -- they ring
-   * for themselves. See utils/clockPopups.js.
-   */
-  export let quiet = new Set();
 
   let now = Date.now();
   let wake = null;
@@ -108,7 +102,9 @@
     const waits = [
       msUntilAlarmCheck({ now, alarms }),
       ...timers.map(entry => msUntilTimerRingChange(entry.device.timer, now)),
-      msUntilGoalRingChange({ blocks, habits, now })
+      msUntilGoalRingChange({ blocks, habits, now }),
+      // The moment a ring's sound stops, two minutes in (ringTone.js).
+      ...soundEnds().map(end => end + RING_SOUND_MS - now + 5).filter(wait => wait > 0)
     ].filter(wait => wait !== null);
     wake = setTimeout(schedule, Math.min(...waits));
   }
@@ -129,16 +125,22 @@
   }
 
   // ── Sound ─────────────────────────────────────────────────────────
-  // The shared ring (utils/ringTone.js). Quiet for anything whose always-on-top
-  // pop-up is open and ringing it already -- two sets of beeps a fraction of a
-  // second apart sound like a fault, not an alarm.
+  // The shared ring (utils/ringTone.js), for everything: the always-on-top
+  // pop-ups only show. A finished timer or objective sounds until it is
+  // stopped or for two minutes, whichever comes first; an alarm for its whole
+  // ring.
   const ringer = createRinger();
 
-  $: ringingLabels = [
-    ...ringing.map(alarm => popupLabel(alarm.id, 'alarm')),
-    ...rungTimers.map(entry => popupLabel(entry.id, 'timer'))
-  ];
-  $: ringer.set(ringingLabels.some(label => !quiet.has(label)) || goalRinging.some(ring => ring.loud));
+  function soundEnds() {
+    return [
+      ...rungTimers.map(entry => timerEndsAt(entry.device.timer)),
+      ...goalRinging.filter(ring => ring.loud).map(ring => ring.finishedAt)
+    ];
+  }
+  $: sounding = ringing.length > 0
+    || rungTimers.some(entry => stillSounding(timerEndsAt(entry.device.timer), now))
+    || goalRinging.some(ring => ring.loud && stillSounding(ring.finishedAt, now));
+  $: ringer.set(sounding);
 
   function stop(alarm) {
     setClockDevice(alarm.id, dismissed(alarm.device, Date.now()));

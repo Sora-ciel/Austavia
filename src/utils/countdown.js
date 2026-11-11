@@ -80,6 +80,11 @@ export function timerState(timer, now = Date.now()) {
   return 'idle';
 }
 
+/** When a timer ran out or will run out; 0 when it is not running. */
+export function timerEndsAt(timer) {
+  return readTimer(timer).endsAt;
+}
+
 /** How much time is left, at `now`. */
 export function timeLeft(timer, now = Date.now()) {
   const state = readTimer(timer);

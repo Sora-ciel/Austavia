@@ -1,6 +1,7 @@
 /**
- * The little always-on-top windows for a clock block's timer and alarm, on the
- * Windows app.
+ * The little always-on-top windows for a clock block's timer and alarm, and
+ * for a running timed habit or objective, in the desktop apps (Windows and
+ * Linux).
  *
  * ## What was asked for
  *
@@ -25,6 +26,12 @@
  *   that is the one moment it exists for.
  * - **A ringing alarm gets one too**, so an alarm is not missed with the app
  *   minimised.
+ * - **A timed habit or objective gets the same pop-up** -- asked 2026-11-10:
+ *   "the same pop up of timer but pop up we can put for the timer of habits
+ *   ... for linux and windows". One pop-up, not a second one written for
+ *   habits: it shows the name, the time left, pause and resume, and Stop when
+ *   it rings. It behaves as the timer's does -- open while it runs, hidden by
+ *   its ×, back when time is up, kept after a pause pressed in it.
  * - It sits in the bottom-right corner above the taskbar, or wherever it was
  *   last dragged to, and several stack upwards rather than on top of each
  *   other.
@@ -77,6 +84,16 @@ export const KEEP_KEY_PREFIX = 'austavia.popup.keep.';
 export const POSITION_KEY = 'austavia.popup.position';
 /** Where the app leaves its colours for the pop-ups to read. */
 export const THEME_KEY = 'austavia.popup.theme';
+/**
+ * Where the main window leaves the running timed habits and objectives for
+ * their pop-ups. Unlike a clock timer they live in the folder, which only the
+ * main window holds, so it writes what each pop-up shows -- the entries of
+ * goalTimers (utils/goalNotices.js), by key -- and a pop-up's buttons come
+ * back the other way through GOAL_ACTION_KEY, to the same handler the
+ * phone's notification uses (App.svelte, handleGoalAction).
+ */
+export const GOALS_KEY = 'austavia.popup.goals';
+export const GOAL_ACTION_KEY = 'austavia.popup.goalAction';
 
 /**
  * How the pop-up reads a timer: `4:59` and `59:59` as everywhere else, but an
@@ -105,6 +122,11 @@ export function popupLabel(blockId, kind) {
   return `clock-popup-${kind}-${safe}`;
 }
 
+/** A window label for a timed habit's or objective's pop-up, from its key. */
+export function goalPopupLabel(key) {
+  return popupLabel(String(key || '').replace(/:/g, '_'), 'goal');
+}
+
 /**
  * The pop-ups that should be open now, in a stable order.
  *
@@ -118,7 +140,7 @@ export function popupLabel(blockId, kind) {
  * forgotten meanwhile -- a pop-up hidden or kept is still hidden or kept when
  * the app goes to the back and they return.
  */
-export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidden = new Set(), kept = new Set(), appInFront = false } = {}) {
+export function popupsWanted({ blocks = [], devices = {}, goals = [], now = Date.now(), hidden = new Set(), kept = new Set(), appInFront = false } = {}) {
   const wanted = [];
   if (appInFront) return wanted;
 
@@ -150,6 +172,17 @@ export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidd
     }
   }
 
+  // Timed habits and objectives, as goalTimers lists them: running, ringing,
+  // or paused from their own pop-up (it lists those only when asked to keep
+  // them). Hidden by hand stays hidden until it rings, as a timer's does.
+  for (const goal of goals || []) {
+    if (!goal?.blockId) continue;
+    const label = goalPopupLabel(goal.blockId);
+    if (goal.phase === 'ringing' || !hidden.has(label)) {
+      wanted.push({ goalKey: goal.blockId, kind: 'goal', label });
+    }
+  }
+
   return wanted;
 }
 
@@ -158,8 +191,8 @@ export function popupsWanted({ blocks = [], devices = {}, now = Date.now(), hidd
  * that was stopped, reset or has run its course, or a clock that is gone.
  * Hiding lasts for one run; the next start shows the pop-up again.
  */
-export function hiddenToForget({ blocks = [], devices = {}, now = Date.now(), hidden = new Set() } = {}) {
-  const live = new Set();
+export function hiddenToForget({ blocks = [], devices = {}, goals = [], now = Date.now(), hidden = new Set() } = {}) {
+  const live = new Set((goals || []).map(goal => goalPopupLabel(goal.blockId)));
   for (const block of blocks || []) {
     if (block?.type !== 'clock' || !block.id) continue;
     const phase = timerState((devices[block.id] || {}).timer, now);
@@ -174,10 +207,13 @@ export function hiddenToForget({ blocks = [], devices = {}, now = Date.now(), hi
  * Kept-open marks for clocks that no longer exist in the folder. A kept
  * pop-up otherwise lasts until its own × is pressed.
  */
-export function keptToForget({ blocks = [], kept = new Set() } = {}) {
+export function keptToForget({ blocks = [], goals = [], kept = new Set() } = {}) {
   const clocks = new Set(
     (blocks || []).filter(block => block?.type === 'clock' && block.id).map(block => popupLabel(block.id, 'timer'))
   );
+  // A habit or objective kept after a pause in its pop-up: until it is done
+  // or gone, which is when goalTimers stops listing it.
+  for (const goal of goals || []) clocks.add(goalPopupLabel(goal.blockId));
   return [...kept].filter(label => !clocks.has(label));
 }
 

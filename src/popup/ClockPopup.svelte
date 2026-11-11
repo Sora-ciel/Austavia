@@ -1,12 +1,18 @@
 <script>
   /**
-   * The always-on-top pop-up for one clock block's timer or ringing alarm, in
-   * its own small window on the Windows app. What it is for, and why it
-   * behaves as it does, is in utils/clockPopups.js.
+   * The always-on-top pop-up for one clock block's timer or ringing alarm, or
+   * for a running timed habit or objective, in its own small window in the
+   * desktop apps. What it is for, and why it behaves as it does, is in
+   * utils/clockPopups.js.
    *
-   * It keeps no state of its own. The timer is read from this device's memory
+   * It keeps no state of its own. A timer is read from this device's memory
    * of the block, the same record the block and the main window read, and every
    * button writes to that record -- the other windows hear the write and follow.
+   * A habit or objective lives in the folder, which only the main window
+   * holds: it is read from what the main window writes for it (GOALS_KEY), and
+   * its buttons are sent back (GOAL_ACTION_KEY).
+   *
+   * It makes no sound: the main window rings for it (utils/ringTone.js).
    */
   import { onMount, onDestroy } from 'svelte';
   import { clockDevices, clockDevice, peekClockDevice, setClockDevice } from '../utils/clockDeviceStore.js';
@@ -19,13 +25,13 @@
     oneMoreMinute
   } from '../utils/countdown.js';
   import { isRinging, dismissed, snoozed, alarmReading } from '../utils/alarm.js';
-  import { timerFractionLeft, popupTimerReading, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY } from '../utils/clockPopups.js';
-  import { createRinger } from '../utils/ringTone.js';
+  import { timerFractionLeft, popupTimerReading, HIDDEN_KEY_PREFIX, KEEP_KEY_PREFIX, POSITION_KEY, THEME_KEY, GOALS_KEY, GOAL_ACTION_KEY } from '../utils/clockPopups.js';
   import PlayerIcon from '../components/PlayerIcons.svelte';
 
   const params = new URLSearchParams(location.search);
   const blockId = params.get('block') || '';
-  const kind = params.get('kind') === 'alarm' ? 'alarm' : 'timer';
+  const kind = ['alarm', 'goal'].includes(params.get('kind')) ? params.get('kind') : 'timer';
+  const goalKey = params.get('goal') || '';
   const label = params.get('label') || '';
   const alarmTime = params.get('time') || '';
   const hour12 = params.get('hour12') === '1';
@@ -35,17 +41,29 @@
   let tick = null;
   let theme = readTheme();
 
-  clockDevice(blockId);
-  $: device = peekClockDevice(blockId, $clockDevices);
+  if (kind !== 'goal') clockDevice(blockId);
+  $: device = kind === 'goal' ? {} : peekClockDevice(blockId, $clockDevices);
 
-  $: phase = timerState(device.timer, now);
-  $: left = timeLeft(device.timer, now);
-  $: fraction = timerFractionLeft(left, device.timer?.duration);
+  // A habit or objective: what the main window last wrote for it. Seen once,
+  // then gone, means it is done or stopped -- the pop-up closes.
+  let goal = readGoal();
+  let goalSeen = !!goal;
+  function readGoal() {
+    if (kind !== 'goal') return null;
+    try { return JSON.parse(localStorage.getItem(GOALS_KEY) || '{}')[goalKey] || null; } catch { return null; }
+  }
+  $: goalLeft = !goal ? 0 : goal.phase === 'running' ? Math.max(0, goal.endsAt - now) : goal.left || 0;
+  // Running past its end is ringing already, before the main window says so.
+  $: goalPhase = !goal ? 'idle' : goal.phase === 'running' && goalLeft === 0 ? 'ringing' : goal.phase;
+
+  $: phase = kind === 'goal' ? goalPhase : timerState(device.timer, now);
+  $: left = kind === 'goal' ? goalLeft : timeLeft(device.timer, now);
+  $: fraction = kind === 'goal' ? timerFractionLeft(left, goal?.duration) : timerFractionLeft(left, device.timer?.duration);
   // What the big figure says -- an hour or more as `1h 05`, see
   // popupTimerReading.
-  $: figure = kind === 'timer' ? popupTimerReading(left) : alarmReading(alarmTime, hour12);
+  $: figure = kind === 'alarm' ? alarmReading(alarmTime, hour12) : popupTimerReading(left);
   $: alarmRinging = kind === 'alarm' && isRinging({ now, time: alarmTime, enabled: true, device });
-  $: ringing = kind === 'timer' ? phase === 'ringing' : alarmRinging;
+  $: ringing = kind === 'alarm' ? alarmRinging : phase === 'ringing';
 
   // Kept open after its own Stop, ready to start again -- see clockPopups.js.
   let kept = readKept();
@@ -54,17 +72,12 @@
   // Nothing left to show: the timer was stopped or reset in the app, or the
   // alarm was answered. The main window would close it on its next look too;
   // closing here makes it immediate. A kept pop-up stays.
-  $: finished = kind === 'timer' ? idle && !kept : !alarmRinging;
+  $: finished = kind === 'timer' ? idle && !kept : kind === 'goal' ? goalSeen && !goal : !alarmRinging;
   $: if (finished && win) closeWindow();
 
   function readKept() {
     try { return localStorage.getItem(KEEP_KEY_PREFIX + label) !== null; } catch { return false; }
   }
-
-  // It rings for itself, so it is heard with Austavia minimised. The main
-  // window stays quiet for anything a pop-up is ringing.
-  const ringer = createRinger();
-  $: ringer.set(ringing);
 
   function readTheme() {
     try {
@@ -77,13 +90,30 @@
   function onStorage(event) {
     if (event.key === THEME_KEY) theme = readTheme();
     if (event.key === KEEP_KEY_PREFIX + label) kept = readKept();
+    if (event.key === GOALS_KEY) {
+      goal = readGoal();
+      if (goal) goalSeen = true;
+    }
   }
 
   function change(fn) {
     setClockDevice(blockId, { ...device, timer: fn(device.timer, Date.now()) });
   }
 
+  // A habit's or objective's button, for the main window to carry out.
+  function sendGoal(action) {
+    try { localStorage.setItem(GOAL_ACTION_KEY, JSON.stringify({ key: goalKey, action, at: Date.now() })); } catch { /* not sent */ }
+  }
+
   function togglePause() {
+    if (kind === 'goal') {
+      // Paused from here, it stays, ready to resume -- as a timer stopped here does.
+      if (phase === 'running') {
+        try { localStorage.setItem(KEEP_KEY_PREFIX + label, String(Date.now())); } catch { /* closes instead */ }
+      }
+      sendGoal('toggle');
+      return;
+    }
     if (kind !== 'timer') return;
     if (phase === 'running') change(pauseTimer);
     else if (phase === 'paused' || idle) change(idle ? (timer, at) => startTimer(resetTimer(timer), at) : startTimer);
@@ -92,6 +122,10 @@
   // Stop sets the timer back to its length and keeps the pop-up, so the same
   // timer can be started again from here. Asked for once it had been tried.
   function stop() {
+    if (kind === 'goal') {
+      sendGoal('stop');
+      return;
+    }
     if (kind === 'timer') {
       try { localStorage.setItem(KEEP_KEY_PREFIX + label, String(Date.now())); } catch { /* closes instead */ }
       kept = true;
@@ -106,8 +140,18 @@
   }
 
   // Hidden, not stopped. It stays hidden for this run and comes back when
-  // time is up -- see popupsWanted.
+  // time is up -- see popupsWanted. While it rings, the × stops the ring and
+  // closes: "a sound that continues till it's put close" (2026-11-10).
   function hide() {
+    if (ringing) {
+      try { localStorage.removeItem(KEEP_KEY_PREFIX + label); } catch { /* closes anyway */ }
+      kept = false;
+      if (kind === 'timer') change(resetTimer);
+      else if (kind === 'goal') sendGoal('stop');
+      else setClockDevice(blockId, dismissed(device, Date.now()));
+      closeWindow();
+      return;
+    }
     try {
       localStorage.setItem(HIDDEN_KEY_PREFIX + label, String(Date.now()));
       localStorage.removeItem(KEEP_KEY_PREFIX + label);
@@ -170,7 +214,6 @@
 
   onDestroy(() => {
     clearInterval(tick);
-    ringer.destroy();
     stopMoved?.();
     window.removeEventListener('storage', onStorage);
     window.removeEventListener('keydown', onKey, true);
@@ -187,7 +230,7 @@
   style="--pp-bg: {theme.bg || 'rgba(12, 12, 14, 0.9)'}; --pp-text: {theme.text || '#ffffff'}; --pp-accent: {theme.accent || theme.text || '#ffffff'}; --pp-border: {theme.border || 'rgba(255, 255, 255, 0.25)'};"
   on:dblclick={openApp}
   role="timer"
-  aria-label={kind === 'timer' ? 'Timer' : 'Alarm'}
+  aria-label={kind === 'alarm' ? 'Alarm' : kind === 'goal' ? (goal?.title || 'Objective') : 'Timer'}
 >
   <div class="top" data-tauri-drag-region>
     <!-- The line stays even when it says nothing: it is where the pop-up is
@@ -197,11 +240,14 @@
     <span class="what" data-tauri-drag-region>
       {#if kind === 'timer'}
         {#if ringing}Time's up{:else if idle}Timer · {popupTimerReading(device.timer?.duration || 0)}{/if}
+      {:else if kind === 'goal'}
+        <!-- A habit or objective is named, since several can run at once. -->
+        {goal?.title || 'Objective'}{#if ringing} · Time's up{/if}
       {:else}
         Alarm · {alarmReading(alarmTime, hour12)}
       {/if}
     </span>
-    <button class="hide" title={idle ? 'Close' : 'Hide (the timer keeps going)'} aria-label={idle ? 'Close' : 'Hide'} on:click={hide}>×</button>
+    <button class="hide" title={ringing ? 'Stop and close' : idle ? 'Close' : kind === 'goal' ? 'Hide (it keeps going)' : 'Hide (the timer keeps going)'} aria-label={ringing ? 'Stop and close' : idle ? 'Close' : 'Hide'} on:click={hide}>×</button>
   </div>
 
   <!-- The time and what to do about it on one row, and how much is left as a
@@ -234,6 +280,19 @@
             <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         {/if}
+      {:else if kind === 'goal'}
+        <!-- A habit or objective: pause and resume, and Stop once it rings.
+             No +1 -- on an objective that would log a minute done, not add
+             one, the opposite of the timer's. -->
+        {#if ringing}
+          <button class="primary icon" title="Stop" aria-label="Stop" on:click={stop}>
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.35-5.65M4 4v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        {:else}
+          <button class="primary icon" title={phase === 'paused' ? 'Resume' : 'Pause'} aria-label={phase === 'paused' ? 'Resume' : 'Pause'} on:click={togglePause}>
+            <PlayerIcon name={phase === 'paused' ? 'play' : 'pause'} size={13} />
+          </button>
+        {/if}
       {:else}
         <button on:click={snooze}>Snooze</button>
         <button class="primary" on:click={stop}>Stop</button>
@@ -241,7 +300,7 @@
     </div>
   </div>
 
-  {#if kind === 'timer'}
+  {#if kind !== 'alarm'}
     <div class="bar" aria-hidden="true"><span style="width: {fraction * 100}%"></span></div>
   {/if}
 </div>

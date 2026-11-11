@@ -63,10 +63,14 @@ function eachGoalTask(blocks, habits, now) {
 /**
  * The time objectives worth a notification: running ones, with when they
  * finish, and finished ones still ringing here. In the timer's entry shape --
- * `{ blockId, phase, left, endsAt, title, ringKey }` -- with `blockId` the
- * objective's key.
+ * `{ blockId, phase, left, endsAt, title, ringKey, duration }` -- with
+ * `blockId` the objective's key and `duration` its whole target.
+ *
+ * `keepPaused(key)` says which paused ones to list as well: the desktop
+ * pop-up keeps one paused from it, as it keeps a clock timer stopped from it
+ * (utils/clockPopups.js). The notification lists none.
  */
-export function goalTimers({ blocks = [], habits = [], now = Date.now(), answered = {} } = {}) {
+export function goalTimers({ blocks = [], habits = [], now = Date.now(), answered = {}, keepPaused = () => false } = {}) {
   const entries = [];
   const ringing = new Map(
     goalRings({ blocks, habits, now, answered })
@@ -78,13 +82,18 @@ export function goalTimers({ blocks = [], habits = [], now = Date.now(), answere
     if (!goal || goal.kind !== 'time') continue;
     const ring = ringing.get(task.id);
     if (ring) {
-      entries.push({ blockId: goalKey(owner, task.id), phase: 'ringing', left: 0, endsAt: 0, title: nameOf(task), ringKey: ring.key });
+      entries.push({ blockId: goalKey(owner, task.id), phase: 'ringing', left: 0, endsAt: 0, title: nameOf(task), ringKey: ring.key, duration: 0 });
       continue;
     }
     const state = goalNow(goal, now);
-    if (!state?.running || state.reached) continue;
+    if (!state || state.reached) continue;
+    const key = goalKey(owner, task.id);
+    if (!state.running) {
+      if (keepPaused(key)) entries.push({ blockId: key, phase: 'paused', left: Math.max(0, state.target - state.value), endsAt: 0, title: nameOf(task), duration: state.target });
+      continue;
+    }
     const endsAt = goalFinishMoment(goal) ?? 0;
-    entries.push({ blockId: goalKey(owner, task.id), phase: 'running', left: Math.max(0, endsAt - now), endsAt, title: nameOf(task) });
+    entries.push({ blockId: key, phase: 'running', left: Math.max(0, endsAt - now), endsAt, title: nameOf(task), duration: state.target });
   }
   return entries;
 }

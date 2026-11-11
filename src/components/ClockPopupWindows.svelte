@@ -1,15 +1,18 @@
 <script>
   /**
    * Opens and closes the always-on-top pop-ups for the open folder's clock
-   * blocks, in the desktop apps (Windows and Linux). Which ones should exist, and where, is
+   * blocks and its running timed habits and objectives, in the desktop apps
+   * (Windows and Linux). Which ones should exist, and where, is
    * decided in utils/clockPopups.js; this looks once a second and makes the
    * windows match -- afresh each time, so one that failed to open is opened on
    * the next look and one left over is closed.
    *
-   * Renders nothing. `open` is the labels it has open, for the main window's
-   * ringer to stay quiet about.
+   * Renders nothing. A button pressed on a habit's or objective's pop-up
+   * comes out as `goalAction`, the event the phone's notification sends.
    */
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
+  import { goalTimers, parseGoalKey } from '../utils/goalNotices.js';
+  import { readAnswered } from '../utils/taskGoalRings.js';
   import { logSync } from '../utils/syncLog.js';
   import { clockDevices, peekClockDevice } from '../utils/clockDeviceStore.js';
   import {
@@ -17,6 +20,9 @@
     hiddenToForget,
     keptToForget,
     popupPosition,
+    goalPopupLabel,
+    GOALS_KEY,
+    GOAL_ACTION_KEY,
     POPUP_WIDTH,
     POPUP_HEIGHT,
     HIDDEN_KEY_PREFIX,
@@ -25,7 +31,10 @@
   } from '../utils/clockPopups.js';
 
   export let blocks = [];
-  export let open = new Set();
+  /** The folder's habits: one with a time running gets a pop-up too. */
+  export let habits = [];
+
+  const dispatch = createEventDispatcher();
 
   const LABEL_PREFIX = 'clock-popup-';
   let api = null;
@@ -99,16 +108,29 @@
         if (block?.type === 'clock') devices[block.id] = peekClockDevice(block.id, $clockDevices);
       }
 
+      // Kept open after the pop-up's own Stop or pause -- until its × or the
+      // clock or objective goes.
+      const kept = readMarks(KEEP_KEY_PREFIX);
+
+      // Timed habits and objectives: running, ringing, or paused from their
+      // own pop-up. Written down for their pop-ups, which cannot see the folder.
+      const goals = goalTimers({
+        blocks,
+        habits,
+        now,
+        answered: readAnswered(localStorage),
+        keepPaused: key => kept.has(goalPopupLabel(key))
+      });
+      publishGoals(goals);
+
       // A hide lasts one run -- see hiddenToForget.
       const hidden = readMarks(HIDDEN_KEY_PREFIX);
-      for (const label of hiddenToForget({ blocks, devices, now, hidden })) {
+      for (const label of hiddenToForget({ blocks, devices, goals, now, hidden })) {
         try { localStorage.removeItem(HIDDEN_KEY_PREFIX + label); } catch { /* next time */ }
         hidden.delete(label);
       }
 
-      // Kept open after the pop-up's own Stop -- until its × or the clock goes.
-      const kept = readMarks(KEEP_KEY_PREFIX);
-      for (const label of keptToForget({ blocks, kept })) {
+      for (const label of keptToForget({ blocks, goals, kept })) {
         try { localStorage.removeItem(KEEP_KEY_PREFIX + label); } catch { /* next time */ }
         kept.delete(label);
       }
@@ -116,7 +138,7 @@
       // Looked at afresh each second as well as on focus and blur, so a
       // missed event costs a second at most.
       const appInFront = await appHasFocus();
-      const wanted = popupsWanted({ blocks, devices, now, hidden, kept, appInFront });
+      const wanted = popupsWanted({ blocks, devices, goals, now, hidden, kept, appInFront });
       note(`app ${appInFront ? 'in front' : 'behind'}; pop-ups wanted: ${wanted.map(p => p.kind).join(', ') || 'none'}`);
       const wantedLabels = new Set(wanted.map(popup => popup.label));
 
@@ -138,7 +160,7 @@
         const { x, y } = popupPosition({ workArea: area, index, saved });
         const query = new URLSearchParams({
           popup: 'clock',
-          block: popup.blockId,
+          ...(popup.kind === 'goal' ? { goal: popup.goalKey } : { block: popup.blockId }),
           kind: popup.kind,
           label: popup.label,
           ...(popup.kind === 'alarm' ? { time: popup.time, hour12: popup.hour12 ? '1' : '0' } : {})
@@ -146,7 +168,7 @@
         try {
           const created = new api.WebviewWindow(popup.label, {
             url: `index.html?${query}`,
-            title: popup.kind === 'alarm' ? 'Alarm' : 'Timer',
+            title: popup.kind === 'alarm' ? 'Alarm' : popup.kind === 'goal' ? 'Objective' : 'Timer',
             width: POPUP_WIDTH,
             height: POPUP_HEIGHT,
             x,
@@ -168,6 +190,11 @@
           });
           created.once?.('tauri://created', async () => {
             let size = '';
+            // And asked again once it exists, for a window system that took
+            // no notice of the size it was made with.
+            if (onLinux) {
+              try { await created.setSize(new api.LogicalSize(POPUP_WIDTH, POPUP_HEIGHT)); } catch { /* the log says what it got */ }
+            }
             try {
               const inner = await created.innerSize();
               const scale = await created.scaleFactor();
@@ -183,7 +210,6 @@
         index += 1;
       }
 
-      open = wantedLabels;
     } catch (error) {
       console.warn('Timer pop-ups:', error);
     } finally {
@@ -195,11 +221,12 @@
     const isDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
     if (!isDesktop) return;
     try {
-      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor, getCurrentWindow }] = await Promise.all([
+      const [{ WebviewWindow, getAllWebviewWindows }, { primaryMonitor, getCurrentWindow, LogicalSize }] = await Promise.all([
         import('@tauri-apps/api/webviewWindow'),
         import('@tauri-apps/api/window')
       ]);
-      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor, currentWindow: getCurrentWindow() };
+      api = { WebviewWindow, getAllWebviewWindows, primaryMonitor, LogicalSize, currentWindow: getCurrentWindow() };
+      window.addEventListener('storage', onGoalAction);
       // The window system says when the app goes behind or comes back, so a
       // pop-up opens at once rather than waiting for the page to notice.
       try {
@@ -216,9 +243,41 @@
 
   // A change to a timer or alarm is looked at straight away rather than on
   // the next second, so a pop-up opens as Start is pressed.
-  $: if (api) { $clockDevices; blocks; reconcile(); }
+  $: if (api) { $clockDevices; blocks; habits; reconcile(); }
+
+  // What each habit's or objective's pop-up shows, written only when it
+  // changes: a running one carries when it ends, not the time left, so it is
+  // not rewritten every second.
+  let lastGoals = '';
+  function publishGoals(goals) {
+    const shown = Object.fromEntries(goals.map(goal => [goal.blockId, {
+      phase: goal.phase,
+      endsAt: goal.endsAt,
+      left: goal.phase === 'paused' ? goal.left : 0,
+      duration: goal.duration,
+      title: goal.title,
+      ringKey: goal.ringKey || null
+    }]));
+    const text = JSON.stringify(shown);
+    if (text === lastGoals) return;
+    lastGoals = text;
+    try { localStorage.setItem(GOALS_KEY, text); } catch { /* the pop-up shows what it last had */ }
+  }
+
+  // A button pressed on a habit's or objective's pop-up.
+  function onGoalAction(event) {
+    if (event.key !== GOAL_ACTION_KEY || !event.newValue) return;
+    let pressed = null;
+    try { pressed = JSON.parse(event.newValue); } catch { return; }
+    const goal = parseGoalKey(pressed?.key);
+    if (!goal || !pressed.action) return;
+    let ringKey = null;
+    try { ringKey = JSON.parse(localStorage.getItem(GOALS_KEY) || '{}')[pressed.key]?.ringKey || null; } catch { /* not ringing */ }
+    dispatch('goalAction', { ...goal, action: pressed.action, ringKey });
+  }
 
   onDestroy(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('storage', onGoalAction);
     clearInterval(tick);
     stopFocusWatch?.();
     window.removeEventListener('focus', reconcile);

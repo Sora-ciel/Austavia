@@ -3057,7 +3057,6 @@
   // The pop-up windows for timers and alarms are separate pages, so they are
   // handed the theme's dialog colours through local storage, which they share
   // with this window -- see utils/clockPopups.js.
-  let popupLabelsOpen = new Set();
   $: sharePopupTheme(themeExtras.popupBg || rightTheme.panelBg, rightTheme.textColor, leftTheme.buttonText, rightTheme.borderColor);
   function sharePopupTheme(bg, text, accent, border) {
     try {
@@ -8507,10 +8506,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
 <!-- Rings the open folder's alarms in every mode, not only where the clock is
      drawn. -->
-<AlarmRinger {blocks} {habits} themeStyle={overlayThemeStyle} quiet={popupLabelsOpen} />
+<AlarmRinger {blocks} {habits} themeStyle={overlayThemeStyle} />
 <!-- The always-on-top timer and alarm windows, in the desktop apps --
      see utils/clockPopups.js. -->
-<ClockPopupWindows {blocks} bind:open={popupLabelsOpen} />
+<ClockPopupWindows {blocks} {habits} on:goalAction={handleGoalAction} />
 
 {#if exportDialogOpen}
   <ExportDialog
