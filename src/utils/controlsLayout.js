@@ -43,7 +43,9 @@ export const STATUS_BAR = ['shown', 'hidden'];
  * opens it.
  */
 export const MODE_GESTURES = ['strip', 'sheet'];
-export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'rail', order: [], hidden: [], statusBar: 'shown', modeGesture: 'strip' });
+// The defaults, chosen 2026-11-10 for the release: the slide up on a phone,
+// and on a computer the column hidden until the pointer reaches the edge.
+export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'auto', order: [], hidden: [], statusBar: 'shown', modeGesture: 'sheet' });
 
 const strings = list => (Array.isArray(list) ? list.filter(item => typeof item === 'string' && item) : []);
 

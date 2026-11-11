@@ -3042,6 +3042,9 @@
     ` --controls-text: ${leftTheme.textColor};` +
     ` --controls-button-text: ${leftTheme.buttonText};` +
     ` --controls-button-bg: ${leftTheme.buttonBg};` +
+    // The bar's colour with its see-through taken off: for what is drawn over
+    // the content rather than beside it (the column that hides).
+    ` --controls-bg-solid: ${solidColor(leftTheme.panelBg, '#111111')};` +
     // What the mini player darkens its cover art with, and sits on without
     // one. The toolbar's own colour unless the theme names one -- a
     // see-through theme's toolbar is clear, which left the cover bare behind
@@ -7348,6 +7351,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 .app.rail-auto .mode-rail {
   z-index: 960;
+  /* Over the content while it is out, so solid -- the theme's bar colour
+     without its see-through (asked 2026-11-10); the column that stays is
+     beside the content and keeps the theme as it is. */
+  background: var(--controls-bg-solid, var(--controls-bg, #111));
   transform: translateX(-100%);
   transition: transform 0.18s ease;
 }

@@ -93,6 +93,6 @@ test('a finger going up from the bar opens the sheet, across the strip', () => {
   assert.equal(gestureStart(-40, -6), 'across');
   assert.equal(gestureStart(2, 40), null, 'down is nothing');
   assert.equal(normalizeLayout({ modeGesture: 'sheet' }).modeGesture, 'sheet');
-  assert.equal(normalizeLayout({ modeGesture: 'wiggle' }).modeGesture, 'strip');
+  assert.equal(normalizeLayout({ modeGesture: 'wiggle' }).modeGesture, 'sheet', 'the default, the slide up');
   assert.equal(normalizeLayout({ computer: 'auto' }).computer, 'auto', 'the column that hides is a choice');
 });
