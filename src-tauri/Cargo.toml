@@ -30,3 +30,8 @@ tauri-plugin-log = "2"
 # windows. See run() in src/lib.rs.
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 tauri-plugin-single-instance = "2"
+
+# The timer pop-up's input shape on Linux: only its card takes the pointer
+# (src/popup_input.rs). The same GTK the window library is built on.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"

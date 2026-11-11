@@ -86,3 +86,18 @@ test('on Linux the pop-up\'s card still sits in the bottom-right corner, where i
   assert.equal(linux.y + size.height, plain.y + POPUP_HEIGHT);
   assert.equal(plain.y + POPUP_HEIGHT, workArea.height - POPUP_MARGIN);
 });
+
+import { beepWav } from '../src/utils/ringTone.js';
+
+test('the ring is one second of sound that repeats by itself, two beeps a second', () => {
+  const rate = 22050;
+  const wav = beepWav(rate);
+  const view = new DataView(wav.buffer);
+  const samples = view.getUint32(40, true) / 2;
+  assert.equal(samples, rate, 'exactly one second, so a loop keeps the rhythm without a timer');
+  const at = seconds => Math.abs(view.getInt16(44 + Math.round(seconds * rate) * 2, true));
+  const loudest = (from, to) => { let m = 0; for (let t = from; t < to; t += 1 / rate) m = Math.max(m, at(t)); return m; };
+  assert.ok(loudest(0, 0.1) > 1000, 'a first beep');
+  assert.ok(loudest(0.22, 0.32) > 1000, 'a second beep');
+  assert.ok(loudest(0.5, 0.99) === 0, 'then quiet until it starts again');
+});

@@ -1,6 +1,7 @@
 mod audio_server;
 mod external_links;
 mod local_http;
+mod popup_input;
 mod sign_in_window;
 mod temp_blobs;
 
@@ -120,7 +121,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       sign_in_window::open_sign_in_window,
       audio_server::serve_audio,
-      external_links::open_in_browser
+      external_links::open_in_browser,
+      popup_input::set_popup_input_area
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

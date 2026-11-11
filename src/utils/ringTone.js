@@ -69,7 +69,9 @@ function primeOnFirstTouch() {
  * is what is tried when that is refused.
  */
 export function beepWav(sampleRate = 22050) {
-  const length = Math.round(sampleRate * 0.42);
+  // A whole second, the rest silent, so played on a loop it is two beeps a
+  // second, as the ring always was.
+  const length = sampleRate;
   const data = new Int16Array(length);
   for (const offset of [0, 0.22]) {
     const from = Math.round(offset * sampleRate);
@@ -115,32 +117,53 @@ function report(how) {
 }
 
 export function createRinger() {
-  let beeper = null;
+  // While ringing: the looping <audio>, or the timer that beeps through Web
+  // Audio when that was refused, and the one that buzzes a phone.
+  let ringing = false;
+  let loop = null;
+  let synthTimer = null;
+  let buzzTimer = null;
+
   primeOnFirstTouch();
 
-  function beep() {
-    let element = null;
-    try {
-      element = new Audio(beepUrl());
-    } catch {
-      element = null;
-    }
-    if (!element) {
-      synthBeep();
-    } else {
-      element.play().then(
-        () => report('rang through an audio element'),
-        error => {
-          report(`the audio element was refused (${error?.name || error}); rang through Web Audio`);
-          synthBeep();
-        }
-      );
-    }
+  function vibrate() {
     try {
       navigator.vibrate?.([180, 60, 180]);
     } catch {
       // Not a device that vibrates.
     }
+  }
+
+  // The ring as one sound file that repeats by itself. It used to be a beep
+  // started once a second by a timer, and a window behind others has its
+  // timers slowed: the beeps spread out after a few seconds (Linux,
+  // 2026-11-10). A looping <audio> keeps its own time.
+  function startSound() {
+    let element = null;
+    try {
+      element = new Audio(beepUrl());
+      element.loop = true;
+    } catch {
+      element = null;
+    }
+    if (!element) return startSynth();
+    loop = element;
+    element.play().then(
+      () => {
+        report('rang through an audio element');
+        if (!ringing || loop !== element) element.pause();
+      },
+      error => {
+        report(`the audio element was refused (${error?.name || error}); rang through Web Audio`);
+        if (loop === element) loop = null;
+        if (ringing) startSynth();
+      }
+    );
+  }
+
+  function startSynth() {
+    synthBeep();
+    synthTimer = setInterval(synthBeep, 1000);
   }
 
   function synthBeep() {
@@ -171,16 +194,27 @@ export function createRinger() {
      * utils/taskGoalRings.js), where somebody is already looking.
      */
     chime() {
-      beep();
+      let element = null;
+      try { element = new Audio(beepUrl()); } catch { element = null; }
+      if (element) element.play().catch(() => synthBeep());
+      else synthBeep();
+      vibrate();
     },
     /** Start or stop ringing. Safe to call with the same value repeatedly. */
     set(on) {
-      if (on && !beeper) {
-        beep();
-        beeper = setInterval(beep, 1000);
-      } else if (!on && beeper) {
-        clearInterval(beeper);
-        beeper = null;
+      if (on && !ringing) {
+        ringing = true;
+        startSound();
+        vibrate();
+        if (typeof navigator !== 'undefined' && navigator.vibrate) buzzTimer = setInterval(vibrate, 1000);
+      } else if (!on && ringing) {
+        ringing = false;
+        try { loop?.pause(); } catch { /* already stopped */ }
+        loop = null;
+        clearInterval(synthTimer);
+        clearInterval(buzzTimer);
+        synthTimer = null;
+        buzzTimer = null;
         try { navigator.vibrate?.(0); } catch { /* nothing to stop */ }
       }
     },

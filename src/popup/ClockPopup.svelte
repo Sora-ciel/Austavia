@@ -197,25 +197,21 @@
   let stopMoved = null;
 
   // The see-through part of a Linux window must not catch clicks meant for
-  // what is behind it. A window takes the pointer or does not, as a whole;
-  // so it is told to let it through except while the pointer is over the
-  // card, which is looked at ten times a second from where the pointer is on
-  // the screen -- a window that lets the pointer through hears nothing of it.
-  let throughTimer = null;
-  let lettingThrough = null;
-  async function followPointer(cursorPosition) {
-    if (!win || !cardRef) return;
+  // what is behind it: the window is told that only the card takes the
+  // pointer (src-tauri/src/popup_input.rs). Telling it to ignore the pointer
+  // everywhere but over the card left the card deaf to clicks (2026-11-10).
+  async function takePointerOnCardOnly() {
+    if (!cardRef) return;
     try {
-      const [pointer, place, scale] = await Promise.all([cursorPosition(), win.outerPosition(), win.scaleFactor()]);
+      const { invoke } = await import('@tauri-apps/api/core');
       const rect = cardRef.getBoundingClientRect();
-      const x = (pointer.x - place.x) / scale;
-      const y = (pointer.y - place.y) / scale;
-      const overCard = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-      if (lettingThrough !== !overCard) {
-        lettingThrough = !overCard;
-        await win.setIgnoreCursorEvents(lettingThrough);
-      }
-    } catch { /* stays as it was */ }
+      await invoke('set_popup_input_area', {
+        x: Math.floor(rect.left),
+        y: Math.floor(rect.top),
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height)
+      });
+    } catch { /* the whole window takes the pointer, as before */ }
   }
 
   onMount(async () => {
@@ -225,11 +221,13 @@
     window.addEventListener('keyup', onKey, true);
 
     try {
-      const { getCurrentWindow, cursorPosition } = await import('@tauri-apps/api/window');
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
       win = getCurrentWindow();
       if (framed) {
-        followPointer(cursorPosition);
-        throughTimer = setInterval(() => followPointer(cursorPosition), 100);
+        takePointerOnCardOnly();
+        // Again once the window is surely on the screen: a shape given to a
+        // window before it is shown can be dropped when it is.
+        setTimeout(takePointerOnCardOnly, 300);
       }
       // Where it was dragged to, so the next one opens there.
       stopMoved = await win.onMoved(async ({ payload }) => {
@@ -245,7 +243,6 @@
 
   onDestroy(() => {
     clearInterval(tick);
-    clearInterval(throughTimer);
     stopMoved?.();
     window.removeEventListener('storage', onStorage);
     window.removeEventListener('keydown', onKey, true);
