@@ -750,9 +750,25 @@
     padding-left: var(--sb-balance, 0px);
   }
 
-  /* The scrollbar fades while nobody is scrolling (idleScrollbar). */
+  /* The scrollbar fades while nobody is scrolling (idleScrollbar), and is a
+     third of the app's usual width (asked 2026-11-11, "around half or third
+     width"); the page is balanced by what it measures, so it stays centred. */
   .page-mode:global(.sb-idle) {
     --sb-thumb: transparent;
+  }
+  /* The standard properties app.css sets on everything make Chrome, and the
+     Android app's web view, ignore the width below; off here, it takes. The
+     colours below are the same theme variables, so the fading still works. */
+  .page-mode {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .page-mode::-webkit-scrollbar {
+    width: 4px;
+  }
+  .page-mode::-webkit-scrollbar-thumb {
+    border: none;
+    border-radius: 2px;
   }
 
   .page-mode.dragging {
@@ -768,7 +784,9 @@
     z-index: 1;
     max-width: 100%;
     margin: 0 auto;
-    padding: 14px max(40px, 3vw) 0;
+    /* About half what it was (asked 2026-11-11, "use less margin on each side
+       ... halve it"), and no less than the handle beside a block needs. */
+    padding: 14px max(26px, 1.5vw) 0;
     box-sizing: border-box;
     min-height: 100%;
     display: flex;
