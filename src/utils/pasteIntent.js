@@ -70,41 +70,47 @@ export function pasteKind({ html = '', text = '', imageCount = 0 } = {}) {
   return 'none';
 }
 
-const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s+/;
-const FENCE = /^\s*(```|~~~)/;
+/**
+ * Plain text as the writing of one block: a paragraph for each run of text
+ * between blank lines, a line break for each single newline.
+ *
+ * Pasting plain text onto the canvas made one block per paragraph -- what it
+ * was first built for. Asked 2026-11-11: "if you aren't focused on a block of
+ * text, it should create only one block of text with all the pasting thing,
+ * not one for each paragraph." So it is one block now, its paragraphs inside.
+ */
+export function plainTextAsHtml(text) {
+  const trimmed = String(text || '').replace(/\r\n?/g, '\n').trim();
+  if (!trimmed) return '';
+  const escape = value => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return trimmed
+    .split(/\n\s*\n/)
+    .map(paragraph => `<p>${paragraph.split('\n').map(escape).join('<br>')}</p>`)
+    .join('');
+}
 
 /**
- * Plain text cut into the blocks it should become.
+ * Whether a paste is going into writing -- a note, a field -- and is the
+ * editor's to place at the caret, not the canvas's to make blocks of.
  *
- * Pasting plain text onto the canvas makes one block per paragraph, which is
- * what it was for. What it must not do is cut a list or a code block apart:
- * a list whose items are separated by blank lines stays one block, and so does
- * everything between two code fences.
+ * `target` is where the paste landed, which in some engines is a text node
+ * inside the editor rather than the editor itself; asking only that node
+ * whether it could be typed in said no, and a paste meant for the caret in a
+ * block became new blocks beside it (reported 2026-11-11: "when already
+ * inside a canvas block of text, pasting should [not] create other blocks
+ * ... it should only paste in the block of text focused and where your caret
+ * is"). So the element around it is asked, and so is what has the focus.
  */
-export function textChunks(text) {
-  const trimmed = String(text || '').trim();
-  if (!trimmed) return [];
-
-  const pieces = trimmed.split(/\n\s*\n/).map(piece => piece.trim()).filter(Boolean);
-  const chunks = [];
-  let insideFence = false;
-
-  for (const piece of pieces) {
-    const previous = chunks[chunks.length - 1];
-    const firstLine = piece.split('\n')[0];
-    const continuesList =
-      previous !== undefined && LIST_ITEM.test(firstLine) && LIST_ITEM.test(previous.split('\n').pop());
-
-    if (previous !== undefined && (insideFence || continuesList)) {
-      chunks[chunks.length - 1] = `${previous}\n\n${piece}`;
-    } else {
-      chunks.push(piece);
-    }
-
-    // An odd number of fence lines in this piece opens or closes a code block.
-    const fences = piece.split('\n').filter(line => FENCE.test(line)).length;
-    if (fences % 2 === 1) insideFence = !insideFence;
-  }
-
-  return chunks;
+export function pasteIsForWriting(target, active = null) {
+  const element = target && target.nodeType === 3 ? target.parentElement : target;
+  const writable = node => Boolean(node && (
+    node.tagName === 'INPUT'
+    || node.tagName === 'TEXTAREA'
+    || node.isContentEditable
+    || node.closest?.('input, textarea, [contenteditable="true"], [contenteditable=""]')
+  ));
+  return writable(element) || writable(active);
 }

@@ -151,7 +151,7 @@
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
   import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, screenScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
-  import { pasteKind, textChunks } from './utils/pasteIntent.js';
+  import { pasteKind, plainTextAsHtml, pasteIsForWriting } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
   import { wallpaperPaint, wallpaperRect, isWallpaperLayer, wallpaperSettingsFor, WALLPAPER_LAYER_CLASSES, freshCopyUrl } from './utils/screenshotWallpaper.js';
   import { JOURNAL_KEY, journalEntry, appendLaunch } from './utils/storageJournal.js';
@@ -4980,9 +4980,11 @@
   }
 
   async function handlePaste(event) {
-    // Don't intercept paste inside text fields
-    const t = event.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    // Already placed by an editor -- this listens on the window, after it.
+    if (event.defaultPrevented) return;
+    // Into writing, the editor places it at the caret: not new blocks
+    // (pasteIsForWriting, utils/pasteIntent.js).
+    if (pasteIsForWriting(event.target, typeof document === 'undefined' ? null : document.activeElement)) return;
 
     // Read now, while the event is live -- a clipboard is emptied once the
     // handler returns.
@@ -5012,9 +5014,10 @@
         const clean = sanitizeRichText(html);
         if (clean.trim()) await addTextBlockFromContent(clean);
       } else {
-        // Plain text still makes one block per paragraph, but never cuts a
-        // list or a code block apart.
-        for (const chunk of textChunks(text)) await addTextBlockFromContent(chunk);
+        // Plain text makes one block, its paragraphs inside it -- not a block
+        // per paragraph (asked 2026-11-11; plainTextAsHtml).
+        const writing = plainTextAsHtml(text);
+        if (writing) await addTextBlockFromContent(writing);
       }
     } catch (error) {
       console.error('Paste failed:', error);

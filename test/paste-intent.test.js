@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pasteKind, textOfHtml, textChunks } from '../src/utils/pasteIntent.js';
+import { pasteKind, textOfHtml, plainTextAsHtml, pasteIsForWriting } from '../src/utils/pasteIntent.js';
 
 describe('pasteKind', () => {
   // Word, Google Docs and Office put a rendered picture of the selection on the
@@ -47,24 +47,30 @@ describe('textOfHtml', () => {
   });
 });
 
-describe('textChunks', () => {
-  it('still makes one block per paragraph of plain text', () => {
-    assert.deepEqual(textChunks('first\n\nsecond'), ['first', 'second']);
+// Asked 2026-11-11: "if you aren't focused on a block of text, it should create
+// only one block of text with all the pasting thing, not one for each
+// paragraph" -- and inside a block, the paste goes at the caret.
+describe('pasting onto the canvas', () => {
+  it('makes one block with all the paragraphs, not a block per paragraph', () => {
+    assert.equal(plainTextAsHtml('first\n\nsecond'), '<p>first</p><p>second</p>');
+    assert.equal(plainTextAsHtml('a line\nthe next'), '<p>a line<br>the next</p>');
   });
 
-  // The one-block-per-item bug: a copied list has blank lines between items.
-  it('keeps a list in one piece, even with blank lines between its items', () => {
-    assert.deepEqual(
-      textChunks('Intro\n\n- apple\n\n- pear\n\n1. one\n\n2. two\n\nAfter'),
-      ['Intro', '- apple\n\n- pear\n\n1. one\n\n2. two', 'After']
-    );
-  });
-
-  it('keeps a code block in one piece', () => {
-    assert.deepEqual(textChunks('```\nline one\n\nline two\n```\n\nafter'), ['```\nline one\n\nline two\n```', 'after']);
+  it('keeps what was pasted as writing, not as markup', () => {
+    assert.equal(plainTextAsHtml('<b>not bold</b> & co'), '<p>&lt;b&gt;not bold&lt;/b&gt; &amp; co</p>');
   });
 
   it('makes nothing of nothing', () => {
-    assert.deepEqual(textChunks('   \n\n  '), []);
+    assert.equal(plainTextAsHtml('   \n\n  '), '');
+  });
+
+  it('inside a block of text, leaves the paste to the editor, at the caret', () => {
+    const editor = { tagName: 'DIV', isContentEditable: true, closest: () => editor };
+    const textNode = { nodeType: 3, parentElement: editor };
+    assert.equal(pasteIsForWriting(textNode), true, 'landing on the text itself');
+    assert.equal(pasteIsForWriting(editor), true);
+    const board = { tagName: 'DIV', isContentEditable: false, closest: () => null };
+    assert.equal(pasteIsForWriting(board, editor), true, 'the editor has the focus');
+    assert.equal(pasteIsForWriting(board, board), false, 'on the board: the canvas makes the block');
   });
 });
