@@ -141,6 +141,18 @@ update. Deleting still works from an old app.
 3. Staging the same way, `--project staging` -- and rehearsed there first: the staging builds from before this commit write
    schema 1 and are refused once staging's rules are deployed.
 
+**Rehearsed on staging, 2026-11-11** (phone b11 → b31..b36, computer on
+staging): an old version is refused and says "too old" at launch (and "sync
+limit" when it saves -- its own wording, see above); downloading still works
+on it. Four faults found and fixed on the way: unsent work waited for the
+next edit after a restart (aheadOfCloud, owedSinceLaunch); opened offline,
+"Syncing with the cloud" never went away (workspaceHeldBySync); a folder
+changed on two devices was overwritten whole by the later stamp -- now both
+are kept, "Notes (from phone, 11 Nov)" (utils/syncConflict.js), confirmed on
+two devices; and a device with nothing recorded yet missed the conflict
+(seenFor). Merging block by block instead of a conflict copy needs each
+block stored on its own: after this release, with pictures by reference.
+
 Still to do before it (2026-11-11): the Linux pop-ups and the device checks
 are done. Left: one look on the phone at a fresh staging APK (it has had none
 of the changes since b12 -- headers, crop, the page dot), and the Windows
