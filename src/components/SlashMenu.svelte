@@ -14,6 +14,7 @@
    */
   import { createEventDispatcher, onMount, tick } from 'svelte';
   import { portal } from '../utils/portal.js';
+  import { menuPlacement, MENU_MAX_HEIGHT } from '../utils/slashMenu.js';
 
   export let items = [];
   export let active = 0;
@@ -37,15 +38,21 @@
   let menuEl;
   let searchEl;
 
-  // Kept on screen: under the caret, or above it when there is no room below.
+  // Kept where it can be seen: under the caret, or above it, inside the part
+  // of the screen a phone's keyboard leaves (menuPlacement in
+  // utils/slashMenu.js), and placed again when the keyboard opens or shuts.
   let left = x;
   let top = y;
+  let maxHeight = MENU_MAX_HEIGHT;
   async function place() {
     await tick();
     if (!menuEl) return;
+    const vv = window.visualViewport;
+    const view = vv
+      ? { top: vv.offsetTop, bottom: vv.offsetTop + vv.height, left: vv.offsetLeft, right: vv.offsetLeft + vv.width }
+      : { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth };
     const box = menuEl.getBoundingClientRect();
-    left = Math.max(8, Math.min(x, window.innerWidth - box.width - 8));
-    top = y + 6 + box.height > window.innerHeight - 8 ? Math.max(8, y - box.height - 28) : y + 6;
+    ({ left, top, maxHeight } = menuPlacement({ x, y, width: box.width, height: menuEl.scrollHeight, view }));
   }
   $: x, y, items.length, place();
 
@@ -61,6 +68,13 @@
 
   onMount(() => {
     if (search) searchEl?.focus();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', place);
+    vv?.addEventListener('scroll', place);
+    return () => {
+      vv?.removeEventListener('resize', place);
+      vv?.removeEventListener('scroll', place);
+    };
   });
 </script>
 
@@ -70,7 +84,7 @@
   aria-label="Blocks"
   bind:this={menuEl}
   use:portal
-  style="{themeStyle} left:{left}px; top:{top}px;"
+  style="{themeStyle} left:{left}px; top:{top}px; max-height:{maxHeight}px;"
 >
   {#if search}
     <input
@@ -110,7 +124,7 @@
     position: fixed;
     z-index: 1000;
     width: 260px;
-    max-height: min(340px, 60vh);
+    max-height: 340px;
     overflow-y: auto;
     padding: 6px;
     box-sizing: border-box;

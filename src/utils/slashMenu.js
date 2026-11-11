@@ -71,3 +71,31 @@ export function slashSplit({ beforeEmpty, afterEmpty }) {
   if (beforeEmpty) return 'above';
   return 'split';
 }
+
+/** The tallest the menu is drawn, as in its style (min(340px, 60vh)). */
+export const MENU_MAX_HEIGHT = 340;
+
+/**
+ * Where the menu goes: under the caret at (x, y), or above it when there is
+ * no room below, always inside `view` -- the part of the screen that can be
+ * seen -- and no taller than the room there is.
+ *
+ * `view` is the visible part, not the window: on a phone the keyboard covers
+ * the bottom of the window without making it any shorter, and the menu went
+ * behind the keyboard, out of reach (reported 2026-11-11: "it stays behind
+ * the keyboard making it impossible to choose"). The call site reads it from
+ * window.visualViewport.
+ */
+export function menuPlacement({ x = 0, y = 0, width = 0, height = 0, view, gap = 6, caretHeight = 22, margin = 8 }) {
+  const area = view || { top: 0, bottom: 0, left: 0, right: 0 };
+  const left = Math.max(area.left + margin, Math.min(x, area.right - width - margin));
+  const below = area.bottom - margin - (y + gap);
+  const above = (y - caretHeight - gap) - (area.top + margin);
+  const wanted = Math.min(height, MENU_MAX_HEIGHT);
+  if (wanted <= below) return { left, top: y + gap, maxHeight: MENU_MAX_HEIGHT };
+  if (wanted <= above) return { left, top: y - caretHeight - gap - wanted, maxHeight: MENU_MAX_HEIGHT };
+  // Room on neither side for all of it: the bigger side, its list scrolling.
+  if (below >= above) return { left, top: y + gap, maxHeight: Math.max(80, below) };
+  const room = Math.max(80, above);
+  return { left, top: Math.max(area.top + margin, y - caretHeight - gap - room), maxHeight: room };
+}
