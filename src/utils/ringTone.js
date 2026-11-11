@@ -59,6 +59,13 @@ function primeOnFirstTouch() {
 }
 
 /**
+ * How loud the ring is, out of 1. It was 0.3, and not loud enough: "the
+ * alarm isn't loud enough make it louder please" (2026-11-10). 0.9 is three
+ * times that, short of the clipping a full 1 risks.
+ */
+export const RING_LOUDNESS = 0.9;
+
+/**
  * The two beeps as a WAV file: 880Hz, each 0.18s, the second 0.22s after the
  * first, rising in 20ms and dying away -- what the Web Audio version below
  * plays, written out as samples so an ordinary <audio> can play it.
@@ -80,7 +87,7 @@ export function beepWav(sampleRate = 22050) {
       const t = i / sampleRate;
       const rise = Math.min(1, t / 0.02);
       const fall = t < 0.02 ? 1 : Math.exp(-(t - 0.02) / 0.025);
-      data[from + i] = Math.round(Math.sin(2 * Math.PI * 880 * t) * rise * fall * 0.3 * 32767);
+      data[from + i] = Math.round(Math.sin(2 * Math.PI * 880 * t) * rise * fall * RING_LOUDNESS * 32767);
     }
   }
   const bytes = new Uint8Array(44 + data.length * 2);
@@ -177,7 +184,7 @@ export function createRinger() {
         tone.type = 'sine';
         tone.frequency.value = 880;
         gain.gain.setValueAtTime(0.0001, start + offset);
-        gain.gain.exponentialRampToValueAtTime(0.3, start + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(RING_LOUDNESS, start + offset + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.16);
         tone.connect(gain).connect(audio.destination);
         tone.start(start + offset);

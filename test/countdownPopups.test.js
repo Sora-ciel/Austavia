@@ -81,10 +81,18 @@ test('on Linux the pop-up\'s card still sits in the bottom-right corner, where i
   const plain = popupPosition({ workArea, size: popupWindowSize(false) });
   const size = popupWindowSize(true);
   const linux = popupPosition({ workArea, size });
-  // The card is the window's bottom-right corner, so its edges land where the plain window's do.
+  // The card is the window's top-right corner, so its edges land where the plain window's do.
   assert.equal(linux.x + size.width, plain.x + POPUP_WIDTH);
-  assert.equal(linux.y + size.height, plain.y + POPUP_HEIGHT);
+  assert.equal(linux.y, plain.y);
   assert.equal(plain.y + POPUP_HEIGHT, workArea.height - POPUP_MARGIN);
+});
+
+test('on Linux the card can be put right up at the top of the screen', () => {
+  const workArea = { x: 0, y: 0, width: 1920, height: 1040 };
+  const atTop = popupPosition({ workArea, size: popupWindowSize(true), saved: { x: 500, y: 0 } });
+  assert.equal(atTop.y, 0);
+  const atBottom = popupPosition({ workArea, size: popupWindowSize(true), saved: { x: 500, y: 2000 } });
+  assert.equal(atBottom.y, workArea.height - POPUP_HEIGHT, 'and down to the bottom, its see-through part below the screen');
 });
 
 import { beepWav } from '../src/utils/ringTone.js';
@@ -100,4 +108,14 @@ test('the ring is one second of sound that repeats by itself, two beeps a second
   assert.ok(loudest(0, 0.1) > 1000, 'a first beep');
   assert.ok(loudest(0.22, 0.32) > 1000, 'a second beep');
   assert.ok(loudest(0.5, 0.99) === 0, 'then quiet until it starts again');
+});
+
+import { RING_LOUDNESS } from '../src/utils/ringTone.js';
+
+test('the ring is loud -- three times what it was, asked for as not loud enough', () => {
+  assert.ok(RING_LOUDNESS >= 0.9);
+  const view = new DataView(beepWav(22050).buffer);
+  let loudest = 0;
+  for (let i = 44; i < 44 + 22050 * 2; i += 2) loudest = Math.max(loudest, Math.abs(view.getInt16(i, true)));
+  assert.ok(loudest > 0.85 * 32767, 'the beep itself reaches near full strength');
 });

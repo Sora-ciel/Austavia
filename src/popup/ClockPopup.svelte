@@ -33,7 +33,7 @@
   const kind = ['alarm', 'goal'].includes(params.get('kind')) ? params.get('kind') : 'timer';
   const goalKey = params.get('goal') || '';
   // On Linux the window is bigger than the card (LINUX_POPUP_WINDOW in
-  // utils/clockPopups.js): the card is drawn in its bottom-right corner and
+  // utils/clockPopups.js): the card is drawn in its top-right corner and
   // the rest of it lets the pointer through.
   const framed = params.get('framed') === '1';
   let cardRef;
@@ -375,11 +375,12 @@
     overflow: hidden;
   }
 
-  /* In a Linux window bigger than itself: its own size, in the corner. */
+  /* In a Linux window bigger than itself: its own size, in the top corner,
+     so it can be dragged right up to the top of the screen. */
   .card.framed {
     position: fixed;
     right: 0;
-    bottom: 0;
+    top: 0;
     width: var(--card-w);
     height: var(--card-h);
   }

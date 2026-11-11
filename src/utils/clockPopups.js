@@ -78,8 +78,12 @@ export const POPUP_GAP = 10;
  * The smallest window the Linux app can make: asked for 195 by 48, it opened
  * at 200 by 200 every time, whatever it was told afterwards (measured
  * 2026-11-10, Copy diagnostics). So there the window is that size and see-
- * through, the card is drawn at its bottom right at its own size, and the
+ * through, the card is drawn at its top right at its own size, and the
  * rest lets clicks through to what is behind (popup/ClockPopup.svelte).
+ * The top, not the bottom: KDE keeps a window from going above the screen's
+ * top edge, so with the card at the bottom the see-through part above it
+ * stopped the card well short of the top (2026-11-10). Below the screen's
+ * bottom edge a window may go.
  */
 export const LINUX_POPUP_WINDOW = Object.freeze({ width: 200, height: 200 });
 
@@ -241,24 +245,24 @@ export function keptToForget({ blocks = [], goals = [], kept = new Set() } = {})
 export function popupPosition({ workArea, index = 0, saved = null, size = null } = {}) {
   const area = workArea || { x: 0, y: 0, width: 1280, height: 720 };
   // The window, which on Linux is bigger than the card it shows -- the card
-  // sits in its bottom-right corner, so the window's corner is the card's.
+  // sits in its top-right corner, so the window's top and right edges are the
+  // card's, and the see-through rest hangs below it.
   const width = size?.width || POPUP_WIDTH;
-  const height = size?.height || POPUP_HEIGHT;
   const step = (POPUP_HEIGHT + POPUP_GAP) * index;
 
   const base = saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)
     ? { x: saved.x, y: saved.y }
     : {
         x: area.x + area.width - width - POPUP_MARGIN,
-        y: area.y + area.height - height - POPUP_MARGIN
+        y: area.y + area.height - POPUP_HEIGHT - POPUP_MARGIN
       };
 
   const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
   return {
     x: Math.round(clamp(base.x, area.x, area.x + area.width - width)),
-    // A bigger window may reach above the screen's top by its see-through
-    // part; the card itself is what has to stay on the screen.
-    y: Math.round(clamp(base.y - step, area.y - (height - POPUP_HEIGHT), area.y + area.height - height))
+    // The card is what has to stay on the screen; a bigger window's see-
+    // through part may hang below its bottom edge.
+    y: Math.round(clamp(base.y - step, area.y, area.y + area.height - POPUP_HEIGHT))
   };
 }
 
