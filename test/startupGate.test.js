@@ -146,3 +146,17 @@ test('an unknown trigger is treated as a hint, not as proof', () => {
   assert.equal(shouldCheckOnReturn({ trigger: 'pageshow', wasHidden: true }), true);
   assert.equal(shouldCheckOnReturn(), false);
 });
+
+// Reported 2026-11-11: opened with no connection, the app said "Syncing with
+// the cloud" for ever, where it used to let them in to work offline.
+import { workspaceHeldBySync } from '../src/utils/startupGate.js';
+
+test('offline, nothing holds the workspace shut -- not even a sync under way', () => {
+  assert.equal(workspaceHeldBySync({ bootstrapping: true, online: false }), false);
+  assert.equal(workspaceHeldBySync({ gateHolds: true, gating: true, resuming: true, online: false }), false);
+});
+
+test('online, a sync under way still holds it until the cloud copy is here', () => {
+  assert.equal(workspaceHeldBySync({ bootstrapping: true, online: true }), true);
+  assert.equal(workspaceHeldBySync({ online: true }), false);
+});

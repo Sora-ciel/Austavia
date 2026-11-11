@@ -141,3 +141,19 @@ export function shouldCheckOnReturn({ trigger = 'focus', wasHidden = false } = {
   // Everything else is a hint, and only worth acting on if the app was away.
   return Boolean(wasHidden);
 }
+
+/**
+ * Whether the workspace is held shut by the gate above or by a sync under way.
+ *
+ * Never while the device is offline: nothing is coming, and holding it shut
+ * only kept somebody out of their own notes. Reported 2026-11-11 -- opened with
+ * no connection, the app said "Syncing with the cloud" for ever, where it used
+ * to let them in. The gate above already let go offline; the sync at launch
+ * did not, and the safety net that frees a stuck one only released it to be
+ * started again. The launch sync now waits for a connection instead
+ * (App.svelte), and this is what lets the workspace open meanwhile.
+ */
+export function workspaceHeldBySync({ gateHolds = false, bootstrapping = false, gating = false, resuming = false, online = true } = {}) {
+  if (!online) return false;
+  return gateHolds || bootstrapping || gating || resuming;
+}

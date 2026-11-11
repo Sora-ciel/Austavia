@@ -179,7 +179,8 @@
     startupGate,
     releasedWithoutSyncing,
     shouldCheckOnReturn,
-    GATE_TIMEOUT_MS
+    GATE_TIMEOUT_MS,
+    workspaceHeldBySync
   } from './utils/startupGate.js';
   import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload, aheadOfCloud } from './utils/syncOwing.js';
   import {
@@ -1006,11 +1007,13 @@
   // Mounting is what the request was about: pointer-events on a mounted mode
   // still leaves an editor holding a document, and the lock only ever covered
   // the part after Firebase had answered anyway.
-  $: workspaceHeld =
-    workspaceGate.hold
-    || cloudBootstrapInProgress
-    || cloudSyncGateInProgress
-    || resumeCheckInProgress;
+  $: workspaceHeld = workspaceHeldBySync({
+    gateHolds: workspaceGate.hold,
+    bootstrapping: cloudBootstrapInProgress,
+    gating: cloudSyncGateInProgress,
+    resuming: resumeCheckInProgress,
+    online: deviceOnline
+  });
 
   $: gateMessage = cloudBootstrapInProgress || cloudSyncGateInProgress
     ? 'Syncing with the cloud… editing resumes in a moment.'
@@ -7163,7 +7166,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
   $: scheduleDeferredLastSaveAutoDismiss(!!deferredLastSaveName);
 
-  $: if (firebaseReady && authUser && !cloudBootstrapComplete && !cloudBootstrapInProgress) {
+  // Only with a connection: offline it waited on the cloud for ever, was freed
+  // by the stalled-lock pass, and started again at once (2026-11-11). Coming
+  // back online starts it (deviceOnline).
+  $: if (firebaseReady && authUser && deviceOnline && !cloudBootstrapComplete && !cloudBootstrapInProgress) {
     bootstrapCloudSync();
   }
 
