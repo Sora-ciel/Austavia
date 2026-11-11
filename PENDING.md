@@ -107,6 +107,32 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Making money, in order (decided 2026-11-11)
+
+Agreed with Sora after 0.8.67 shipped. Each step before the next:
+
+1. **Polar live, and the money proven to arrive.** The live product, checkout
+   link, portal link, webhook and its two secrets (`POLAR.md` step 9, with the
+   real dashboard); the two public links go in `src/utils/checkout.js`. Then
+   one month bought with a real card and kept until it is in the bank -- the
+   only proof Polar can pay out to a 971 account (Stripe's identity check is
+   the unknown: do it first). Not code, still open: the INPI filing, and the
+   accountant's question in `POLAR.md`. Code worth adding: a daily pass that
+   lists subscriptions from Polar and recomputes, so the two sides cannot
+   disagree in silence (section 6 below, item 2).
+2. **Help for beginners**: an explanation on hover (long press on a phone)
+   for each control; a short "how Austavia works" at first launch; an example
+   folder instead of an empty canvas, which is also what gets screenshotted.
+3. **Quality of life for new people**: in a mode with nothing to show, a
+   button that adds the right block there (Task mode without a task block,
+   Calendar without a calendar). With it, the two that would lose a newcomer:
+   slow typing in long notes on a phone (section 1), pictures by reference
+   (section 2).
+4. **Marketing, mostly by Sora, semi-automated** -- organic posting first,
+   no paid ads until the funnel is measured (memory: launch marketing), built
+   around "aruku", a project of Sora's, with tweaks. What aruku does is still
+   to be said.
+
 ## Releasing 0.8.67 (decided 2026-11-10)
 
 The first full release since 0.8.66. **Older devices are refused, on
