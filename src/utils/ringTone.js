@@ -60,10 +60,10 @@ function primeOnFirstTouch() {
 
 /**
  * How loud the ring is, out of 1. It was 0.3, and not loud enough: "the
- * alarm isn't loud enough make it louder please" (2026-11-10). 0.9 is three
- * times that, short of the clipping a full 1 risks.
+ * alarm isn't loud enough make it louder please" (2026-11-10). 0.9 was
+ * offered, and the answer was "no just put it at 65%".
  */
-export const RING_LOUDNESS = 0.9;
+export const RING_LOUDNESS = 0.65;
 
 /**
  * The two beeps as a WAV file: 880Hz, each 0.18s, the second 0.22s after the

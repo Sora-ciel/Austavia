@@ -112,10 +112,10 @@ test('the ring is one second of sound that repeats by itself, two beeps a second
 
 import { RING_LOUDNESS } from '../src/utils/ringTone.js';
 
-test('the ring is loud -- three times what it was, asked for as not loud enough', () => {
-  assert.ok(RING_LOUDNESS >= 0.9);
+test('the ring is at 65% of full strength -- "no just put it at 65%"', () => {
+  assert.equal(RING_LOUDNESS, 0.65);
   const view = new DataView(beepWav(22050).buffer);
   let loudest = 0;
   for (let i = 44; i < 44 + 22050 * 2; i += 2) loudest = Math.max(loudest, Math.abs(view.getInt16(i, true)));
-  assert.ok(loudest > 0.85 * 32767, 'the beep itself reaches near full strength');
+  assert.ok(loudest > 0.6 * 32767 && loudest <= 0.65 * 32767 + 1, 'the beep itself peaks there');
 });
