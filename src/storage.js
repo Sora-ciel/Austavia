@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { nextStamp } from './utils/stamps.js';
 
 const DB_NAME = 'codex-db';
 const STORE_NAME = 'blocks';
@@ -246,8 +247,8 @@ async function clearSaveFiles(db, saveName) {
   await tx.done;
 }
 
-async function preparePersistedPayload(saveName, payload) {
-  const normalized = asPayloadWithTimestamp(payload, Date.now());
+async function preparePersistedPayload(saveName, payload, now = Date.now()) {
+  const normalized = asPayloadWithTimestamp(payload, now);
   const blocks = (normalized.blocks || []).map(cloneBlock);
   const fileWrites = [];
   const persistedBlocks = blocks.map(block => {
@@ -325,7 +326,17 @@ async function hydratePayload(db, payload) {
 
 export async function saveBlocks(name, blocks) {
   const db = await getDB();
-  const prepared = await preparePersistedPayload(name, blocks);
+  // A payload with no stamp of its own is a change made on this device, and it
+  // is stamped later than the copy it was made from -- never earlier because
+  // this device's clock is behind the one that wrote that copy. A copy that
+  // arrives with its own stamp (a download) keeps it. See utils/stamps.js.
+  let stampAt = Date.now();
+  const carriesStamp = blocks && !Array.isArray(blocks) && (blocks.modifiedAt || blocks.updatedAt);
+  if (!carriesStamp) {
+    const previous = await db.get(STORE_NAME, name);
+    stampAt = nextStamp(previous?.modifiedAt || previous?.updatedAt, stampAt);
+  }
+  const prepared = await preparePersistedPayload(name, blocks, stampAt);
   await clearSaveFiles(db, name);
 
   const tx = db.transaction([STORE_NAME, FILE_STORE_NAME], 'readwrite');

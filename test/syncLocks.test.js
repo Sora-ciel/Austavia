@@ -58,3 +58,16 @@ test('anyHeld reports whether sync is busy at all', () => {
   assert.equal(anyHeld({}), false);
   assert.equal(anyHeld(), false);
 });
+
+// Reported on 2026-11-11: on Windows the phone's changes stopped arriving
+// while Windows's own went on reaching the phone. The background pull had its
+// own "one at a time" flag that no watchdog looked at, so one pull waiting on
+// something that never answered blocked every pull after it. It is a lock
+// like the others now (App.svelte, pullRemoteUpdatesIfNeeded).
+test('a background pull that stops answering is let go of, so downloads carry on', () => {
+  assert.deepEqual(stalledLocks({ pull: agoMs(STALL_LIMIT_MS) }, NOW), ['pull']);
+});
+
+test('a background pull still working through folders is left alone', () => {
+  assert.deepEqual(stalledLocks({ pull: agoMs(5000) }, NOW), []);
+});

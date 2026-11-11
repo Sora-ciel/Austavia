@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -8,7 +9,9 @@ import { join, relative } from 'node:path';
 // draws ⏸ ⏮ ⏭ ⏯ ⏹ as coloured emoji, which no theme can reach; controls use
 // PlayerIcons.svelte, drawn in the writing's colour (CLAUDE.md).
 
-const ROOT = new URL('../src/', import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows .pathname is /E:/..., which
+// readdirSync turns into E:\E:\... and every test here failed there.
+const ROOT = fileURLToPath(new URL('../src/', import.meta.url));
 const files = dir => readdirSync(dir).flatMap(name => {
   const path = join(dir, name);
   return statSync(path).isDirectory() ? files(path) : name.endsWith('.svelte') ? [path] : [];

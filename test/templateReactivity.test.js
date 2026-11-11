@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -15,7 +16,9 @@ import { join, relative } from 'node:path';
 // Nothing about the data was wrong -- the task was saved -- which is why only
 // looking at the screen found it. This keeps the shape out of every component.
 
-const ROOT = new URL('../src/', import.meta.url).pathname;
+// fileURLToPath, not .pathname: on Windows .pathname is /E:/..., which
+// readdirSync turns into E:\E:\... and every test here failed there.
+const ROOT = fileURLToPath(new URL('../src/', import.meta.url));
 
 function svelteFiles(dir) {
   return readdirSync(dir).flatMap((name) => {

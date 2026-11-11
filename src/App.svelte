@@ -2900,7 +2900,19 @@
   // and covers failing — but not an await that never settles, and that is the
   // one that leaves sync stuck until the app is force-stopped. See
   // utils/syncLocks.js.
-  let lockProgress = { upload: null, download: null, bootstrap: null, gate: null };
+  let lockProgress = { upload: null, download: null, bootstrap: null, gate: null, pull: null };
+  // Where a background pull had got to, so that one released for not
+  // answering says what it was waiting on (2026-11-11 -- see the pull below).
+  let pullStep = '';
+  // Which pull is the current one. A pull let go of for not answering may still
+  // answer later; when it does, it must not clear the flag of the pull that
+  // replaced it.
+  let pullGeneration = 0;
+
+  function pullAt(step) {
+    pullStep = step;
+    lockProgressed('pull');
+  }
 
   function takeLock(name) {
     lockProgress = { ...lockProgress, [name]: Date.now() };
@@ -2928,11 +2940,16 @@
       if (name === 'download') downloadInProgress = false;
       if (name === 'bootstrap') cloudBootstrapInProgress = false;
       if (name === 'gate') cloudSyncGateInProgress = false;
+      if (name === 'pull') {
+        pullInFlight = false;
+        pullGeneration += 1;
+      }
       releaseLock(name);
       logSync(
         'error',
         currentSaveName,
-        `sync ${name} stopped responding and was released, so syncing can carry on`
+        `sync ${name} stopped responding and was released, so syncing can carry on`,
+        name === 'pull' ? { waitingOn: pullStep || 'unknown' } : undefined
       );
     }
   }
@@ -5674,17 +5691,33 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // same stale value, all decided the same folder was behind, and all fetched
     // it. Three downloads, three snapshots of the copy being replaced, and
     // three remounts of the workspace, for one change.
+    //
+    // And watched, like every other lock. Reported on 2026-11-11: on Windows
+    // the phone's changes stopped arriving while Windows's own went on
+    // reaching the phone. A pull waiting on something that never answers left
+    // this flag set, and every pull after it -- the subscription's, the
+    // thirty-second tick's, the one on coming back -- returned here without
+    // looking. The watchdog lets go of it after two minutes without progress,
+    // and the sync log says which step it was stuck on.
     if (pullInFlight) return false;
     pullInFlight = true;
+    const generation = ++pullGeneration;
+    takeLock('pull');
+    pullStep = 'starting';
     try {
       return await runPull(options);
     } finally {
-      pullInFlight = false;
+      if (generation === pullGeneration) {
+        pullInFlight = false;
+        releaseLock('pull');
+      }
     }
   }
 
   async function runPull(options = {}) {
+    pullAt('reading the cloud index');
     const remoteIndex = options.remoteIndex || await loadRemoteIndex();
+    pullAt('reading the bin');
     const remoteEntries = Object.entries(remoteIndex || {});
     // Bin marks, tombstones and this device's own bin count as changes too --
     // see syncFingerprint.
@@ -5703,6 +5736,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     for (const [fileName, remoteMeta] of remoteEntries) {
       if (leaveInCloud(fileName, { owedDeletes, localFolders: savedList })) continue;
       // In the bin, here or elsewhere, or deleted for ever: the bin decides.
+      pullAt(`checking "${fileName}"`);
       if (await applyCloudBin(fileName, remoteMeta, binEntries, savedList) !== 'normal') continue;
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
@@ -5745,8 +5779,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         localModifiedAt,
         remoteModifiedAt
       })) {
+        pullAt(`downloading "${fileName}"`);
         const remotePayload = await loadRemoteFile(fileName);
         if (!remotePayload) continue;
+        pullAt(`saving "${fileName}"`);
         // Asked again now the download has landed: editing may have been let
         // go while it ran (a resume check that outlasted the hold), and what
         // was typed since must not be overwritten. See editedDuringDownload.
@@ -5828,6 +5864,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         // Only when the folder on screen is the one that actually changed.
         if (openFileChanged) {
           logSync('remount', currentSaveName, 'open folder changed underneath, redrawing');
+          pullAt('redrawing the open folder');
           await remountCurrentSaveIfLoaded();
         }
       } finally {
