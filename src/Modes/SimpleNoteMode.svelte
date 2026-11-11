@@ -30,8 +30,6 @@
   import { galleryOf } from '../utils/gallery.js';
   import { cropBlockUpdate } from '../utils/cropImage.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
-  import { canvasMustTakeWheel } from '../utils/scrollOwnership.js';
-  import { scrollerUnderPointer } from '../utils/scrollerUnderPointer.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -382,23 +380,6 @@
     if (focusedBlockId !== id) {
       dispatch('focusToggle', { id });
     }
-  }
-
-  // A scroller inside a card -- a calendar's hours, a long list -- takes the
-  // wheel only while its card is focused, as on the Canvas
-  // (utils/scrollOwnership.js; asked for Simple Note 2026-11-11: "going over
-  // the calendar without selecting it should [not] activate the scroll. It
-  // should be focused before"). Refused, the browser would still scroll it,
-  // so the page is scrolled here instead.
-  function onWheel(event) {
-    if (event.ctrlKey || !canvasRef) return;
-    const found = scrollerUnderPointer(event, canvasRef, {
-      blockSelector: '[data-simple-block]',
-      isFocused: card => Boolean(card.querySelector(':scope > .container.focused'))
-    });
-    if (!canvasMustTakeWheel(found)) return;
-    if (event.cancelable) event.preventDefault();
-    canvasRef.scrollTop += event.deltaY;
   }
 
   function handleBlockClick(event, id) {
@@ -772,6 +753,17 @@
   transition: box-shadow 0.15s ease, outline 0.15s ease;
 }
 
+/* A calendar's hours only scroll while its card is focused -- asked
+   2026-11-11: "going over the calendar without selecting it should [not]
+   activate the scroll. It should be focused before". Untouchable rather than
+   refused in code: the wheel then reaches the page, which the browser scrolls
+   smoothly as it always does (scrolling it from code went in jumps), and a
+   click lands on the card, which is what focuses it. The rule is
+   utils/scrollOwnership.js's; this is how Simple Note carries it out. */
+.container:not(.focused) :global(.cal-scroll) {
+  pointer-events: none;
+}
+
 .container.focused {
   outline: 4px solid transparent;
 
@@ -1105,7 +1097,7 @@ input[type="text"] {
 
 
 
-<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`} on:wheel|nonpassive={onWheel}>
+<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
   <ModeWallpaper settings={backgroundSettings} />
   {#each renderColumns as column}
     <div class="simple-column">

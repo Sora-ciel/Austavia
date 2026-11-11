@@ -3,11 +3,11 @@
  * the first scrollable thing from the pointer up to `root`, whether it is
  * inside a block, and whether that block is focused.
  *
- * The DOM half of the rule, shared by every mode that holds blocks (CLAUDE.md,
- * "one of everything"): the Canvas had it to itself, and Simple Note had no
- * rule at all, so an unfocused calendar there scrolled under the wheel --
- * reported 2026-11-11, "going over the calendar without selecting it should
- * [not] activate the scroll. It should be focused before".
+ * The DOM half of the rule, out of CanvasMode so a mode that needs to refuse
+ * the wheel in code can use the same one (CLAUDE.md, "one of everything").
+ * Simple Note does not: it makes an unfocused card's calendar untouchable
+ * instead, which lets the browser scroll the page itself -- scrolling it from
+ * code here went in jumps (2026-11-11).
  *
  * `blockSelector` finds a block from inside it; `isFocused(block)` says
  * whether it is the focused one. Browser-only.
