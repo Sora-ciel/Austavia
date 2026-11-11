@@ -7015,6 +7015,41 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   flex-direction: column;
   height: 100dvh; /* full app height (stable on mobile browsers) */
   overflow: hidden;
+  /* Where the bar is, for everything placed by it: what fills the screen
+     starts under it (--bar-top) and ends above it (--bar-bottom); pop-ups
+     open just past it (--popup-top / --popup-bottom). */
+  --bar-top: var(--controls-height, 56px);
+  --bar-bottom: 0px;
+  --popup-top: calc(var(--controls-height, 56px) + 8px);
+  --popup-bottom: auto;
+}
+
+/* ── A phone: the bar at the bottom ─────────────────────────────────
+   Decided 2026-11-10, on how modes are changed: "For the phone especially I
+   was hoping a way that also doesn't take too much more space on the
+   screen, especially height." The same bar, at the same height, moved to
+   where a thumb is -- nothing added, the top given back to the content.
+   Everything that opened under it opens above it, through the variables
+   above. While writing, the keyboard is where the bar would be, so the bar
+   steps aside (keyboardOpen). PENDING, "How modes are changed", stage a. */
+@media (max-width: 700px) {
+  .app {
+    --bar-top: 0px;
+    --bar-bottom: var(--controls-height, 56px);
+    --popup-top: auto;
+    --popup-bottom: calc(var(--controls-height, 56px) + 8px);
+  }
+  .app > .controls {
+    order: 2;
+    position: relative;
+    border-bottom: none;
+    border-top: 1px solid var(--controls-border, #333);
+    padding-top: 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .app.keyboard-up > .controls {
+    display: none;
+  }
 }
 .controls {
   flex: 0 0 auto;  /* only as tall as needed */
@@ -7188,7 +7223,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   --sb-track: var(--dlg-bg, #17171a);
   --sb-thumb: var(--dlg-btn-text, var(--dlg-text, #f0f0f0));
   position: fixed;
-  top: calc(var(--controls-height, 56px) + 8px);
+  top: var(--popup-top, calc(var(--controls-height, 56px) + 8px));
+  bottom: var(--popup-bottom, auto);
   right: 8px;
   z-index: 1400;
   width: min(94vw, 400px);
@@ -7655,7 +7691,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
      frames its folders in them (2026-10-05). -->
 <!-- The dialog colours (--dlg-*) are set here too, so a dialog a mode opens
      (components/AppDialog.svelte) is in the theme's pop-up colours. -->
-<div class="app" style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
+<div class="app" class:keyboard-up={keyboardOpen} style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
   <!-- Which Austavia this is, when it is not the real one: inside .app so it
        takes the theme's colours. utils/releaseChannel.js; nothing on production. -->
   {#if channelBadgeText}

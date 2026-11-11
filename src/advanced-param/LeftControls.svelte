@@ -950,7 +950,8 @@ onMount(() => {
       padding: 12px;
       border-radius: 12px;
       position: fixed;
-      top: calc(var(--controls-height, 56px) + 8px);
+      top: var(--popup-top, calc(var(--controls-height, 56px) + 8px));
+      bottom: var(--popup-bottom, auto);
       left: 8px;
       right: auto;
       width: min(120px, calc(100vw - 16px));
@@ -1021,7 +1022,8 @@ onMount(() => {
     .mode-ladder,
     .add-block-list {
       position: fixed;
-      top: calc(var(--controls-height, 56px) + 8px);
+      top: var(--popup-top, calc(var(--controls-height, 56px) + 8px));
+      bottom: var(--popup-bottom, auto);
       left: 8px;
       right: auto;
       max-height: calc(100dvh - var(--controls-height, 56px) - 16px);

@@ -386,9 +386,9 @@
     .dropdown-content {
     display: none;
     position: fixed;
-    top: calc(var(--controls-height, 56px) + 8px);
+    top: var(--popup-top, calc(var(--controls-height, 56px) + 8px));
     right: 8px;
-    bottom: auto;
+    bottom: var(--popup-bottom, auto);
     width: min(56vw, 240px);
     max-width: 92vw;
     max-height: calc(100dvh - var(--controls-height, 56px) - 16px);

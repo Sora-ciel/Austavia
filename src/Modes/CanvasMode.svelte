@@ -517,10 +517,10 @@
 <style>
 .canvas {
   position: fixed;
-  top: var(--controls-height, 56px);
+  top: var(--bar-top, var(--controls-height, 56px));
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--bar-bottom, 0px);
   background: var(--canvas-outer-bg, rgb(0, 0, 0));
   overflow: auto;
   touch-action: pan-x pan-y;
@@ -599,10 +599,10 @@
 @media (max-width: 1024px) {
   .canvas {
   position: fixed;
-  top: var(--controls-height, 56px);
+  top: var(--bar-top, var(--controls-height, 56px));
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--bar-bottom, 0px);
   background: var(--canvas-outer-bg, #141414);
   overflow: auto;
   }

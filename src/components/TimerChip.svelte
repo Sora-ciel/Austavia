@@ -309,7 +309,8 @@
     --sb-track: var(--dlg-bg, #17171a);
     --sb-thumb: var(--dlg-btn-text, var(--dlg-text, #f0f0f0));
     position: fixed;
-    top: calc(var(--controls-height, 56px) + 8px);
+    top: var(--popup-top, calc(var(--controls-height, 56px) + 8px));
+    bottom: var(--popup-bottom, auto);
     right: 8px;
     /* As wide as its rows, never wrapping a button onto a second line. */
     width: max-content;
