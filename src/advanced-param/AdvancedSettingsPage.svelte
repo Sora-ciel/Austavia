@@ -18,6 +18,8 @@
    * this one instead of only the one that is here.
    */
   import { createEventDispatcher } from 'svelte';
+  import ModeIcon from '../components/ModeIcon.svelte';
+  import { normalizeLayout, orderedModes, movedMode, withModeHidden } from '../utils/controlsLayout.js';
   import {
     DEFAULT_SCALES,
     MIN_SCALE,
@@ -29,8 +31,20 @@
   /** The replaced copies kept for the folder that is open, newest first. */
   export let folderSnapshots = [];
   export let currentSaveName = '';
+  /** How the controls are laid out on this device (utils/controlsLayout.js). */
+  export let controlsLayout = { phone: 'bottom', computer: 'rail', order: [], hidden: [] };
+  /** Every mode, by id, and its name. */
+  export let allModes = [];
+  export let modeLabels = {};
 
   const dispatch = createEventDispatcher();
+
+  // ── Controls layout (asked 2026-11-10) ─────────────────────────────────
+  // "for phone and pc we can change the layout and basically go back to the
+  // way things were before our update ... saved per device for now."
+  let showLayout = false;
+  $: layoutModes = orderedModes(allModes, controlsLayout);
+  const setLayout = next => dispatch('controlsLayoutChange', normalizeLayout(next));
 
   // Which of the two numbers this window is currently using, so the page can
   // mark it. Read from the window rather than assumed, and the same breakpoint
@@ -85,6 +99,47 @@
   <button class="back-btn" type="button" on:click={() => dispatch('back')}>
     ‹ Settings
   </button>
+
+  <div class="tab-section">
+    <h4>🧭 Controls</h4>
+    <button class="create-theme-btn" type="button" aria-expanded={showLayout} on:click={() => (showLayout = !showLayout)}>
+      Controls layout {showLayout ? '▾' : '›'}
+    </button>
+    {#if showLayout}
+      <p class="advanced-note">
+        Where the controls are on this device. The new way is the default; the
+        way it was before is still here. Kept on this device.
+      </p>
+      <div class="layout-group" role="radiogroup" aria-label="On a phone">
+        <span class="scale-name">Phone</span>
+        <label><input type="radio" name="phone-layout" checked={controlsLayout.phone === 'bottom'} on:change={() => setLayout({ ...controlsLayout, phone: 'bottom' })} /> The bar at the bottom</label>
+        <label><input type="radio" name="phone-layout" checked={controlsLayout.phone === 'top'} on:change={() => setLayout({ ...controlsLayout, phone: 'top' })} /> The bar at the top, as before</label>
+      </div>
+      <div class="layout-group" role="radiogroup" aria-label="On a computer">
+        <span class="scale-name">Computer</span>
+        <label><input type="radio" name="computer-layout" checked={controlsLayout.computer === 'rail'} on:change={() => setLayout({ ...controlsLayout, computer: 'rail' })} /> Modes in a column on the left</label>
+        <label><input type="radio" name="computer-layout" checked={controlsLayout.computer === 'top'} on:change={() => setLayout({ ...controlsLayout, computer: 'top' })} /> Modes in the bar only, as before</label>
+      </div>
+      <span class="scale-name">Modes: their order, and which are shown</span>
+      <ul class="layout-modes">
+        {#each layoutModes as id, i (id)}
+          <li class:hidden-mode={controlsLayout.hidden.includes(id)}>
+            <label class="layout-mode-name">
+              <input
+                type="checkbox"
+                checked={!controlsLayout.hidden.includes(id)}
+                on:change={(e) => setLayout(withModeHidden(allModes, controlsLayout, id, !e.target.checked))}
+              />
+              <ModeIcon mode={id} size={18} />
+              {modeLabels[id] || id}
+            </label>
+            <button type="button" title="Up" aria-label="Move {modeLabels[id] || id} up" disabled={i === 0} on:click={() => setLayout(movedMode(allModes, controlsLayout, id, -1))}>↑</button>
+            <button type="button" title="Down" aria-label="Move {modeLabels[id] || id} down" disabled={i === layoutModes.length - 1} on:click={() => setLayout(movedMode(allModes, controlsLayout, id, 1))}>↓</button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 
   <div class="tab-section">
     <h4>🔠 Text size</h4>
@@ -206,6 +261,65 @@
 </div>
 
 <style>
+  .layout-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 10px;
+  }
+
+  .layout-group label {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .layout-modes {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .layout-modes li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .layout-modes li.hidden-mode .layout-mode-name {
+    opacity: 0.5;
+  }
+
+  .layout-mode-name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .layout-modes button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .layout-modes button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
   /* Every colour here is taken rather than chosen: the writing is whatever the
      panel's writing is, and the surfaces are that colour mixed into nothing.
      A theme moves all of it without this file being told. */

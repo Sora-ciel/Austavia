@@ -3,6 +3,8 @@
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
+  import { readLayout, writeLayout, offeredModes, neighbourMode, swipeDirection } from './utils/controlsLayout.js';
+  import ModeIcon from './components/ModeIcon.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText } from './utils/textHistory.js';
@@ -3894,6 +3896,41 @@
   // (PageBlock.svelte, 2026-11-10) -- `pageAt`, how this device is moving
   // around, so it stays on the device. `places` is the back and forward
   // history (utils/pagePlaces.js).
+  // ── How modes are changed, on this device (utils/controlsLayout.js) ─
+  // Decided 2026-11-10: the bar at the bottom on a phone, a column of modes
+  // on a computer, modes in order or hidden -- each choosable back to the
+  // way it was in Advanced settings, "Controls layout".
+  let controlsLayout = readLayout(typeof localStorage !== 'undefined' ? localStorage : null);
+  function changeControlsLayout(next) {
+    controlsLayout = next;
+    writeLayout(typeof localStorage !== 'undefined' ? localStorage : null, next);
+  }
+  $: offered = offeredModes(MODE_ORDER, controlsLayout, mode);
+
+  // A swipe along the bar on a phone: the next or previous mode.
+  let barSwipe = null;
+  function barTouchStart(event) {
+    if (event.touches?.length !== 1 || event.target.closest?.('input, .mini-player, .player-panel')) { barSwipe = null; return; }
+    barSwipe = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  }
+  function barTouchEnd(event) {
+    if (!barSwipe || window.innerWidth > 700) { barSwipe = null; return; }
+    const t = event.changedTouches?.[0];
+    const direction = t ? swipeDirection(t.clientX - barSwipe.x, t.clientY - barSwipe.y) : 0;
+    barSwipe = null;
+    if (direction) setMode(neighbourMode(MODE_ORDER, controlsLayout, mode, direction));
+  }
+
+  // Ctrl+1 to Ctrl+9 on a computer: the modes, in the order shown.
+  function modeShortcut(event) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    if (!/^[1-9]$/.test(event.key) || window.innerWidth <= 700) return;
+    const target = offered[Number(event.key) - 1];
+    if (!target) return;
+    event.preventDefault();
+    setMode(target);
+  }
+
   let pageAt = null;
   let places = NO_PLACES;
   // Page mode's edit mode: pictures sized and cropped. Its button is in the
@@ -7033,13 +7070,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    above. While writing, the keyboard is where the bar would be, so the bar
    steps aside (keyboardOpen). PENDING, "How modes are changed", stage a. */
 @media (max-width: 700px) {
-  .app {
+  .app.phone-bar-bottom {
     --bar-top: 0px;
     --bar-bottom: var(--controls-height, 56px);
     --popup-top: auto;
     --popup-bottom: calc(var(--controls-height, 56px) + 8px);
   }
-  .app > .controls {
+  .app.phone-bar-bottom > .controls {
     order: 2;
     position: relative;
     border-bottom: none;
@@ -7047,9 +7084,61 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     padding-top: 8px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
-  .app.keyboard-up > .controls {
+  .app.phone-bar-bottom.keyboard-up > .controls {
     display: none;
   }
+  /* A mode's own buttons in the bar while it is short of width (stage c):
+     forward only once there is somewhere to go forward to. */
+  .app.crowded-bar .page-bar-forward:disabled {
+    display: none;
+  }
+}
+
+/* ── A computer: the modes in a column on the left ─────────────────── */
+.mode-rail {
+  flex: 0 0 auto;
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--controls-bg, #111);
+  border-right: 1px solid var(--controls-border, #333);
+  position: relative;
+  z-index: 900;
+}
+.mode-rail-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--controls-button-text, var(--controls-text, #fff));
+  opacity: 0.6;
+  cursor: pointer;
+}
+.mode-rail-btn:hover { opacity: 1; background: color-mix(in srgb, currentColor 10%, transparent); }
+.mode-rail-btn.active {
+  opacity: 1;
+  background: var(--controls-bg-active, color-mix(in srgb, currentColor 16%, transparent));
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+@media (min-width: 701px) {
+  /* What is placed on the screen rather than in the flow (the Canvas) starts
+     after the column. */
+  .app.has-rail { --bar-left: 52px; }
+}
+/* The column is a computer's; a phone has the sheet and the swipe. After the
+   rules that draw it: Svelte weighs both the same, so the later one wins. */
+@media (max-width: 700px) {
+  .mode-rail { display: none; }
 }
 .controls {
   flex: 0 0 auto;  /* only as tall as needed */
@@ -7329,13 +7418,22 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   cursor: pointer;
   opacity: 0.85;
 }
-.pp-btn:hover {
-  opacity: 1;
-  background: color-mix(in srgb, var(--dlg-btn-text, var(--dlg-text, #fff)) 14%, transparent);
+/* Hover only where there is a pointer that hovers. On a phone a tapped
+   button kept its hover tint, which was nearly the "on" tint, so turning
+   shuffle off still looked on until the player was closed and opened again
+   (reported 2026-11-10). */
+@media (hover: hover) {
+  .pp-btn:hover {
+    opacity: 1;
+    background: color-mix(in srgb, var(--dlg-btn-text, var(--dlg-text, #fff)) 14%, transparent);
+  }
 }
+/* On is filled: the button's colour behind, the panel's colour for the
+   icon -- unmistakable next to off. */
 .pp-btn.on {
   opacity: 1;
-  background: color-mix(in srgb, var(--dlg-btn-text, var(--dlg-text, #fff)) 22%, transparent);
+  background: var(--dlg-btn-text, var(--dlg-text, #fff));
+  color: var(--dlg-bg, #17171a);
 }
 .pp-play {
   width: 44px;
@@ -7691,14 +7789,23 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
      frames its folders in them (2026-10-05). -->
 <!-- The dialog colours (--dlg-*) are set here too, so a dialog a mode opens
      (components/AppDialog.svelte) is in the theme's pop-up colours. -->
-<div class="app" class:keyboard-up={keyboardOpen} style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
+<svelte:window on:keydown={modeShortcut} />
+
+<div
+  class="app"
+  class:keyboard-up={keyboardOpen}
+  class:phone-bar-bottom={controlsLayout.phone === 'bottom'}
+  class:has-rail={controlsLayout.computer === 'rail'}
+  class:crowded-bar={mode === 'page' || Boolean(nowPlayingTrack)}
+  style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
   <!-- Which Austavia this is, when it is not the real one: inside .app so it
        takes the theme's colours. utils/releaseChannel.js; nothing on production. -->
   {#if channelBadgeText}
     <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
   {/if}
-  <div class="controls" bind:this={controlsRef} style={controlsStyle}>
+  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchend|passive={barTouchEnd}>
     <LeftControls
+      modeIds={offered}
       bind:currentSaveName
       on:renameFolder={renameFolder}
       {mode}
@@ -7731,7 +7838,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         <button class="page-bar-btn" title="Back" aria-label="Back" disabled={!places.back.length} on:click={() => stepPlace(-1)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <button class="page-bar-btn" title="Forward" aria-label="Forward" disabled={!places.forward.length} on:click={() => stepPlace(1)}>
+        <button class="page-bar-btn page-bar-forward" title="Forward" aria-label="Forward" disabled={!places.forward.length} on:click={() => stepPlace(1)}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
         </button>
         <button
@@ -7939,6 +8046,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     {#if showRightControls}
     <div class="right-controls">
       <RightControls
+        {controlsLayout}
+        allModes={MODE_ORDER}
+        modeLabels={MODE_LABELS}
+        on:controlsLayoutChange={(e) => changeControlsLayout(e.detail)}
         {collectDiagnostics}
         {typeScales}
         {folderSnapshots}
@@ -8016,6 +8127,24 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     on:dragover={handleModeDragOver}
     on:drop={handleModeDrop}
   >
+    <!-- The modes, a click away, down the left edge on a computer (PENDING,
+         "How modes are changed", stage d); Ctrl+1 to 9 in the same order. -->
+    {#if controlsLayout.computer === 'rail'}
+      <nav class="mode-rail" aria-label="Modes">
+        {#each offered as id, i (id)}
+          <button
+            class="mode-rail-btn"
+            class:active={id === mode}
+            title="{MODE_LABELS[id] || id}{i < 9 ? `  (Ctrl+${i + 1})` : ''}"
+            aria-label={MODE_LABELS[id] || id}
+            aria-current={id === mode ? 'page' : undefined}
+            on:click={() => setMode(id)}
+          >
+            <ModeIcon mode={id} size={22} />
+          </button>
+        {/each}
+      </nav>
+    {/if}
     {#if workspaceHeld}
       <div class="sync-lock-banner" style={overlayThemeStyle}>{gateMessage}</div>
     {:else if syncFailureNotice}

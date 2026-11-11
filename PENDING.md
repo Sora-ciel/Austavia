@@ -149,15 +149,21 @@ moment, archive instead of delete) after these, in an order to be agreed.
        added, the top given back to the content, everything in thumb's
        reach. What opened under the bar (Mode, Menu, Settings, the timer's
        pop-up) opens above it.
-    b. **Phone: the mode button opens a sheet of every mode** (an icon and a
+    b. *Done 2026-11-10.* **Phone: the mode button opens a sheet of every mode** (an icon and a
        name each) rising from the bar, and a swipe along the bar goes to the
        next or previous mode.
-    c. **Phone: the bar makes room** -- a mode's own buttons (Page's back,
+    c. *Done 2026-11-10.* **Phone: the bar makes room** -- a mode's own buttons (Page's back,
        forward, edit) sit in it, and the mini player shrinks to its cover and
        play button when the bar is short of width.
-    d. **Computer: a column of mode icons down the left edge**, the name on
+    d. *Done 2026-11-10.* **Computer: a column of mode icons down the left edge**, the name on
        hover, every mode one click away; Ctrl+1 to Ctrl+9.
-    e. **Both: modes can be put in order or hidden**, per device.
+    e. *Done 2026-11-10.* **Both: modes can be put in order or hidden**, per device.
+    f. *Done 2026-11-10.* **Advanced settings, "Controls layout"** (asked 2026-11-10): for a
+       phone and for a computer, choose the new layout or the way it was
+       before (bar at the top, no mode column), "saved per device for now.
+       Later we will save it per account per default. but not until maybe
+       1 year" -- so: per device now, and a note here that it becomes the
+       account's default later, not before about 2027-11.
 
 ## Now, asked 2026-11-10 (third list): look and feel
 
@@ -482,6 +488,7 @@ list below with what was observed.
 | Shipped | What to look for |
 | --- | --- |
 | next | **One Austavia at a time (Linux .deb, Windows).** Reported 2026-10-26: after each restart KDE reopened Austavia once per window it had saved, so the windows multiplied. With the single-instance plugin a second launch brings the open window forward and exits. Log out with Austavia open, log back in: one window. Click the launcher while it is open: the same window comes forward. |
+| next | **Changing modes** (2026-11-10). Phone: Mode opens a sheet of every mode, three to a row with icons; a swipe left or right along the bar goes to the next or previous mode; in Page mode or with music playing, Mode and Menu show as icons only, and Page's forward shows only when there is somewhere to go. Computer: a column of mode icons down the left, names on hover, Ctrl+1 to Ctrl+9. Advanced settings, Controls layout: the bar at the top on a phone, or no column on a computer, as before; modes in order and hidden; kept on that device. The player's shuffle is filled when on, and a tap no longer leaves a tint that looks on. |
 | next | **The bar at the bottom on a phone** (2026-11-10). Up to 700px wide the bar is at the bottom, the same height; Mode, Menu, Settings and the timer's and player's pop-ups open upwards from it; the Canvas fills from the top. While typing (keyboard up) the bar steps aside. Check on the phone: the bar clears the gesture line at the bottom, nothing is hidden behind it, and typing in a note gives the full height. |
 | next | **The phone's timer notification, restyled** (2026-11-10). A rounded panel in the theme's pop-up colour, the time big in the theme's writing, the three buttons round on faint backs as in the pop-up, the stop in the accent -- instead of a flat dark box inside the phone's card. Check on the Samsung with a timer running, in a dark and a light theme. Before Android 12 the panel keeps its drawn colour. |
 | next | **Look and feel, third round** (2026-11-10). Calendar: the 7-day row has no background of its own and stays above the hours; the arrows sit either side of the date; now is a line and a time pill in the writing's colour; Ctrl + wheel down makes hours taller, and blocks stay on their hours. Page mode: back, forward and edit are in the control bar; the six-dot handle sits closer; beside a longer block, a drop goes beside (edges), under it in its column (lower half, or the empty space under a column), or below the whole row (the row's last few pixels). Habit tracker: days are squares at every width (today the biggest), no dot on a day not pressed, bigger names, Rename and Delete only on the habit the pointer is on. |

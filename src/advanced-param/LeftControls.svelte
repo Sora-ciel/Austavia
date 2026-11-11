@@ -2,6 +2,7 @@
   import ControlIcon from '../components/ControlIcon.svelte';
   import { createEventDispatcher, onMount, afterUpdate } from "svelte";
   import { getModeDefinition, getModeOptions, hasWallpaper } from "../Modes/modeRegistry.js";
+  import ModeIcon from "../components/ModeIcon.svelte";
   import { getBlockDefinitions } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
   import { addBackgroundPatch, usesPortraitBackground } from '../utils/modeBackground.js';
@@ -41,7 +42,11 @@
   let showModeLadder = false;
   let showAddBlockMenu = false;
 
-  $: modeOptions = getModeOptions();
+  /** The modes offered, in the order chosen on this device (App, utils/controlsLayout.js); every mode when not given. */
+  export let modeIds = null;
+  $: modeOptions = Array.isArray(modeIds) && modeIds.length
+    ? modeIds.map(id => ({ id, label: getModeDefinition(id).label, locked: false }))
+    : getModeOptions();
   $: activeModeDefinition = getModeDefinition(mode);
 
   const defaultColors = {
@@ -1075,6 +1080,39 @@ onMount(() => {
     }
 
   }
+
+  .mode-ladder button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* A phone with the bar at the bottom: the modes as a sheet rising from the
+     bar, three to a row, an icon over each name (asked 2026-11-10). */
+  @media (max-width: 700px) {
+    :global(.app.phone-bar-bottom) .mode-sheet {
+      left: 8px;
+      right: 8px;
+      width: auto;
+      min-width: 0;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      padding: 10px;
+    }
+    :global(.app.phone-bar-bottom) .mode-sheet button {
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+      min-height: 64px;
+      font-size: 0.78rem;
+      text-align: center;
+    }
+    /* Short of width (Page's buttons, or music in the bar): the icons alone. */
+    :global(.app.crowded-bar) .bar-label {
+      display: none;
+    }
+  }
 </style>
 
 <div class="left-controls-wrapper" style={leftCssVars}>
@@ -1095,10 +1133,12 @@ onMount(() => {
           aria-expanded={showModeLadder}
         >
           <ControlIcon name="mode" />
-          Mode
+          <span class="bar-label">Mode</span>
         </button>
         {#if showModeLadder}
-          <div class="mode-ladder" bind:this={modeMenuRef} role="listbox">
+          <!-- On a phone with the bar at the bottom, a sheet of every mode
+               rising from it, an icon and a name each (stage b). -->
+          <div class="mode-ladder mode-sheet" bind:this={modeMenuRef} role="listbox">
             {#each modeOptions as option}
               <button
                 class:active={option.id === mode}
@@ -1107,7 +1147,8 @@ onMount(() => {
                 aria-selected={option.id === mode}
                 disabled={option.locked}
               >
-                {option.label}
+                <ModeIcon mode={option.id} size={20} />
+                <span>{option.label}</span>
               </button>
             {/each}
           </div>
@@ -1120,7 +1161,7 @@ onMount(() => {
         on:click={() => (showMobileMenu = !showMobileMenu)}
       >
         <ControlIcon name={showMobileMenu ? 'close' : 'menu'} />
-        {showMobileMenu ? "Close" : "Menu"}
+        <span class="bar-label">{showMobileMenu ? "Close" : "Menu"}</span>
       </button>
     </div>
   {/if}

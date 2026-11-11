@@ -518,7 +518,7 @@
 .canvas {
   position: fixed;
   top: var(--bar-top, var(--controls-height, 56px));
-  left: 0;
+  left: var(--bar-left, 0px);
   right: 0;
   bottom: var(--bar-bottom, 0px);
   background: var(--canvas-outer-bg, rgb(0, 0, 0));
@@ -600,7 +600,7 @@
   .canvas {
   position: fixed;
   top: var(--bar-top, var(--controls-height, 56px));
-  left: 0;
+  left: var(--bar-left, 0px);
   right: 0;
   bottom: var(--bar-bottom, 0px);
   background: var(--canvas-outer-bg, #141414);

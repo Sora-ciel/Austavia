@@ -5,6 +5,10 @@
   export let typeScales = DEFAULT_SCALES;
   export let folderSnapshots = [];
   export let currentSaveName = '';
+  /** How the controls are laid out on this device, for Advanced settings (utils/controlsLayout.js). */
+  export let controlsLayout = undefined;
+  export let allModes = [];
+  export let modeLabels = {};
   export let savedList = [];
   // The server's stored-byte record for this account: { bytes, limit, full }.
   // Null when signed out, or before the first snapshot arrives.
@@ -717,6 +721,10 @@
           {typeScales}
           {folderSnapshots}
           {currentSaveName}
+          {controlsLayout}
+          {allModes}
+          {modeLabels}
+          on:controlsLayoutChange
           on:typeScaleChange
           on:restoreSnapshot
           on:forgetSnapshot
