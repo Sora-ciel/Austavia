@@ -107,6 +107,31 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Now, asked 2026-11-10 (fourth list)
+
+1. **Calendar: a thicker line under the days and whole-day row, and a
+   thicker now line** -- it is the colour of the blocks' outlines.
+2. **Habit tracker: more days as the width allows** (from a phone's 7 up),
+   **today no bigger -- a wider outline instead** ("it's ugly"), and the
+   writing in habits bigger.
+3. **Checkboxes** (the ones in notes, habits, Single Note, the Canvas...):
+   outlined in the writing's colour, a little thicker.
+4. **Cobalt Wire: the blue a little more cyan.**
+5. **Page edit mode: the size of a nest's tiles**, per layout like a
+   picture's size.
+6. **Page mode: a crop per layout** -- a phone and a computer crop a picture
+   on a page apart, as they lay it out apart. On the cell.
+7. **The picture viewer crops too**: the picture itself (as the Canvas shows
+   it), or a cropped copy to download, or a new picture block from it.
+8. **Page mode: the title moves like a block.**
+9. **Page mode: a handle that does not look like Notion's.**
+10. **Page mode on a phone: blocks move only in edit mode.**
+11. **Music dropped on the app goes into the library**, and opens Playlist
+    mode if another mode is open.
+12. **Waiting on a decision: how modes are changed**, on a phone and a
+    computer, as modes multiply -- asked for an opinion -- and with it, the
+    page buttons crowding a phone's bar while music plays.
+
 ## Now, asked 2026-11-10 (third list): look and feel
 
 1. *Done 2026-11-10.* **Calendar, 7 days: the days' row has a background of its own** -- "it
