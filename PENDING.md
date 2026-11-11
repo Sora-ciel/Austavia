@@ -128,6 +128,16 @@ moment, archive instead of delete) after these, in an order to be agreed.
 10. *Done 2026-11-10.* **Page mode on a phone: blocks move only in edit mode.**
 11. *Done 2026-11-10.* **Music dropped on the app goes into the library**, and opens Playlist
     mode if another mode is open.
+15. **Asked 2026-11-10, after trying the new controls:**
+    a. **Phone: the content starts under the phone's own status bar** (time,
+       battery) now the bar is at the bottom -- room for it above the mode,
+       or the status bar hidden, chosen in Controls layout.
+    b. **Phone: a slow slide along the bar goes through several modes**,
+       showing the mode it will open, icon and name, while sliding.
+    c. **Phone: the Menu panel wider**; the folder's name field was wider
+       than the buttons.
+    d. **Advanced settings: a better page**, and **Controls layout a page of
+       its own taking the whole mode area** -- it will hold many settings.
 13. *Done in the app's player 2026-11-10* (the whole timeline row, with room
     above and below, seeks; utils/playerClicks.js). **The phone's music
     notification cannot be done from the app**: it is Android's MediaStyle
