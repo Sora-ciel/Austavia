@@ -125,7 +125,13 @@ update. Deleting still works from an old app.
    functions). From that moment a device not yet updated cannot save, and
    shows "too old ... please update" -- the release notes must say to
    update every device.
-3. Staging the same way: the staging builds from before this commit write
+   **Then write the minimum at once**, or old devices are refused in silence
+   until midnight: what they read to say "too old" is
+   `sync/default/meta/schemaVersion`, written by publishSchemaVersionMeta,
+   which only runs once a day (found 2026-11-11). Either run that job now
+   (Cloud Scheduler, "Force run"), or:
+   `firebase database:set /sync/default/meta/schemaVersion --data '{"latest":2,"minSupported":2}' --project default`
+3. Staging the same way, `--project staging` -- and rehearsed there first: the staging builds from before this commit write
    schema 1 and are refused once staging's rules are deployed.
 
 Still to do before it (2026-11-11): the Linux pop-ups and the device checks
