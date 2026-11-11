@@ -781,9 +781,10 @@
     z-index: 2;
   }
 
+  /* Just a dot (asked 2026-11-11, smaller than the 7px first tried). */
   .page-handle-dot {
-    width: 7px;
-    height: 7px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
     background: currentColor;
   }
