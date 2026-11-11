@@ -10,6 +10,7 @@
   import { getContext, createEventDispatcher } from 'svelte';
   import BlockShell from './BlockShell.svelte';
   import { normalizeCrop, croppedAspect } from '../utils/crop.js';
+  import { isDoubleTap } from '../utils/doubleTap.js';
 
   const appDialogs = getContext('appDialogs');
   const dispatch = createEventDispatcher();
@@ -160,14 +161,24 @@
   // way the whole one is -- an SVG viewBox does exactly that, on every engine.
   $: showCrop = Boolean(crop && natural.w && mediaSrc && !mediaSrc.startsWith('data:video'));
 
-  // Click on the media content:
-  //   - When NOT focused: focus the block (next click will open lightbox)
-  //   - When focused: open lightbox if there's a source
+  // A click selects the block; a double-click, or a double tap, opens the
+  // picture in the viewer -- as in Simple Note, asked 2026-11-11 for every
+  // place a picture opens (utils/doubleTap.js). A second single click on a
+  // focused block used to open it.
   function handleMediaClick() {
-    if (!focused) {
-      shell?.ensureFocus();
-    } else if (mediaSrc) {
-      dispatch('lightbox', { src: mediaSrc });
+    if (!focused) shell?.ensureFocus();
+  }
+  function openViewer() {
+    shell?.ensureFocus();
+    if (mediaSrc) dispatch('lightbox', { src: mediaSrc });
+  }
+  // A finger: a double-click is not reliably sent for two taps.
+  const taps = new Map();
+  function handleMediaTouchEnd(event) {
+    if (event.touches?.length) return;
+    if (isDoubleTap(taps, 'media')) {
+      event.preventDefault();
+      openViewer();
     }
   }
 </script>
@@ -217,6 +228,8 @@
           autoplay loop muted playsinline
           on:loadedmetadata={noteNaturalSize}
           on:click|stopPropagation={handleMediaClick}
+          on:dblclick|stopPropagation={openViewer}
+          on:touchend={handleMediaTouchEnd}
         ></video>
       {:else}
         <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -228,6 +241,8 @@
           class:hidden-under-crop={showCrop}
           on:load={noteNaturalSize}
           on:click|stopPropagation={handleMediaClick}
+          on:dblclick|stopPropagation={openViewer}
+          on:touchend={handleMediaTouchEnd}
         />
         {#if showCrop}
           <!-- svelte-ignore a11y-click-events-have-key-events -->
@@ -237,6 +252,8 @@
             viewBox="{crop.x * natural.w} {crop.y * natural.h} {crop.w * natural.w} {crop.h * natural.h}"
             preserveAspectRatio={placement === 'page' ? 'xMinYMin meet' : 'xMidYMid meet'}
             on:click|stopPropagation={handleMediaClick}
+            on:dblclick|stopPropagation={openViewer}
+            on:touchend={handleMediaTouchEnd}
           >
             <image href={mediaSrc} width={natural.w} height={natural.h} />
           </svg>

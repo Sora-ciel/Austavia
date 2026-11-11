@@ -29,6 +29,7 @@
   import Block from '../components/Block.svelte';
   import { galleryOf } from '../utils/gallery.js';
   import { cropBlockUpdate } from '../utils/cropImage.js';
+  import { isDoubleTap } from '../utils/doubleTap.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -427,7 +428,8 @@
   }
 
   let imageInputRefs = {};
-  let imageTapTracker = {};
+  // Double taps on pictures (utils/doubleTap.js).
+  const imageTaps = new Map();
 
   // ── Lightbox ──────────────────────────────────────────────────────
   let lbOpen = false;
@@ -519,13 +521,8 @@
     }
     if (!hasImageSource(block)) return;
 
-    const currentTap = Date.now();
-    const previousTap = imageTapTracker[block.id] || 0;
-    imageTapTracker[block.id] = currentTap;
-
-    if (currentTap - previousTap <= 300) {
+    if (isDoubleTap(imageTaps, block.id)) {
       event.preventDefault();
-      imageTapTracker[block.id] = 0;
       openLightbox(block);
     } else {
       ensureFocus(block.id);
