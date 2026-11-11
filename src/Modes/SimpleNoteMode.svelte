@@ -30,6 +30,8 @@
   import { galleryOf } from '../utils/gallery.js';
   import { cropBlockUpdate } from '../utils/cropImage.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
+  import { canvasMustTakeWheel } from '../utils/scrollOwnership.js';
+  import { scrollerUnderPointer } from '../utils/scrollerUnderPointer.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -380,6 +382,23 @@
     if (focusedBlockId !== id) {
       dispatch('focusToggle', { id });
     }
+  }
+
+  // A scroller inside a card -- a calendar's hours, a long list -- takes the
+  // wheel only while its card is focused, as on the Canvas
+  // (utils/scrollOwnership.js; asked for Simple Note 2026-11-11: "going over
+  // the calendar without selecting it should [not] activate the scroll. It
+  // should be focused before"). Refused, the browser would still scroll it,
+  // so the page is scrolled here instead.
+  function onWheel(event) {
+    if (event.ctrlKey || !canvasRef) return;
+    const found = scrollerUnderPointer(event, canvasRef, {
+      blockSelector: '[data-simple-block]',
+      isFocused: card => Boolean(card.querySelector(':scope > .container.focused'))
+    });
+    if (!canvasMustTakeWheel(found)) return;
+    if (event.cancelable) event.preventDefault();
+    canvasRef.scrollTop += event.deltaY;
   }
 
   function handleBlockClick(event, id) {
@@ -1086,7 +1105,7 @@ input[type="text"] {
 
 
 
-<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
+<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`} on:wheel|nonpassive={onWheel}>
   <ModeWallpaper settings={backgroundSettings} />
   {#each renderColumns as column}
     <div class="simple-column">

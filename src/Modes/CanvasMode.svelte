@@ -11,6 +11,7 @@
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
   import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../utils/scrollOwnership.js';
+  import { scrollerUnderPointer } from '../utils/scrollerUnderPointer.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
 
 
@@ -207,30 +208,12 @@
   // and the only record that anyone had wanted it was a conversation months
   // earlier. Walking the DOM needs a DOM and stays here; what gets decided does
   // not.
+  // Shared with Simple Note (utils/scrollerUnderPointer.js).
   function nestedScrollerUnderPointer(event) {
-    if (!canvasRef || !(event.target instanceof Element)) return { scroller: false };
-
-    let current = event.target;
-    while (current && current !== canvasRef) {
-      const style = getComputedStyle(current);
-      const overflowY = style.overflowY;
-      const overflowX = style.overflowX;
-      const canScrollY = (overflowY === 'auto' || overflowY === 'scroll') && current.scrollHeight > current.clientHeight;
-      const canScrollX = (overflowX === 'auto' || overflowX === 'scroll') && current.scrollWidth > current.clientWidth;
-
-      if (canScrollY || canScrollX) {
-        const block = current.closest('[data-block-id]');
-        return {
-          scroller: true,
-          insideBlock: Boolean(block),
-          blockFocused: Boolean(block && block.classList.contains('focused'))
-        };
-      }
-
-      current = current.parentElement;
-    }
-
-    return { scroller: false };
+    return scrollerUnderPointer(event, canvasRef, {
+      blockSelector: '[data-block-id]',
+      isFocused: block => block.classList.contains('focused')
+    });
   }
 
   function onWheel(event) {
