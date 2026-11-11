@@ -27,6 +27,7 @@
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { ALL_MUSIC } from '../utils/playlistPlayback.js';
   import Block from '../components/Block.svelte';
+  import { galleryOf } from '../utils/gallery.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -429,18 +430,13 @@
 
   // ── Lightbox ──────────────────────────────────────────────────────
   let lbOpen = false;
-  let lbImages = [];
-  let lbStart = 0;
+  let gallery = { images: [], blockIds: [], crops: {}, start: 0 };
 
+  // Every picture of the folder, in order (utils/gallery.js).
   function openLightbox(block) {
     const src = getImageSource(block);
     if (!src) return;
-    const imageSrcs = blocks
-      .filter(b => b.type === 'image' && hasImageSource(b))
-      .map(getImageSource);
-    lbStart = imageSrcs.indexOf(src);
-    if (lbStart < 0) lbStart = 0;
-    lbImages = imageSrcs;
+    gallery = galleryOf(blocks, src);
     lbOpen = true;
   }
 
@@ -1364,5 +1360,13 @@ input[type="text"] {
 {/if}
 
 {#if lbOpen}
-  <Lightbox images={lbImages} startIndex={lbStart} on:close={() => lbOpen = false} />
+  <Lightbox
+    images={gallery.images}
+    startIndex={gallery.start}
+    blockIds={gallery.blockIds}
+    crops={gallery.crops}
+    on:close={() => (lbOpen = false)}
+    on:cropBlock={(e) => dispatch('update', { id: e.detail.blockId, crop: e.detail.crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true })}
+    on:newImage={(e) => dispatch('addImage', { src: e.detail.src })}
+  />
 {/if}

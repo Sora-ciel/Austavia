@@ -2,11 +2,24 @@
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import BlockContextMenu from './BlockContextMenu.svelte';
   import { fileNameForMedia } from '../utils/downloadNaming.js';
+  import CropEditor from './CropEditor.svelte';
+  import { croppedBlob, blobToDataUrl } from '../utils/cropImage.js';
 
   // Array of image/video URLs to display
   export let images = [];
   // Which image to show first
   export let startIndex = 0;
+  /**
+   * The picture block each image is, in the same order, where known: what
+   * "Crop this picture" changes. Asked 2026-11-10: the viewer "can activate
+   * the same block recropper that crops the block for canvas or crops the
+   * block for download or creation of another image block".
+   */
+  export let blockIds = [];
+  /** The crop each picture block has now, by id, for the crop editor to start from. */
+  export let crops = {};
+  /** Whether "New picture from it" is offered: a mode that can add a block listens for `newImage`. */
+  export let canAddImage = true;
 
   const dispatch = createEventDispatcher();
 
@@ -122,6 +135,8 @@
   }
 
   function onKeyDown(event) {
+    // While cropping, the keys are the crop editor's.
+    if (cropping) return;
     if (event.key === 'Escape') {
       // Stop other handlers (e.g. parent's block-menu handler) from also firing
       event.stopImmediatePropagation();
@@ -244,12 +259,46 @@
     try {
       const response = await fetch(src);
       if (!response.ok) throw new Error(`fetch failed: ${response.status}`);
+      await saveBlob(await response.blob());
+    } catch (error) {
+      console.warn('Could not save this attachment, opening it instead:', error);
+      // Better to land somewhere the picture can be saved by hand than to do
+      // nothing at all and look broken.
+      window.open(src, '_blank', 'noopener');
+    }
+  }
 
-      const blob = await response.blob();
+  // ── Cropping (asked 2026-11-10) ──────────────────────────────────────
+  let cropping = false;
+  $: currentBlockId = blockIds[index] || null;
+  $: cropActions = [
+    { id: 'save', label: 'Save cropped' },
+    ...(canAddImage ? [{ id: 'newImage', label: 'New picture from it' }] : []),
+    ...(currentBlockId ? [{ id: 'block', label: 'Crop this picture' }] : [])
+  ];
+
+  async function onCropAction({ id, crop }) {
+    cropping = false;
+    if (id === 'block') {
+      dispatch('cropBlock', { blockId: currentBlockId, crop });
+      return;
+    }
+    try {
+      const blob = await croppedBlob(src, crop);
+      if (id === 'save') await saveBlob(blob, true);
+      else if (id === 'newImage') dispatch('newImage', { src: await blobToDataUrl(blob) });
+    } catch (error) {
+      console.warn('Could not crop this picture:', error);
+    }
+  }
+
+  /** A picture or video saved to the device, shared to Photos on a phone where that is the way there. */
+  async function saveBlob(blob, cropped = false) {
+    {
       const name = fileNameForMedia({
-        url: src,
+        url: cropped ? 'cropped.png' : src,
         contentType: blob.type,
-        fallbackBase: isVideo ? 'arial-video' : 'arial-image',
+        fallbackBase: isVideo ? 'arial-video' : (cropped ? 'arial-image-cropped' : 'arial-image'),
         isVideo
       });
 
@@ -288,11 +337,6 @@
       // Revoked on a delay rather than immediately: the click starts the save
       // asynchronously and revoking too early cancels it.
       setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
-    } catch (error) {
-      console.warn('Could not save this attachment, opening it instead:', error);
-      // Better to land somewhere the picture can be saved by hand than to do
-      // nothing at all and look broken.
-      window.open(src, '_blank', 'noopener');
     }
   }
 
@@ -371,6 +415,11 @@
   {/if}
 
   <button class="lb-close" on:click|stopPropagation={close}>✕</button>
+  {#if !isVideo && src}
+    <button class="lb-crop" title="Crop" aria-label="Crop" on:click|stopPropagation={() => (cropping = true)}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M2 6h14a2 2 0 0 1 2 2v14" /></svg>
+    </button>
+  {/if}
 
   {#if ctxMenu.open}
     <BlockContextMenu
@@ -382,6 +431,16 @@
     />
   {/if}
 </div>
+
+{#if cropping}
+  <CropEditor
+    {src}
+    crop={currentBlockId ? crops[currentBlockId] : null}
+    actions={cropActions}
+    on:action={(e) => onCropAction(e.detail)}
+    on:close={() => (cropping = false)}
+  />
+{/if}
 
 <style>
   .lb-overlay {
@@ -418,6 +477,34 @@
     cursor: pointer;
   }
   .lb-panning .lb-media { transition: none; }
+
+  .lb-crop {
+    position: fixed;
+    top: 16px;
+    right: 64px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+  .lb-crop svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .lb-crop:hover { background: rgba(255,255,255,0.22); }
 
   .lb-close {
     position: fixed;

@@ -5,6 +5,7 @@
   import { MIN_CANVAS_WIDTH, MIN_ZOOM, MAX_ZOOM, getInitialCanvasScale, canvasExtent } from '../utils/canvasFit.js';
   import { htmlToText as htmlToPlainText } from '../utils/htmlToText.js';
   import Block from '../components/Block.svelte';
+  import { galleryOf } from '../utils/gallery.js';
   import Lightbox from '../components/Lightbox.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { usesPortraitBackground } from '../utils/modeBackground.js';
@@ -58,23 +59,12 @@
 
   // ── Lightbox ─────────────────────────────────────────────────────
   let lbOpen = false;
-  let lbImages = [];
-  let lbStart = 0;
+  let gallery = { images: [], blockIds: [], crops: {}, start: 0 };
 
+  // Every picture of the folder, in order, and which block each is
+  // (utils/gallery.js), so the viewer can crop the one shown.
   function openCanvasLightbox(event) {
-    const clickedSrc = event.detail.src;
-    // Build gallery from all image blocks in their visual order
-    const allSrcs = blocks
-      .filter(b => b.type === 'image')
-      .map(b => {
-        if (typeof b.src === 'string') return b.src;
-        if (b.resolvedSrc) return b.resolvedSrc;
-        return null;
-      })
-      .filter(Boolean);
-    lbImages = allSrcs.length ? allSrcs : [clickedSrc];
-    lbStart = lbImages.indexOf(clickedSrc);
-    if (lbStart < 0) lbStart = 0;
+    gallery = galleryOf(blocks, event.detail.src);
     lbOpen = true;
   }
 
@@ -686,7 +676,15 @@
 </div>
 
 {#if lbOpen}
-  <Lightbox images={lbImages} startIndex={lbStart} on:close={() => lbOpen = false} />
+  <Lightbox
+    images={gallery.images}
+    startIndex={gallery.start}
+    blockIds={gallery.blockIds}
+    crops={gallery.crops}
+    on:close={() => (lbOpen = false)}
+    on:cropBlock={(e) => dispatch('update', { id: e.detail.blockId, crop: e.detail.crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true })}
+    on:newImage={(e) => dispatch('addImage', { src: e.detail.src })}
+  />
 {/if}
 
 {#if canvasCtxMenu.open}

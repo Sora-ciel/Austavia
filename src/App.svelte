@@ -3999,9 +3999,9 @@
     return newBlock;
   }
 
-  function addBlock(type = "text", { afterId = null } = {}) {
+  function addBlock(type = "text", { afterId = null, fields = {} } = {}) {
     if (mode === "single") type = "text";
-    const newBlock = makeBlock(type);
+    const newBlock = makeBlock(type, fields);
 
     blocks = [...blocks, newBlock];
     modeOrders = ensureModeOrders(blocks, modeOrders);
@@ -7964,6 +7964,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
       on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
       on:insertOnPage={(e) => insertOnPage(e.detail)}
+      on:addImage={(e) => addBlock('image', { fields: { src: e.detail.src } })}
       {habits}
       {mayAddPicture}
       {musicLibrary}

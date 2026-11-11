@@ -29,6 +29,7 @@
   import SlashMenu from '../components/SlashMenu.svelte';
   import CropEditor from '../components/CropEditor.svelte';
   import { widthFromDrag } from '../utils/crop.js';
+  import { galleryOf } from '../utils/gallery.js';
   import { slashItems, stepChoice, slashSplit } from '../utils/slashMenu.js';
   import { splitWritingAt } from '../utils/editorSplit.js';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
@@ -420,14 +421,13 @@
 
   // ── Pictures open full screen, as on the Canvas ──────────────────────
   let lbOpen = false;
-  let lbImages = [];
-  let lbStart = 0;
+  let gallery = { images: [], blockIds: [], crops: {}, start: 0 };
 
+  // Every picture on this page, in order (utils/gallery.js).
   function openLightbox(event) {
     const src = event.detail?.src;
     if (!src) return;
-    lbImages = [src];
-    lbStart = 0;
+    gallery = galleryOf(shownRows.flatMap(row => row.blocks), src);
     lbOpen = true;
   }
 
@@ -591,7 +591,15 @@
 {/if}
 
 {#if lbOpen}
-  <Lightbox images={lbImages} startIndex={lbStart} on:close={() => (lbOpen = false)} />
+  <Lightbox
+    images={gallery.images}
+    startIndex={gallery.start}
+    blockIds={gallery.blockIds}
+    crops={gallery.crops}
+    on:close={() => (lbOpen = false)}
+    on:cropBlock={(e) => dispatch('update', { id: e.detail.blockId, crop: e.detail.crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true })}
+    on:newImage={(e) => dispatch('addImage', { src: e.detail.src })}
+  />
 {/if}
 
 <style>

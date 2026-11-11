@@ -12,6 +12,12 @@
 
   export let src = '';
   export let crop = null;
+  /**
+   * What the crop can be used for, as buttons: `{ id, label }`, each sending
+   * `action` with `{ id, crop }`. None: the one "Crop" button, sending
+   * `apply` -- as Page mode uses it.
+   */
+  export let actions = [];
 
   const dispatch = createEventDispatcher();
   let frame = normalizeCrop(crop) || { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
@@ -42,7 +48,10 @@
 
   function onKey(event) {
     if (event.key === 'Escape') dispatch('close');
-    if (event.key === 'Enter') dispatch('apply', normalizeCrop(frame));
+    if (event.key === 'Enter') {
+      if (actions.length) dispatch('action', { id: actions[actions.length - 1].id, crop: normalizeCrop(frame) });
+      else dispatch('apply', normalizeCrop(frame));
+    }
   }
 
   onMount(() => () => up());
@@ -72,10 +81,16 @@
     </div>
   </div>
   <div class="crop-bar">
-    <button on:click={() => dispatch('apply', null)}>Whole picture</button>
+    {#if !actions.length}<button on:click={() => dispatch('apply', null)}>Whole picture</button>{/if}
     <span class="crop-gap"></span>
     <button on:click={() => dispatch('close')}>Cancel</button>
-    <button class="crop-apply" on:click={() => dispatch('apply', normalizeCrop(frame))}>Crop</button>
+    {#if actions.length}
+      {#each actions as action, i}
+        <button class:crop-apply={i === actions.length - 1} on:click={() => dispatch('action', { id: action.id, crop: normalizeCrop(frame) })}>{action.label}</button>
+      {/each}
+    {:else}
+      <button class="crop-apply" on:click={() => dispatch('apply', normalizeCrop(frame))}>Crop</button>
+    {/if}
   </div>
 </div>
 
@@ -86,7 +101,7 @@
   .crop-overlay {
     position: fixed;
     inset: 0;
-    z-index: 3000;
+    z-index: 9500;
     display: flex;
     flex-direction: column;
     background: rgba(0, 0, 0, 0.82);

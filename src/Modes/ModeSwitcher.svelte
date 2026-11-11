@@ -103,7 +103,8 @@
     on:update={updateBlockHandler}
     on:delete={deleteBlockHandler}
     on:focusToggle={focusToggleHandler}
-    on:play
+    on:addImage
+      on:play
     on:toggle
   />
 {:else if mode === 'simple'}
@@ -119,6 +120,7 @@
       library={musicLibrary}
       {nowPlayingId}
       {isPlaying}
+      on:addImage
       on:play
       on:toggle
       on:touchstart={onTouchStart}
@@ -145,6 +147,7 @@
       library={musicLibrary}
       {nowPlayingId}
       {isPlaying}
+      on:addImage
       on:play
       on:toggle
       on:update={updateBlockHandler}
