@@ -3924,6 +3924,25 @@
     if (showControlsLayout) showControlsLayout = false;
   }
 
+  // The column that hides goes away once a mode is chosen from it -- asked
+  // 2026-11-11: "make it disappear even after you click a mode ... i don't
+  // think it needs to stay". The pointer is still over it and the button
+  // pressed holds the focus, either of which kept it out. It stays tucked
+  // until the pointer has moved off to the right of it, so it does not come
+  // straight back out from under the pointer.
+  let railTucked = false;
+  function tuckRail(button) {
+    if (controlsLayout.computer !== 'auto') return;
+    button?.blur?.();
+    railTucked = true;
+    const untuck = (event) => {
+      if (event.clientX <= 64) return;
+      railTucked = false;
+      window.removeEventListener('pointermove', untuck);
+    };
+    window.addEventListener('pointermove', untuck);
+  }
+
   // A finger on the phone's bar changes mode, one of two ways to compare
   // (Controls layout, modeGesture; asked 2026-11-10):
   // - 'strip': sliding along the bar shows every mode in a strip above it,
@@ -7362,6 +7381,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 .app.rail-auto .mode-rail:focus-within {
   transform: none;
 }
+/* Gone once a mode is chosen from it, though the pointer is still there
+   (tuckRail). Weighs as much as the edge's hover above and comes after it. */
+.app.rail-auto .rail-edge + .mode-rail.tucked {
+  transform: translateX(-100%);
+}
 /* The layout page starts after a column that stays. */
 @media (min-width: 701px) {
   .app.has-rail .modes > :global(.layout-page) {
@@ -8376,7 +8400,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
              on it (Controls layout, asked 2026-11-10). -->
         <div class="rail-edge" aria-hidden="true"></div>
       {/if}
-      <nav class="mode-rail" aria-label="Modes" style={controlsStyle} on:pointerdown={closeLayoutFromBar}>
+      <nav class="mode-rail" class:tucked={railTucked} aria-label="Modes" style={controlsStyle} on:pointerdown={closeLayoutFromBar}>
         {#each offered as id, i (id)}
           <button
             class="mode-rail-btn"
@@ -8384,7 +8408,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
             title="{MODE_LABELS[id] || id}{i < 9 ? `  (Ctrl+${i + 1})` : ''}"
             aria-label={MODE_LABELS[id] || id}
             aria-current={id === mode ? 'page' : undefined}
-            on:click={() => setMode(id)}
+            on:click={(event) => { setMode(id); tuckRail(event.currentTarget); }}
           >
             <ModeIcon mode={id} size={22} />
           </button>
