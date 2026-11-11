@@ -38,7 +38,7 @@
   import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import {
-    blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, dropSide,
+    blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, clickWrites, dropSide,
     PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
     setPlaceField, placesById, withTitle, TITLE_ID
   } from '../utils/pageLayout.js';
@@ -165,8 +165,23 @@
     editorOf(blockId)?.commands.focus('end');
   }
 
+  // Where the press that ends in a click began: a click writes only when it
+  // began on the empty page too, with no drag (clickWrites in
+  // utils/pageLayout.js).
+  let pagePress = null;
+  const onEmptyPage = target => !target?.closest?.('.page-cell, button, input, a, .page-title');
+  function onPagePointerDown(event) {
+    pagePress = { onPage: onEmptyPage(event.target), x: event.clientX, y: event.clientY };
+  }
+
   function onPageClick(event) {
-    if (event.target.closest?.('.page-cell, button, input, a, .page-title')) return;
+    if (!onEmptyPage(event.target)) return;
+    const writes = clickWrites({
+      pressOnPage: pagePress?.onPage === true,
+      moved: pagePress ? Math.hypot(event.clientX - pagePress.x, event.clientY - pagePress.y) : 0
+    });
+    pagePress = null;
+    if (!writes) return;
     const answer = clickBelow(shownRows);
     if (answer.focus) {
       caretAtEnd(answer.focus);
@@ -448,7 +463,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">

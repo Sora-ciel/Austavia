@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   normalizePageRows, normalizePageSettings, blocksOnPage, blocksOffPage,
-  tidyPage, putOnPage, takeOffPage, placeOnPage, samePage, clickBelow, dropSide, blockPickName
+  tidyPage, putOnPage, takeOffPage, placeOnPage, samePage, clickBelow, clickWrites, dropSide, blockPickName
 } from '../src/utils/pageLayout.js';
 import { normalizeModeSettings } from '../src/utils/modeSettings.js';
 
@@ -204,4 +204,14 @@ test('the title is first until it is moved, and then stays where it was put', ()
   const moved = placeOnPage(withTitle(rows), TITLE_ID, { targetId: 'a', side: 'below' });
   assert.deepEqual(shape(withTitle(moved)), ['a', TITLE_ID, 'b']);
   assert.deepEqual(shape(tidyPage(moved, [{ id: 'a' }, { id: 'b' }])), ['a', TITLE_ID, 'b'], 'not tidied away as a missing block');
+});
+
+// Reported 2026-11-11: selecting writing and dragging past the block made the
+// page jump, not following the selection -- the release on the empty page
+// reached it as a click, and a click there writes.
+test('selecting past a block does not write on the page; only a plain click on the empty page does', () => {
+  assert.equal(clickWrites({ pressOnPage: true, moved: 0 }), true, 'a click on the empty page writes');
+  assert.equal(clickWrites({ pressOnPage: false, moved: 200 }), false, 'a selection dragged out of a block');
+  assert.equal(clickWrites({ pressOnPage: false, moved: 0 }), false, 'pressed in a block, let go on the page');
+  assert.equal(clickWrites({ pressOnPage: true, moved: 40 }), false, 'a drag on the page');
 });

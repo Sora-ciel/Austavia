@@ -267,6 +267,24 @@ export function samePage(a, b) {
   return JSON.stringify(normalizePageRows(a)) === JSON.stringify(normalizePageRows(b));
 }
 
+/** How far the pointer may move between press and release and still be a click. */
+export const CLICK_SLOP_PX = 5;
+
+/**
+ * Whether a click on the page writes (clickBelow): only a click begun and
+ * ended on the empty page, without a drag. A selection left from before does
+ * not stop it -- a plain click there is meant to write.
+ *
+ * Reported 2026-11-11: selecting writing and dragging past the block made
+ * the page jump somewhere the selection was not. A press in a block and a
+ * release on the empty page reach the page as a click -- the browser sends it
+ * to the nearest thing both were in -- so it wrote: the caret went to the end
+ * of the last text block, or into a new one, and the page scrolled there.
+ */
+export function clickWrites({ pressOnPage = false, moved = 0 } = {}) {
+  return pressOnPage && moved <= CLICK_SLOP_PX;
+}
+
 /**
  * What a click on the empty page below everything does: write. Into the last
  * row's text block when the page ends with writing (`{ focus: id }`), or into
