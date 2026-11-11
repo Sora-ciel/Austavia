@@ -38,7 +38,8 @@
   import { isPrimaryPointer } from '../utils/pointer.js';
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, dropSide,
-    PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth
+    PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
+    setPlaceField, placesById, withTitle, TITLE_ID
   } from '../utils/pageLayout.js';
 
   export let openFolder = '';
@@ -71,7 +72,13 @@
   $: narrow = isNarrow(innerWidth);
   $: rows = rowsFor(page, narrow);
   // A page block never shows itself, which would open it inside itself.
-  $: shownRows = blocksOnPage(rows, blocks.filter(block => block.id !== pageId));
+  // The title is placed among the blocks (pageLayout.js withTitle), drawn
+  // here rather than by a block component.
+  const TITLE_BLOCK = { id: TITLE_ID, type: TITLE_ID };
+  $: shownRows = blocksOnPage(withTitle(rows), [...blocks.filter(block => block.id !== pageId), TITLE_BLOCK]);
+  // How each block is shown on this page in this layout: its crop, a nest's
+  // tile size (asked 2026-11-10, per layout like its place).
+  $: places = placesById(rows);
 
   // ── Edit mode: pictures sized and cropped (asked 2026-11-10) ─────────
   // "activate an edit mode for that mode. where you can change the images
@@ -112,12 +119,24 @@
     window.addEventListener('pointerup', onUp);
   }
 
+  // On a page a crop is the layout's, like the picture's place (asked
+  // 2026-11-10: "on phone or pc you have different crop following the same
+  // rule as block moving"); the picture's own crop is the viewer's to set.
   function applyCrop(crop) {
     const block = cropping;
     cropping = null;
     if (!block) return;
-    dispatch('update', { id: block.id, crop, changedKeys: ['crop'], pushToHistory: true, bumpVersion: true });
+    changeLayout(r => setPlaceField(r, block.id, 'crop', crop));
   }
+
+  // A nest's tile size, in edit mode, per layout.
+  let liveTile = null; // { id, size } while the slider moves
+  const tileOf = id => (liveTile?.id === id ? liveTile.size : places.get(id)?.tile);
+  function setTile(id, size) {
+    liveTile = null;
+    changeLayout(r => setPlaceField(r, id, 'tile', size));
+  }
+
 
   /** Putting on or taking off -- the page's content, both layouts. */
   function changeContent(op) {
@@ -126,7 +145,8 @@
 
   /** Moving -- the layout in use only. */
   function changeLayout(op) {
-    dispatch('pageChange', { page: editPage(page, { narrow, op }) });
+    // With the title among the rows, so it can be moved and dropped by.
+    dispatch('pageChange', { page: editPage(page, { narrow, op: r => op(withTitle(r)) }) });
   }
 
   // ── Writing anywhere ─────────────────────────────────────────────────
@@ -377,7 +397,7 @@
     } else if (!dragging && press) {
       // A press without a move is a click: the menu.
       const handle = canvasRef?.querySelector(`[data-page-block="${press.blockId}"] .page-handle`);
-      if (handle) openMenu(press.blockId, handle);
+      if (handle && press.blockId !== TITLE_ID) openMenu(press.blockId, handle);
     }
     press = null;
     dragging = null;
@@ -432,19 +452,6 @@
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">
-    {#if renaming}
-      <input
-        class="page-title page-title-input"
-        aria-label="Page name"
-        value={title}
-        bind:this={titleInput}
-        on:keydown={titleKeydown}
-        on:blur={finishRename}
-      />
-    {:else}
-      <button class="page-title" title="Press to rename" on:click={startRename}>{title || 'Untitled'}</button>
-    {/if}
-
     {#each shownRows as row (row.key)}
       <div class="page-row" class:several={row.columns.length > 1}>
         {#each row.columns as col (col.key)}
@@ -464,12 +471,27 @@
                   on:pointerdown|preventDefault={(event) => handleDown(event, block.id)}
                   on:click|stopPropagation
                 >
-                  <svg viewBox="0 0 10 16" aria-hidden="true">
-                    <circle cx="2.5" cy="3" r="1.4" /><circle cx="7.5" cy="3" r="1.4" />
-                    <circle cx="2.5" cy="8" r="1.4" /><circle cx="7.5" cy="8" r="1.4" />
-                    <circle cx="2.5" cy="13" r="1.4" /><circle cx="7.5" cy="13" r="1.4" />
+                  <!-- Four arrows: moving, in the app's own drawing rather
+                       than Notion's six dots (asked 2026-11-10). -->
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3v18M3 12h18" />
+                    <path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3" />
                   </svg>
                 </button>
+                {#if block.id === TITLE_ID}
+                  {#if renaming}
+                    <input
+                      class="page-title page-title-input"
+                      aria-label="Page name"
+                      value={title}
+                      bind:this={titleInput}
+                      on:keydown={titleKeydown}
+                      on:blur={finishRename}
+                    />
+                  {:else}
+                    <button class="page-title" title="Press to rename" on:click={startRename}>{title || 'Untitled'}</button>
+                  {/if}
+                {:else}
                 <Block
                   {block}
                   placement="page"
@@ -486,7 +508,25 @@
                   on:slashKey={(e) => onSlashKey(e.detail)}
                   on:play
                   on:toggle
+                  pageCrop={places.get(block.id)?.crop}
+                  tileSize={tileOf(block.id)}
                 />
+                {/if}
+                {#if editMode && block.type === 'nest'}
+                  <label class="page-edit-tools page-tile-size" title="Size of the tiles">
+                    Tiles
+                    <input
+                      type="range"
+                      min="100"
+                      max="360"
+                      step="10"
+                      value={tileOf(block.id) || 210}
+                      on:input={(e) => (liveTile = { id: block.id, size: Number(e.target.value) })}
+                      on:change={(e) => setTile(block.id, Number(e.target.value))}
+                      on:pointerdown|stopPropagation
+                    />
+                  </label>
+                {/if}
                 {#if editMode && block.type === 'image'}
                   <div class="page-edit-tools">
                     <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
@@ -732,9 +772,31 @@
   }
 
   .page-handle svg {
-    width: 9px;
+    width: 15px;
     height: 15px;
-    fill: currentColor;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* On a phone, blocks are moved in edit mode only (asked 2026-11-10), so a
+     finger reading or scrolling the page never picks one up. */
+  .page-mode.narrow:not(.edit-mode) .page-handle {
+    display: none;
+  }
+
+  .page-tile-size {
+    left: auto;
+    right: 8px;
+    top: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 85%, transparent);
+    font-size: 0.8rem;
   }
 
   .page-cell:hover > .page-handle,

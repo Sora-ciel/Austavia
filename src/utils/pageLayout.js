@@ -191,9 +191,25 @@ function keepEntries(rows, keep) {
   })));
 }
 
-/** The rows without the local entries whose block is gone; other folders' stay. */
+/**
+ * The page's title as a place in its rows (asked 2026-11-10: "make it so
+ * titles in pages or folders in page mode can be moved places with other
+ * blocks"). Not a block: Page mode draws the folder's name or the page's
+ * title there. A page whose rows do not hold it shows it first.
+ */
+export const TITLE_ID = '__title';
+
+/** The rows with the title placed: as stored when they hold it, else first. */
+export function withTitle(rows) {
+  const list = normalizePageRows(rows);
+  if (rowOf(list, TITLE_ID) !== -1) return list;
+  return [{ cells: [{ blockId: TITLE_ID }] }, ...list];
+}
+
+/** The rows without the local entries whose block is gone; other folders' stay, and so does the title. */
 export function tidyPage(rows, blocks = []) {
   const ids = new Set((blocks || []).map(block => block.id));
+  ids.add(TITLE_ID);
   return keepEntries(rows, entry => !isLocal(entry) || ids.has(entry.blockId));
 }
 
@@ -314,4 +330,35 @@ export function setCellWidth(rows, blockId, width) {
       return width == null ? rest : { ...rest, width: Math.max(0.15, Math.min(1, Number(width))) };
     })
   }));
+}
+
+/**
+ * The rows with a field set on one block's place, or cleared (null): how that
+ * block is shown on this page in this layout, as a picture's crop or a nest's
+ * tile size (asked 2026-11-10: "on phone or pc you have different crop
+ * following the same rule as block moving"). On the entry, wherever it sits
+ * in its column; editPage keeps each layout's own.
+ */
+export function setPlaceField(rows, blockId, key, value) {
+  const set = entry => {
+    if (!isLocal(entry) || entry.blockId !== blockId) return entry;
+    const { [key]: _old, ...rest } = entry;
+    return value == null ? rest : { ...rest, [key]: value };
+  };
+  return normalizePageRows(normalizePageRows(rows).map(row => ({
+    ...row,
+    cells: row.cells.map(cell => {
+      const head = set(cell);
+      return Array.isArray(cell.under) ? { ...head, under: cell.under.map(set) } : head;
+    })
+  })));
+}
+
+/** Each block's place on the page, by id: the stored entry, with its own fields. */
+export function placesById(rows) {
+  const out = new Map();
+  for (const row of normalizePageRows(rows)) for (const cell of row.cells) for (const entry of stackOf(cell)) {
+    if (isLocal(entry)) out.set(entry.blockId, entry);
+  }
+  return out;
 }

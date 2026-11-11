@@ -117,15 +117,15 @@ moment, archive instead of delete) after these, in an order to be agreed.
 3. *Done 2026-11-10.* **Checkboxes** (the ones in notes, habits, Single Note, the Canvas...):
    outlined in the writing's colour, a little thicker.
 4. *Done 2026-11-10.* **Cobalt Wire: the blue a little more cyan.**
-5. **Page edit mode: the size of a nest's tiles**, per layout like a
+5. *Done 2026-11-10.* **Page edit mode: the size of a nest's tiles**, per layout like a
    picture's size.
-6. **Page mode: a crop per layout** -- a phone and a computer crop a picture
+6. *Done 2026-11-10.* **Page mode: a crop per layout** -- a phone and a computer crop a picture
    on a page apart, as they lay it out apart. On the cell.
 7. **The picture viewer crops too**: the picture itself (as the Canvas shows
    it), or a cropped copy to download, or a new picture block from it.
-8. **Page mode: the title moves like a block.**
-9. **Page mode: a handle that does not look like Notion's.**
-10. **Page mode on a phone: blocks move only in edit mode.**
+8. *Done 2026-11-10.* **Page mode: the title moves like a block.**
+9. *Done 2026-11-10.* **Page mode: a handle that does not look like Notion's.**
+10. *Done 2026-11-10.* **Page mode on a phone: blocks move only in edit mode.**
 11. **Music dropped on the app goes into the library**, and opens Playlist
     mode if another mode is open.
 12. **Waiting on a decision: how modes are changed**, on a phone and a

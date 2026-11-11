@@ -43,6 +43,8 @@
   export let focused = false;
   export let canvasScale = 1;
   export let placement = 'canvas';
+  /** The tiles' width on a page, set in its edit mode (per layout); the default when none. */
+  export let tileSize = undefined;
 
   const appDialogs = getContext('appDialogs');
   const folders = getContext('folders') || {
@@ -161,7 +163,7 @@
   on:delete
   on:focusToggle
 >
-  <div class="nest" class:on-page={placement === 'page'}>
+  <div class="nest" class:on-page={placement === 'page'} class:sized={Boolean(tileSize)} style={tileSize ? `--tile: ${tileSize}px;` : ''}>
     {#if placement === 'page'}
       <div class="nest-title">{title}</div>
     {/if}
@@ -352,6 +354,18 @@
       font-size: 1rem;
       padding: 9px 11px;
     }
+  }
+
+  /* A size chosen in Page mode's edit mode, on any screen. */
+  .nest.sized .nest-tiles {
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile), 1fr)) !important;
+  }
+  .nest.sized .nest-tile,
+  .nest.sized .nest-open {
+    min-height: calc(var(--tile) * 0.9) !important;
+  }
+  .nest.sized .nest-cover {
+    min-height: calc(var(--tile) * 0.65) !important;
   }
 
   /* No hover on a phone: the remove button is always there, faintly. */

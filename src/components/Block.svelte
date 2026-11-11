@@ -30,6 +30,10 @@
   export let isPlaying = false;
   /** Drawn full size by a mode of its own (a calendar in Calendar mode). */
   export let big = false;
+  /** On a page: this layout's crop of a picture, over the picture's own (undefined for none). */
+  export let pageCrop = undefined;
+  /** On a page: this layout's size for a nest's tiles. */
+  export let tileSize = undefined;
 
   $: common = {
     id: block.id,
@@ -68,7 +72,7 @@
     initialSrc={block.src}
     initialResolvedSrc={block.resolvedSrc}
     initialAttachmentRequiresAuth={block.attachmentRequiresAuth}
-    initialCrop={block.crop}
+    initialCrop={pageCrop !== undefined ? pageCrop : block.crop}
     on:delete
     on:update
     on:focusToggle
@@ -109,6 +113,7 @@
   <NestBlock
     {...common}
     initialLinks={block.links}
+    {tileSize}
     initialTitle={block.title}
     on:delete
     on:update

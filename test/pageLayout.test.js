@@ -178,3 +178,30 @@ test('an older build reads the column\'s top block, and keeps the rest as a fiel
   const page = [{ cells: [{ blockId: 'b', under: [{ blockId: 'c', newer: 1 }] }] }];
   assert.deepEqual(normalizePageRows(page), page);
 });
+
+// Asked 2026-11-10: a crop and a nest's tile size per layout, "following the
+// same rule as block moving"; and the title movable like a block.
+import { setPlaceField, placesById, withTitle, TITLE_ID } from '../src/utils/pageLayout.js';
+
+test('a picture is cropped on a phone without changing the computer\'s crop', () => {
+  const page = { rows: rowsOf(['img', 't']) };
+  const phone = editPage(page, { narrow: true, op: r => setPlaceField(r, 'img', 'crop', { x: 0, y: 0, w: 0.5, h: 1 }) });
+  assert.deepEqual(placesById(rowsFor(phone, true)).get('img').crop, { x: 0, y: 0, w: 0.5, h: 1 });
+  assert.equal(placesById(rowsFor(phone, false)).get('img').crop, undefined);
+  const cleared = setPlaceField(rowsFor(phone, true), 'img', 'crop', null);
+  assert.equal(placesById(cleared).get('img').crop, undefined);
+});
+
+test('a place\'s own fields go with it when it moves, inside a column too', () => {
+  let rows = setPlaceField(rowsOf(['a', 'b']), 'b', 'tile', 220);
+  rows = placeOnPage(rows, 'b', { targetId: 'a', side: 'under' });
+  assert.equal(placesById(rows).get('b').tile, 220);
+});
+
+test('the title is first until it is moved, and then stays where it was put', () => {
+  const rows = rowsOf(['a'], ['b']);
+  assert.deepEqual(shape(withTitle(rows)), [TITLE_ID, 'a', 'b']);
+  const moved = placeOnPage(withTitle(rows), TITLE_ID, { targetId: 'a', side: 'below' });
+  assert.deepEqual(shape(withTitle(moved)), ['a', TITLE_ID, 'b']);
+  assert.deepEqual(shape(tidyPage(moved, [{ id: 'a' }, { id: 'b' }])), ['a', TITLE_ID, 'b'], 'not tidied away as a missing block');
+});
