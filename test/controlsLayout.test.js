@@ -65,3 +65,29 @@ test('a slide along the bar goes through a mode for every step of it, either way
   assert.equal(modeAfterSteps(MODES, {}, 'default', -1), 'playlist');
   assert.equal(modeAfterSteps(MODES, {}, 'task', 0), 'task');
 });
+
+// Asked 2026-11-10: two ways to change mode from the bar, to compare --
+// "always at the same place each mode and if you went back to the middle you
+// stay on the mode you were", or "a slide from the controls but then up and
+// it shows all the modes ... you just have to let go your finger on the mode".
+import { stripChoice, gestureStart } from '../src/utils/controlsLayout.js';
+
+test('in the strip every mode keeps its place, and going back to where the finger started keeps the open one', () => {
+  const at = x => stripChoice({ startX: 200, x, currentIndex: 3, count: 8, slot: 48 }).index;
+  assert.equal(at(200), 3);
+  assert.equal(at(250), 4);
+  assert.equal(at(100), 1);
+  assert.equal(at(600), 7, 'never past the last');
+  assert.equal(at(-400), 0, 'never before the first');
+  assert.equal(at(205), 3, 'back near the start is the open mode again');
+  assert.equal(stripChoice({ startX: 200, x: 200, currentIndex: 3, count: 8, slot: 48 }).left, 200 - 3.5 * 48);
+});
+
+test('a finger going up from the bar opens the sheet, across the strip', () => {
+  assert.equal(gestureStart(3, -4), null);
+  assert.equal(gestureStart(4, -40), 'up');
+  assert.equal(gestureStart(-40, -6), 'across');
+  assert.equal(gestureStart(2, 40), null, 'down is nothing');
+  assert.equal(normalizeLayout({ modeGesture: 'sheet' }).modeGesture, 'sheet');
+  assert.equal(normalizeLayout({ modeGesture: 'wiggle' }).modeGesture, 'strip');
+});

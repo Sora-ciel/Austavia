@@ -32,7 +32,16 @@ export const LAYOUT_KEY = 'austavia.controlsLayout';
 export const PHONE_LAYOUTS = ['bottom', 'top'];
 export const COMPUTER_LAYOUTS = ['rail', 'top'];
 export const STATUS_BAR = ['shown', 'hidden'];
-export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'rail', order: [], hidden: [], statusBar: 'shown' });
+/**
+ * How a finger on the phone's bar changes mode -- two to compare, asked
+ * 2026-11-10: "make it so that i can change between one or the other to see
+ * which one is neater". 'strip': sliding along the bar shows every mode in a
+ * strip, each at its own place, the open one where the finger started.
+ * 'sheet': sliding up from the bar opens the modes, and letting go on one
+ * opens it.
+ */
+export const MODE_GESTURES = ['strip', 'sheet'];
+export const DEFAULT_LAYOUT = Object.freeze({ phone: 'bottom', computer: 'rail', order: [], hidden: [], statusBar: 'shown', modeGesture: 'strip' });
 
 const strings = list => (Array.isArray(list) ? list.filter(item => typeof item === 'string' && item) : []);
 
@@ -44,7 +53,8 @@ export function normalizeLayout(raw) {
     computer: COMPUTER_LAYOUTS.includes(value.computer) ? value.computer : DEFAULT_LAYOUT.computer,
     order: [...new Set(strings(value.order))],
     hidden: [...new Set(strings(value.hidden))],
-    statusBar: STATUS_BAR.includes(value.statusBar) ? value.statusBar : DEFAULT_LAYOUT.statusBar
+    statusBar: STATUS_BAR.includes(value.statusBar) ? value.statusBar : DEFAULT_LAYOUT.statusBar,
+    modeGesture: MODE_GESTURES.includes(value.modeGesture) ? value.modeGesture : DEFAULT_LAYOUT.modeGesture
   };
 }
 
@@ -131,4 +141,25 @@ export function modeAfterSteps(allModes, layout, current, steps) {
   const at = Math.max(0, offered.indexOf(current));
   const n = offered.length;
   return offered[(((at + steps) % n) + n) % n];
+}
+
+/**
+ * The strip of modes (modeGesture 'strip'): each mode a slot `slot` pixels
+ * wide, the open one under where the finger started -- so going back there
+ * keeps it, and every mode is always the same distance away (asked
+ * 2026-11-10: "always at the same place each mode and if you went back to
+ * the middle you stay on the mode you were"). The index chosen, kept within
+ * the strip, and where the strip's left edge is drawn.
+ */
+export function stripChoice({ startX, x, currentIndex, count, slot }) {
+  const index = Math.max(0, Math.min(count - 1, currentIndex + Math.round((x - startX) / slot)));
+  return { index, left: startX - (currentIndex + 0.5) * slot };
+}
+
+/** Which way a finger set off from the bar: 'across' (the strip), 'up' (the sheet), or null while it has not gone far. */
+export function gestureStart(dx, dy, { min = 12 } = {}) {
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < min) return null;
+  if (-dy > Math.abs(dx)) return 'up';
+  if (Math.abs(dx) >= Math.abs(dy)) return 'across';
+  return null;
 }

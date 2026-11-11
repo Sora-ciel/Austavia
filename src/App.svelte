@@ -3,7 +3,7 @@
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
-  import { readLayout, writeLayout, offeredModes, slideSteps, modeAfterSteps } from './utils/controlsLayout.js';
+  import { readLayout, writeLayout, offeredModes, stripChoice, gestureStart } from './utils/controlsLayout.js';
   import ModeIcon from './components/ModeIcon.svelte';
   import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
@@ -3917,28 +3917,56 @@
   // The Controls layout page, over the whole mode area, from Advanced settings.
   let showControlsLayout = false;
 
-  // A slide along the bar on a phone: through as many modes as it goes,
-  // the one it will open shown above the bar while sliding (asked
-  // 2026-11-10; slideSteps and modeAfterSteps in utils/controlsLayout.js).
-  let barSwipe = null;
-  let slidePreview = null; // the mode a slide would open, while sliding
+  // A finger on the phone's bar changes mode, one of two ways to compare
+  // (Controls layout, modeGesture; asked 2026-11-10):
+  // - 'strip': sliding along the bar shows every mode in a strip above it,
+  //   each at its own place, the open one where the finger started;
+  // - 'sheet': sliding up from the bar opens every mode, and letting go on
+  //   one opens it.
+  // utils/controlsLayout.js decides (gestureStart, stripChoice).
+  const STRIP_SLOT = 52;
+  let barGesture = null; // { kind: null | 'strip' | 'sheet', startX, startY }
+  let stripIndex = -1;
+  let stripLeft = 0;
+  let sheetPick = null;
+  $: stripSlot = typeof window !== 'undefined' ? Math.min(STRIP_SLOT, Math.floor((window.innerWidth - 16) / Math.max(1, offered.length))) : STRIP_SLOT;
+
   function barTouchStart(event) {
-    if (event.touches?.length !== 1 || window.innerWidth > 700 || event.target.closest?.('input, .mini-player, .player-panel')) { barSwipe = null; return; }
-    barSwipe = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    barGesture = null;
+    if (event.touches?.length !== 1 || window.innerWidth > 700 || controlsLayout.phone !== 'bottom') return;
+    if (event.target.closest?.('input, .mini-player, .player-panel')) return;
+    barGesture = { kind: null, startX: event.touches[0].clientX, startY: event.touches[0].clientY };
   }
   function barTouchMove(event) {
-    if (!barSwipe) return;
+    if (!barGesture) return;
     const t = event.touches?.[0];
     if (!t) return;
-    const steps = slideSteps(t.clientX - barSwipe.x, t.clientY - barSwipe.y);
-    if (steps === null) { barSwipe = null; slidePreview = null; return; }
-    slidePreview = steps ? modeAfterSteps(MODE_ORDER, controlsLayout, mode, steps) : null;
+    if (!barGesture.kind) {
+      const way = gestureStart(t.clientX - barGesture.startX, t.clientY - barGesture.startY);
+      if (!way) return;
+      const wanted = controlsLayout.modeGesture === 'sheet' ? 'up' : 'across';
+      if (way !== wanted) { barGesture = null; return; }
+      barGesture = { ...barGesture, kind: controlsLayout.modeGesture };
+    }
+    if (barGesture.kind === 'strip') {
+      const choice = stripChoice({ startX: barGesture.startX, x: t.clientX, currentIndex: Math.max(0, offered.indexOf(mode)), count: offered.length, slot: stripSlot });
+      stripIndex = choice.index;
+      stripLeft = choice.left;
+    } else {
+      const hit = document.elementFromPoint(t.clientX, t.clientY)?.closest?.('[data-gesture-mode]');
+      sheetPick = hit ? hit.dataset.gestureMode : null;
+    }
   }
   function barTouchEnd() {
-    const target = slidePreview;
-    barSwipe = null;
-    slidePreview = null;
+    const g = barGesture;
+    const target = g?.kind === 'strip' ? offered[stripIndex] : g?.kind === 'sheet' ? sheetPick : null;
+    cancelBarGesture();
     if (target && target !== mode) setMode(target);
+  }
+  function cancelBarGesture() {
+    barGesture = null;
+    stripIndex = -1;
+    sheetPick = null;
   }
 
   // Ctrl+1 to Ctrl+9 on a computer: the modes, in the order shown.
@@ -7139,9 +7167,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   box-sizing: border-box;
   overflow-y: auto;
   scrollbar-width: none;
-  background: color-mix(in srgb, var(--controls-bg, #111) 45%, transparent);
-  backdrop-filter: blur(6px);
-  border-right: 1px solid color-mix(in srgb, var(--controls-border, #333) 70%, transparent);
+  /* The bar's own colours from the theme, as the theme has them -- a
+     see-through theme's bar is see-through here too (asked 2026-11-10). They
+     are set on the bar only, so the column is handed them as well. */
+  background: var(--controls-bg, #111);
+  border-right: 1px solid var(--controls-border, #333);
   z-index: 900;
 }
 .mode-rail-btn {
@@ -7153,7 +7183,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   justify-content: center;
   border-radius: 8px;
   border: 1px solid var(--controls-border, #333);
-  background: var(--controls-bg, #333);
+  background: var(--controls-button-bg, var(--controls-bg, #333));
   color: var(--controls-button-text, var(--controls-text, #fff));
   cursor: pointer;
   transition: filter 0.15s ease;
@@ -7163,36 +7193,95 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
 }
 @media (min-width: 701px) {
-  .app.has-rail .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.slide-preview)) {
+  .app.has-rail .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
     padding-left: 56px !important;
     box-sizing: border-box;
   }
 }
 @media (max-width: 700px) {
-  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.slide-preview)) {
+  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
     padding-top: var(--safe-top, 0px) !important;
     box-sizing: border-box;
   }
 }
-/* While sliding along the bar: the mode it will open, above the bar, in the
-   bar's own colours. */
-.slide-preview {
+/* The strip of modes while sliding along the bar (modeGesture 'strip'). */
+.mode-strip {
   position: fixed;
-  left: 50%;
-  bottom: calc(var(--controls-height, 56px) + 18px);
-  transform: translateX(-50%);
+  bottom: calc(var(--controls-height, 56px) + 14px);
   z-index: 1500;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--controls-border, #333);
-  background: var(--controls-bg, #111);
-  color: var(--controls-button-text, var(--controls-text, #fff));
-  font-weight: 700;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  align-items: flex-end;
   pointer-events: none;
+}
+.strip-slot {
+  position: relative;
+  width: var(--slot);
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--controls-bg, #111);
+  border: 1px solid var(--controls-border, #333);
+  color: var(--controls-button-text, var(--controls-text, #fff));
+  opacity: 0.75;
+  box-sizing: border-box;
+}
+.strip-slot.open { border-style: dashed; }
+.strip-slot.chosen {
+  opacity: 1;
+  height: 56px;
+  box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff)), 0 6px 18px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+.strip-name {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--controls-bg, #111);
+  border: 1px solid var(--controls-border, #333);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+/* The sheet of modes while sliding up from the bar (modeGesture 'sheet'). */
+.gesture-sheet {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(var(--controls-height, 56px) + 8px);
+  z-index: 1500;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: var(--controls-bg, #111);
+  border: 1px solid var(--controls-border, #333);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.gesture-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 70px;
+  border-radius: 10px;
+  border: 1px solid var(--controls-border, #333);
+  background: var(--controls-button-bg, transparent);
+  color: var(--controls-button-text, var(--controls-text, #fff));
+  font-size: 0.78rem;
+  text-align: center;
+}
+.gesture-mode.open { border-style: dashed; }
+.gesture-mode.chosen {
+  box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
+  transform: scale(1.05);
 }
 
 /* The column is a computer's; a phone has the sheet and the swipe. After the
@@ -7863,7 +7952,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   {#if channelBadgeText}
     <div class="channel-badge channel-{channel}" aria-label="This is {channelName(channel)}">{channelBadgeText}</div>
   {/if}
-  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={() => { barSwipe = null; slidePreview = null; }}>
+  <div class="controls" bind:this={controlsRef} style={controlsStyle} on:touchstart|passive={barTouchStart} on:touchmove|passive={barTouchMove} on:touchend|passive={barTouchEnd} on:touchcancel|passive={cancelBarGesture}>
     <LeftControls
       modeIds={offered}
       bind:currentSaveName
@@ -8187,7 +8276,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     <!-- The modes, a click away, down the left edge on a computer (PENDING,
          "How modes are changed", stage d); Ctrl+1 to 9 in the same order. -->
     {#if controlsLayout.computer === 'rail'}
-      <nav class="mode-rail" aria-label="Modes">
+      <nav class="mode-rail" aria-label="Modes" style={controlsStyle}>
         {#each offered as id, i (id)}
           <button
             class="mode-rail-btn"
@@ -8202,11 +8291,27 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         {/each}
       </nav>
     {/if}
-    {#if slidePreview}
-      <!-- The mode a slide along the bar will open, while sliding. -->
-      <div class="slide-preview" aria-live="polite">
-        <ModeIcon mode={slidePreview} size={26} />
-        <span>{MODE_LABELS[slidePreview] || slidePreview}</span>
+    {#if barGesture?.kind === 'strip' && stripIndex >= 0}
+      <!-- Every mode at its own place above the bar, the one the finger is
+           over raised with its name. In the bar's colours. -->
+      <div class="mode-strip" style="{controlsStyle} left: {stripLeft}px; --slot: {stripSlot}px;" aria-hidden="true">
+        {#each offered as id, i (id)}
+          <div class="strip-slot" class:chosen={i === stripIndex} class:open={id === mode}>
+            {#if i === stripIndex}<span class="strip-name">{MODE_LABELS[id] || id}</span>{/if}
+            <ModeIcon mode={id} size={i === stripIndex ? 26 : 20} />
+          </div>
+        {/each}
+      </div>
+    {/if}
+    {#if barGesture?.kind === 'sheet'}
+      <!-- Every mode, rising from the bar; letting go on one opens it. -->
+      <div class="gesture-sheet" style={controlsStyle} aria-hidden="true">
+        {#each offered as id (id)}
+          <div class="gesture-mode" data-gesture-mode={id} class:chosen={id === sheetPick} class:open={id === mode}>
+            <ModeIcon mode={id} size={24} />
+            <span>{MODE_LABELS[id] || id}</span>
+          </div>
+        {/each}
       </div>
     {/if}
     {#if showControlsLayout}

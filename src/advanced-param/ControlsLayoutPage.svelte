@@ -27,6 +27,11 @@
     { id: 'bottom', title: 'The bar at the bottom', note: 'Within reach of a thumb, the same height as before. The modes in a sheet; slide along the bar to change mode.' },
     { id: 'top', title: 'The bar at the top', note: 'As it was before.' }
   ];
+  // Two ways to change mode from the bar, to try both (asked 2026-11-10).
+  const GESTURES = [
+    { id: 'strip', title: 'Slide along the bar', note: 'Every mode in a strip above the bar, each at its own place; back where you started keeps the mode you are in.' },
+    { id: 'sheet', title: 'Slide up from the bar', note: 'Every mode rises from the bar; let go on the one you want.' }
+  ];
   const STATUS = [
     { id: 'shown', title: 'Shown', note: 'The time and battery stay; the mode reaches up under them, its writing kept clear.' },
     { id: 'hidden', title: 'Hidden', note: 'More room. A swipe down from the top edge shows them for a moment.' }
@@ -50,6 +55,15 @@
       <div class="choice-group" role="radiogroup" aria-label="The bar on a phone">
         {#each PHONE as option}
           <button class="choice" class:on={layout.phone === option.id} role="radio" aria-checked={layout.phone === option.id} on:click={() => set({ ...layout, phone: option.id })}>
+            <span class="choice-title">{option.title}</span>
+            <span class="choice-note">{option.note}</span>
+          </button>
+        {/each}
+      </div>
+      <h4>Changing mode with a finger on the bar</h4>
+      <div class="choice-group" role="radiogroup" aria-label="Changing mode from the bar">
+        {#each GESTURES as option}
+          <button class="choice" class:on={layout.modeGesture === option.id} role="radio" aria-checked={layout.modeGesture === option.id} on:click={() => set({ ...layout, modeGesture: option.id })}>
             <span class="choice-title">{option.title}</span>
             <span class="choice-note">{option.note}</span>
           </button>
