@@ -76,6 +76,28 @@
     shell?.commit(['links'], {}, { links, title });
   }
 
+  // Its name, renamed by pressing it, as a page's title is -- asked
+  // 2026-11-11: "I want nests to be able to change name in page mode ...
+  // otherwise it's hard to see which nest is which". The block's own field,
+  // so it syncs; empty goes back to "Nest".
+  let renaming = false;
+  function focusAndSelect(node) {
+    node.focus();
+    node.select();
+  }
+  function finishRename(event, keep = true) {
+    if (!renaming) return;
+    renaming = false;
+    const to = event.target.value.trim() || 'Nest';
+    if (!keep || to === title) return;
+    title = to;
+    shell?.commit(['title'], {}, { links, title });
+  }
+  function renameKey(event) {
+    if (event.key === 'Enter') { event.preventDefault(); finishRename(event); }
+    else if (event.key === 'Escape') { event.preventDefault(); finishRename(event, false); }
+  }
+
   function removeLink(key) {
     save(links.filter(link => linkKey(link) !== key));
   }
@@ -165,7 +187,20 @@
 >
   <div class="nest" class:on-page={placement === 'page'} class:sized={Boolean(tileSize)} style={tileSize ? `--tile: ${tileSize}px;` : ''}>
     {#if placement === 'page'}
-      <div class="nest-title">{title}</div>
+      {#if renaming}
+        <input
+          class="nest-title nest-title-input"
+          aria-label="Nest name"
+          value={title}
+          use:focusAndSelect
+          on:keydown={renameKey}
+          on:blur={finishRename}
+          on:pointerdown|stopPropagation
+          on:click|stopPropagation
+        />
+      {:else}
+        <button class="nest-title" title="Press to rename" on:click|stopPropagation={() => (renaming = true)}>{title}</button>
+      {/if}
     {/if}
     <div class="nest-tiles">
       {#each tiles as tile (tile.key)}
@@ -226,9 +261,26 @@
   }
 
   .nest-title {
+    display: block;
     font-weight: 700;
     font-size: 1.05rem;
     margin-bottom: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    text-align: left;
+    cursor: text;
+  }
+
+  .nest-title-input {
+    width: 100%;
+    max-width: 24em;
+    box-sizing: border-box;
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
   }
 
   .nest-tiles {
