@@ -2,5 +2,24 @@
   "projects": {
     "default": "arial-473c1",
     "staging": "arial-staging"
+  },
+  "targets": {
+    "arial-473c1": {
+      "hosting": {
+        "app": [
+          "arial-473c1"
+        ],
+        "site": [
+          "austavia-site"
+        ]
+      }
+    },
+    "arial-staging": {
+      "hosting": {
+        "app": [
+          "arial-staging"
+        ]
+      }
+    }
   }
 }

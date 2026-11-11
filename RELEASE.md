@@ -13,7 +13,7 @@ is not a label on the GitHub page — it is which of the steps below you run.
 
 | | Full release | Test release |
 | --- | --- | --- |
-| The live site | `firebase deploy --only hosting` | **not touched** |
+| The live site | `firebase deploy --only hosting:app` | **not touched** |
 | The web app | — | an unlisted preview channel, 30 days |
 | The apps | built and attached | built and attached |
 | GitHub | a release | `gh release create --prerelease` |
@@ -21,7 +21,7 @@ is not a label on the GitHub page — it is which of the steps below you run.
 
 The GitHub flag is the small half. **The live site is the half that reaches
 people**, and it does not care what the release was labelled, so a test release
-that runs `firebase deploy --only hosting` has shipped to everybody no matter
+that runs `firebase deploy --only hosting:app` has shipped to everybody no matter
 what the page says. Skipping that one command is what makes a test release a
 test release.
 
@@ -73,7 +73,7 @@ pre-release does can reach a real note (see the staging note in `CLAUDE.md`).
 | --- | --- |
 | Version | a test build's: 0.8.661 → 0.8.662 |
 | Rules and functions | to **staging** only, if they changed |
-| The web app | staging's own site, `firebase deploy --only hosting --project staging` after `npm run build:staging` |
+| The web app | staging's own site, `firebase deploy --only hosting:app --project staging` after `npm run build:staging` |
 | The apps | `./build_tauri.sh --staging`, `./build_apk.sh --staging` |
 | GitHub | `--prerelease`, title says *staging*, never `Latest` |
 | Production | **not touched** -- not its site, rules or functions |
@@ -215,8 +215,13 @@ git push origin v0.8.51
 **Full release only.**
 
 ```bash
-firebase deploy --only hosting
+firebase deploy --only hosting:app
 ```
+
+**`:app`, always** (since 2026-11-11): the project has two hosting sites --
+`app` is Austavia itself (austavia.app), `site` is the website at
+austavia.com (`site/`, `firebase deploy --only hosting:site`). A bare
+`--only hosting` deploys both, and on staging, which has no website, fails.
 
 Then **open it and confirm it is the build you just made** — the diagnostics
 button reports the version, which is the quickest way to be sure the upload was
@@ -228,7 +233,7 @@ Never to `live`. A preview channel is a separate, unguessable URL on the same
 project, and production is untouched:
 
 ```bash
-firebase hosting:channel:deploy testing --expires 30d
+firebase hosting:channel:deploy testing --only app --expires 30d
 ```
 
 Thirty days is the maximum the CLI allows, and deploying to the same channel
