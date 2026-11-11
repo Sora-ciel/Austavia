@@ -173,7 +173,7 @@
     border: none;
     color: inherit;
     cursor: pointer;
-    padding: 0 6px;
+    padding: 0 4px;
     font-size: 1rem;
     line-height: 1;
   }

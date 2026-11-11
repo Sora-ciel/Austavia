@@ -99,7 +99,7 @@
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 2px 6px;
+    padding: 0 4px;
     font-size: 1rem;
     line-height: 1;
     outline: none;

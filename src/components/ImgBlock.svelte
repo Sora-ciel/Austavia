@@ -263,14 +263,22 @@
     display: none;
   }
 
+  /* The whole button, the header's size (BlockShell), its sign centred. */
   .media-btn .emoji {
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 24px;
     color: var(--block-media-button-text, var(--block-header-text, var(--text)));
     background: var(--block-media-button-bg, transparent);
-    padding: 4px 6px;
+    padding: 0;
     border-radius: var(--block-control-radius, 6px);
     cursor: pointer;
-    font-size: 1.25rem;
+    font-size: 1rem;
+    line-height: 1;
   }
 
   .media-container {

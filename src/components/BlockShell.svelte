@@ -455,9 +455,36 @@
     letter-spacing: var(--block-header-letter-spacing, 0.08em);
     text-transform: var(--block-header-transform, uppercase);
   }
+  /* Every control in a header one size, in one line, its sign centred in it
+     -- asked 2026-11-11: "align all elements and make elements have the same
+     height and center well each element ... on every type of blocks". They
+     were 22, 26 and 41 pixels tall (colour, ×, a picture's ⏏), and the
+     tallest stretched the others and made that header taller than the rest.
+     Set once here for every block type, so a control a block adds later
+     takes the same size without being told; a block's own rules only give it
+     its look. */
+  .header > span {
+    line-height: 1;
+  }
   .header-controls {
+    --header-control: 24px;
+    --color-field-width: var(--header-control);
+    --color-field-height: var(--header-control);
     display: flex;
+    align-items: center;
     gap: 4px;
+  }
+  .header-controls > :global(*) {
+    flex: none;
+    box-sizing: border-box;
+    height: var(--header-control);
+    min-width: var(--header-control);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: middle;
   }
   /* No background or colour here any more. Both were overrides of what the
      editor imposed on itself, at the same specificity, so the winner depended
@@ -546,11 +573,11 @@
   }
   .delete-btn {
     background: var(--block-accent-color, var(--text));
-    border-color: transparent;
-    font-size: 1.1rem;
+    border: none;
+    font-size: 1.05rem;
     color: var(--block-accent-text, var(--bg));
     cursor: pointer;
-    padding: 0px 8px;
+    padding: 0;
     border-radius: var(--block-control-radius, 6px);
     transition: transform 0.15s ease, filter 0.2s ease;
   }
