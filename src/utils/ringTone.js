@@ -61,35 +61,48 @@ function primeOnFirstTouch() {
 /**
  * How loud the ring is, out of 1. It was 0.3, and not loud enough: "the
  * alarm isn't loud enough make it louder please" (2026-11-10). 0.9 was
- * offered, and the answer was "no just put it at 65%".
+ * offered, then 65% asked for, then "make the ring volume be 80%".
  */
-export const RING_LOUDNESS = 0.65;
+export const RING_LOUDNESS = 0.8;
+
+/** The two beeps: 880Hz, each 0.18s, the second 0.22s after the first, once a second. */
+const BEEP_HZ = 880;
+const BEEP_AT = [0, 0.22];
+const BEEP_LENGTH = 0.18;
 
 /**
- * The two beeps as a WAV file: 880Hz, each 0.18s, the second 0.22s after the
- * first, rising in 20ms and dying away -- what the Web Audio version below
- * plays, written out as samples so an ordinary <audio> can play it.
+ * The ring as a WAV file of `seconds` seconds: two beeps a second, rising in
+ * 20ms and dying away -- what the Web Audio version below plays, written out
+ * as samples so an ordinary <audio> can play it.
  *
- * Why a file at all: on the Linux app Web Audio made no sound at "Time's up"
- * even with the app clicked in, while music played through an <audio> was
- * heard (2026-11-10). So the ring goes the way the music goes, and Web Audio
- * is what is tried when that is refused.
+ * Why a file: on the Linux app Web Audio made no sound at "Time's up" even
+ * with the app clicked in, while music played through an <audio> was heard
+ * (2026-11-10).
+ *
+ * Why the whole ring in one file rather than one second repeated: a window
+ * behind others has its timers slowed, and the beeps spread out after a few
+ * seconds -- first with a timer starting each beep, then still with the
+ * <audio> looping (2026-11-10). A file that already holds two minutes of
+ * beeps has nothing to repeat. At 8000 samples a second -- plenty for an
+ * 880Hz tone -- two minutes is under 2MB.
  */
-export function beepWav(sampleRate = 22050) {
-  // A whole second, the rest silent, so played on a loop it is two beeps a
-  // second, as the ring always was.
-  const length = sampleRate;
+export function beepWav(sampleRate = 8000, seconds = 1) {
+  const length = Math.round(sampleRate * seconds);
   const data = new Int16Array(length);
-  for (const offset of [0, 0.22]) {
+  const count = Math.round(BEEP_LENGTH * sampleRate);
+  // One second of it, worked out once and copied.
+  const pattern = new Int16Array(Math.min(length, sampleRate));
+  for (const offset of BEEP_AT) {
     const from = Math.round(offset * sampleRate);
-    const count = Math.round(0.18 * sampleRate);
-    for (let i = 0; i < count && from + i < length; i += 1) {
+    for (let i = 0; i < count && from + i < pattern.length; i += 1) {
       const t = i / sampleRate;
       const rise = Math.min(1, t / 0.02);
       const fall = t < 0.02 ? 1 : Math.exp(-(t - 0.02) / 0.025);
-      data[from + i] = Math.round(Math.sin(2 * Math.PI * 880 * t) * rise * fall * RING_LOUDNESS * 32767);
+      pattern[from + i] = Math.round(Math.sin(2 * Math.PI * BEEP_HZ * t) * rise * fall * RING_LOUDNESS * 32767);
     }
   }
+  for (let at = 0; at < length; at += sampleRate) data.set(pattern.subarray(0, Math.min(pattern.length, length - at)), at);
+
   const bytes = new Uint8Array(44 + data.length * 2);
   const view = new DataView(bytes.buffer);
   const text = (at, word) => { for (let i = 0; i < word.length; i += 1) bytes[at + i] = word.charCodeAt(i); };
@@ -101,18 +114,24 @@ export function beepWav(sampleRate = 22050) {
   return bytes;
 }
 
-// As a data: address, made once. Not a blob: the Linux app's web engine
-// cannot rewind a blob (utils/audioAddress.js), and each beep is a fresh
-// <audio> from the start, so nothing is ever rewound anyway.
-let beepAddress = null;
-function beepUrl() {
-  if (beepAddress) return beepAddress;
-  const bytes = beepWav();
+// As a data: address. Not a blob: the Linux app's web engine cannot rewind a
+// blob (utils/audioAddress.js); nothing here is rewound.
+//
+// Made in memory when it is needed -- nothing is shipped with the app, so its
+// size is unchanged. The one-second chime is kept; the two-minute ring
+// (about 2.5MB as text) is made afresh for each ring and let go when it
+// stops, rather than held for the rest of the session.
+let chimeAddress = null;
+function wavUrl(seconds) {
+  if (seconds === 1 && chimeAddress) return chimeAddress;
+  const bytes = beepWav(8000, seconds);
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  beepAddress = `data:audio/wav;base64,${btoa(binary)}`;
-  return beepAddress;
+  const address = `data:audio/wav;base64,${btoa(binary)}`;
+  if (seconds === 1) chimeAddress = address;
+  return address;
 }
+const RING_SECONDS = RING_SOUND_MS / 1000;
 
 // Which way the sound went, written to the sync log once (Copy diagnostics),
 // since nobody can see from outside why a ring is silent.
@@ -123,12 +142,77 @@ function report(how) {
   import('./syncLog.js').then(({ logSync }) => logSync('ring', '', how)).catch(() => {});
 }
 
+/**
+ * The ring through Web Audio, for when the <audio> is refused: every beep of
+ * the two minutes lined up at once on the sound card's own clock, which a
+ * window behind others does not slow, all through one volume that is cut to
+ * stop it. Returns that stop, or null with no Web Audio here.
+ */
+function synthRing(seconds) {
+  try {
+    const audio = openAudio();
+    if (!audio) return null;
+    const master = audio.createGain();
+    master.connect(audio.destination);
+    const start = audio.currentTime + 0.02;
+    for (let second = 0; second < seconds; second += 1) {
+      for (const offset of BEEP_AT) {
+        const at = start + second + offset;
+        const tone = audio.createOscillator();
+        const gain = audio.createGain();
+        tone.type = 'sine';
+        tone.frequency.value = BEEP_HZ;
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(RING_LOUDNESS, at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + BEEP_LENGTH - 0.02);
+        tone.connect(gain).connect(master);
+        tone.start(at);
+        tone.stop(at + BEEP_LENGTH);
+      }
+    }
+    return () => {
+      try { master.gain.setValueAtTime(0, audio.currentTime); master.disconnect(); } catch { /* already stopped */ }
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** One sound of `seconds`: a fresh <audio>, or Web Audio when that is refused. Returns its stop. */
+function playRing(seconds) {
+  let stopped = false;
+  let stopSynth = null;
+  let element = null;
+  try { element = new Audio(wavUrl(seconds)); } catch { element = null; }
+  if (!element) {
+    stopSynth = synthRing(seconds);
+  } else {
+    element.play().then(
+      () => {
+        report('rang through an audio element');
+        if (stopped) element.pause();
+      },
+      error => {
+        report(`the audio element was refused (${error?.name || error}); rang through Web Audio`);
+        if (!stopped) stopSynth = synthRing(seconds);
+      }
+    );
+  }
+  return () => {
+    stopped = true;
+    try {
+      element?.pause();
+      // Lets the two minutes of sound go.
+      element?.removeAttribute('src');
+      element?.load();
+    } catch { /* already stopped */ }
+    element = null;
+    stopSynth?.();
+  };
+}
+
 export function createRinger() {
-  // While ringing: the looping <audio>, or the timer that beeps through Web
-  // Audio when that was refused, and the one that buzzes a phone.
-  let ringing = false;
-  let loop = null;
-  let synthTimer = null;
+  let stopSound = null;
   let buzzTimer = null;
 
   primeOnFirstTouch();
@@ -141,86 +225,30 @@ export function createRinger() {
     }
   }
 
-  // The ring as one sound file that repeats by itself. It used to be a beep
-  // started once a second by a timer, and a window behind others has its
-  // timers slowed: the beeps spread out after a few seconds (Linux,
-  // 2026-11-10). A looping <audio> keeps its own time.
-  function startSound() {
-    let element = null;
-    try {
-      element = new Audio(beepUrl());
-      element.loop = true;
-    } catch {
-      element = null;
-    }
-    if (!element) return startSynth();
-    loop = element;
-    element.play().then(
-      () => {
-        report('rang through an audio element');
-        if (!ringing || loop !== element) element.pause();
-      },
-      error => {
-        report(`the audio element was refused (${error?.name || error}); rang through Web Audio`);
-        if (loop === element) loop = null;
-        if (ringing) startSynth();
-      }
-    );
-  }
-
-  function startSynth() {
-    synthBeep();
-    synthTimer = setInterval(synthBeep, 1000);
-  }
-
-  function synthBeep() {
-    try {
-      const audio = openAudio();
-      if (!audio) throw new Error('no audio');
-      const start = audio.currentTime;
-      for (const offset of [0, 0.22]) {
-        const tone = audio.createOscillator();
-        const gain = audio.createGain();
-        tone.type = 'sine';
-        tone.frequency.value = 880;
-        gain.gain.setValueAtTime(0.0001, start + offset);
-        gain.gain.exponentialRampToValueAtTime(RING_LOUDNESS, start + offset + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + offset + 0.16);
-        tone.connect(gain).connect(audio.destination);
-        tone.start(start + offset);
-        tone.stop(start + offset + 0.18);
-      }
-    } catch {
-      // No audio here; whatever is showing the ring still shows it.
-    }
-  }
-
   return {
     /**
      * One ring and no more: a count objective finished by a tap (see
      * utils/taskGoalRings.js), where somebody is already looking.
      */
     chime() {
-      let element = null;
-      try { element = new Audio(beepUrl()); } catch { element = null; }
-      if (element) element.play().catch(() => synthBeep());
-      else synthBeep();
+      playRing(1);
       vibrate();
     },
-    /** Start or stop ringing. Safe to call with the same value repeatedly. */
+    /**
+     * Start or stop ringing. Safe to call with the same value repeatedly.
+     * The sound is the whole two minutes from the start (RING_SOUND_MS); the
+     * ringer is told to stop when it is stopped, or when the two minutes are
+     * up, whichever is first.
+     */
     set(on) {
-      if (on && !ringing) {
-        ringing = true;
-        startSound();
+      if (on && !stopSound) {
+        stopSound = playRing(RING_SECONDS);
         vibrate();
         if (typeof navigator !== 'undefined' && navigator.vibrate) buzzTimer = setInterval(vibrate, 1000);
-      } else if (!on && ringing) {
-        ringing = false;
-        try { loop?.pause(); } catch { /* already stopped */ }
-        loop = null;
-        clearInterval(synthTimer);
+      } else if (!on && stopSound) {
+        stopSound();
+        stopSound = null;
         clearInterval(buzzTimer);
-        synthTimer = null;
         buzzTimer = null;
         try { navigator.vibrate?.(0); } catch { /* nothing to stop */ }
       }

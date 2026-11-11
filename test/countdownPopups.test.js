@@ -97,12 +97,19 @@ test('on Linux the card can be put right up at the top of the screen', () => {
 
 import { beepWav } from '../src/utils/ringTone.js';
 
-test('the ring is one second of sound that repeats by itself, two beeps a second', () => {
-  const rate = 22050;
+test('the ring is the whole two minutes of beeps in one sound, so nothing repeating can slow it', () => {
+  // Reported twice on 2026-11-10: the beeps slowed after a few seconds, first
+  // started by a timer, then as a looping one-second sound.
+  const rate = 8000;
+  const whole = new DataView(beepWav(rate, RING_SOUND_MS / 1000).buffer);
+  assert.equal(whole.getUint32(40, true) / 2, rate * 120, 'two minutes of it');
+  const late = t => Math.abs(whole.getInt16(44 + Math.round(t * rate) * 2, true));
+  let lastBeep = 0;
+  for (let t = 119; t < 119.1; t += 1 / rate) lastBeep = Math.max(lastBeep, late(t));
+  assert.ok(lastBeep > 1000, 'still beeping on time in the last second');
+
   const wav = beepWav(rate);
   const view = new DataView(wav.buffer);
-  const samples = view.getUint32(40, true) / 2;
-  assert.equal(samples, rate, 'exactly one second, so a loop keeps the rhythm without a timer');
   const at = seconds => Math.abs(view.getInt16(44 + Math.round(seconds * rate) * 2, true));
   const loudest = (from, to) => { let m = 0; for (let t = from; t < to; t += 1 / rate) m = Math.max(m, at(t)); return m; };
   assert.ok(loudest(0, 0.1) > 1000, 'a first beep');
@@ -112,10 +119,10 @@ test('the ring is one second of sound that repeats by itself, two beeps a second
 
 import { RING_LOUDNESS } from '../src/utils/ringTone.js';
 
-test('the ring is at 65% of full strength -- "no just put it at 65%"', () => {
-  assert.equal(RING_LOUDNESS, 0.65);
+test('the ring is at 80% of full strength -- "make the ring volume be 80%"', () => {
+  assert.equal(RING_LOUDNESS, 0.8);
   const view = new DataView(beepWav(22050).buffer);
   let loudest = 0;
   for (let i = 44; i < 44 + 22050 * 2; i += 2) loudest = Math.max(loudest, Math.abs(view.getInt16(i, true)));
-  assert.ok(loudest > 0.6 * 32767 && loudest <= 0.65 * 32767 + 1, 'the beep itself peaks there');
+  assert.ok(loudest > 0.75 * 32767 && loudest <= 0.8 * 32767 + 1, 'the beep itself peaks there');
 });
