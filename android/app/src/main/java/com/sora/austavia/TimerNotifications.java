@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.SystemClock;
@@ -169,9 +170,22 @@ final class TimerNotifications {
         view.setOnClickPendingIntent(R.id.timer_plus, action(context, ACTION_PLUS, blockId, 2));
         view.setOnClickPendingIntent(R.id.timer_stop, action(context, ACTION_STOP, blockId, 3));
 
-        // The theme's colours: its dialog background behind, its writing for
-        // the time and the buttons, its accent for the one that stops.
-        if (colors.background != null) view.setInt(R.id.timer_root, "setBackgroundColor", colors.background);
+        // The theme's colours: its dialog background for the panel, its writing
+        // for the time and the buttons (on round faint backs of the same
+        // writing, as the pop-up's), its accent for the one that stops. The
+        // panel is rounded (notification_timer_bg) and tinted rather than
+        // painted, so it keeps its corners; before Android 12 a view cannot
+        // be tinted from here and it keeps its drawn colour.
+        boolean canTint = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        if (colors.background != null && canTint) {
+            view.setColorStateList(R.id.timer_root, "setBackgroundTintList", ColorStateList.valueOf(colors.background));
+        }
+        if (colors.text != null && canTint) {
+            ColorStateList faint = ColorStateList.valueOf((colors.text & 0x00FFFFFF) | 0x2E000000);
+            view.setColorStateList(R.id.timer_toggle, "setBackgroundTintList", faint);
+            view.setColorStateList(R.id.timer_plus, "setBackgroundTintList", faint);
+            view.setColorStateList(R.id.timer_stop, "setBackgroundTintList", faint);
+        }
         if (colors.text != null) {
             view.setTextColor(R.id.timer_clock, colors.text);
             view.setTextColor(R.id.timer_label, colors.text);

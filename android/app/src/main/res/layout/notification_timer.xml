@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     The timer in the notification shade: the time on the left, the timer
-    pop-up's buttons on the right. Coloured from the app's theme at run time
-    (TimerNotifications.java), so the colours here are only what shows if
-    none arrive.
+    pop-up's buttons on the right, on a rounded panel as the pop-up is.
+    Coloured from the app's theme at run time (TimerNotifications.java), so
+    the colours here are only what shows if none arrive.
+
+    Restyled 2026-11-10: it was a flat dark rectangle inside the phone's own
+    notification card, "a weird notification with a rectangle in the middle
+    showing a black background and the timing".
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/timer_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="44dp"
-    android:background="#FF17171A"
+    android:minHeight="60dp"
+    android:background="@drawable/notification_timer_bg"
+    android:backgroundTint="#FF17171A"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="12dp"
-    android:paddingEnd="8dp">
+    android:paddingStart="18dp"
+    android:paddingEnd="10dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
 
     <FrameLayout
         android:layout_width="0dp"
@@ -41,18 +48,23 @@
 
     <ImageButton
         android:id="@+id/timer_toggle"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@android:color/transparent"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/notification_timer_button_bg"
+        android:backgroundTint="#33FFFFFF"
         android:contentDescription="Pause or resume"
-        android:padding="8dp"
+        android:padding="10dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_media_pause" />
 
     <TextView
         android:id="@+id/timer_plus"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/notification_timer_button_bg"
+        android:backgroundTint="#33FFFFFF"
         android:contentDescription="One more minute"
         android:gravity="center"
         android:text="+1"
@@ -62,11 +74,13 @@
 
     <ImageButton
         android:id="@+id/timer_stop"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@android:color/transparent"
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/notification_timer_button_bg"
+        android:backgroundTint="#33FFFFFF"
         android:contentDescription="Stop and set back to the start"
-        android:padding="8dp"
+        android:padding="10dp"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_timer_reset" />
 </LinearLayout>

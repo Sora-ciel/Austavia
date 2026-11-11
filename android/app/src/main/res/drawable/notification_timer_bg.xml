@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The timer notification's panel: rounded, as the app's timer pop-up is.
+    White here and tinted with the theme's background at run time
+    (TimerNotifications.java); a flat square of colour inside the phone's own
+    notification card read as a stray black box (reported 2026-11-10).
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FFFFFFFF" />
+</shape>
