@@ -97,6 +97,28 @@ export const POPUP_MARGIN = 16;
 export const HIDDEN_KEY_PREFIX = 'austavia.popup.hidden.';
 /** Where a pop-up kept open after its own Stop is remembered, per window. */
 export const KEEP_KEY_PREFIX = 'austavia.popup.keep.';
+/**
+ * Where a timed habit's pop-up switched off is remembered, per window label:
+ * "in habits when the habit is counted in time add a button to activate or
+ * deactivate pop up" (2026-11-11). On by default, and per device, as the clock
+ * block's own switch is (timerPopup in clockDeviceStore): whether a computer
+ * puts a window on top is how that computer shows things, not the habit.
+ */
+export const POPUP_OFF_KEY_PREFIX = 'austavia.popup.off.';
+
+/** Whether a habit's or objective's pop-up is on, on this device. */
+export function goalPopupOn(storage, key) {
+  try { return storage?.getItem(POPUP_OFF_KEY_PREFIX + goalPopupLabel(key)) === null; } catch { return true; }
+}
+
+/** Switches a habit's or objective's pop-up on or off, on this device. */
+export function setGoalPopup(storage, key, on) {
+  try {
+    if (on) storage?.removeItem(POPUP_OFF_KEY_PREFIX + goalPopupLabel(key));
+    else storage?.setItem(POPUP_OFF_KEY_PREFIX + goalPopupLabel(key), String(Date.now()));
+  } catch { /* stays as it was */ }
+}
+
 /** Where the last place a pop-up was dragged to is remembered. */
 export const POSITION_KEY = 'austavia.popup.position';
 /** Where the app leaves its colours for the pop-ups to read. */
@@ -157,7 +179,7 @@ export function goalPopupLabel(key) {
  * forgotten meanwhile -- a pop-up hidden or kept is still hidden or kept when
  * the app goes to the back and they return.
  */
-export function popupsWanted({ blocks = [], devices = {}, goals = [], now = Date.now(), hidden = new Set(), kept = new Set(), appInFront = false } = {}) {
+export function popupsWanted({ blocks = [], devices = {}, goals = [], now = Date.now(), hidden = new Set(), kept = new Set(), off = new Set(), appInFront = false } = {}) {
   const wanted = [];
   if (appInFront) return wanted;
 
@@ -192,9 +214,11 @@ export function popupsWanted({ blocks = [], devices = {}, goals = [], now = Date
   // Timed habits and objectives, as goalTimers lists them: running, ringing,
   // or paused from their own pop-up (it lists those only when asked to keep
   // them). Hidden by hand stays hidden until it rings, as a timer's does.
+  // Switched off (`off`, by label): no pop-up at all, as for a clock.
   for (const goal of goals || []) {
     if (!goal?.blockId) continue;
     const label = goalPopupLabel(goal.blockId);
+    if (off.has(label)) continue;
     if (goal.phase === 'ringing' || !hidden.has(label)) {
       wanted.push({ goalKey: goal.blockId, kind: 'goal', label });
     }

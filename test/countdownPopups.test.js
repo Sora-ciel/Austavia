@@ -126,3 +126,21 @@ test('the ring is at 80% of full strength -- "make the ring volume be 80%"', () 
   for (let i = 44; i < 44 + 22050 * 2; i += 2) loudest = Math.max(loudest, Math.abs(view.getInt16(i, true)));
   assert.ok(loudest > 0.75 * 32767 && loudest <= 0.8 * 32767 + 1, 'the beep itself peaks there');
 });
+
+// Asked 2026-11-11: "in habits when the habit is counted in time add a button
+// to activate or deactivate pop up". On by default, per device, as the clock
+// block's switch is.
+import { goalPopupOn, setGoalPopup } from '../src/utils/clockPopups.js';
+
+test('a timed habit\'s pop-up can be switched off, and then never opens -- not even at Time\'s up', () => {
+  const store = new Map();
+  const storage = { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v), removeItem: k => store.delete(k) };
+  assert.equal(goalPopupOn(storage, key), true, 'on until it is switched off');
+  setGoalPopup(storage, key, false);
+  assert.equal(goalPopupOn(storage, key), false);
+  const off = new Set([label]);
+  assert.deepEqual(popupsWanted({ goals: goalTimers({ habits: habitsWithTimer(), now: t0 + 30 * SEC }), off }), []);
+  assert.deepEqual(popupsWanted({ goals: goalTimers({ habits: habitsWithTimer(), now: t0 + 601 * SEC }), off }), []);
+  setGoalPopup(storage, key, true);
+  assert.equal(goalPopupOn(storage, key), true, 'and on again');
+});

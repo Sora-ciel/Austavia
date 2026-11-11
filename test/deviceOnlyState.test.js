@@ -21,6 +21,7 @@ const DEVICE_ONLY = {
   'components/CalendarBlock.svelte': 'the height of an hour and day or 7 days, through utils/calendarView.js',
   'components/ClockPopupWindows.svelte': 'where the clock pop-up sits on this screen',
   'components/TimerChip.svelte': 'reads the objective rings stopped on this device, to leave them out of the notification',
+  'components/TaskGoalLine.svelte': 'whether a timed habit opens the pop-up on this computer (as the clock block\'s switch, per device)',
   'components/TaskBlock.svelte': 'the last goal set, as the default for the next (as Task mode)',
   'components/ColorPicker.svelte': 'the colour format last chosen',
   'components/NotePicker.svelte': 'the picker layout last chosen',

@@ -12,6 +12,7 @@
   import { createListReorder } from "../utils/listReorder.js";
   import HabitPage from "../components/HabitPage.svelte";
   import TaskGoalLine from "../components/TaskGoalLine.svelte";
+  import { goalKey, HABITS_OWNER } from "../utils/goalNotices.js";
   import TaskGoalEditor from "../components/TaskGoalEditor.svelte";
   import { goalNow, startTimer, pauseTimer, addProgress, setGoal, removeGoal } from "../utils/taskGoals.js";
   import { withHabitGoal, settleHabits } from "../utils/habitGoals.js";
@@ -1024,6 +1025,7 @@
             <div class="habit-goal" on:pointerdown|stopPropagation>
               <TaskGoalLine
                 goal={habit.goal}
+                popupKey={goalKey(HABITS_OWNER, habit.id)}
                 {now}
                 on:timer={() => toggleTimer(habit)}
                 on:count={() => countOnce(habit)}

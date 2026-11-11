@@ -27,6 +27,7 @@
     POPUP_WIDTH,
     POPUP_HEIGHT,
     HIDDEN_KEY_PREFIX,
+    POPUP_OFF_KEY_PREFIX,
     KEEP_KEY_PREFIX,
     POSITION_KEY
   } from '../utils/clockPopups.js';
@@ -139,7 +140,9 @@
       // Looked at afresh each second as well as on focus and blur, so a
       // missed event costs a second at most.
       const appInFront = await appHasFocus();
-      const wanted = popupsWanted({ blocks, devices, goals, now, hidden, kept, appInFront });
+      // Habits whose pop-up is switched off on this device.
+      const off = readMarks(POPUP_OFF_KEY_PREFIX);
+      const wanted = popupsWanted({ blocks, devices, goals, now, hidden, kept, off, appInFront });
       note(`app ${appInFront ? 'in front' : 'behind'}; pop-ups wanted: ${wanted.map(p => p.kind).join(', ') || 'none'}`);
       const wantedLabels = new Set(wanted.map(popup => popup.label));
 

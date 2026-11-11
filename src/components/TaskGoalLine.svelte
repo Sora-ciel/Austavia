@@ -9,8 +9,15 @@
   import { createEventDispatcher } from 'svelte';
   import PlayerIcons from './PlayerIcons.svelte';
   import { goalNow, goalLabel, parseTarget } from '../utils/taskGoals.js';
+  import { goalPopupOn, setGoalPopup } from '../utils/clockPopups.js';
 
   export let goal;
+  /**
+   * The objective's key (utils/goalNotices.js), to offer the switch for its
+   * always-on-top pop-up in the desktop apps -- asked for habits counted in
+   * time, 2026-11-11. Left out, there is no switch.
+   */
+  export let popupKey = '';
   /** The clock, passed in so one tick in the mode moves every bar together. */
   export let now = Date.now();
 
@@ -21,6 +28,15 @@
   let logError = false;
 
   $: state = goalNow(goal, now);
+
+  const onDesktop = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+  const deviceStorage = () => (typeof localStorage === 'undefined' ? undefined : localStorage);
+  let popupOn = true;
+  $: popupOn = popupKey ? goalPopupOn(deviceStorage(), popupKey) : true;
+  function togglePopup() {
+    popupOn = !popupOn;
+    setGoalPopup(deviceStorage(), popupKey, popupOn);
+  }
   $: label = goalLabel(goal, now);
 
   function openLog() {
@@ -101,6 +117,28 @@
 
     <span class="goal-label">{label}{state.daily ? ' today' : ''}</span>
 
+    {#if popupKey && onDesktop && state.kind === 'time'}
+      <!-- Whether this one opens the always-on-top pop-up while Austavia is
+           behind, on this computer: the clock block's switch, its icon and
+           its On/Off. -->
+      <button
+        type="button"
+        class="goal-btn popup-switch"
+        class:off={!popupOn}
+        role="switch"
+        aria-checked={popupOn}
+        aria-label="Pop-up"
+        title={popupOn ? 'Pop-up on: click to turn it off' : 'Pop-up off: click to turn it on'}
+        on:click|stopPropagation={togglePopup}
+      >
+        <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+          <rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/>
+          <path d="M13 3h8v8M21 3l-8 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>{popupOn ? 'On' : 'Off'}</span>
+      </button>
+    {/if}
+
     {#if logging}
       <input
         class="goal-log"
@@ -153,6 +191,14 @@
   }
   .goal-btn:hover { background: color-mix(in srgb, currentColor 20%, transparent); }
   .goal-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .popup-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  /* Off: the same button, faded, as the clock block's switch. */
+  .popup-switch.off { opacity: 0.5; background: transparent; }
 
   .goal-bar {
     flex: 1 1 auto;
