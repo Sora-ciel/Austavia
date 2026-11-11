@@ -7250,7 +7250,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 }
 @media (min-width: 701px) {
   .app.has-rail .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
-    padding-left: 56px !important;
+    /* The column's room, and a mode's scrollbar balance on top of it
+       (utils/idleScrollbar.js), which this would otherwise override. */
+    padding-left: calc(56px + var(--sb-balance, 0px)) !important;
     box-sizing: border-box;
   }
 }

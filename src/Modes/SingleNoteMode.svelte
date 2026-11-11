@@ -1,4 +1,5 @@
 <script>
+  import { idleScrollbar } from '../utils/idleScrollbar.js';
   import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
@@ -149,28 +150,9 @@
   function updateViewport() {
     isMobileViewport = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
   }
-  // ── Idle-hiding scrollbar ────────────────────────────────────────
-  // Fades the thumb out after a few seconds of not scrolling so it stops
-  // cluttering the page, and brings it back on scroll or when the pointer
-  // comes near the right edge. Only the colour changes — the gutter stays
-  // reserved, so nothing reflows as it appears and disappears.
-  const SCROLLBAR_IDLE_MS = 5000;
-  const SCROLLBAR_EDGE_PX = 60;
-  let scrollbarIdle = true;
-  let scrollbarIdleTimer;
-
-  function wakeScrollbar() {
-    scrollbarIdle = false;
-    clearTimeout(scrollbarIdleTimer);
-    scrollbarIdleTimer = setTimeout(() => { scrollbarIdle = true; }, SCROLLBAR_IDLE_MS);
-  }
-
-  function handleNotePointerMove(event) {
-    if (!canvasRef) return;
-    const nearRightEdge =
-      event.clientX >= canvasRef.getBoundingClientRect().right - SCROLLBAR_EDGE_PX;
-    if (nearRightEdge) wakeScrollbar();
-  }
+  // The scrollbar fades after a few seconds of not scrolling and comes back
+  // on a scroll or the pointer near the right edge: utils/idleScrollbar.js,
+  // shared with Page mode.
 
   onMount(() => {
     updateViewport();
@@ -180,7 +162,6 @@
     return () => {
       window.removeEventListener('resize', updateViewport);
       window.removeEventListener('orientationchange', updateViewport);
-      clearTimeout(scrollbarIdleTimer);
     };
   });
 
@@ -440,7 +421,7 @@
 
   /* Untouched for a few seconds: fade the thumb away but keep the gutter, so
      the page never reflows when it comes back. */
-  .single-note.sb-idle {
+  .single-note:global(.sb-idle) {
     --sb-thumb: transparent;
   }
   .single-note :global(*) {
@@ -723,12 +704,9 @@
 <div
   class="single-note"
   class:has-bg-image={bgImage}
-  class:sb-idle={scrollbarIdle}
   bind:this={canvasRef}
   style={canvasCssVars + noteImageVars}
-  on:scroll|capture={wakeScrollbar}
-  on:pointermove={handleNotePointerMove}
-  on:wheel|passive={wakeScrollbar}
+  use:idleScrollbar
 >
   {#if bgImage}
     <div class="note-bg-clip">

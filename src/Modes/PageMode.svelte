@@ -43,6 +43,7 @@
     setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES
   } from '../utils/pageLayout.js';
   import { createLongPress } from '../utils/longPress.js';
+  import { idleScrollbar } from '../utils/idleScrollbar.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -550,7 +551,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">
@@ -743,6 +744,15 @@
     cursor: text;
     --sb-track: var(--canvas-inner-bg);
     --sb-thumb: var(--mode-text-color);
+    /* As much room on the left as the scrollbar takes on the right, so the
+       page is centred between the screen's edges whether the scrollbar shows
+       or not (utils/idleScrollbar.js; asked 2026-11-11). */
+    padding-left: var(--sb-balance, 0px);
+  }
+
+  /* The scrollbar fades while nobody is scrolling (idleScrollbar). */
+  .page-mode:global(.sb-idle) {
+    --sb-thumb: transparent;
   }
 
   .page-mode.dragging {
@@ -834,11 +844,27 @@
     width: 100% !important;
   }
 
-  /* Edit mode: each picture outlined, with its tools and a grip on its right
-     edge to size it. */
-  .page-mode.edit-mode .page-cell:has(.page-width-grip) {
-    outline: 1px dashed color-mix(in srgb, var(--mode-text-color, #fff) 55%, transparent);
+  /* Edit mode handles blocks as blocks (asked 2026-11-11: "on edit mode ...
+     it should take the whole block as a whole for easier handling and for
+     example long held to pop to delete or other things"): each one outlined,
+     and what is inside it -- writing, tiles, a calendar's hours -- left
+     untouchable, so a press is on the block. A long press then opens its
+     menu, writing included, and nothing is typed into or opened by mistake.
+     A picture's tools, a nest's tile slider and the handle sit beside the
+     block, not in it, and still work. */
+  .page-mode.edit-mode .page-cell {
+    outline: 1px dashed color-mix(in srgb, var(--mode-text-color, #fff) 45%, transparent);
     outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Everything inside, too, and over what it says for itself: the editor
+     turns the pointer back on for its writing. */
+  .page-mode.edit-mode .page-cell > :global(.note),
+  .page-mode.edit-mode .page-cell > :global(.note *) {
+    pointer-events: none !important;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   /* Over the picture's top left, on a backing of the page's colour so it
@@ -986,7 +1012,12 @@
     display: none;
   }
 
+  /* Above the nest's tiles, which were drawn over it, so a finger on the
+     slider landed on a tile and it could not be held (2026-11-11); and the
+     slider takes a sideways drag rather than the page scrolling. */
   .page-tile-size {
+    z-index: 6;
+    pointer-events: auto;
     left: auto;
     right: 8px;
     top: 0;
@@ -996,6 +1027,12 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--canvas-inner-bg, #000) 85%, transparent);
     font-size: 0.8rem;
+    flex-direction: row;
+  }
+
+  .page-tile-size input {
+    height: 28px;
+    touch-action: none;
   }
 
   .page-cell:hover > .page-handle,
