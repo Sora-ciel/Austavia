@@ -49,9 +49,11 @@ In this order:
    first-launch "how Austavia works", an example folder (step 2 there).
 6. **Then marketing** (memory: launch marketing).
 
-Waiting alongside, not in that order: Polar's review ("Submit for review" once
-austavia.com is live), the proof purchase on the legacy account, the 0.8.68
-web deploy held until Polar approves, austavia.com and www showing Connected.
+Alongside: Polar **approved** the account on 2026-11-11 and austavia.com and
+www are live. Still owed: the 0.8.68 web deploy (`dist/` built from the
+v0.8.68 tag, so the delete button is not on the web before its functions are
+on production), then the proof purchase on the legacy account, kept until the
+payout reaches the bank.
 
 ## Now, asked 2026-10-26: one of everything, then the habit tracker
 
