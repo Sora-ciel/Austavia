@@ -81,7 +81,10 @@
     </div>
   </div>
   <div class="crop-bar">
-    {#if !actions.length}<button on:click={() => dispatch('apply', null)}>Whole picture</button>{/if}
+    <!-- The frame back round the whole picture, to start again or keep it
+         whole; nothing is saved until one of the buttons after it (asked
+         2026-11-10). -->
+    <button on:click={() => (frame = { x: 0, y: 0, w: 1, h: 1 })}>Reset</button>
     <span class="crop-gap"></span>
     <button on:click={() => dispatch('close')}>Cancel</button>
     {#if actions.length}
@@ -168,9 +171,10 @@
     flex: 0 0 24px;
   }
 
+  /* Squarer than pills (asked 2026-11-10: "less radius on buttons"). */
   .crop-bar button {
     padding: 8px 16px;
-    border-radius: 999px;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.4);
     background: transparent;
     color: inherit;

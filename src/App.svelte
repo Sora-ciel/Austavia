@@ -3940,8 +3940,8 @@
   // gesture (asked 2026-11-10, after the sheet opened from inside Settings).
   const OPENED_FROM_BAR = '.dropdown-content, .left-controls, .mode-ladder, .add-block-list, .timer-panel, .player-panel, .mini-player, [role="dialog"]';
 
-  // Which touches are the bar's: one that starts on the bar, or -- for the
-  // slide up -- in a band half the bar's height above it (asked 2026-11-10:
+  // Which touches are the bar's: one that starts on the bar, or in a band
+  // half the bar's height above it (asked 2026-11-10:
   // some phones keep the very bottom for their own swipe between apps). The
   // band was first a layer over the mode, which swallowed taps there (Task
   // mode's "Add a task" stopped answering); it is only a test of where the
@@ -3949,7 +3949,8 @@
   function startsOnBar(touch, target) {
     if (!controlsRef) return false;
     if (controlsRef.contains(target)) return true;
-    if (controlsLayout.modeGesture !== 'sheet') return false;
+    // Both gestures, since 2026-11-10: "let's give some more height to the
+    // slide along the bar too".
     const bar = controlsRef.getBoundingClientRect();
     return touch.clientY >= bar.top - bar.height / 2 && touch.clientY < bar.top;
   }
@@ -3976,6 +3977,11 @@
       barGesture = { ...barGesture, kind: controlsLayout.modeGesture };
       if (barGesture.kind === 'strip') strip = stripLayout(offered.length, window.innerWidth);
     }
+    // Once it is a gesture, the touch is the bar's alone: what is behind
+    // neither scrolls nor gets a press out of it (asked 2026-11-10: the
+    // Playlist went on scrolling while sliding up from the bar). Before that,
+    // nothing is stopped, so a tap or a scroll there is never in the way.
+    if (event.cancelable) event.preventDefault();
     if (barGesture.kind === 'strip') {
       stripIndex = stripPick(t.clientX, strip);
     } else {
@@ -3983,8 +3989,10 @@
       sheetPick = hit ? hit.dataset.gestureMode : null;
     }
   }
-  function barTouchEnd() {
+  function barTouchEnd(event) {
     const g = barGesture;
+    // A finished gesture is not also a tap on whatever it ended over.
+    if (g?.kind && event?.cancelable) event.preventDefault();
     const target = g?.kind === 'strip' ? (stripIndex === null ? null : offered[stripIndex]) : g?.kind === 'sheet' ? sheetPick : null;
     cancelBarGesture();
     if (target && target !== mode) setMode(target);
@@ -8015,8 +8023,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <svelte:window
   on:keydown={modeShortcut}
   on:touchstart|passive={barTouchStart}
-  on:touchmove|passive={barTouchMove}
-  on:touchend|passive={barTouchEnd}
+  on:touchmove|nonpassive={barTouchMove}
+  on:touchend|nonpassive={barTouchEnd}
   on:touchcancel|passive={cancelBarGesture}
 />
 
