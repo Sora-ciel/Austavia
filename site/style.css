@@ -1,16 +1,20 @@
-/* The Austavia website (austavia.com). Its own small page, apart from the
-   app: what Austavia is, what Pro costs, where to get it, and the policies.
-   Plain HTML and CSS, nothing to build. Colours from the app's dark theme. */
+/* The Austavia website (austavia.com). Its own small site, apart from the
+   app, dressed like the app itself: a warm wallpaper behind see-through
+   blocks with an uppercase header, in the Copper Lagoon theme's colours
+   (asked 2026-11-11: "a style closer to our app's see-through experience",
+   not a basic app presentation page). Plain HTML and CSS, nothing to build. */
 :root {
-  --bg: #0b1220;
-  --surface: #111b2d;
-  --surface-2: #16233a;
-  --border: #22324d;
-  --text: #e8eef8;
-  --muted: #9aa9c2;
-  --accent: #7fe3f2;
-  --accent-ink: #062030;
-  --radius: 16px;
+  --ground: #1d0e0c;
+  --panel: rgba(42, 21, 18, 0.55);
+  --button: rgba(61, 32, 27, 0.7);
+  --text: #f3e2dc;
+  --muted: #c9aba2;
+  --accent: #4fd6cd;
+  --accent-ink: #10302e;
+  --line: rgba(79, 214, 205, 0.38);
+  --line-soft: rgba(243, 226, 220, 0.14);
+  --glow: 0 22px 48px rgba(20, 8, 6, 0.7), 0 0 20px rgba(79, 214, 205, 0.18);
+  --radius: 14px;
   --max: 1320px;
 }
 
@@ -18,10 +22,20 @@
 
 html { scroll-behavior: smooth; }
 
+/* The wallpaper: the theme's maroon ground, lit in places by copper and by
+   the turquoise of its highlights, fixed behind everything like the app's. */
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
   color: var(--text);
+  background-color: var(--ground);
+  background-image:
+    radial-gradient(60vw 50vh at 12% 8%, rgba(196, 98, 58, 0.35), transparent 70%),
+    radial-gradient(50vw 45vh at 88% 22%, rgba(79, 214, 205, 0.16), transparent 70%),
+    radial-gradient(70vw 60vh at 70% 95%, rgba(150, 60, 40, 0.32), transparent 70%),
+    radial-gradient(40vw 40vh at 20% 70%, rgba(79, 214, 205, 0.08), transparent 70%),
+    linear-gradient(160deg, #2a1310 0%, #1d0e0c 45%, #160a09 100%);
+  background-attachment: fixed;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -34,114 +48,134 @@ img { max-width: 100%; height: auto; display: block; }
 
 .wrap { max-width: var(--max); margin: 0 auto; padding: 0 20px; }
 
-/* Header */
-.site-header {
+/* ── A block, as the app draws one ─────────────────────────────── */
+.block {
+  background: var(--panel);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--glow);
+  overflow: hidden;
+}
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* The three little controls at the right of an app block's header. */
+.dots { display: flex; gap: 6px; }
+.dots i { width: 16px; height: 16px; border-radius: 5px; border: 1px solid var(--line); display: block; }
+.dots i:nth-child(2) { background: rgba(79, 214, 205, 0.25); }
+.dots i:last-child { background: var(--accent); border-color: var(--accent); }
+.block-body { padding: 18px; }
+
+/* ── The bar, as the app's controls ────────────────────────────── */
+.bar {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(42, 21, 18, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(90, 47, 39, 0.9);
 }
-.site-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; font-size: 1.15rem; letter-spacing: 0.01em; }
-.brand-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
-.nav { display: flex; gap: 22px; align-items: center; }
-.nav a { color: var(--muted); text-decoration: none; font-size: 0.95rem; }
-.nav a:hover { color: var(--text); }
+.bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 62px; }
+.brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; font-size: 1.1rem; }
+.brand-mark { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--line); background: rgba(79, 214, 205, 0.18); box-shadow: 0 0 12px rgba(79, 214, 205, 0.35); }
+.nav { display: flex; gap: 8px; align-items: center; }
 
-/* Buttons */
-.btn {
+.pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 22px;
-  border-radius: 999px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(90, 47, 39, 0.95);
+  background: var(--button);
+  color: var(--accent);
   font-weight: 700;
+  font-size: 0.95rem;
   text-decoration: none;
-  border: 1px solid var(--border);
-  color: var(--text);
-  background: var(--surface);
-  transition: transform 0.15s ease, filter 0.15s ease;
+  transition: filter 0.15s ease, transform 0.15s ease;
 }
-.btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.nav .btn { padding: 8px 16px; color: var(--accent-ink); }
+.pill:hover { filter: brightness(1.18); transform: translateY(-1px); }
+.pill.solid { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 
-/* Hero */
-.hero { padding: 72px 0 40px; text-align: center; }
-.hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.1; margin: 0 0 18px; font-weight: 800; letter-spacing: -0.02em; }
-.hero h1 em { font-style: normal; color: var(--accent); }
-.hero p.lead { font-size: 1.15rem; color: var(--muted); max-width: 640px; margin: 0 auto 30px; }
-.hero .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.platforms { margin-top: 14px; color: var(--muted); font-size: 0.9rem; }
+/* ── The first screen ─────────────────────────────────────────── */
+.hero { display: grid; gap: 22px; padding: 40px 0 20px; }
+.hero h1 { font-size: clamp(2rem, 4.4vw, 3.4rem); line-height: 1.12; margin: 0 0 12px; font-weight: 800; letter-spacing: -0.02em; }
+.hero h1 span { color: var(--accent); }
+.hero .lead { font-size: 1.12rem; color: var(--muted); max-width: 760px; margin: 0 0 22px; }
+.hero .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.platforms { margin: 16px 0 0; color: var(--muted); font-size: 0.9rem; letter-spacing: 0.04em; }
 
-.showcase { position: relative; margin: 48px auto 0; max-width: 100%; }
-/* Bigger screenshots, and each opens full size (asked 2026-11-11: "we can't
-   see properly what they are"). */
-.shot { display: block; cursor: zoom-in; }
-.showcase .pc { border-radius: var(--radius); border: 1px solid var(--border); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); }
-.showcase .phone {
+.showcase { position: relative; padding: 14px; overflow: visible; }
+.showcase .pc { border-radius: 10px; }
+.showcase .phone-shot {
   position: absolute;
-  right: -10px;
-  bottom: -40px;
-  width: 27%;
-  min-width: 140px;
-  border-radius: 22px;
-  border: 1px solid var(--border);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  right: 3%;
+  bottom: -6%;
+  width: 24%;
+  min-width: 130px;
 }
+.showcase .phone { border-radius: 22px; border: 1px solid var(--line); box-shadow: var(--glow); }
 
-/* Sections */
-section { padding: 80px 0; }
-.section-title { text-align: center; font-size: clamp(1.7rem, 3.4vw, 2.4rem); margin: 0 0 12px; letter-spacing: -0.01em; }
-.section-sub { text-align: center; color: var(--muted); max-width: 620px; margin: 0 auto 44px; }
+.shot { display: block; cursor: zoom-in; }
 
-.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-.feature { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
-.feature h3 { margin: 0 0 6px; font-size: 1.05rem; }
-.feature p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+/* ── Sections ─────────────────────────────────────────────────── */
+section { padding: 56px 0; }
+.section-title { font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0 0 6px; letter-spacing: -0.01em; }
+.section-sub { color: var(--muted); margin: 0 0 26px; max-width: 680px; }
 
-.phones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 26px; }
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.features .block-body p { margin: 0; color: var(--muted); }
+
+.phones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
 .phones figure { margin: 0; }
-.phones img { border-radius: 20px; border: 1px solid var(--border); }
-.phones figcaption { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 10px; }
+.phones img { border-radius: 18px; border: 1px solid var(--line-soft); }
+.phones figcaption { text-align: center; color: var(--muted); font-size: 0.88rem; margin-top: 10px; }
 
-/* Pricing */
-.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; max-width: 760px; margin: 0 auto; }
-.plan { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
-.plan.pro { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.plan h3 { margin: 0; font-size: 1.2rem; }
-.price { font-size: 2.4rem; font-weight: 800; margin: 10px 0 4px; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; max-width: 820px; }
+.plan.pro { border-color: var(--accent); box-shadow: var(--glow), 0 0 0 1px var(--accent) inset; }
+.price { font-size: 2.3rem; font-weight: 800; margin: 0 0 4px; }
 .price small { font-size: 1rem; color: var(--muted); font-weight: 600; }
-.plan ul { padding-left: 18px; color: var(--muted); margin: 16px 0 0; }
+.plan ul { padding-left: 18px; color: var(--muted); margin: 12px 0 0; }
 .plan li { margin: 6px 0; }
-.note { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 22px; }
+.note { color: var(--muted); font-size: 0.9rem; margin-top: 18px; max-width: 820px; }
 
-/* Download */
-.downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; max-width: 900px; margin: 0 auto; }
-.download { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; text-decoration: none; color: var(--text); }
-.download strong { display: block; font-size: 1.05rem; }
+.downloads { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.download { display: block; padding: 16px; border-radius: 12px; border: 1px solid var(--line-soft); background: rgba(61, 32, 27, 0.5); color: var(--text); text-decoration: none; }
+.download strong { display: block; color: var(--accent); }
 .download span { color: var(--muted); font-size: 0.88rem; }
 .download:hover { border-color: var(--accent); }
 
-/* Footer */
-.site-footer { border-top: 1px solid var(--border); padding: 32px 0; color: var(--muted); font-size: 0.9rem; }
+/* ── Footer ───────────────────────────────────────────────────── */
+.site-footer { padding: 28px 0 40px; color: var(--muted); font-size: 0.9rem; }
 .site-footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .site-footer a { color: var(--muted); }
 
-/* Legal pages */
-.legal { max-width: 760px; margin: 0 auto; padding: 56px 20px 80px; }
-.legal h1 { font-size: 2.2rem; margin: 0 0 6px; }
-.legal .updated { color: var(--muted); margin: 0 0 32px; }
-.legal h2 { font-size: 1.3rem; margin: 36px 0 10px; }
-.legal p, .legal li { color: #c9d4e6; }
-.legal .draft { border: 1px dashed var(--accent); border-radius: 12px; padding: 12px 16px; color: var(--accent); }
+/* ── Legal pages: one long block ──────────────────────────────── */
+.legal { max-width: 860px; margin: 36px auto 56px; padding: 0 20px; }
+.legal .block-body { padding: 26px 30px 34px; }
+.legal h1 { font-size: 2rem; margin: 0 0 4px; }
+.legal .updated { color: var(--muted); margin: 0 0 22px; }
+.legal h2 { font-size: 1.2rem; margin: 30px 0 8px; color: var(--accent); }
+.legal p, .legal li { color: #ead5ce; }
 
 @media (max-width: 760px) {
-  .nav a:not(.btn) { display: none; }
+  .nav .pill:not(.solid) { display: none; }
   .phones { grid-template-columns: repeat(2, 1fr); }
-  .showcase .phone { width: 30%; right: 4px; bottom: -24px; }
-  section { padding: 60px 0; }
+  .showcase .phone-shot { width: 30%; bottom: -4%; }
+  section { padding: 40px 0; }
+  .legal .block-body { padding: 20px; }
 }

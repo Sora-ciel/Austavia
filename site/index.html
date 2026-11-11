@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Austavia — notes, pages, habits and music in one place</title>
+  <title>Austavia · notes, pages, habits and music in one place</title>
   <meta name="description" content="Austavia is a notes app you can make your own: a canvas, pages, tasks, habits, a calendar and your music, with themes and wallpapers, synced across your computer and phone.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,71 +11,77 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="site-header">
+  <header class="bar">
     <div class="wrap">
-      <a class="brand" href="index.html"><span class="brand-dot"></span>Austavia</a>
+      <a class="brand" href="index.html"><span class="brand-mark"></span>Austavia</a>
       <nav class="nav">
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#download">Download</a>
-        <a class="btn primary" href="https://austavia.app">Open Austavia</a>
+        <a class="pill" href="#features">Features</a>
+        <a class="pill" href="#pricing">Pricing</a>
+        <a class="pill" href="#download">Download</a>
+        <a class="pill solid" href="https://austavia.app">Open Austavia</a>
       </nav>
     </div>
   </header>
 
-  <main>
-    <div class="wrap hero">
-      <h1>Your notes, <em>your way</em>.</h1>
-      <p class="lead">Austavia is a calm, good-looking place for everything you keep: notes on a canvas, pages, tasks, habits, a calendar and your own music — in a theme and wallpaper that are yours, on your computer and your phone.</p>
-      <div class="actions">
-        <a class="btn primary" href="https://austavia.app">Open in your browser</a>
-        <a class="btn" href="#download">Download the app</a>
+  <main class="wrap">
+    <div class="hero">
+      <div class="block">
+        <div class="block-head"><span>Welcome</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="block-body">
+          <h1>Your notes, <span>your way</span>.</h1>
+          <p class="lead">A calm, good-looking place for everything you keep. Notes on a canvas, pages, tasks, habits, a calendar and your own music, in a theme and a wallpaper that are yours, on your computer and your phone.</p>
+          <div class="actions">
+            <a class="pill solid" href="https://austavia.app">Open in your browser</a>
+            <a class="pill" href="#download">Download the app</a>
+          </div>
+          <p class="platforms">Windows · Linux · Android · Web · free to start</p>
+        </div>
       </div>
-      <p class="platforms">Windows · Linux · Android · Web — free to start</p>
 
-      <div class="showcase">
+      <div class="block showcase">
         <a class="shot" href="img/pc-canvas.png" target="_blank" rel="noopener"><img class="pc" src="img/pc-canvas.png" width="1920" height="1080" alt="Austavia on a computer: a canvas of pictures, a clock, a note and a nest"></a>
-        <a class="shot" href="img/phone-clock.jpg" target="_blank" rel="noopener"><img class="phone" src="img/phone-clock.jpg" width="1080" height="2340" alt="Austavia on a phone: a clock, a note and pictures"></a>
+        <a class="shot phone-shot" href="img/phone-clock.jpg" target="_blank" rel="noopener"><img class="phone" src="img/phone-clock.jpg" width="1080" height="2340" alt="Austavia on a phone: a clock, a note and pictures"></a>
       </div>
     </div>
 
     <section id="features">
-      <div class="wrap">
-        <h2 class="section-title">Many ways to keep things, one app</h2>
-        <p class="section-sub">Every mode works on the same folders, so what you write once can be seen the way that suits the moment.</p>
-        <div class="features">
-          <div class="feature"><h3>Canvas</h3><p>Notes, pictures, clocks and timers placed freely on a board you can arrange.</p></div>
-          <div class="feature"><h3>Pages</h3><p>Write anywhere on a page, put blocks side by side, and link pages and folders together.</p></div>
-          <div class="feature"><h3>Tasks and habits</h3><p>Lists with goals of time or times, and habits with streaks, schedules and a year of days.</p></div>
-          <div class="feature"><h3>Calendar</h3><p>Plan your day or your week in colour, right next to your notes.</p></div>
-          <div class="feature"><h3>Your music</h3><p>Play your own tracks and playlists while you work — they stay on your device.</p></div>
-          <div class="feature"><h3>Themes and wallpapers</h3><p>Dozens of themes, see-through ones included, and a wallpaper for every folder.</p></div>
-          <div class="feature"><h3>Everywhere you are</h3><p>Sign in and your folders follow you between your computer and your phone — even after working offline.</p></div>
-          <div class="feature"><h3>Yours to take</h3><p>Export a folder or everything, pictures included, whenever you like.</p></div>
-        </div>
+      <h2 class="section-title">Many ways to keep things, one app</h2>
+      <p class="section-sub">Every mode works on the same folders, so what you write once can be seen the way that suits the moment.</p>
+      <div class="features">
+        <div class="block"><div class="block-head">Canvas</div><div class="block-body"><p>Notes, pictures, clocks and timers placed freely on a board you arrange.</p></div></div>
+        <div class="block"><div class="block-head">Pages</div><div class="block-body"><p>Write anywhere on a page, put blocks side by side, and link pages and folders together.</p></div></div>
+        <div class="block"><div class="block-head">Tasks and habits</div><div class="block-body"><p>Lists with goals of time or times, and habits with streaks, schedules and a year of days.</p></div></div>
+        <div class="block"><div class="block-head">Calendar</div><div class="block-body"><p>Plan your day or your week in colour, right next to your notes.</p></div></div>
+        <div class="block"><div class="block-head">Your music</div><div class="block-body"><p>Play your own tracks and playlists while you work. They stay on your device.</p></div></div>
+        <div class="block"><div class="block-head">Themes and wallpapers</div><div class="block-body"><p>Dozens of themes, see-through ones included, and a wallpaper for every folder.</p></div></div>
+        <div class="block"><div class="block-head">Everywhere you are</div><div class="block-body"><p>Sign in and your folders follow you between your computer and your phone, even after working offline.</p></div></div>
+        <div class="block"><div class="block-head">Yours to take</div><div class="block-body"><p>Export a folder or everything, pictures included, whenever you like.</p></div></div>
       </div>
     </section>
 
     <section>
-      <div class="wrap">
-        <h2 class="section-title">Made for your phone too</h2>
-        <p class="section-sub">The same folders and the same look, with controls where your thumb is.</p>
-        <div class="phones">
-          <figure><a class="shot" href="img/phone-themes.jpg" target="_blank" rel="noopener"><img src="img/phone-themes.jpg" width="1080" height="2340" alt="Choosing a theme on a phone" loading="lazy"></a><figcaption>Themes</figcaption></figure>
-          <figure><a class="shot" href="img/phone-calendar.jpg" target="_blank" rel="noopener"><img src="img/phone-calendar.jpg" width="1080" height="2340" alt="The calendar on a phone" loading="lazy"></a><figcaption>Calendar</figcaption></figure>
-          <figure><a class="shot" href="img/phone-modes.jpg" target="_blank" rel="noopener"><img src="img/phone-modes.jpg" width="1080" height="2340" alt="Choosing a mode from the bar on a phone" loading="lazy"></a><figcaption>Every mode, one slide away</figcaption></figure>
-          <figure><a class="shot" href="img/phone-canvas.jpg" target="_blank" rel="noopener"><img src="img/phone-canvas.jpg" width="1080" height="2340" alt="A canvas with a picture on a phone" loading="lazy"></a><figcaption>Canvas</figcaption></figure>
+      <div class="block">
+        <div class="block-head"><span>On your phone</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="block-body">
+          <h2 class="section-title">Made for your phone too</h2>
+          <p class="section-sub">The same folders and the same look, with the controls where your thumb is.</p>
+          <div class="phones">
+            <figure><a class="shot" href="img/phone-themes.jpg" target="_blank" rel="noopener"><img src="img/phone-themes.jpg" width="1080" height="2340" alt="Choosing a theme on a phone" loading="lazy"></a><figcaption>Themes</figcaption></figure>
+            <figure><a class="shot" href="img/phone-calendar.jpg" target="_blank" rel="noopener"><img src="img/phone-calendar.jpg" width="1080" height="2340" alt="The calendar on a phone" loading="lazy"></a><figcaption>Calendar</figcaption></figure>
+            <figure><a class="shot" href="img/phone-modes.jpg" target="_blank" rel="noopener"><img src="img/phone-modes.jpg" width="1080" height="2340" alt="Choosing a mode from the bar on a phone" loading="lazy"></a><figcaption>Every mode, one slide away</figcaption></figure>
+            <figure><a class="shot" href="img/phone-canvas.jpg" target="_blank" rel="noopener"><img src="img/phone-canvas.jpg" width="1080" height="2340" alt="A canvas with a picture on a phone" loading="lazy"></a><figcaption>Canvas</figcaption></figure>
+          </div>
         </div>
       </div>
     </section>
 
     <section id="pricing">
-      <div class="wrap">
-        <h2 class="section-title">Simple pricing</h2>
-        <p class="section-sub">Everything in Austavia is free. Pro gives you more room in the cloud.</p>
-        <div class="plans">
-          <div class="plan">
-            <h3>Free</h3>
+      <h2 class="section-title">Simple pricing</h2>
+      <p class="section-sub">Everything in Austavia is free. Pro gives you more room in the cloud.</p>
+      <div class="plans">
+        <div class="block plan">
+          <div class="block-head">Free</div>
+          <div class="block-body">
             <div class="price">$0</div>
             <ul>
               <li>Every mode, theme and feature</li>
@@ -83,8 +89,10 @@
               <li>100 MB of cloud storage for pictures and notes</li>
             </ul>
           </div>
-          <div class="plan pro">
-            <h3>Austavia Pro</h3>
+        </div>
+        <div class="block plan pro">
+          <div class="block-head">Austavia Pro</div>
+          <div class="block-body">
             <div class="price">$8 <small>/ month</small></div>
             <ul>
               <li>Everything in Free</li>
@@ -94,19 +102,21 @@
             </ul>
           </div>
         </div>
-        <p class="note">Upgrade from the Settings panel inside the app. Payments are handled by Polar, our reseller and merchant of record; taxes are included where they apply.</p>
       </div>
+      <p class="note">Upgrade from the Settings panel inside the app. Payments are handled by Polar, our reseller and merchant of record; taxes are included where they apply.</p>
     </section>
 
     <section id="download">
-      <div class="wrap">
-        <h2 class="section-title">Get Austavia</h2>
-        <p class="section-sub">Free to download. One account on all of them.</p>
-        <div class="downloads">
-          <a class="download" href="https://austavia.app"><strong>Web</strong><span>Open in any browser</span></a>
-          <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Windows</strong><span>Setup .exe</span></a>
-          <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Linux</strong><span>.deb package</span></a>
-          <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Android</strong><span>.apk</span></a>
+      <div class="block">
+        <div class="block-head"><span>Get Austavia</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="block-body">
+          <p class="section-sub">Free to download. One account on all of them.</p>
+          <div class="downloads">
+            <a class="download" href="https://austavia.app"><strong>Web</strong><span>Open in any browser</span></a>
+            <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Windows</strong><span>Setup .exe</span></a>
+            <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Linux</strong><span>.deb package</span></a>
+            <a class="download" href="https://github.com/Sora-ciel/Austavia/releases/latest"><strong>Android</strong><span>.apk</span></a>
+          </div>
         </div>
       </div>
     </section>
@@ -115,7 +125,7 @@
   <footer class="site-footer">
     <div class="wrap">
       <span>© 2026 Austavia</span>
-      <span><a href="mailto:support@austavia.com">support@austavia.com</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms &amp; refunds</a></span>
+      <span><a href="mailto:support@austavia.com">support@austavia.com</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms and refunds</a></span>
     </div>
   </footer>
 </body>
