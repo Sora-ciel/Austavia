@@ -32,6 +32,7 @@
   let tick = null;
   let busy = false;
   let stopFocusWatch = null;
+  const onLinux = typeof navigator !== 'undefined' && /Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent);
 
   // What happened, in the sync log ("Copy diagnostics"), once per change
   // rather than every second: the pop-ups never appeared on the Linux app
@@ -154,12 +155,26 @@
             decorations: false,
             transparent: true,
             shadow: false,
-            resizable: false,
+            // On Linux a window that cannot be resized is sized by GTK to its
+            // content, not to the size asked for: the pop-up opened about
+            // 210 by 235 rather than one row (reported 2026-11-10). There
+            // it stays resizable and is held to the size by a minimum and a
+            // maximum instead; it has no frame to be resized by anyway.
+            resizable: !onLinux,
+            ...(onLinux ? { minWidth: POPUP_WIDTH, minHeight: POPUP_HEIGHT, maxWidth: POPUP_WIDTH, maxHeight: POPUP_HEIGHT } : {}),
             skipTaskbar: true,
             // Not taking the keyboard from whatever is being typed into.
             focus: false
           });
-          created.once?.('tauri://created', () => logSync('popup', '', `opened the ${popup.kind} pop-up`));
+          created.once?.('tauri://created', async () => {
+            let size = '';
+            try {
+              const inner = await created.innerSize();
+              const scale = await created.scaleFactor();
+              size = ` at ${Math.round(inner.width / scale)}x${Math.round(inner.height / scale)}`;
+            } catch { /* the size is only for the log */ }
+            logSync('popup', '', `opened the ${popup.kind} pop-up${size} (asked ${POPUP_WIDTH}x${POPUP_HEIGHT})`);
+          });
           created.once?.('tauri://error', event => logSync('popup', '', `the ${popup.kind} pop-up would not open: ${JSON.stringify(event?.payload ?? event)}`));
         } catch (error) {
           console.warn('Could not open the timer pop-up:', error);
