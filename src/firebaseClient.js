@@ -127,7 +127,15 @@ const ATTACHMENT_FIELDS = ['src', 'content', 'trackUrl'];
 // Bump when the shape of a synced file payload changes in a way older
 // instances can't read as-is. The backend migrates old payloads forward on
 // write, so older/newer instances don't need to know about each other.
-export const SYNC_SCHEMA_VERSION = 1;
+//
+// 2 (0.8.67, 2026-11-10): builds before 0.8.662 rebuild what they save from
+// the fields they know, so a phone still on 0.8.66 saving a folder would
+// throw away its pages, calendar settings and anything else newer. The
+// database rules refuse a folder or index entry without schemaVersion 2,
+// which keeps such a device from overwriting anything; it says it is too old
+// and asks to be updated instead. Kept in step with
+// functions/migrations/index.js and database.rules.json.
+export const SYNC_SCHEMA_VERSION = 2;
 
 let firebaseModulesPromise;
 let firebaseContextPromise;
@@ -606,7 +614,8 @@ export async function saveRemoteFile(fileId, payload, options = {}) {
       updatedAt,
       modifiedAt,
       lastSyncedAt,
-      blockCount: Array.isArray(payloadWithRemoteAttachments?.blocks) ? payloadWithRemoteAttachments.blocks.length : 0
+      blockCount: Array.isArray(payloadWithRemoteAttachments?.blocks) ? payloadWithRemoteAttachments.blocks.length : 0,
+      schemaVersion: SYNC_SCHEMA_VERSION
     }
   );
 
@@ -640,7 +649,7 @@ export async function binRemoteFile(fileId, binnedAt = Date.now()) {
   const entryRef = ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`));
   const snapshot = await ctx.dbApi.get(entryRef);
   if (!snapshot.exists() || Number(snapshot.val()?.deletedAt) > 0) return null;
-  await ctx.dbApi.update(entryRef, { binnedAt: Number(binnedAt) });
+  await ctx.dbApi.update(entryRef, { binnedAt: Number(binnedAt), schemaVersion: SYNC_SCHEMA_VERSION });
   return { fileId, binnedAt };
 }
 
@@ -661,7 +670,7 @@ export async function deleteRemoteFile(fileId) {
   const deletedAt = Date.now();
   await ctx.dbApi.set(
     ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `index/${fileId}`)),
-    { fileId, updatedAt: deletedAt, deletedAt }
+    { fileId, updatedAt: deletedAt, deletedAt, schemaVersion: SYNC_SCHEMA_VERSION }
   );
   await ctx.dbApi.remove(ctx.dbApi.ref(ctx.db, getUserPath(user.uid, `files/${fileId}`)));
 

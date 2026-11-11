@@ -84,7 +84,7 @@ describe('account isolation', () => {
   it('refuses one user writing into another user', async () => {
     await reset();
     await assertFails(
-      set(ref(db(ALICE), `${userPath(BOB)}/files/f1`), { updatedAt: 1 })
+      set(ref(db(ALICE), `${userPath(BOB)}/files/f1`), { schemaVersion: 2, updatedAt: 1 })
     );
   });
 
@@ -92,7 +92,7 @@ describe('account isolation', () => {
     await reset();
     await assertFails(get(ref(db(null), `${userPath(ALICE)}/files`)));
     await assertFails(
-      set(ref(db(null), `${userPath(ALICE)}/files/f1`), { updatedAt: 1 })
+      set(ref(db(null), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: 1 })
     );
   });
 
@@ -106,7 +106,7 @@ describe('write is scoped to files and index', () => {
   it('accepts a file carrying a numeric updatedAt', async () => {
     await reset();
     await assertSucceeds(
-      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), {
+      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2,
         updatedAt: 1700000000000,
         blocks: []
       })
@@ -116,7 +116,7 @@ describe('write is scoped to files and index', () => {
   it('accepts an index entry whose fileId matches its key', async () => {
     await reset();
     await assertSucceeds(
-      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), {
+      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2,
         fileId: 'f1',
         updatedAt: 1700000000000
       })
@@ -251,7 +251,7 @@ describe('payload validation', () => {
   it('refuses a file with no updatedAt', async () => {
     await reset();
     await assertFails(
-      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { name: 'My folder' })
+      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, name: 'My folder' })
     );
   });
 
@@ -281,14 +281,14 @@ describe('payload validation', () => {
   it('refuses a file whose updatedAt is not a number', async () => {
     await reset();
     await assertFails(
-      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 'now' })
+      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: 'now' })
     );
   });
 
   it('refuses an index entry whose fileId contradicts its key', async () => {
     await reset();
     await assertFails(
-      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), {
+      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2,
         fileId: 'f2',
         updatedAt: 1700000000000
       })
@@ -313,10 +313,10 @@ describe('the quota block', () => {
     );
 
     await assertFails(
-      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 1 })
+      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: 1 })
     );
     await assertFails(
-      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), {
+      set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2,
         fileId: 'f1',
         updatedAt: 1
       })
@@ -329,7 +329,7 @@ describe('the quota block', () => {
       set(ref(adminDb, `${userPath(ALICE)}/blocked`), false)
     );
     await assertSucceeds(
-      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 1 })
+      set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: 1 })
     );
   });
 });
@@ -507,25 +507,25 @@ describe('a folder deleted for ever', () => {
 
   it('cannot be uploaded back from an older copy', async () => {
     await tombstone();
-    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000, blocks: [] }));
-    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000 }));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000, blocks: [] }));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, fileId: 'f1', updatedAt: DELETED_AT - 5000, modifiedAt: DELETED_AT - 5000 }));
   });
 
   it('cannot be uploaded back by a build that sends no modifiedAt at all', async () => {
     await tombstone();
-    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT + 5000, blocks: [] }));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: DELETED_AT + 5000, blocks: [] }));
   });
 
   it('can be made again later under the same name', async () => {
     await tombstone();
-    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000, blocks: [] }));
-    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000 }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { schemaVersion: 2, updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000, blocks: [] }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, fileId: 'f1', updatedAt: DELETED_AT + 5000, modifiedAt: DELETED_AT + 5000 }));
   });
 
   it('a client can write the tombstone itself', async () => {
     await reset();
     await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
-    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: DELETED_AT, deletedAt: DELETED_AT }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, fileId: 'f1', updatedAt: DELETED_AT, deletedAt: DELETED_AT }));
     await assertSucceeds(remove(ref(db(ALICE), `${userPath(ALICE)}/files/f1`)));
   });
 });
@@ -534,13 +534,44 @@ describe('a folder in the bin', () => {
   it('can be marked binned, and unmarked by an ordinary upload', async () => {
     await reset();
     await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
-    await assertSucceeds(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { binnedAt: 2 }));
-    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 3, modifiedAt: 3 }));
+    await assertSucceeds(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, binnedAt: 2 }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, fileId: 'f1', updatedAt: 3, modifiedAt: 3 }));
   });
 
   it('refuses a mark that is not a time', async () => {
     await reset();
     await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 1, modifiedAt: 1 }));
-    await assertFails(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { binnedAt: 'soon' }));
+    await assertFails(update(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { schemaVersion: 2, binnedAt: 'soon' }));
+  });
+});
+
+// Asked 2026-11-10, before 0.8.67: a device still on 0.8.66 saves a folder by
+// rebuilding it from the fields it knows, and would throw away pages,
+// calendar settings and anything else newer. From 0.8.67 every folder and
+// index entry carries schemaVersion 2, and the rules refuse one without it,
+// so an old device cannot overwrite the newer copy -- it is told it is too
+// old instead (checkSyncCompatibility).
+describe('a version too old to keep newer data cannot overwrite it', () => {
+  it('refuses a folder saved without the current schema version, as 0.8.66 saves one', async () => {
+    await reset();
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 5, blocks: [] }));
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 5, blocks: [], schemaVersion: 1 }));
+  });
+
+  it('refuses its index entry too, so the folder list never points at a save that did not happen', async () => {
+    await reset();
+    await assertFails(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 5 }));
+  });
+
+  it('accepts the same save from the current version', async () => {
+    await reset();
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/files/f1`), { updatedAt: 5, blocks: [], schemaVersion: 2 }));
+    await assertSucceeds(set(ref(db(ALICE), `${userPath(ALICE)}/index/f1`), { fileId: 'f1', updatedAt: 5, schemaVersion: 2 }));
+  });
+
+  it('still lets an old version delete, which is somebody choosing to', async () => {
+    await reset();
+    await seed(dbx => set(ref(dbx, `${userPath(ALICE)}/files/f1`), { updatedAt: 1, schemaVersion: 2 }));
+    await assertSucceeds(remove(ref(db(ALICE), `${userPath(ALICE)}/files/f1`)));
   });
 });

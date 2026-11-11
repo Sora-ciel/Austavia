@@ -20,14 +20,14 @@
             "files": {
               ".write": "auth !== null && auth.uid === $uid && root.child('sync/' + $ns + '/users/' + $uid + '/blocked').val() !== true",
               "$fileId": {
-                ".validate": "newData.hasChildren(['updatedAt']) && newData.child('updatedAt').isNumber() && (!root.child('sync/' + $ns + '/users/' + $uid + '/index/' + $fileId + '/deletedAt').exists() || newData.child('modifiedAt').val() > root.child('sync/' + $ns + '/users/' + $uid + '/index/' + $fileId + '/deletedAt').val())"
+                ".validate": "newData.hasChildren(['updatedAt']) && newData.child('updatedAt').isNumber() && newData.child('schemaVersion').isNumber() && newData.child('schemaVersion').val() >= 2 && (!root.child('sync/' + $ns + '/users/' + $uid + '/index/' + $fileId + '/deletedAt').exists() || newData.child('modifiedAt').val() > root.child('sync/' + $ns + '/users/' + $uid + '/index/' + $fileId + '/deletedAt').val())"
               }
             },
 
             "index": {
               ".write": "auth !== null && auth.uid === $uid && root.child('sync/' + $ns + '/users/' + $uid + '/blocked').val() !== true",
               "$fileId": {
-                ".validate": "newData.hasChildren(['fileId', 'updatedAt']) && newData.child('fileId').val() === $fileId && newData.child('updatedAt').isNumber() && (!newData.child('binnedAt').exists() || newData.child('binnedAt').isNumber()) && (!newData.child('deletedAt').exists() || newData.child('deletedAt').isNumber()) && (!data.child('deletedAt').exists() || newData.child('deletedAt').exists() || newData.child('modifiedAt').val() > data.child('deletedAt').val())"
+                ".validate": "newData.hasChildren(['fileId', 'updatedAt']) && newData.child('fileId').val() === $fileId && newData.child('updatedAt').isNumber() && newData.child('schemaVersion').isNumber() && newData.child('schemaVersion').val() >= 2 && (!newData.child('binnedAt').exists() || newData.child('binnedAt').isNumber()) && (!newData.child('deletedAt').exists() || newData.child('deletedAt').isNumber()) && (!data.child('deletedAt').exists() || newData.child('deletedAt').exists() || newData.child('modifiedAt').val() > data.child('deletedAt').val())"
               }
             },
 

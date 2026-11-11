@@ -11,8 +11,12 @@
 // equivalent payload for version N + 1. Steps run in sequence so a payload
 // several versions behind gets migrated all the way forward in one write.
 
-const LATEST_SCHEMA_VERSION = 1;
-const MIN_SUPPORTED_SCHEMA_VERSION = 1;
+// 2 (0.8.67): nothing to migrate -- the payload's shape is the same -- but
+// builds before 0.8.662 drop what they do not know when they save, so they are
+// no longer supported and the database rules refuse their writes. See
+// SYNC_SCHEMA_VERSION in src/firebaseClient.js.
+const LATEST_SCHEMA_VERSION = 2;
+const MIN_SUPPORTED_SCHEMA_VERSION = 2;
 
 const MIGRATIONS = {};
 

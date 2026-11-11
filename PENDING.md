@@ -107,6 +107,30 @@ e.g. the Task-mode drop line, the objective editor, the alarm banner.
 10, 12, 13, 14 (a note on a day, the weekly review, the finished-the-day
 moment, archive instead of delete) after these, in an order to be agreed.
 
+## Releasing 0.8.67 (decided 2026-11-10)
+
+The first full release since 0.8.66. **Older devices are refused, on
+purpose**: builds before 0.8.662 rebuild what they save from the fields they
+know and would throw away pages, calendar settings and anything newer.
+SYNC_SCHEMA_VERSION is 2, every folder and index entry carries it, and
+database.rules.json refuses one without it (test-rules: "a version too old to
+keep newer data cannot overwrite it"); the minimum published to clients is
+2 (functions/migrations), so an old app says it is too old and asks for an
+update. Deleting still works from an old app.
+
+**The order matters**:
+1. Build and publish everything first -- the web app (hosting), the .deb,
+   Windows and the APK, and the GitHub release.
+2. Then deploy the rules and functions (`npm run deploy:rules`, then the
+   functions). From that moment a device not yet updated cannot save, and
+   shows "too old ... please update" -- the release notes must say to
+   update every device.
+3. Staging the same way: the staging builds from before this commit write
+   schema 1 and are refused once staging's rules are deployed.
+
+Still to do before it: the Linux pop-ups (item 8 of the first list), the
+device checks explained to Sora in plain words.
+
 ## Now, asked 2026-11-10 (fourth list)
 
 1. *Done 2026-11-10.* **Calendar: a thicker line under the days and whole-day row, and a
