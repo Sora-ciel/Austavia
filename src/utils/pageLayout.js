@@ -272,8 +272,13 @@ export const CLICK_SLOP_PX = 5;
 
 /**
  * Whether a click on the page writes (clickBelow): only a click begun and
- * ended on the empty page, without a drag. A selection left from before does
- * not stop it -- a plain click there is meant to write.
+ * ended on the empty page below everything, without a drag. A selection left
+ * from before does not stop it -- a plain click there is meant to write.
+ *
+ * Below everything (`below`), not anywhere off a block: a click in the margin
+ * beside a row or in the gap between two, often just to let go of something,
+ * made a text block at the end of the page each time the page did not end
+ * with one -- "it creates easily text blocks, all the time" (2026-11-11).
  *
  * Reported 2026-11-11: selecting writing and dragging past the block made
  * the page jump somewhere the selection was not. A press in a block and a
@@ -281,8 +286,8 @@ export const CLICK_SLOP_PX = 5;
  * to the nearest thing both were in -- so it wrote: the caret went to the end
  * of the last text block, or into a new one, and the page scrolled there.
  */
-export function clickWrites({ pressOnPage = false, moved = 0 } = {}) {
-  return pressOnPage && moved <= CLICK_SLOP_PX;
+export function clickWrites({ pressOnPage = false, moved = 0, below = true } = {}) {
+  return pressOnPage && below && moved <= CLICK_SLOP_PX;
 }
 
 /**

@@ -215,3 +215,10 @@ test('selecting past a block does not write on the page; only a plain click on t
   assert.equal(clickWrites({ pressOnPage: false, moved: 0 }), false, 'pressed in a block, let go on the page');
   assert.equal(clickWrites({ pressOnPage: true, moved: 40 }), false, 'a drag on the page');
 });
+
+// Reported 2026-11-11: "when moving things around etc. it seems that it
+// creates easily text blocks. all the time."
+test('a click beside a row or between two writes nothing; only a click below everything does', () => {
+  assert.equal(clickWrites({ pressOnPage: true, moved: 0, below: false }), false);
+  assert.equal(clickWrites({ pressOnPage: true, moved: 0, below: true }), true);
+});

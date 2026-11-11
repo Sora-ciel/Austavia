@@ -176,9 +176,12 @@
 
   function onPageClick(event) {
     if (!onEmptyPage(event.target)) return;
+    const rows = canvasRef?.querySelectorAll('.page-row');
+    const last = rows?.length ? rows[rows.length - 1].getBoundingClientRect() : null;
     const writes = clickWrites({
       pressOnPage: pagePress?.onPage === true,
-      moved: pagePress ? Math.hypot(event.clientX - pagePress.x, event.clientY - pagePress.y) : 0
+      moved: pagePress ? Math.hypot(event.clientX - pagePress.x, event.clientY - pagePress.y) : 0,
+      below: !last || event.clientY > last.bottom
     });
     pagePress = null;
     if (!writes) return;
