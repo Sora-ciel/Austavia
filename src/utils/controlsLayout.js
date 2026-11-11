@@ -183,10 +183,45 @@ export function stripPick(x, layout) {
   return x < layout.slots[0].left ? 0 : layout.slots.length - 1;
 }
 
-/** Which way a finger set off from the bar: 'across' (the strip), 'up' (the sheet), or null while it has not gone far. */
-export function gestureStart(dx, dy, { min = 12 } = {}) {
+/**
+ * Which way a finger set off from the bar: 'across' (the strip), away from
+ * the bar into the screen (the sheet) -- 'up' from a bar at the bottom,
+ * 'down' from one at the top (`toward`) -- or null while it has not gone far,
+ * or went the other way.
+ *
+ * From the top too since 2026-11-11: "the modes slides don't work when the
+ * controls are up. ... if the bar is up it works from up to bottom".
+ */
+export function gestureStart(dx, dy, { min = 12, toward = 'up' } = {}) {
   if (Math.max(Math.abs(dx), Math.abs(dy)) < min) return null;
-  if (-dy > Math.abs(dx)) return 'up';
+  const inward = toward === 'down' ? dy : -dy;
+  if (inward > Math.abs(dx)) return toward === 'down' ? 'down' : 'up';
   if (Math.abs(dx) >= Math.abs(dy)) return 'across';
   return null;
+}
+
+/**
+ * Whether a touch that began at `y` is the bar's: on it, or in a band half
+ * its height on the screen's side of it -- above a bar at the bottom, below
+ * one at the top -- so a slide can start just off it (asked 2026-11-10 for
+ * the bottom, 2026-11-11 for the top: "still make a band so that you can
+ * slide easier even a bit out of the controls").
+ */
+export function inBarBand(y, bar, at = 'bottom') {
+  if (!bar) return false;
+  if (y >= bar.top && y <= bar.bottom) return true;
+  const band = (bar.bottom - bar.top) / 2;
+  return at === 'top' ? y > bar.bottom && y <= bar.bottom + band : y < bar.top && y >= bar.top - band;
+}
+
+/**
+ * Whether this is a phone, for where the controls go: narrow, or a touch
+ * screen whose short side is a phone's. By width alone, a phone turned on its
+ * side was wide enough to count as a computer, and the bar chosen to be at
+ * the bottom went back to the top (reported 2026-11-11: "when i turn my phone
+ * around the controls go back up even though i chose below").
+ */
+export function isPhoneShape({ width = 0, height = 0, coarse = false } = {}) {
+  if (width <= 700) return true;
+  return coarse && Math.min(width, height) <= 500;
 }

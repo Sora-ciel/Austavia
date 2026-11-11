@@ -70,7 +70,7 @@ test('a slide along the bar goes through a mode for every step of it, either way
 // "always at the same place each mode and if you went back to the middle you
 // stay on the mode you were", or "a slide from the controls but then up and
 // it shows all the modes ... you just have to let go your finger on the mode".
-import { stripLayout, stripPick, gestureStart } from '../src/utils/controlsLayout.js';
+import { stripLayout, stripPick, gestureStart, inBarBand, isPhoneShape } from '../src/utils/controlsLayout.js';
 
 test('in the strip every mode is always at the same place, in order, with a space in the middle that keeps the open one', () => {
   const layout = stripLayout(8, 390);
@@ -95,4 +95,27 @@ test('a finger going up from the bar opens the sheet, across the strip', () => {
   assert.equal(normalizeLayout({ modeGesture: 'sheet' }).modeGesture, 'sheet');
   assert.equal(normalizeLayout({ modeGesture: 'wiggle' }).modeGesture, 'sheet', 'the default, the slide up');
   assert.equal(normalizeLayout({ computer: 'auto' }).computer, 'auto', 'the column that hides is a choice');
+});
+
+// Asked 2026-11-11: "when i turn my phone around the controls go back up even
+// though i chose below, i think it should stay below".
+test('a phone turned on its side is still a phone: the bar stays where it was chosen', () => {
+  assert.equal(isPhoneShape({ width: 390, height: 844, coarse: true }), true);
+  assert.equal(isPhoneShape({ width: 844, height: 390, coarse: true }), true, 'sideways');
+  assert.equal(isPhoneShape({ width: 1280, height: 800, coarse: false }), false, 'a computer');
+  assert.equal(isPhoneShape({ width: 1280, height: 800, coarse: true }), false, 'a touch-screen computer or tablet');
+});
+
+// Asked 2026-11-11: "the modes slides don't work when the controls are up. ...
+// if the bar is up it works from up to bottom ... still make a band so that
+// you can slide easier even a bit out of the controls".
+test('with the bar at the top, the slide goes down from it, and starts just under it', () => {
+  assert.equal(gestureStart(4, 40, { toward: 'down' }), 'down');
+  assert.equal(gestureStart(4, -40, { toward: 'down' }), null, 'up is nothing from the top');
+  assert.equal(gestureStart(-40, 6, { toward: 'down' }), 'across', 'the strip slides along it as at the bottom');
+  const bar = { top: 0, bottom: 56 };
+  assert.equal(inBarBand(70, bar, 'top'), true, 'just under the bar');
+  assert.equal(inBarBand(120, bar, 'top'), false);
+  assert.equal(inBarBand(-10, { top: 700, bottom: 756 }, 'bottom'), false);
+  assert.equal(inBarBand(680, { top: 700, bottom: 756 }, 'bottom'), true, 'just over a bar at the bottom');
 });

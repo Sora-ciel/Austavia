@@ -3,7 +3,7 @@
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
-  import { readLayout, writeLayout, offeredModes, stripLayout, stripPick, gestureStart } from './utils/controlsLayout.js';
+  import { readLayout, writeLayout, offeredModes, stripLayout, stripPick, gestureStart, inBarBand, isPhoneShape } from './utils/controlsLayout.js';
   import ModeIcon from './components/ModeIcon.svelte';
   import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
@@ -3971,14 +3971,29 @@
     if (!controlsRef) return false;
     if (controlsRef.contains(target)) return true;
     // Both gestures, since 2026-11-10: "let's give some more height to the
-    // slide along the bar too".
-    const bar = controlsRef.getBoundingClientRect();
-    return touch.clientY >= bar.top - bar.height / 2 && touch.clientY < bar.top;
+    // slide along the bar too". The band is on the screen's side of the bar,
+    // wherever the bar is (inBarBand).
+    return inBarBand(touch.clientY, controlsRef.getBoundingClientRect(), barAtTop ? 'top' : 'bottom');
   }
+
+  // A phone, by its shape rather than its width alone, so turning it on its
+  // side keeps the bar where it was chosen (utils/controlsLayout.js
+  // isPhoneShape; reported 2026-11-11).
+  const phoneNow = () => typeof window !== 'undefined' && isPhoneShape({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    coarse: Boolean(window.matchMedia?.('(pointer: coarse)').matches)
+  });
+  let onPhone = phoneNow();
+  const rememberShape = () => { onPhone = phoneNow(); };
+  $: barAtTop = onPhone && controlsLayout.phone !== 'bottom';
+  // Where the bar ends on the screen's side, for what opens from a bar at the
+  // top to open under it.
+  let barEdge = 0;
 
   function barTouchStart(event) {
     barGesture = null;
-    if (event.touches?.length !== 1 || window.innerWidth > 700 || controlsLayout.phone !== 'bottom' || keyboardOpen) return;
+    if (event.touches?.length !== 1 || !onPhone || keyboardOpen) return;
     if (event.target.closest?.(OPENED_FROM_BAR)) return;
     // A field in the bar is for typing in, not sliding from.
     if (controlsRef?.contains(event.target) && event.target.closest?.('input, textarea')) return;
@@ -3991,9 +4006,11 @@
     const t = event.touches?.[0];
     if (!t) return;
     if (!barGesture.kind) {
-      const way = gestureStart(t.clientX - barGesture.startX, t.clientY - barGesture.startY);
+      const toward = barAtTop ? 'down' : 'up';
+      const way = gestureStart(t.clientX - barGesture.startX, t.clientY - barGesture.startY, { toward });
       if (!way) return;
-      const wanted = controlsLayout.modeGesture === 'sheet' ? 'up' : 'across';
+      const wanted = controlsLayout.modeGesture === 'sheet' ? toward : 'across';
+      barEdge = controlsRef?.getBoundingClientRect().bottom || 0;
       if (way !== wanted) { barGesture = null; return; }
       barGesture = { ...barGesture, kind: controlsLayout.modeGesture };
       if (barGesture.kind === 'strip') strip = stripLayout(offered.length, window.innerWidth);
@@ -4028,7 +4045,7 @@
   // Ctrl+1 to Ctrl+9 on a computer: the modes, in the order shown.
   function modeShortcut(event) {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
-    if (!/^[1-9]$/.test(event.key) || window.innerWidth <= 700) return;
+    if (!/^[1-9]$/.test(event.key) || onPhone) return;
     const target = offered[Number(event.key) - 1];
     if (!target) return;
     event.preventDefault();
@@ -7173,7 +7190,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    Everything that opened under it opens above it, through the variables
    above. While writing, the keyboard is where the bar would be, so the bar
    steps aside (keyboardOpen). PENDING, "How modes are changed", stage a. */
-@media (max-width: 700px) {
+/* A phone's (class on-phone, isPhoneShape) rather than a width's: turned on
+   its side a phone is wider than 700px and kept the computer's layout. */
   .app.phone-bar-bottom {
     /* The phone's own status bar: the mode reaches up under it, so its
        background and wallpaper show there, and its content starts below it
@@ -7197,10 +7215,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   }
   /* A mode's own buttons in the bar while it is short of width (stage c):
      forward only once there is somewhere to go forward to. */
-  .app.crowded-bar .page-bar-forward:disabled {
+  .app.on-phone.crowded-bar .page-bar-forward:disabled {
     display: none;
   }
-}
 
 /* ── A computer: the modes in a column on the left ─────────────────── */
 /* Over the mode rather than beside it, see-through, so the mode's own
@@ -7248,19 +7265,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 .mode-rail-btn.active {
   box-shadow: inset 0 0 0 2px var(--controls-button-text, var(--controls-text, #fff));
 }
-@media (min-width: 701px) {
-  .app.has-rail .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
-    /* The column's room, and a mode's scrollbar balance on top of it
-       (utils/idleScrollbar.js), which this would otherwise override. */
-    padding-left: calc(56px + var(--sb-balance, 0px)) !important;
-    box-sizing: border-box;
-  }
+.app.has-rail .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
+  /* The column's room, and a mode's scrollbar balance on top of it
+     (utils/idleScrollbar.js), which this would otherwise override. */
+  padding-left: calc(56px + var(--sb-balance, 0px)) !important;
+  box-sizing: border-box;
 }
-@media (max-width: 700px) {
-  .app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
-    padding-top: var(--safe-top, 0px) !important;
-    box-sizing: border-box;
-  }
+.app.phone-bar-bottom .modes > :global(:not(.mode-rail):not(.rail-edge):not(.sync-lock-banner):not(.layout-page):not(.mode-strip):not(.gesture-sheet)) {
+  padding-top: var(--safe-top, 0px) !important;
+  box-sizing: border-box;
 }
 /* The strip of modes while sliding along the bar (modeGesture 'strip'):
    across the width, every mode at its own place. */
@@ -7389,16 +7402,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   transform: translateX(-100%);
 }
 /* The layout page starts after a column that stays. */
-@media (min-width: 701px) {
-  .app.has-rail .modes > :global(.layout-page) {
-    left: 56px;
-  }
+.app.has-rail .modes > :global(.layout-page) {
+  left: 56px;
 }
 /* The column is a computer's; a phone has the sheet and the swipe. After the
    rules that draw it: Svelte weighs both the same, so the later one wins. */
-@media (max-width: 700px) {
-  .mode-rail { display: none; }
-}
+.app.on-phone .mode-rail { display: none; }
 .controls {
   flex: 0 0 auto;  /* only as tall as needed */
   position: sticky;
@@ -8053,6 +8062,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
      band above the bar too -- reaches what is under it. barTouchStart says
      which touches are the bar's. -->
 <svelte:window
+  on:resize={rememberShape}
+  on:orientationchange={rememberShape}
   on:keydown={modeShortcut}
   on:touchstart|passive={barTouchStart}
   on:touchmove|nonpassive={barTouchMove}
@@ -8063,9 +8074,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <div
   class="app"
   class:keyboard-up={keyboardOpen}
-  class:phone-bar-bottom={controlsLayout.phone === 'bottom'}
-  class:has-rail={controlsLayout.computer === 'rail'}
-  class:rail-auto={controlsLayout.computer === 'auto'}
+  class:on-phone={onPhone}
+  class:phone-bar-bottom={onPhone && controlsLayout.phone === 'bottom'}
+  class:phone-bar-top={barAtTop}
+  class:has-rail={!onPhone && controlsLayout.computer === 'rail'}
+  class:rail-auto={!onPhone && controlsLayout.computer === 'auto'}
   class:crowded-bar={mode === 'page' || Boolean(nowPlayingTrack)}
   style="{appThemeCssVars}; {blockThemeCssVars}; --toolbar-bg: {leftTheme.panelBg}; --toolbar-button-text: {leftTheme.buttonText}; {overlayThemeStyle}">
   <!-- Which Austavia this is, when it is not the real one: inside .app so it
@@ -8421,7 +8434,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       <!-- Every mode, always at the same place in its order, a space in the
            middle that keeps the open one; the one under the finger raised
            with its name. In the bar's colours. -->
-      <div class="mode-strip" style={controlsStyle} aria-hidden="true">
+      <div class="mode-strip" style="{controlsStyle}{barAtTop ? `; top: ${barEdge + 14}px; bottom: auto;` : ''}" aria-hidden="true">
         <div class="strip-space" class:chosen={stripIndex === null} style="left: {strip.space.left}px; width: {strip.space.right - strip.space.left}px;">
           {#if stripIndex === null}<span class="strip-name">Stay: {MODE_LABELS[mode] || mode}</span>{/if}
         </div>
@@ -8435,7 +8448,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     {/if}
     {#if barGesture?.kind === 'sheet'}
       <!-- Every mode, rising from the bar; letting go on one opens it. -->
-      <div class="gesture-sheet" style={controlsStyle} aria-hidden="true">
+      <div class="gesture-sheet" style="{controlsStyle}{barAtTop ? `; top: ${barEdge + 8}px; bottom: auto;` : ''}" aria-hidden="true">
         {#each offered as id (id)}
           <div class="gesture-mode" data-gesture-mode={id} class:chosen={id === sheetPick} class:open={id === mode}>
             <ModeIcon mode={id} size={24} />
