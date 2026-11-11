@@ -491,6 +491,11 @@
   /* The two colours swap -- the writing's becomes the fill, the panel's the
      writing -- and the panel's at full opacity, so a see-through theme keeps
      its writing visible instead of clear on a filled button. */
+  .delete-account-btn {
+    opacity: 0.6;
+    font-size: 0.85em;
+  }
+
   .create-theme-btn:hover {
     background: var(--right-button-text, #ffffff);
     color: var(--right-panel-solid, var(--right-panel-bg, #222222));
@@ -857,6 +862,12 @@
                   {/if}
                 </div>
               {/if}
+              <!-- Last in the section and quieter than the rest, so it is found
+                   by someone looking for it rather than by a stray tap. What it
+                   deletes is said in the confirmation that follows. -->
+              <button class="create-theme-btn delete-account-btn" type="button" on:click={() => dispatch('deleteAccount')}>
+                Delete my account
+              </button>
             {:else}
               <button class="create-theme-btn" type="button" on:click={signIn}>🔐 Sign in Google</button>
             {/if}

@@ -87,7 +87,17 @@ export function prewarmGoogleSignIn() {
   ensureNativeGoogleAuthInitialized().catch(() => {});
 }
 
-async function signInWithGoogleNative(ctx) {
+// Signing in again to prove it is you (deleting the account) confirms the
+// account already signed in rather than switching to whichever one is picked:
+// Firebase refuses a different Google account with auth/user-mismatch, and
+// nothing changes on the device.
+function useCredential(ctx, credential, again) {
+  return again
+    ? ctx.authApi.reauthenticateWithCredential(ctx.auth.currentUser, credential)
+    : ctx.authApi.signInWithCredential(ctx.auth, credential);
+}
+
+async function signInWithGoogleNative(ctx, again = false) {
   if (!googleWebClientId) {
     throw new Error('Google sign-in is not configured for this app (missing web client ID).');
   }
@@ -109,7 +119,7 @@ async function signInWithGoogleNative(ctx) {
   if (!idToken) throw new Error('Google sign-in did not return an ID token.');
 
   const credential = ctx.authApi.GoogleAuthProvider.credential(idToken);
-  const signInResult = await ctx.authApi.signInWithCredential(ctx.auth, credential);
+  const signInResult = await useCredential(ctx, credential, again);
   return signInResult.user;
 }
 
@@ -413,7 +423,7 @@ function currentSignInMethod() {
 // is open opens a fresh one (the old is replaced), and the wait follows it.
 let pendingWindowSignIn = null;
 
-async function signInWithGoogleInWindow(ctx) {
+async function signInWithGoogleInWindow(ctx, again = false) {
   const [{ invoke }, { listen }] = await Promise.all([
     import('@tauri-apps/api/core'),
     import('@tauri-apps/api/event')
@@ -450,7 +460,7 @@ async function signInWithGoogleInWindow(ctx) {
     // A hang here once looked like nothing at all happening (see authSetup in
     // utils/desktopSignIn.js); a message is better than silence.
     const signInResult = await Promise.race([
-      ctx.authApi.signInWithCredential(ctx.auth, credential),
+      useCredential(ctx, credential, again),
       new Promise((_, reject) => setTimeout(
         () => reject(new Error('Firebase did not answer the sign-in within 30 seconds.')), 30000))
     ]);
@@ -464,16 +474,17 @@ async function signInWithGoogleInWindow(ctx) {
   }
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle({ again = false } = {}) {
   const ctx = await getFirebaseContext();
   if (!ctx) throw new Error('Firebase is not configured.');
+  if (again && !ctx.auth.currentUser) throw new Error('Not signed in.');
 
   const method = currentSignInMethod();
   if (method === 'native') {
-    return signInWithGoogleNative(ctx);
+    return signInWithGoogleNative(ctx, again);
   }
   if (method === 'window') {
-    return signInWithGoogleInWindow(ctx);
+    return signInWithGoogleInWindow(ctx, again);
   }
 
   const provider = new ctx.authApi.GoogleAuthProvider();
@@ -481,8 +492,42 @@ export async function signInWithGoogle() {
   // to the browser, so anyone with a single session could never reach a second
   // one. Always offer the picker instead.
   provider.setCustomParameters({ prompt: 'select_account' });
-  const result = await ctx.authApi.signInWithPopup(ctx.auth, provider);
+  const result = again
+    ? await ctx.authApi.reauthenticateWithPopup(ctx.auth.currentUser, provider)
+    : await ctx.authApi.signInWithPopup(ctx.auth, provider);
   return result.user;
+}
+
+/**
+ * Delete the signed-in account and everything it holds, through the
+ * deleteAccount function (functions/accountDeletion.js). The server asks for a
+ * sign-in made in the last few minutes, so signInWithGoogle({ again: true })
+ * comes first.
+ *
+ * Called over plain fetch in the callable protocol rather than through the
+ * Functions SDK: it is one request, made once in an account's life, and not
+ * worth another module loaded on every start.
+ */
+export async function deleteSignedInAccount() {
+  const ctx = await getFirebaseContext();
+  const user = ctx?.auth.currentUser;
+  if (!user) throw new Error('Not signed in.');
+  const idToken = await user.getIdToken(true);
+  const response = await fetch(
+    `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/deleteAccount`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ data: {} })
+    }
+  );
+  const answer = await response.json().catch(() => ({}));
+  if (!response.ok || answer.error) {
+    const error = new Error(answer.error?.message || `The server answered ${response.status}.`);
+    error.code = answer.error?.status || String(response.status);
+    throw error;
+  }
+  return answer.result;
 }
 
 export async function signOutUser() {

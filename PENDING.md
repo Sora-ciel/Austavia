@@ -120,13 +120,13 @@ Agreed with Sora after 0.8.67 shipped. Each step before the next:
    accountant's question in `POLAR.md`. Code worth adding: a daily pass that
    lists subscriptions from Polar and recomputes, so the two sides cannot
    disagree in silence (section 6 below, item 2).
-   **Deleting an account** (raised 2026-11-11): there is no button for it in
-   the app. A request by email is answered by finding the account in Firebase
-   Authentication by its email, then removing by hand: the Authentication
-   user, `sync/default/users/<uid>`, `storage/<uid>`, `usage/<uid>`,
-   `activity/<uid>`, `subscriptions/<uid>`, `noteSizes/<uid>`, and
-   `users/<uid>/` in Cloud Storage. Worth making a button for (a callable
-   function, after signing in again) before many people use it.
+   **Deleting an account**: built 2026-11-11 -- "Delete my account" in the
+   Cloud section, the deleteAccount function, finishAccountDeletions daily
+   (functions/accountDeletion.js). Owed: deploy the functions to staging and
+   delete a throwaway account there (check every path in accountPaths is
+   gone, and that nothing reappears the next day); then production. Anyone
+   who subscribed before 2026-11-11 has no subscription id on record, so a
+   deletion lands in diagnostics/polar/deletedWhilePaying to cancel by hand.
 2. **Help for beginners**: an explanation on hover (long press on a phone)
    for each control; a short "how Austavia works" at first launch; an example
    folder instead of an empty canvas, which is also what gets screenshotted.

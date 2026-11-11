@@ -52,6 +52,7 @@
     isFirebaseConfigured,
     onAuthStateChange,
     signInWithGoogle,
+    deleteSignedInAccount,
     prewarmGoogleSignIn,
     signOutUser,
     loadRemoteFile,
@@ -163,6 +164,7 @@
   import { folderIdOf } from './utils/folderIdentity.js';
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
   import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen, seenFor } from './utils/syncConflict.js';
+  import { DELETE_ACCOUNT_WARNING, deletionFailureMessage } from './utils/accountDeletion.js';
   import { backstopNeedsFullRead } from './utils/syncBackstop.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
@@ -5362,6 +5364,38 @@
     savedList = await listSavedBlocks();
   }
 
+  // "Delete my account" (asked 2026-11-11). The server does the deleting and
+  // the rules (functions/accountDeletion.js); here: ask, prove it is the same
+  // person, then leave the device as a new install. Uploads are held for the
+  // length of it so this device does not write back what is being removed.
+  async function deleteAccount() {
+    if (!authUser) return;
+    const choice = await appChoice(DELETE_ACCOUNT_WARNING, [
+      { id: 'delete', label: 'Delete my account', variant: 'danger' },
+      { id: 'keep', label: 'Keep it', variant: 'safe' }
+    ]);
+    if (choice !== 'delete') return;
+
+    const heldUploads = uploadInProgress;
+    uploadInProgress = true;
+    try {
+      await signInWithGoogle({ again: true });
+      await deleteSignedInAccount();
+    } catch (error) {
+      console.error(error);
+      uploadInProgress = heldUploads;
+      await appAlert(deletionFailureMessage(error));
+      return;
+    }
+
+    // The account is gone; what is left is this device's copy of it.
+    await signOutUser().catch(() => {});
+    persistSyncedUid('');
+    await wipeLocalSaves();
+    uploadInProgress = heldUploads;
+    await appAlert('Your account and everything in it have been deleted.');
+  }
+
   async function signOutGoogle() {
     try {
       // Local files belong to the account that's signing out — leaving them
@@ -8576,6 +8610,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         {blocksFollowThemeAll}
         on:googleSignIn={signInGoogle}
         on:googleSignOut={signOutGoogle}
+        on:deleteAccount={deleteAccount}
         on:uploadNow={uploadAllLocalToCloud}
         on:downloadNow={downloadAllCloudToLocal}
         on:toggleAutoSync={toggleAutoSync}

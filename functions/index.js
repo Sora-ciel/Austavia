@@ -1,12 +1,13 @@
 const { onValueWritten } = require('firebase-functions/v2/database');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { onObjectFinalized, onObjectDeleted } = require('firebase-functions/v2/storage');
 const { logger } = require('firebase-functions');
 const { initializeApp } = require('firebase-admin/app');
 const { getDatabase } = require('firebase-admin/database');
 const { getStorage } = require('firebase-admin/storage');
+const { getAuth } = require('firebase-admin/auth');
 const { sweepIndex, indexWriteKind } = require('./cloudBin');
 const { LATEST_SCHEMA_VERSION, MIN_SUPPORTED_SCHEMA_VERSION, migrateFilePayload } = require('./migrations');
 const { DAILY_BYTE_LIMIT } = require('./limits');
@@ -14,8 +15,17 @@ const { SYNC_NAMESPACE } = require('./syncNamespace');
 const { recordStorageDelta, recordNoteBytes, reconcileStorageUsage } = require('./storageAccounting');
 const { recordActivity, rollUpStats } = require('./activityTracking');
 const { verifyWebhook, eventAtFrom } = require('./polarAdapter');
-const { applyPolarEvent, sweepExpiredPlans } = require('./subscriptions');
-const { apiBaseFor, runningProject } = require('./polarApi');
+const { applyPolarEvent, sweepExpiredPlans, REVOKE_FAILURES } = require('./subscriptions');
+const { apiBaseFor, runningProject, revokeSubscription } = require('./polarApi');
+const {
+  DELETED_ACCOUNTS,
+  isDeletableUid,
+  accountPaths,
+  storagePrefix,
+  signedInRecently,
+  subscriptionToEnd,
+  markersToForget
+} = require('./accountDeletion');
 
 initializeApp();
 
@@ -468,5 +478,122 @@ exports.sweepExpiredPlans = onSchedule(
   },
   async () => {
     await sweepExpiredPlans({});
+  }
+);
+
+// Deleting an account, from the button in the app (accountDeletion.js has the
+// why and every rule; this is the doing).
+//
+// In this order, so that stopping half way is never worse than not starting:
+//   1. the subscription is ended first, and if Polar cannot be reached nothing
+//      is deleted -- the one outcome worse than an account that will not go is
+//      a deleted account that goes on being charged;
+//   2. the marker, so the balance triggers fired by what follows stand aside;
+//   3. pictures, then the database, then the sign-in itself -- last, because
+//      while it exists the person can press the button again and finish.
+const DELETED_WHILE_PAYING = 'diagnostics/polar/deletedWhilePaying';
+
+async function removeAccountData({ db, bucket, uid }) {
+  await bucket.deleteFiles({ prefix: storagePrefix(uid) });
+  const removal = {};
+  for (const path of accountPaths(uid, SYNC_NAMESPACE)) removal[path] = null;
+  await db.ref().update(removal);
+}
+
+async function removeSignIn(uid) {
+  try {
+    await getAuth().deleteUser(uid);
+  } catch (error) {
+    if (error.code !== 'auth/user-not-found') throw error;
+  }
+}
+
+exports.deleteAccount = onCall(
+  {
+    region: 'us-central1',
+    maxInstances: MAX_INSTANCES,
+    secrets: [polarAccessToken],
+    timeoutSeconds: 300
+  },
+  async request => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid || !isDeletableUid(uid)) {
+      throw new HttpsError('unauthenticated', 'Sign in to delete your account.');
+    }
+    if (!signedInRecently({ authTimeSeconds: request.auth.token.auth_time })) {
+      throw new HttpsError('failed-precondition', 'recent-sign-in');
+    }
+
+    const db = getDatabase();
+    const bucket = getStorage().bucket();
+    const record = (await db.ref(`subscriptions/${uid}`).get()).val();
+    const subscription = subscriptionToEnd(record);
+
+    if (subscription.action === 'revoke') {
+      const result = await revokeSubscription({
+        id: subscription.id,
+        token: polarAccessToken.value(),
+        baseUrl: apiBaseFor(runningProject(), PRODUCTION_PROJECT_ID)
+      }).catch(error => ({ ok: false, reason: error.message }));
+      if (!result.ok) {
+        logger.error('delete-account-revoke-failed', { uid, subscriptionId: subscription.id, ...result });
+        await db.ref(`${REVOKE_FAILURES}/${subscription.id}`).set({
+          uid,
+          at: Date.now(),
+          reason: result.reason || 'unknown',
+          status: result.status || 0,
+          during: 'account-deletion'
+        });
+        throw new HttpsError('unavailable', 'subscription');
+      }
+    } else if (subscription.action === 'by-hand') {
+      // Paying, with no id on record (subscribed before ids were kept). Left
+      // for a person to cancel at Polar; the email is what finds it there.
+      logger.error('delete-account-cancel-by-hand', { uid });
+      await db.ref(`${DELETED_WHILE_PAYING}/${uid}`).set({
+        email: request.auth.token.email || null,
+        at: Date.now()
+      });
+    }
+
+    await db.ref(`${DELETED_ACCOUNTS}/${uid}`).set({ at: Date.now() });
+    await removeAccountData({ db, bucket, uid });
+    await removeSignIn(uid);
+    logger.info('account-deleted', { uid, subscription: subscription.action });
+    return { ok: true };
+  }
+);
+
+// The pass that looks again. Every trigger a deletion set off lands in the
+// minutes after it, and any of them may have written something back; a
+// deletion that failed half way leaves the rest. So each marked account is
+// removed again, whole -- absolute, harmless to repeat -- and its marker is
+// forgotten after a month.
+exports.finishAccountDeletions = onSchedule(
+  {
+    schedule: 'every day 04:30',
+    region: 'us-central1',
+    maxInstances: SCHEDULED_MAX_INSTANCES
+  },
+  async () => {
+    const db = getDatabase();
+    const bucket = getStorage().bucket();
+    const markers = (await db.ref(DELETED_ACCOUNTS).get()).val() || {};
+    let finished = 0;
+
+    for (const uid of Object.keys(markers)) {
+      if (!isDeletableUid(uid)) continue;
+      try {
+        await removeAccountData({ db, bucket, uid });
+        await removeSignIn(uid);
+        finished += 1;
+      } catch (error) {
+        logger.warn('finish-account-deletion-failed', { uid, cause: error.message });
+      }
+    }
+    for (const uid of markersToForget(markers)) {
+      await db.ref(`${DELETED_ACCOUNTS}/${uid}`).remove();
+    }
+    logger.info('account-deletions-finished', { accounts: finished });
   }
 );

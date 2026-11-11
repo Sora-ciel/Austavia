@@ -20,7 +20,24 @@ const {
   graceEndsAt,
   isAlreadyProcessed
 } = require('./entitlements');
-const { statusFromEvent, periodEndsAt } = require('./polarAdapter');
+const { statusFromEvent, periodEndsAt, subscriptionIdFrom } = require('./polarAdapter');
+
+/**
+ * The subscription an event is about. A subscription event is the
+ * subscription itself; an order names the one it paid for.
+ *
+ * Kept on the record so that deleting an account can end the subscription at
+ * Polar (accountDeletion.js) -- without it, someone could delete their account
+ * and go on being charged for it.
+ */
+function subscriptionIdIn(event = {}) {
+  const data = event.data || {};
+  if (typeof event.type === 'string' && event.type.startsWith('subscription.') &&
+      typeof data.id === 'string' && data.id) {
+    return data.id;
+  }
+  return subscriptionIdFrom(event);
+}
 
 // How many delivery ids to keep. They exist only to recognise a redelivery,
 // and a provider gives up retrying long before twenty more events have
@@ -141,6 +158,7 @@ function recordAfterEvent({
       periodEndsAt: endsAt,
       gracePeriodEndsAt,
       provider: 'polar',
+      subscriptionId: subscriptionIdIn(event) || record.subscriptionId || null,
       eventAt: at || lastAt,
       lastEventType: typeof event.type === 'string' ? event.type : null,
       updatedAt: now,
@@ -155,5 +173,6 @@ module.exports = {
   IGNORED,
   rememberEvent,
   graceFor,
+  subscriptionIdIn,
   recordAfterEvent
 };

@@ -38,6 +38,7 @@ import, and the code that acts on them stayed where it was:
 | `src/utils/checkout.js` | whether to offer an upgrade, and what the checkout is told |
 | `src/utils/screenshotDelivery.js` | what a screenshot is called, and whether it can be copied |
 | `src/utils/subscriptionStatus.js` | what a subscriber is told about their own plan |
+| `functions/accountDeletion.js` | what deleting an account removes, who may, and what happens to a subscription |
 | `src/utils/storageJournal.js` | what each launch found, and where something went missing |
 | `src/utils/habitStore.js` | what a folder's habits may contain, and when they have changed |
 | `src/utils/storageAlerts.js` | when to say the cloud storage is filling up |

@@ -8,6 +8,7 @@ const { getDatabase } = require('firebase-admin/database');
 const { getAuth } = require('firebase-admin/auth');
 const { getStorage } = require('firebase-admin/storage');
 const { SYNC_NAMESPACE } = require('./syncNamespace');
+const { DELETED_ACCOUNTS } = require('./accountDeletion');
 const {
   componentsOf,
   withComponent,
@@ -74,6 +75,15 @@ async function syncStorageFullClaim(uid, isFull) {
   logger.info('storage-claim-updated', { uid, storageFull: isFull });
 }
 
+// Whether this account was deleted (accountDeletion.js). Deleting one removes
+// every file and folder it had, and each removal fires a trigger here; left to
+// run, they would write a fresh empty balance for an account that is gone.
+// Asked only on removals, so a save costs no extra read.
+async function accountDeleted(db, uid) {
+  const snap = await db.ref(`${DELETED_ACCOUNTS}/${uid}`).get();
+  return snap.exists();
+}
+
 // Read one account's plan rather than the whole users node. Reading
 // sync/{ns}/users in one go would pull every note every user has along with
 // it — the plan is a leaf on the same branch as the entire file store.
@@ -87,6 +97,7 @@ async function recordStorageDelta(objectName, deltaBytes) {
   if (!uid || !deltaBytes) return;
 
   const db = getDatabase();
+  if (deltaBytes < 0 && await accountDeleted(db, uid)) return;
 
   // Read before the transaction, so the whole record can be written in one
   // step below. This used to bump `bytes` and then write `limit` and `full`
@@ -246,6 +257,7 @@ async function reconcileStorageUsage() {
  */
 async function recordNoteBytes(db, uid, fileId, bytes, at = Date.now()) {
   if (!uid || !fileId) return;
+  if (!(bytes > 0) && await accountDeleted(db, uid)) return;
 
   const sizeRef = db.ref(`noteSizes/${uid}/${fileId}`);
   // The folder's own stamp goes down beside its size, so the weekly pass can
