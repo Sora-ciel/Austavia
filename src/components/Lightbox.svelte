@@ -4,6 +4,7 @@
   import { fileNameForMedia } from '../utils/downloadNaming.js';
   import CropEditor from './CropEditor.svelte';
   import { croppedBlob, blobToDataUrl } from '../utils/cropImage.js';
+  import { deliverFile, isNativeAndroid } from '../utils/fileDelivery.js';
 
   // Array of image/video URLs to display
   export let images = [];
@@ -302,8 +303,19 @@
         isVideo
       });
 
-      // On a phone, a download lands in a Downloads folder the gallery does not
-      // index, so the picture is saved and still not in Photos. Handing the file
+      // In the apps, the way every other file leaves Austavia (fileDelivery.js):
+      // a download on a computer, the share sheet in the Android app. "Save
+      // cropped" saved nothing on Linux (2026-11-11): the Linux app's web
+      // engine says it can share a file, then shares it nowhere, so the
+      // browser's share below swallowed it.
+      const inDesktopApp = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+      if (inDesktopApp || isNativeAndroid()) {
+        await deliverFile(blob, name, { title: name });
+        return;
+      }
+
+      // In a phone's browser, a download lands in a Downloads folder the
+      // gallery does not index, so the picture is saved and still not in Photos. Handing the file
       // to the system sheet instead offers "Save to Photos" — and on iOS it is
       // the only route a web page has to the camera roll at all.
       //
