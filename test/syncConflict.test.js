@@ -38,3 +38,16 @@ test('what was seen is kept per account on this device, across restarts', () => 
   assert.deepEqual(readSeen(storage, 'u1'), { Notes: 100 });
   assert.deepEqual(readSeen(storage, 'u2'), {});
 });
+
+import { seenFor } from '../src/utils/syncConflict.js';
+
+// The rehearsal on staging, 2026-11-11: the phone's first run of this version
+// was opened offline, so it had recorded nothing when it was edited, and its
+// later stamp overwrote the computer's work instead of keeping both.
+test('a device that has recorded nothing yet still notices the other device changed the folder', () => {
+  // Last synced at 1000; the computer changed it at 2000; the phone, offline, at 3000.
+  const seen = seenFor({ seen: null, lastSynced: 1000 });
+  assert.equal(uploadVerdict({ seen, remoteModifiedAt: 2000, localModifiedAt: 3000 }), 'conflict');
+  assert.equal(seenFor({ seen: 1500, lastSynced: 1000 }), 1500, 'what was recorded comes first');
+  assert.equal(seenFor({}), null);
+});

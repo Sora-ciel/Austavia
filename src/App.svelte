@@ -161,7 +161,7 @@
   import { NO_PLACES, visit, goBack, goForward, placesStillThere } from './utils/pagePlaces.js';
   import { folderIdOf } from './utils/folderIdentity.js';
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
-  import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen } from './utils/syncConflict.js';
+  import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen, seenFor } from './utils/syncConflict.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
 
@@ -5447,7 +5447,7 @@
           const verdict = remoteEntry?.deletedAt || remoteEntry?.binnedAt
             ? 'upload'
             : uploadVerdict({
-              seen: cloudSeen[fileName] ?? null,
+              seen: seenFor({ seen: cloudSeen[fileName], lastSynced: cloudSyncMemoryByFile[fileName] }),
               remoteModifiedAt: remoteEntry?.modifiedAt || remoteEntry?.updatedAt || 0,
               localModifiedAt
             });
@@ -6277,7 +6277,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           // before the cloud's comes in (utils/syncConflict.js). Unknown when
           // nothing was recorded -- the first launch of this version -- and
           // then the copy below is what is kept, as before.
-          const seenAt = cloudSeen[remoteName];
+          const seenAt = seenFor({ seen: cloudSeen[remoteName], lastSynced: cloudSyncMemoryByFile[remoteName] });
           const localAt = Number(localMeta[remoteName]?.modifiedAt || localMeta[remoteName]?.updatedAt || 0);
           if (localMeta[remoteName] && seenAt && localAt > seenAt) {
             try {

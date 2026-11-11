@@ -88,3 +88,17 @@ export function readSeen(storage, uid) {
 export function writeSeen(storage, uid, seen) {
   try { storage?.setItem(SEEN_KEY_PREFIX + uid, JSON.stringify(seen || {})); } catch { /* recorded next time */ }
 }
+
+/**
+ * What to count as "last seen" for a folder: the cloud stamp recorded, or,
+ * where none is yet, when this device last synced it (kept by every version,
+ * across updates). Without the second, a device on its first run of this
+ * version -- opened offline, so nothing was recorded before it was edited --
+ * had nothing to compare with, and its later stamp overwrote the other
+ * device's work: the rehearsal on staging, 2026-11-11.
+ */
+export function seenFor({ seen = null, lastSynced = null } = {}) {
+  if (seen !== null && seen !== undefined && Number(seen) > 0) return Number(seen);
+  if (lastSynced !== null && lastSynced !== undefined && Number(lastSynced) > 0) return Number(lastSynced);
+  return null;
+}
