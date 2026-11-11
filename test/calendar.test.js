@@ -101,15 +101,16 @@ test('the 7-day view is the week holding the day, Monday first', () => {
 test('Ctrl and the wheel change the height of an hour, and this device keeps it', () => {
   const storage = memoryStorage();
   assert.equal(readHourHeight(storage, true), 64);
-  // Down makes the hours taller (reported the other way round as backwards).
-  const taller = zoomedHour(64, 100);
+  // Up makes the hours taller: turned round on 2026-11-10, then turned back on
+  // 2026-11-11 -- "i guess i was wrong the first time".
+  const taller = zoomedHour(64, -100);
   assert.ok(taller > 64);
   writeHourHeight(storage, true, taller);
   assert.equal(readHourHeight(storage, true), taller);
   assert.equal(readHourHeight(storage, false), 44, 'a block keeps its own');
-  assert.ok(zoomedHour(64, -100) < 64);
-  assert.equal(zoomedHour(MAX_HOUR, 100), MAX_HOUR);
-  assert.equal(zoomedHour(MIN_HOUR, -100), MIN_HOUR);
+  assert.ok(zoomedHour(64, 100) < 64);
+  assert.equal(zoomedHour(MAX_HOUR, -100), MAX_HOUR);
+  assert.equal(zoomedHour(MIN_HOUR, 100), MIN_HOUR);
 });
 
 test('day or 7 days is kept per calendar on this device', () => {
