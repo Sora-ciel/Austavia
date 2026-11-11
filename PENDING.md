@@ -9,6 +9,50 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Where we left off (2026-11-11) -- read this first
+
+Sora's words, the last session: "we'll do the budget alert and delete my
+account button first, those are the most important. after that ... the b and
+c are for the process of making the app user friendly just before marketing.
+though before that i do want to plan a cybersecurity audit."
+
+In this order:
+
+1. **Budget alert** (Sora, in the console). Google Cloud Console, Billing,
+   Budgets & alerts, Create budget: the project, an amount (about $5), emails
+   at 50/90/100 %. It warns; it stops nothing.
+2. **Delete my account** -- built (a650a0b), not deployed. Deploy functions
+   to staging (`firebase deploy --only functions --project staging`), delete a
+   throwaway account from `npm run dev:staging`, check every path is gone and
+   stays gone the next day, then production. Details under "Making money",
+   step 2.
+3. **Security audit**, planned 2026-11-11. Neither Polar (it reviews the
+   business, not the code) nor Google Play (data-safety form, deletion in the
+   app and on the web) requires a pentest; it is for our own sake. The harm
+   that is likely is cost and abuse, not reading someone else's notes:
+   1. Rules: emulator tests where account A tries to read, write and list B,
+      and to write its own `plan`, `blocked`, `storage`, `subscriptions`.
+   2. Cost abuse: one free account uploading as fast as it can. The 50 MB/day
+      cap covers database writes; check Storage uploads and downloads are
+      capped too.
+   3. Notes as a way in: pasted HTML, links and SVG in TipTap; an imported
+      folder must never run a script, above all in the desktop app.
+   4. Tauri: what the window may do (files, shell, windows) and its CSP.
+   5. Functions: the webhook signature (strict already), deleteAccount,
+      instance limits.
+   6. `npm audit`, `cargo audit`, no secrets in the repo or the build;
+      Firebase App Check so only the app reaches the API.
+   7. Later, with paying users: an outside review (a few hundred euros).
+4. **B**: in an empty mode, a button that adds the right block (step 3 under
+   "Making money").
+5. **C**: help for beginners -- explanations on hover / long press, a short
+   first-launch "how Austavia works", an example folder (step 2 there).
+6. **Then marketing** (memory: launch marketing).
+
+Waiting alongside, not in that order: Polar's review ("Submit for review" once
+austavia.com is live), the proof purchase on the legacy account, the 0.8.68
+web deploy held until Polar approves, austavia.com and www showing Connected.
+
 ## Now, asked 2026-10-26: one of everything, then the habit tracker
 
 Set 2026-10-26. Two halves, in this order, because the second is built on the
