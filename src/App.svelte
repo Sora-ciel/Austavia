@@ -8481,7 +8481,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       on:pageChange={(e) => changePageShown(e.detail.page)}
       on:renamePage={(e) => renamePageShown(e.detail.title)}
 
-      on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId })}
+      on:addBlock={(e) => addBlock(e.detail.type, { afterId: e.detail.afterId, fields: e.detail.fields })}
       on:insertOnPage={(e) => insertOnPage(e.detail)}
       on:addImage={(e) => addBlock('image', { fields: { src: e.detail.src } })}
       {habits}

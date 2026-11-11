@@ -40,8 +40,9 @@
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, clickWrites, dropSide,
     PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
-    setPlaceField, placesById, withTitle, TITLE_ID
+    setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES
   } from '../utils/pageLayout.js';
+  import { createLongPress } from '../utils/longPress.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -90,7 +91,11 @@
   let cropping = null;  // the picture block being cropped
 
   $: widths = new Map(rows.flatMap(row => row.cells).filter(cell => cell.width).map(cell => [cell.blockId, cell.width]));
-  const widthOf = id => (liveWidth?.id === id ? liveWidth.width : widths.get(id));
+  // Reactive, not a plain function: the markup asks it for each column, and
+  // Svelte redraws markup only when a name in it changes -- as a plain
+  // function the width being dragged was never drawn until the drag ended,
+  // so a picture did not change size under the finger (2026-11-11).
+  $: widthOf = id => (liveWidth?.id === id ? liveWidth.width : widths.get(id));
 
   function sourceOf(block) {
     if (typeof block?.src === 'string' && block.src) return block.src;
@@ -132,7 +137,7 @@
 
   // A nest's tile size, in edit mode, per layout.
   let liveTile = null; // { id, size } while the slider moves
-  const tileOf = id => (liveTile?.id === id ? liveTile.size : places.get(id)?.tile);
+  $: tileOf = id => (liveTile?.id === id ? liveTile.size : places.get(id)?.tile);
   function setTile(id, size) {
     liveTile = null;
     changeLayout(r => setPlaceField(r, id, 'tile', size));
@@ -266,8 +271,10 @@
     slashMenu = null;
     if (!item || !opened) return;
     if (opened.source === 'button') {
-      if (item.kind === 'new') dispatch('addBlock', { type: item.type });
-      else changeContent(r => putOnPage(r, item.blockId, { blocks }));
+      // From "＋ Block…" at the end, or "Add a block below…" in a block's menu.
+      const afterId = opened.afterId || null;
+      if (item.kind === 'new') dispatch('addBlock', { type: item.type, afterId });
+      else changeContent(r => putOnPage(r, item.blockId, { afterId, blocks }));
       return;
     }
     const editor = editorOf(opened.textId);
@@ -297,12 +304,89 @@
     menu = { blockId, x: box.right + 4, y: box.top };
   }
 
+  $: menuBlock = menu ? blocks.find(b => b.id === menu.blockId) : null;
+
   function menuAction(id) {
-    const blockId = menu?.blockId;
+    const opened = menu;
+    const blockId = opened?.blockId;
     menu = null;
     if (!blockId) return;
     if (id === 'takeOff') changeContent(r => takeOffPage(r, blockId, { blocks }));
     else if (id === 'delete') dispatch('delete', { id: blockId });
+    else if (id === 'crop') cropping = blocks.find(b => b.id === blockId) || null;
+    else if (id === 'replacePicture') choosePicture({ replace: blockId });
+    else if (id === 'addPicture') choosePicture({ afterId: blockId });
+    else if (id === 'addBlock') {
+      slashMenu = { source: 'button', x: opened.x, y: opened.y, query: '', afterId: blockId };
+      slashActive = 0;
+    }
+  }
+
+  // ── A block's menu without edit mode ─────────────────────────────────
+  // A long press on a phone, a right-click on a computer: asked 2026-11-11,
+  // "easier to add an image or delete an image or block without having to go
+  // to edit mode, using for example a pop-up that comes after a long press".
+  // What it offers is pageBlockMenu (pageLayout.js). Not on writing: a long
+  // press there selects words, and a right-click there is the browser's.
+  const onWriting = target => Boolean(target?.closest?.('.ProseMirror, input, textarea, [contenteditable="true"]'));
+  let heldBlock = null;
+  let swallowClick = false;
+  const hold = createLongPress({
+    onLongPress: point => {
+      if (!heldBlock || heldBlock === TITLE_ID) return;
+      menu = { blockId: heldBlock, x: point.x, y: point.y };
+      swallowClick = true;
+      try { navigator.vibrate?.(15); } catch { /* no buzz here */ }
+    }
+  });
+
+  function cellPointerDown(event, blockId) {
+    if (event.pointerType !== 'touch' || onWriting(event.target)) return;
+    heldBlock = blockId;
+    hold.start({ x: event.clientX, y: event.clientY });
+  }
+  const cellPointerMove = event => hold.move({ x: event.clientX, y: event.clientY });
+  const cellPointerUp = () => hold.finish();
+  const cellPointerCancel = () => hold.cancel();
+
+  function cellClickCapture(event) {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function cellContextMenu(event, blockId) {
+    if (blockId === TITLE_ID || onWriting(event.target)) return;
+    event.preventDefault();
+    menu = { blockId, x: event.clientX, y: event.clientY };
+  }
+
+  // A picture chosen from the device: added under a block, or in place of one.
+  let pictureInput;
+  let pictureFor = null; // { afterId } | { replace }
+  function choosePicture(target) {
+    pictureFor = target;
+    if (pictureInput) {
+      pictureInput.value = '';
+      pictureInput.click();
+    }
+  }
+  function onPictureChosen(event) {
+    const file = event.target.files?.[0];
+    const target = pictureFor;
+    pictureFor = null;
+    if (!file || !target) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = reader.result;
+      if (target.replace) {
+        dispatch('update', { id: target.replace, src, resolvedSrc: null, changedKeys: ['src', 'resolvedSrc'], pushToHistory: true, bumpVersion: true });
+      } else {
+        dispatch('addBlock', { type: 'image', afterId: target.afterId, fields: { src } });
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   // Moving: hold the handle and drag. Where it lands is decided by
@@ -481,7 +565,18 @@
             style={widthOf(col.key) ? `flex: 0 1 ${widthOf(col.key) * 100}%; max-width: ${widthOf(col.key) * 100}%;` : ''}
           >
             {#each col.blocks as block (`${block.id}-${block._version || 0}`)}
-              <div class="page-cell" class:moving={dragging === block.id} data-page-block={block.id}>
+              <!-- svelte-ignore a11y-no-static-element-interactions -->
+              <div
+                class="page-cell"
+                class:moving={dragging === block.id}
+                data-page-block={block.id}
+                on:pointerdown={(event) => cellPointerDown(event, block.id)}
+                on:pointermove={cellPointerMove}
+                on:pointerup={cellPointerUp}
+                on:pointercancel={cellPointerCancel}
+                on:click|capture={cellClickCapture}
+                on:contextmenu={(event) => cellContextMenu(event, block.id)}
+              >
                 <button
                   class="page-handle"
                   title="Drag to move, press for the menu"
@@ -546,14 +641,30 @@
                   </label>
                 {/if}
                 {#if editMode && block.type === 'image'}
+                  <!-- A picture's tools in edit mode, and only there: its size
+                       stays as it is outside it (asked 2026-11-11). One press
+                       for a size, or the round grip on its edge dragged, the
+                       share shown while it moves. -->
                   <div class="page-edit-tools">
-                    <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
-                    {#if widthOf(col.key)}
-                      <button on:click|stopPropagation={() => changeLayout(r => setCellWidth(r, block.id, null))}>Natural size</button>
-                    {/if}
+                    <div class="page-edit-row">
+                      <button on:click|stopPropagation={() => (cropping = block)} disabled={!sourceOf(block)}>Crop</button>
+                      <button on:click|stopPropagation={() => choosePicture({ replace: block.id })}>Replace</button>
+                    </div>
+                    <div class="page-edit-row page-sizes" role="group" aria-label="Size">
+                      {#each PICTURE_SIZES as size}
+                        <button
+                          class:on={size.width === null ? !widthOf(col.key) : Math.abs((widthOf(col.key) || 0) - size.width) < 0.01}
+                          on:click|stopPropagation={() => changeLayout(r => setCellWidth(r, col.key, size.width))}
+                        >{size.label}</button>
+                      {/each}
+                    </div>
                   </div>
                   <!-- svelte-ignore a11y-no-static-element-interactions -->
-                  <div class="page-width-grip" title="Drag to size" on:pointerdown={(e) => startWidthDrag(e, col.key)}></div>
+                  <div class="page-width-grip" title="Drag to size" on:pointerdown={(e) => startWidthDrag(e, col.key)}>
+                    {#if liveWidth?.id === col.key}
+                      <span class="page-width-badge">{Math.round(liveWidth.width * 100)}%</span>
+                    {/if}
+                  </div>
                 {/if}
               </div>
             {/each}
@@ -591,14 +702,14 @@
   />
 {/if}
 
+<!-- A picture from the device, for a block's menu or edit mode's Replace. -->
+<input class="page-picture-input" type="file" accept="image/*,video/mp4" bind:this={pictureInput} on:change={onPictureChosen} />
+
 {#if menu}
   <BlockContextMenu
     x={menu.x}
     y={menu.y}
-    items={[
-      { id: 'takeOff', label: 'Take off page' },
-      { id: 'delete', label: 'Delete block', variant: 'danger' }
-    ]}
+    items={pageBlockMenu(menuBlock)}
     on:action={(e) => menuAction(e.detail)}
     on:close={() => (menu = null)}
   />
@@ -730,32 +841,60 @@
     outline-offset: 2px;
   }
 
+  /* Over the picture's top left, on a backing of the page's colour so it
+     reads over any photograph; two rows -- what to do, and its size -- that
+     wrap on a narrow picture rather than run off it. */
   .page-edit-tools {
     position: absolute;
     left: 8px;
+    right: 24px;
     top: 10px;
     z-index: 3;
     display: flex;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 6px;
+    pointer-events: none;
+  }
+
+  .page-edit-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 82%, transparent);
+    pointer-events: auto;
   }
 
   .page-edit-tools button {
+    min-width: 34px;
+    min-height: 30px;
     padding: 4px 10px;
     border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 45%, transparent);
-    background: color-mix(in srgb, var(--canvas-inner-bg, #000) 80%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mode-text-color, #fff) 40%, transparent);
+    background: transparent;
     color: var(--mode-text-color, #fff);
     font: inherit;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     cursor: pointer;
   }
 
+  /* The size it has now. */
+  .page-edit-tools button.on {
+    background: var(--mode-text-color, #fff);
+    color: var(--canvas-inner-bg, #000);
+    border-color: var(--mode-text-color, #fff);
+  }
+
+  /* The picture's right edge to drag: a wide strip to hold, a round knob in
+     its middle to see, the share of the row beside it while it moves. */
   .page-width-grip {
     position: absolute;
     top: 0;
     bottom: 0;
-    right: -7px;
-    width: 14px;
+    right: -16px;
+    width: 32px;
     z-index: 3;
     cursor: ew-resize;
     touch-action: none;
@@ -765,13 +904,41 @@
     content: '';
     position: absolute;
     top: 50%;
-    left: 5px;
-    width: 4px;
-    height: 44px;
-    transform: translateY(-50%);
-    border-radius: 2px;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid var(--canvas-inner-bg, #000);
     background: var(--mode-text-color, #fff);
-    opacity: 0.8;
+    box-sizing: border-box;
+  }
+
+  .page-width-badge {
+    position: absolute;
+    top: calc(50% - 40px);
+    right: 50%;
+    transform: translateX(50%);
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--mode-text-color, #fff);
+    color: var(--canvas-inner-bg, #000);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .page-picture-input {
+    display: none;
+  }
+
+  /* A long press on a picture is the page's menu, not the phone's own
+     picture menu or a drag of the image. */
+  .page-cell :global(img),
+  .page-cell :global(svg) {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
   }
 
   .page-cell.moving {

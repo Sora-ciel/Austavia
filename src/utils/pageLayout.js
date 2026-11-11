@@ -385,3 +385,38 @@ export function placesById(rows) {
   }
   return out;
 }
+
+/**
+ * What a block's menu on a page offers -- opened by a long press on a phone
+ * or a right-click on a computer, outside edit mode as well as in it. Asked
+ * 2026-11-11: "make it easier to add an image or delete an image or block
+ * without having to go to edit mode, using for example a pop-up that comes
+ * after a long press". A picture's size is not here: it is edit mode's, and
+ * stays there ("i want it stuck when out of edit mode").
+ */
+export function pageBlockMenu(block) {
+  const picture = block?.type === 'image';
+  return [
+    ...(picture ? [
+      { id: 'replacePicture', label: 'Replace picture' },
+      { id: 'crop', label: 'Crop' }
+    ] : []),
+    { id: 'addPicture', label: 'Add a picture below' },
+    { id: 'addBlock', label: 'Add a block below…' },
+    { id: 'takeOff', label: 'Take off page' },
+    { id: 'delete', label: picture ? 'Delete picture' : 'Delete block', variant: 'danger' }
+  ];
+}
+
+/**
+ * The sizes a picture can be given in one press in edit mode, as shares of
+ * its row -- easier on a phone than dragging its edge (asked 2026-11-11, "make
+ * it so that it's easier to change the size"). `null` is its natural size.
+ */
+export const PICTURE_SIZES = Object.freeze([
+  { label: '⅓', width: 1 / 3 },
+  { label: '½', width: 0.5 },
+  { label: '¾', width: 0.75 },
+  { label: 'Full', width: 1 },
+  { label: 'Natural', width: null }
+]);

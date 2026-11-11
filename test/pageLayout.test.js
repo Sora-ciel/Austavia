@@ -222,3 +222,23 @@ test('a click beside a row or between two writes nothing; only a click below eve
   assert.equal(clickWrites({ pressOnPage: true, moved: 0, below: false }), false);
   assert.equal(clickWrites({ pressOnPage: true, moved: 0, below: true }), true);
 });
+
+// Asked 2026-11-11: "make it easier to add an image or delete an image or
+// block without having to go to edit mode, using for example a pop-up that
+// comes after a long press" -- and a picture's size stays edit mode's.
+import { pageBlockMenu, PICTURE_SIZES } from '../src/utils/pageLayout.js';
+
+test('a long press on a picture offers to replace, crop, add below and delete it, without edit mode', () => {
+  const ids = pageBlockMenu({ type: 'image' }).map(item => item.id);
+  for (const id of ['replacePicture', 'crop', 'addPicture', 'addBlock', 'takeOff', 'delete']) assert.ok(ids.includes(id), id);
+  assert.ok(!ids.some(id => /size|width/i.test(id)), 'no sizing outside edit mode');
+});
+
+test('any other block offers to add a picture or a block below, and to delete it', () => {
+  const ids = pageBlockMenu({ type: 'calendar' }).map(item => item.id);
+  assert.deepEqual(ids, ['addPicture', 'addBlock', 'takeOff', 'delete']);
+});
+
+test('edit mode sizes a picture in one press: a third, half, three quarters, full, or natural', () => {
+  assert.deepEqual(PICTURE_SIZES.map(s => s.width), [1 / 3, 0.5, 0.75, 1, null]);
+});
