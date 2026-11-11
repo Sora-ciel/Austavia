@@ -122,3 +122,20 @@ test('a save waiting for another folder does not hold this one back', () => {
 test('a folder nobody touched during the download takes the cloud copy as before', () => {
   assert.equal(editedDuringDownload({ updatedAtBefore: 100, updatedAtNow: 100, folder: 'notes' }), false);
 });
+
+// The rehearsal of 0.8.67 on staging, 2026-11-11: a move made on a version too
+// old to save, refused, was not sent after the update until another move was
+// made. Work left unsent when the app shut goes up at the next launch.
+import { aheadOfCloud } from '../src/utils/syncOwing.js';
+
+test('work left unsent when the app shut is owed at the next launch, without waiting for an edit', () => {
+  const local = { test: { modifiedAt: 2000, updatedAt: 2000 }, same: { modifiedAt: 1000 }, behind: { modifiedAt: 500 } };
+  const remote = { test: { modifiedAt: 1500 }, same: { modifiedAt: 1000 }, behind: { modifiedAt: 900 } };
+  assert.deepEqual(aheadOfCloud(local, remote), ['test']);
+});
+
+test('a folder the cloud deleted, binned or never had is not sent back by it', () => {
+  const local = { gone: { modifiedAt: 2000 }, binned: { modifiedAt: 2000 }, mineOnly: { modifiedAt: 2000 } };
+  const remote = { gone: { modifiedAt: 1000, deletedAt: 1500 }, binned: { modifiedAt: 1000, binnedAt: 1500 } };
+  assert.deepEqual(aheadOfCloud(local, remote), []);
+});

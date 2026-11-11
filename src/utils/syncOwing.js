@@ -99,3 +99,29 @@ export function editedDuringDownload({ updatedAtBefore, updatedAtNow, pendingSav
   if (pendingSaveFolder != null && pendingSaveFolder === folder) return true;
   return Number(updatedAtNow || 0) !== Number(updatedAtBefore || 0);
 }
+
+/**
+ * The folders this device has ahead of the cloud at launch: here, in the
+ * cloud too (not deleted or binned there), and changed here later than the
+ * cloud's copy. They are owed an upload straight away.
+ *
+ * What has been sent is only remembered while the app is open, and the upload
+ * pass only runs once something has been edited. So work that failed to go up
+ * before the app was shut -- refused, offline, cut off mid-sync -- waited for
+ * the next edit, however long that was. Seen in the rehearsal of 0.8.67 on
+ * staging (2026-11-11): a move made on a version too old to save was not sent
+ * after the update until another move was made. This is the absolute pass
+ * CLAUDE.md asks of anything kept by events: worked out from the two copies,
+ * not from remembering what happened.
+ */
+export function aheadOfCloud(localMeta = {}, remoteIndex = {}) {
+  const ahead = [];
+  for (const [name, mine] of Object.entries(localMeta || {})) {
+    const theirs = remoteIndex?.[name];
+    if (!theirs || theirs.deletedAt || theirs.binnedAt) continue;
+    const remoteAt = Number(theirs.modifiedAt || theirs.updatedAt || 0);
+    const localAt = Number(mine?.modifiedAt || mine?.updatedAt || 0);
+    if (localAt > remoteAt) ahead.push(name);
+  }
+  return ahead;
+}

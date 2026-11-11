@@ -181,7 +181,7 @@
     shouldCheckOnReturn,
     GATE_TIMEOUT_MS
   } from './utils/startupGate.js';
-  import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload } from './utils/syncOwing.js';
+  import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload, aheadOfCloud } from './utils/syncOwing.js';
   import {
     worthKeeping as folderSnapshotWorthKeeping,
     snapshotOf as folderSnapshotOf,
@@ -6204,6 +6204,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         if (remoteAt && remoteAt >= Number(times?.modifiedAt || 0)) {
           lastAutoSyncFingerprintByFile[fileName] = Number(times?.updatedAt || 0);
         }
+      }
+
+      // And what this device has ahead of the cloud goes up now, not at the
+      // next edit: work that failed to go up before the app shut (aheadOfCloud
+      // in utils/syncOwing.js; rehearsal of 0.8.67, 2026-11-11).
+      const owed = aheadOfCloud(afterFetch, remoteIndex);
+      if (owed.length) {
+        logSync('upload', '', 'ahead of the cloud since before this launch', { folders: owed.join(', ') });
+        autoSyncDirty = true;
       }
 
       savedList = await listSavedBlocks();
