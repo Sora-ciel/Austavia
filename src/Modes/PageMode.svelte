@@ -697,6 +697,12 @@
     min-width: 0;
     padding: 3px 0;
     cursor: auto;
+    /* Selected words take the page's colour. A highlight reverses a region's
+       two colours (app.css), and a block on a page has no background of its
+       own -- its --bg is transparent -- so selected words were drawn
+       see-through: gone in one engine, left in their own colour in another
+       (reported 2026-11-11). */
+    --selection-text: var(--canvas-inner-bg, var(--app-bg, #000));
   }
 
   /* A picture beside other blocks takes the width of the picture, not an
