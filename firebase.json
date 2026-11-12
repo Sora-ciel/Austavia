@@ -49,7 +49,17 @@
       "ignore": [
         "**/.*"
       ],
-      "cleanUrls": true
+      "cleanUrls": true,
+      "headers": [
+        {
+          "source": "**/*.@(html|css)",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+        },
+        {
+          "source": "**/!(*.*)",
+          "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+        }
+      ]
     }
   ]
 }
