@@ -165,6 +165,7 @@
   import { settingsForRename, settingsForCopy, settingsInPlaceOf } from './utils/folderIdentity.js';
   import { uploadVerdict, conflictCopyName, deviceKind, readSeen, writeSeen, seenFor } from './utils/syncConflict.js';
   import { DELETE_ACCOUNT_WARNING, deletionFailureMessage } from './utils/accountDeletion.js';
+  import { baseOf, mergeFolder, readBases, writeBases } from './utils/folderMerge.js';
   import { backstopNeedsFullRead } from './utils/syncBackstop.js';
   import { DEFAULT_MODE_SETTINGS, normalizeModeSettings as normalizeModeSettingsFrom } from './utils/modeSettings.js';
   import { settleHabits, withHabitGoal } from './utils/habitGoals.js';
@@ -3184,6 +3185,25 @@
     writeSeen(typeof localStorage === 'undefined' ? null : localStorage, authUser.uid, cloudSeen);
   }
 
+  // What each folder was, part by part, the last time this device and the
+  // cloud agreed on it -- uploaded or downloaded. What a merge starts from
+  // when both sides have changed it since (utils/folderMerge.js).
+  let cloudBases = {};
+  let cloudBasesFor = null;
+  $: if (authUser?.uid && authUser.uid !== cloudBasesFor) {
+    cloudBasesFor = authUser.uid;
+    cloudBases = readBases(typeof localStorage === 'undefined' ? null : localStorage, authUser.uid);
+  }
+  function noteCloudBase(fileName, payload) {
+    if (!authUser?.uid || !payload) return;
+    const base = baseOf(payload);
+    const next = { ...cloudBases };
+    if (base) next[fileName] = base;
+    else delete next[fileName];
+    cloudBases = next;
+    writeBases(typeof localStorage === 'undefined' ? null : localStorage, authUser.uid, cloudBases);
+  }
+
   function rememberCloudSyncForFile(fileName, syncedAt = Date.now()) {
     cloudSyncMemoryByFile = {
       ...cloudSyncMemoryByFile,
@@ -3235,6 +3255,7 @@
     const result = await saveRemoteFile(fileName, payload, options);
     const syncedAt = Date.now();
     rememberCloudSyncForFile(fileName, syncedAt);
+    noteCloudBase(fileName, payload);
     await sweepDeletedBlockAttachments(fileName, payload);
     await sweepWallpapersFor(fileName, payload);
     return result;
@@ -5508,7 +5529,13 @@
               localModifiedAt
             });
           if (verdict === 'conflict') {
-            await keepBothVersions(fileName, localPayload, remoteEntry);
+            // Merged block by block where the two devices changed different
+            // things; both versions kept whole only where that cannot be told.
+            const remotePayload = await loadRemoteFile(fileName);
+            const remoteAt = remoteEntry?.modifiedAt || remoteEntry?.updatedAt || 0;
+            if (!remotePayload || !(await mergeWithCloud(fileName, localPayload, remotePayload, remoteAt))) {
+              await keepBothVersions(fileName, localPayload, remoteEntry);
+            }
             conflicted.push(fileName);
             continue;
           }
@@ -5569,6 +5596,60 @@
     return copyName;
   }
 
+  /**
+   * A folder changed here and on another device since they last agreed:
+   * merged part by part (utils/folderMerge.js, asked 2026-11-12). Where both
+   * changed the same block, the folder takes the other device's and this
+   * device's whole version is kept as a copy -- only then. Returns false when
+   * there is nothing to merge from (no fingerprint yet), for the caller to
+   * keep both whole as before.
+   */
+  async function mergeWithCloud(fileName, localPayload, remotePayload, remoteAt) {
+    const merged = mergeFolder({ base: cloudBases[fileName], local: localPayload, remote: remotePayload });
+    if (!merged) return false;
+
+    let copyName = null;
+    if (merged.conflicts.length) copyName = await saveConflictCopy(fileName, localPayload);
+    await keepReplacedCopy(fileName, localPayload, remotePayload, copyName
+      ? `merged with another device; this device's version is also in "${copyName}"`
+      : 'merged with another device');
+
+    const remoteStamp = Number(remoteAt || remotePayload?.modifiedAt || remotePayload?.updatedAt || 0);
+    if (!merged.fromLocal) {
+      // Nothing of this device's is left to add: it is the other device's copy.
+      await saveBlocks(fileName, remotePayload);
+      lastAutoSyncFingerprintByFile[fileName] =
+        Number((await loadSaveMeta(fileName))?.updatedAt || receivedFromCloud(remotePayload));
+    } else {
+      // Stamped after both versions, whatever this device's clock says, so
+      // every device takes it as the newest (utils/stamps.js).
+      const localStamp = Number(localPayload?.modifiedAt || localPayload?.updatedAt || 0);
+      const stamp = Math.max(Date.now(), remoteStamp + 1, localStamp + 1);
+      const payload = {
+        ...merged.payload,
+        modeOrders: ensureModeOrders(merged.payload.blocks, merged.payload.modeOrders || {}),
+        modifiedAt: stamp,
+        updatedAt: stamp
+      };
+      await saveBlocks(fileName, payload);
+      owedSinceLaunch = new Set([...owedSinceLaunch, fileName]);
+      autoSyncDirty = true;
+    }
+    rememberCloudSyncForFile(fileName, Date.now());
+    noteCloudSeen(fileName, remoteStamp);
+    // The common ground is now what the cloud holds; the merge goes up next.
+    noteCloudBase(fileName, remotePayload);
+    delete lastAutoSyncAttachmentFingerprintByFile[fileName];
+    savedList = await listSavedBlocks();
+    logSync('download', fileName, copyName
+      ? 'changed on another device too: merged, and the same block changed on both, so this device\'s version is also kept'
+      : 'changed on another device too: merged', {
+      ...(copyName ? { copy: copyName, both: merged.conflicts.join(', ') } : {}),
+      kept: merged.fromLocal ? 'changes from both devices' : 'the other device\'s (nothing of this one\'s was new)'
+    });
+    return true;
+  }
+
   async function keepBothVersions(fileName, localPayload, remoteEntry) {
     const copyName = await saveConflictCopy(fileName, localPayload);
 
@@ -5578,6 +5659,7 @@
     await saveBlocks(fileName, remotePayload);
     rememberCloudSyncForFile(fileName, Number(remotePayload?.lastSyncedAt || Date.now()));
     noteCloudSeen(fileName, remoteEntry?.modifiedAt || remotePayload?.modifiedAt || remotePayload?.updatedAt);
+    noteCloudBase(fileName, remotePayload);
     lastAutoSyncFingerprintByFile[fileName] = Number((await loadSaveMeta(fileName))?.updatedAt || receivedFromCloud(remotePayload));
     delete lastAutoSyncAttachmentFingerprintByFile[fileName];
 
@@ -5869,6 +5951,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         await saveBlocks(fileName, remotePayload);
         rememberCloudSyncForFile(fileName, Number(remoteMeta?.lastSyncedAt || Date.now()));
         noteCloudSeen(fileName, remoteModifiedAt);
+        noteCloudBase(fileName, remotePayload);
 
         // A copy that was just taken from the cloud owes the cloud nothing.
         //
@@ -6386,7 +6469,9 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           const localAt = Number(localMeta[remoteName]?.modifiedAt || localMeta[remoteName]?.updatedAt || 0);
           if (localMeta[remoteName] && seenAt && localAt > seenAt) {
             try {
-              await saveConflictCopy(remoteName, await loadBlocks(remoteName));
+              const localPayload = await loadBlocks(remoteName);
+              if (await mergeWithCloud(remoteName, localPayload, remotePayload, remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt)) continue;
+              await saveConflictCopy(remoteName, localPayload);
               autoSyncDirty = true;
             } catch (error) {
               // Not taken over, then: kept as it is, and asked about again next launch.
@@ -6404,6 +6489,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           await saveBlocks(remoteName, remotePayload);
           rememberCloudSyncForFile(remoteName, Number(remotePayload?.lastSyncedAt || Date.now()));
           noteCloudSeen(remoteName, remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt);
+          noteCloudBase(remoteName, remotePayload);
           // As above: what was just fetched is not owed back.
           lastAutoSyncFingerprintByFile[remoteName] =
             Number((await loadSaveMeta(remoteName))?.updatedAt || receivedFromCloud(remotePayload));
@@ -6424,6 +6510,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           lastAutoSyncFingerprintByFile[fileName] = Number(times?.updatedAt || 0);
           // In step with the cloud: this is what it was seen to hold.
           noteCloudSeen(fileName, remoteAt);
+          // And what it holds, part by part, for a merge later -- written once,
+          // for folders not synced since updating to a version that keeps it.
+          if (!cloudBases[fileName]) {
+            try { noteCloudBase(fileName, await loadBlocks(fileName)); } catch { /* the next sync writes it */ }
+          }
         }
       }
 

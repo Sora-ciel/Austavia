@@ -22,8 +22,9 @@
  * syncs like any other, and the folder takes the cloud's version. Nothing is
  * overwritten and both are in front of the person.
  *
- * Merging block by block is the real answer and needs each block stored on
- * its own (PENDING, after this release).
+ * Since 2026-11-12 a conflict is first merged block by block
+ * (utils/folderMerge.js); keeping both whole is what is left for when that
+ * cannot be done, and the copy is made only where both changed the same block.
  */
 
 /**
