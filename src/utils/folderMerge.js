@@ -41,6 +41,8 @@
  * nothing to merge from: the caller falls back to keeping both, as before.
  */
 
+import { comparableBlock, withoutEmptyValues } from './syncRules.js';
+
 /** A folder's stamps: taken off a merge, so saving it stamps it as a change made here. */
 const PAYLOAD_STAMPS = ['modifiedAt', 'updatedAt', 'lastSyncedAt'];
 
@@ -50,9 +52,12 @@ function stable(value) {
   if (typeof value === 'string') return JSON.stringify(value.replace(PICTURE, 'picture'));
   if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
   if (Array.isArray(value)) return `[${value.map(stable).join(',')}]`;
-  const keys = Object.keys(value).filter(key => value[key] !== undefined).sort();
+  const keys = Object.keys(value).sort();
   return `{${keys.map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}`;
 }
+
+// Nothing to compare: absent, or only empty values (which the cloud drops).
+const isEmpty = value => withoutEmptyValues(value) === undefined;
 
 // Two FNV-1a passes with different seeds: a fingerprint, not a secret, but
 // two different blocks reading as the same would lose a change.
@@ -67,9 +72,21 @@ function hash(text) {
   return (a >>> 0).toString(36) + (b >>> 0).toString(36) + text.length.toString(36);
 }
 
-/** The fingerprint of one part of a folder. */
+/** The fingerprint of one part of a folder, with empty values (which the cloud drops) left out. */
 export function fingerprint(value) {
-  return hash(stable(value));
+  return hash(stable(withoutEmptyValues(value) ?? null));
+}
+
+/**
+ * A block's fingerprint: what a save compares (comparableBlock -- theme paint
+ * undone, scroll position and session fields gone), less historyTriggers,
+ * which opening a folder adds and is not anybody's work. The first run of npm
+ * run test:sync found both: a folder opened and renamed on one device read
+ * as every block changed.
+ */
+function blockFingerprint(block) {
+  const { historyTriggers, ...rest } = comparableBlock(block);
+  return fingerprint(rest);
 }
 
 function settingFingerprint(key, value) {
@@ -99,7 +116,7 @@ export function baseOf(payload) {
     settings[key] = settingFingerprint(key, value);
   }
   const parts = {};
-  for (const [id, block] of blocks) parts[id] = fingerprint(block);
+  for (const [id, block] of blocks) parts[id] = blockFingerprint(block);
   return { blocks: parts, settings, orders: fingerprint(payload?.modeOrders || {}) };
 }
 
@@ -109,8 +126,8 @@ export function baseOf(payload) {
  * Returns { take: 'local' | 'remote', conflict }.
  */
 function decide(base, local, remote, print) {
-  const l = local === undefined ? undefined : print(local);
-  const r = remote === undefined ? undefined : print(remote);
+  const l = isEmpty(local) ? undefined : print(local);
+  const r = isEmpty(remote) ? undefined : print(remote);
   if (l === r) return { take: 'remote', conflict: false };
   if (l === base) return { take: 'remote', conflict: false }; // only the other side changed it
   if (r === base) return { take: 'local', conflict: false }; // only this side changed it
@@ -147,11 +164,11 @@ export function mergeFolder({ base, local, remote }) {
   };
   // The other device's order first, then what only this one has, in its order.
   for (const id of remoteBlocks.keys()) {
-    place(id, decide(base.blocks[id], localBlocks.get(id), remoteBlocks.get(id), fingerprint));
+    place(id, decide(base.blocks[id], localBlocks.get(id), remoteBlocks.get(id), blockFingerprint));
   }
   for (const id of localBlocks.keys()) {
     if (remoteBlocks.has(id)) continue;
-    place(id, decide(base.blocks[id], localBlocks.get(id), undefined, fingerprint));
+    place(id, decide(base.blocks[id], localBlocks.get(id), undefined, blockFingerprint));
   }
 
   const localSettings = local?.modeSettings || {};

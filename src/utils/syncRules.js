@@ -143,3 +143,29 @@ export function unpaintThemeColours(block) {
   for (const key of THEME_PAINT_KEYS) delete restored[key];
   return restored;
 }
+
+// Fields that live on a block but are not part of what the folder *is*.
+//
+// Each of these is either bookkeeping or something this device worked out for
+// itself, and none of them is an edit. Syncing them made two instances
+// disagree for ever: scrollTop is where you happen to have scrolled inside a
+// text block, different per device and per window, and a round trip through
+// the database changed it on its own -- 1384.177734375 came back as 1384, and
+// that alone was enough to restart the loop. resolvedSrc and its companion
+// are worked out from src when a picture is fetched, so they belong to this
+// session rather than to the note. (Moved here from App.svelte on 2026-11-12,
+// so that saving and merging judge a block by the same rule.)
+export const VOLATILE_BLOCK_KEYS = [
+  '_version',
+  'editing',
+  'scrollTop',
+  'resolvedSrc',
+  'attachmentRequiresAuth'
+];
+
+/** A block reduced to what a save compares: theme paint undone, volatile keys and empty values gone. */
+export function comparableBlock(block) {
+  const copy = { ...unpaintThemeColours(block) };
+  for (const key of VOLATILE_BLOCK_KEYS) delete copy[key];
+  return withoutEmptyValues(copy) ?? {};
+}

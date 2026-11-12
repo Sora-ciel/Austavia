@@ -8,6 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  VOLATILE_BLOCK_KEYS,
+  comparableBlock,
   isSyncableFileId,
   findEmbeddedDataUrls,
   payloadCarriesDataUrl,
@@ -222,12 +224,9 @@ test('a theme repaint is not an edit', async t => {
 // differs per device and per window, and a round trip through the database
 // changed the value on its own, which was enough to restart the loop.
 test('view state on a block is not content', async t => {
-  // Read out of App.svelte rather than copied, so this cannot quietly drift out
-  // of step with the list the app actually uses.
-  const source = readFileSync(new URL('../src/App.svelte', import.meta.url), 'utf8');
-  const VOLATILE = JSON.parse(
-    source.match(/const VOLATILE_BLOCK_KEYS = (\[[\s\S]*?\]);/)[1].replace(/'/g, '"')
-  );
+  // The list the app uses, imported: it lives in syncRules.js since
+  // 2026-11-12, shared by saving and merging (comparableBlock).
+  const VOLATILE = VOLATILE_BLOCK_KEYS;
 
   await t.test('the app really does treat these as volatile', () => {
     for (const key of ['_version', 'editing', 'scrollTop', 'resolvedSrc', 'attachmentRequiresAuth']) {
@@ -235,11 +234,7 @@ test('view state on a block is not content', async t => {
     }
   });
 
-  const asContent = block => {
-    const copy = { ...block };
-    for (const key of VOLATILE) delete copy[key];
-    return JSON.stringify(withoutEmptyValues(copy) ?? {});
-  };
+  const asContent = block => JSON.stringify(comparableBlock(block));
 
   await t.test('scrolling inside a block is not an edit', () => {
     const base = { id: 'b1', content: '<p>same words</p>' };

@@ -117,7 +117,7 @@
   import { clickOutside } from './utils/clickOutside.js';
   // Empty-versus-absent, folder-name validity and the rest of the sync rules
   // live in one plain module so they can be tested. See utils/syncRules.js.
-  import { withoutEmptyValues, unpaintThemeColours } from './utils/syncRules.js';
+  import { withoutEmptyValues, comparableBlock } from './utils/syncRules.js';
   // Sync writes down what it decided, so a loop can be read back instead of
   // guessed at. See utils/syncLog.js.
   import { logSync, describeDifference, getSyncLog, persistNow } from './utils/syncLog.js';
@@ -3417,24 +3417,8 @@
     return JSON.stringify(value);
   }
 
-  // Fields that change as the UI renders but say nothing about saved content.
-  // Fields that live on a block but are not part of what the folder *is*.
-  //
-  // Each of these is either bookkeeping or something this device worked out for
-  // itself, and none of them is an edit. Syncing them made two instances
-  // disagree for ever: scrollTop is where you happen to have scrolled inside a
-  // text block, different per device and per window, and a round trip through
-  // the database changed it on its own — 1384.177734375 came back as 1384, and
-  // that alone was enough to restart the loop. resolvedSrc and its companion
-  // are worked out from src when a picture is fetched, so they belong to this
-  // session rather than to the note.
-  const VOLATILE_BLOCK_KEYS = [
-    '_version',
-    'editing',
-    'scrollTop',
-    'resolvedSrc',
-    'attachmentRequiresAuth'
-  ];
+  // What counts as a block's content is comparableBlock in utils/syncRules.js,
+  // shared with the merge (utils/folderMerge.js).
 
   // The folder reduced to what a save actually compares: no volatile keys, and
   // nothing the database cannot hold. The fingerprint is this, stringified.
@@ -3445,12 +3429,9 @@
   // a log that points at the wrong field is worse than no log.
   function comparableSave(blocksValue, ordersValue, settingsValue) {
     const cleanedBlocks = (blocksValue || []).map(block => {
-      // Theme paint is undone first: it is derived from this device's theme, so
-      // comparing it would make two devices on different themes disagree for
-      // ever, each rewriting what the other wrote.
-      const copy = { ...unpaintThemeColours(block) };
-      for (const key of VOLATILE_BLOCK_KEYS) delete copy[key];
-      return withoutEmptyValues(copy) ?? {};
+      // Theme paint undone, volatile keys and empty values gone: see
+      // comparableBlock (utils/syncRules.js).
+      return comparableBlock(block);
     });
     return {
       blocks: cleanedBlocks,

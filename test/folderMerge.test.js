@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import { baseOf, mergeFolder, readBases, writeBases } from '../src/utils/folderMerge.js';
 
-const task = (id, tasks) => ({ id, type: 'task', tasks });
+const task = (id, tasks) => ({ id, type: 'task', tasks, bgColor: '#000', textColor: '#eee' });
 const note = (id, content) => ({ id, type: 'text', content });
 
 const START = {
@@ -77,6 +77,16 @@ describe('a change that is not one is no change at all', () => {
   });
 });
 
+describe('a block as the cloud returns it is the same block', () => {
+  it('empty parts the cloud drops (position: {}, an empty list) are no change', () => {
+    const stored = { ...START, blocks: [{ ...task('t', ['a']), position: {}, size: {}, extra: [] }, START.blocks[1]] };
+    const phone = { ...START, blocks: [START.blocks[0], note('n', '<p>from phone</p>')] };
+    const out = mergeFolder({ base: baseOf(START), local: stored, remote: phone });
+    assert.deepEqual(out.conflicts, []);
+    assert.equal(out.fromLocal, false);
+  });
+});
+
 describe('the name thing, only when both changed the same content', () => {
   it('the same block changed differently on both is a conflict, and the folder takes the other device\'s', () => {
     const phone = { ...START, blocks: [task('t', ['a', 'phone']), START.blocks[1]] };
@@ -130,5 +140,30 @@ describe('fingerprints are kept per account', () => {
     assert.deepEqual(readBases(storage, 'u1'), { Arial: baseOf(START) });
     store.set('austavia.cloudBase.u2', '{not json');
     assert.deepEqual(readBases(storage, 'u2'), {});
+  });
+});
+
+describe('what opening a folder adds to a block is no change', () => {
+  it('bookkeeping, a scroll position and the theme\'s paint on one device do not make a copy', () => {
+    const opened = {
+      ...START,
+      blocks: [
+        // Painted as utils/themePainting.js paints: the original kept in _base*.
+        { ...task('t', ['a']), _version: 3, historyTriggers: ['tasks'], scrollTop: 120.5,
+          bgColor: '#123', textColor: '#fff', _baseBgColor: '#000', _baseTextColor: '#eee',
+          _themedBgColor: '#123', _themedTextColor: '#fff' },
+        START.blocks[1]
+      ]
+    };
+    const phone = { ...START, blocks: [task('t', ['a', 'b']), START.blocks[1]] };
+    const out = mergeFolder({ base: baseOf(START), local: opened, remote: phone });
+    assert.deepEqual(out.conflicts, []);
+    assert.deepEqual(out.payload.blocks[0].tasks, ['a', 'b']);
+  });
+
+  it('a colour somebody picked is still a change', () => {
+    const picked = { ...START, blocks: [{ ...task('t', ['a']), bgColor: '#f00' }, START.blocks[1]] };
+    const phone = { ...START, blocks: [task('t', ['a', 'b']), START.blocks[1]] };
+    assert.deepEqual(mergeFolder({ base: baseOf(START), local: picked, remote: phone }).conflicts, ['block t']);
   });
 });
