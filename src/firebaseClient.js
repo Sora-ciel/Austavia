@@ -36,6 +36,12 @@ import {
 
 
 export { firebaseConfig, firebaseSyncNamespace };
+
+// The local Firebase emulator, for the two-device sync tests (npm run
+// test:sync, scripts/syncTest.mjs). Keyed on the project id rather than a
+// flag: a `demo-` project exists only in the emulator, so no build pointed at
+// a real project can ever turn this on.
+export const usingEmulators = String(firebaseConfig.projectId || '').startsWith('demo-');
 export { isSyncableFileId, payloadCarriesDataUrl };
 
 let socialLoginPlugin = null;
@@ -189,6 +195,11 @@ async function getFirebaseContext() {
       auth.setPersistence(firebaseAuth, auth.browserLocalPersistence).catch(() => {});
       const firebaseDb = database.getDatabase(firebaseApp);
       const firebaseStorage = storage.getStorage(firebaseApp);
+      if (usingEmulators) {
+        auth.connectAuthEmulator(firebaseAuth, 'http://127.0.0.1:9099', { disableWarnings: true });
+        database.connectDatabaseEmulator(firebaseDb, '127.0.0.1', 9000);
+        storage.connectStorageEmulator(firebaseStorage, '127.0.0.1', 9199);
+      }
       return { app: firebaseApp, auth: firebaseAuth, db: firebaseDb, storage: firebaseStorage, authApi: auth, dbApi: database, storageApi: storage };
     });
   }
@@ -496,6 +507,18 @@ export async function signInWithGoogle({ again = false } = {}) {
     ? await ctx.authApi.reauthenticateWithPopup(ctx.auth.currentUser, provider)
     : await ctx.authApi.signInWithPopup(ctx.auth, provider);
   return result.user;
+}
+
+/**
+ * Sign in as a test account that exists only in the emulator: no password, no
+ * Google, nothing that reaches a real project. Refused anywhere else.
+ */
+export async function signInForTest(id = 'sync-test') {
+  if (!usingEmulators) throw new Error('Test sign-in is for the emulator only.');
+  const ctx = await getFirebaseContext();
+  const token = JSON.stringify({ sub: id, email: `${id}@example.com`, email_verified: true });
+  const credential = ctx.authApi.GoogleAuthProvider.credential(token);
+  return (await ctx.authApi.signInWithCredential(ctx.auth, credential)).user;
 }
 
 /**

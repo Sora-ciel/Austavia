@@ -15,6 +15,7 @@
     "deploy:rules": "npm run test:rules && firebase deploy --only database,storage",
     "deploy:rules:staging": "npm run test:rules && firebase deploy --only database,storage --project staging",
     "tauri": "tauri",
+    "test:sync": "node scripts/emulator.mjs exec --only database,storage,auth \"node scripts/syncTest.mjs\"",
     "test:triggers": "node scripts/emulator.mjs exec --only functions,database,storage,auth \"node --test --test-concurrency=1 test-triggers/**/*.test.js\"",
     "dev:staging": "vite dev --mode staging --port 5174 --strictPort",
     "build:staging": "vite build --mode staging"
@@ -25,6 +26,7 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tauri-apps/cli": "^2.9.4",
     "firebase": "^12.18.0",
+    "playwright-core": "^1.65.0",
     "svelte": "^5.28.1",
     "vite": "^6.3.5"
   },

@@ -352,3 +352,23 @@ leaving a window where the record held a new total against the old verdict —
 which the app reads to say "you have used X of Y". It showed up as a test that
 passed on a warm machine and failed on a cold one, which is the kind of
 flakiness worth listening to rather than retrying.
+
+## Two devices: `npm run test:sync`
+
+Not part of `npm test`: it needs Java (the Firebase emulator), Chromium
+(`/snap/bin/chromium`, or `CHROMIUM=...`) and the internet for the Firebase
+scripts the app loads. About a minute.
+
+It starts the emulator, opens Austavia twice in two separate browser profiles
+-- two devices, each with its own storage -- signs both into a test account
+that exists only in the emulator, and plays what has gone wrong between
+Sora's phone and PC: edits in different blocks on each, the same block edited
+on both, a rename and back that never uploaded, edits while one is offline.
+The devices act through `window.__austaviaTest` (App.svelte), which only an
+emulator build has.
+
+Asked 2026-11-12 so that a sync fix is checked before a release rather than
+by Sora with a phone in one hand. Its first run found two real faults in the
+merge it was written for (empty values the cloud drops; what opening a folder
+adds to a block). Run it after any change to sync. Staging is still where
+bugs are found by using the app.

@@ -26,6 +26,8 @@ dist-ssr
 # config and the bare pattern would not have matched it
 .env
 .env.*
+# The emulator's: a demo- project that exists only on this machine, no secrets.
+!.env.emulator
 .firebase/
 
 # emulator scratch: an ASCII temp dir Java can open a socket in, plus the

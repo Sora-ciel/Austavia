@@ -53,6 +53,8 @@
     onAuthStateChange,
     signInWithGoogle,
     deleteSignedInAccount,
+    signInForTest,
+    usingEmulators,
     prewarmGoogleSignIn,
     signOutUser,
     loadRemoteFile,
@@ -7153,7 +7155,54 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }
   }
 
+  // The two-device sync tests' hands (scripts/syncTest.mjs). Only against the
+  // local emulator (usingEmulators), so no real build ever carries it. It
+  // works through the same functions a person's edits and the sync timers do;
+  // what it skips is the waiting.
+  function installSyncTestHook() {
+    // The mode check is replaced at build time, so every other build drops
+    // all of this; the project check is the second lock.
+    if (import.meta.env.MODE !== 'emulator') return;
+    if (!usingEmulators || typeof window === 'undefined') return;
+    const stampless = payload => {
+      const { modifiedAt, updatedAt, lastSyncedAt, ...rest } = payload || {};
+      return rest;
+    };
+    window.__austaviaTest = {
+      signIn: async id => { await signInForTest(id); },
+      ready: () => Boolean(authUser) && cloudBootstrapComplete && !cloudBootstrapInProgress,
+      open: () => currentSaveName,
+      folders: () => listSavedBlocks(),
+      read: async name => stampless(await loadBlocks(name)),
+      // A change as a save makes it: no stamp of its own, so it is stamped now.
+      write: async (name, payload) => {
+        await saveBlocks(name, stampless(payload));
+        savedList = await listSavedBlocks();
+        autoSyncDirty = true;
+      },
+      rename: async (from, to) => {
+        await load(from);
+        await renameFolder({ detail: { to } });
+      },
+      // While a test runs, a device syncs only when told to, as if each step
+      // happened while the other device was away: the timers and the live
+      // subscription stand aside (they all check autoSyncEnabled).
+      manual: () => { autoSyncEnabled = false; },
+      upload: async () => {
+        autoSyncEnabled = true;
+        try { await autoSyncUploadTick({ force: true }); } finally { autoSyncEnabled = false; }
+      },
+      pull: async () => {
+        autoSyncEnabled = true;
+        try { await pullRemoteUpdatesIfNeeded(); } finally { autoSyncEnabled = false; }
+      },
+      base: name => cloudBases[name] || null,
+      log: () => getSyncLog().map(e => ({ kind: e.kind, folder: e.folder, message: e.message }))
+    };
+  }
+
   onMount(async () => {
+    installSyncTestHook();
     Pc = window.innerWidth > MOBILE_BREAKPOINT;
     // Not awaited. It is a note to a future reader and must never sit between
     // the app starting and the person seeing their notes.
