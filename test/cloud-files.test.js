@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { cloudLinksIn, withLinksReplaced, isCloudFile } from '../src/utils/cloudFiles.js';
+import { cloudLinksIn, withLinksReplaced, isCloudFile, fetchableLink } from '../src/utils/cloudFiles.js';
 
 const CLOUD = 'https://firebasestorage.googleapis.com/v0/b/bucket/o/attachments%2FDamn%2Fa%2Fsrc.png?alt=media&token=1';
 const CLOUD2 = 'https://firebasestorage.googleapis.com/v0/b/bucket/o/attachments%2FDamn%2Fb%2Fcontent.jpg?alt=media&token=2';
@@ -50,5 +50,20 @@ describe('putting them back as data', () => {
   it('adds no fields a block did not have', () => {
     const out = withLinksReplaced({ blocks: [{ id: 'x', type: 'clock' }] }, new Map());
     assert.deepEqual(out.blocks[0], { id: 'x', type: 'clock' });
+  });
+});
+
+describe('a picture in writing can be fetched', () => {
+  it('is downloaded with its token, not with the &amp; it is written with', () => {
+    const written = 'https://firebasestorage.googleapis.com/v0/b/b/o/x.png?alt=media&amp;token=abc';
+    assert.equal(fetchableLink(written), 'https://firebasestorage.googleapis.com/v0/b/b/o/x.png?alt=media&token=abc');
+  });
+
+  it('and is still found in the text by the link as written', () => {
+    const written = 'https://firebasestorage.googleapis.com/v0/b/b/o/x.png?alt=media&amp;token=abc';
+    const payload = { blocks: [{ content: `<p><img src="${written}"></p>` }] };
+    assert.deepEqual(cloudLinksIn(payload), [written]);
+    const out = withLinksReplaced(payload, new Map([[written, 'data:image/png;base64,AA']]));
+    assert.equal(out.blocks[0].content, '<p><img src="data:image/png;base64,AA"></p>');
   });
 });

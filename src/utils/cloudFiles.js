@@ -27,6 +27,18 @@ export function isCloudFile(value) {
   return typeof value === 'string' && CLOUD_FILE.test(value);
 }
 
+/**
+ * The address to download a link from. A link inside written text is stored
+ * as HTML writes it, with `&amp;` for `&`, and fetched as written it loses its
+ * `token` -- the cloud then answers 403 and the picture reads as unreachable.
+ * That refused every rename, duplicate and conflict copy of a folder with a
+ * picture in its writing (found 2026-11-12, on Arial). The link itself stays as
+ * stored, so the replacement still finds it in the text.
+ */
+export function fetchableLink(link) {
+  return String(link).replace(/&amp;/g, '&');
+}
+
 /** Every cloud link in a folder: block pictures, pictures in writing and tasks, the wallpaper, and sound when `audio`. */
 export function cloudLinksIn(payload, { audio = false } = {}) {
   const found = new Set();
@@ -102,7 +114,7 @@ export async function embedCloudFiles(payload, { audio = false } = {}) {
   const reasons = [];
   for (const link of links) {
     try {
-      const response = await fetch(link);
+      const response = await fetch(fetchableLink(link));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       map.set(link, await blobToDataUrl(await response.blob()));
     } catch (error) {
