@@ -97,22 +97,26 @@ full release with the steps below, pointed at production.
 
 ## The version
 
-**One step at a time, whatever the size of the release.** 0.8.50 → 0.8.51. The
-number says what came after what and nothing else; it is not a claim about how
-much changed. Do not open a new minor line without being asked.
-
-A test release takes **a further digit** rather than the next number, so the
-version says which kind it is:
+**One step at a time, whatever the size of the release: `0.0.001`, full
+releases and test builds alike** (decided 2026-11-12: "even releases should
+still be 0.0.001 ... they won't see all the hundreds of versions"). The number
+says what came after what and nothing else; it is not a claim about how much
+changed. Do not open a new minor line without being asked.
 
 | | |
 | --- | --- |
-| 0.8.64 | a full release |
-| 0.8.641, 0.8.642, … | its test builds, in order |
-| 0.8.65 | the next full release |
+| 0.8.70 | the last release under the old rule |
+| 0.8.701 | the next build, full or test |
+| 0.8.702, 0.8.703, … | every build after it, in order |
+| 0.8.709 → **0.8.710** | never 0.8.71, which is lower than 0.8.701 |
 
-Asked for in as many words: a test build steps by `0.0.001` and a full release
-by `0.0.01`. Both are ordinary semver — the patch is just a larger number — and
-both fit the MSI's version fields, whose limits are 255 / 255 / 65535.
+Which kind a build is lives in the release itself -- `--prerelease` on GitHub,
+staging's name and badge, the live site deployed or not (above) -- not in the
+number. The patch is just a larger number, ordinary semver, and fits the MSI's
+version fields (255 / 255 / 65535).
+
+Until 2026-11-12 a full release stepped by `0.0.01` and a test build added a
+digit (0.8.64, 0.8.641, 0.8.642, 0.8.65); older tags follow that.
 
 **Going back is not free on Android.** `versionCode` only ever rises, so once a
 test build is on the phone, returning to the last full release means

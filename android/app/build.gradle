@@ -21,8 +21,8 @@ android {
         applicationId staging ? "com.sora.austavia.staging" : "com.sora.austavia"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 53
-        versionName "0.8.70"
+        versionCode 54
+        versionName "0.8.701"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // The name under the icon, here rather than in strings.xml so the
         // staging build can say which one it is.
