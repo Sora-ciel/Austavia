@@ -5551,8 +5551,15 @@
       kind: deviceKind({ nativeAndroid: onAndroidApp(), desktopApp: typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__) }),
       at: new Date()
     });
-    const { payload, failed } = await embedCloudFiles(localPayload, { audio: true });
-    if (failed) throw new Error('the pictures for the copy could not be fetched');
+    // A picture that cannot be fetched keeps its link, as this device's
+    // version already had it. Refusing the copy instead held the whole folder
+    // back from syncing, every ten seconds, for as long as that one picture
+    // was unreachable (2026-11-12) -- and the copy loses nothing by going
+    // ahead: what could not be fetched was not on this device either.
+    const { payload, failed, reasons } = await embedCloudFiles(localPayload, { audio: true });
+    if (failed) {
+      logSync('error', fileName, `${failed} picture${failed === 1 ? '' : 's'} could not be copied into "${copyName}"; kept as links`, { reasons: reasons.join(', ') });
+    }
     await saveBlocks(copyName, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: settingsForCopy(payload.modeSettings) });
     logSync('save', copyName, `this device's version of "${fileName}", changed on another device meanwhile`);
     // Owed an upload whatever marks the sync clean meanwhile -- the launch

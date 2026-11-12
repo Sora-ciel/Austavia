@@ -20,6 +20,8 @@
  * folder's name and not make another folder with that name".
  */
 
+import { isSyncableFileId } from './syncRules.js';
+
 export const PENDING_DELETES_KEY = 'austavia.pendingFolderDeletes';
 
 /** The list as stored, whatever was stored. */
@@ -36,10 +38,15 @@ export function withPending(list, name) {
   return name && !list.includes(name) ? [...list, name] : list;
 }
 
-/** Names that are local folders again are owed nothing. */
+/**
+ * Names that are local folders again are owed nothing. Neither is a name the
+ * database cannot hold as a key (a "." or a quote in it): it was never in the
+ * cloud, so there is nothing to delete, and asking failed on every upload for
+ * ever (seen 2026-11-12, a nest renamed from a sentence).
+ */
 export function settlePending(list, localFolders = []) {
   const local = new Set(localFolders);
-  return list.filter(name => !local.has(name));
+  return list.filter(name => !local.has(name) && isSyncableFileId(name));
 }
 
 /** Whether the pull should leave this cloud folder alone. */

@@ -37,3 +37,10 @@ describe('the old name, after a rename', () => {
     assert.deepEqual(readPending('{"a":1}'), []);
   });
 });
+
+describe('an old name that could never be in the cloud', () => {
+  it('is owed no delete, instead of failing on every upload', () => {
+    const name = 'Polytechnics sir. That is the science of whatever poly means';
+    assert.deepEqual(deletesToRun({ pending: [name, 'Damn'], localFolders: ['Renamed'] }), ['Damn']);
+  });
+});

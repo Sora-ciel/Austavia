@@ -97,6 +97,9 @@ export async function embedCloudFiles(payload, { audio = false } = {}) {
   const links = cloudLinksIn(payload, { audio });
   const map = new Map();
   let failed = 0;
+  // Why each one failed, so a sync log can say "HTTP 404" (the picture is
+  // gone) rather than only that something did.
+  const reasons = [];
   for (const link of links) {
     try {
       const response = await fetch(link);
@@ -104,8 +107,9 @@ export async function embedCloudFiles(payload, { audio = false } = {}) {
       map.set(link, await blobToDataUrl(await response.blob()));
     } catch (error) {
       failed += 1;
-      console.warn('Could not fetch a picture to keep with the folder:', error);
+      reasons.push(String(error?.message || error));
+      console.warn('Could not fetch a picture to keep with the folder:', link, error);
     }
   }
-  return { payload: map.size ? withLinksReplaced(payload, map) : payload, embedded: map.size, failed };
+  return { payload: map.size ? withLinksReplaced(payload, map) : payload, embedded: map.size, failed, reasons };
 }
