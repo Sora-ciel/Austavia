@@ -40,7 +40,11 @@ production, austavia.com with Pro at EUR 7, Polar approved. In order:
 9. **C**: help for beginners (hover / long-press explanations, a first-launch
    "how Austavia works", an example folder), and the two that would lose a
    newcomer: slow typing in long notes on a phone, pictures by reference.
-10. **Then marketing** (memory: launch marketing).
+10. **Marketing has started** (decided 2026-11-13: posting now, beside the
+   rest). Owed from the code side: a script that cuts a weekly screen
+   recording into vertical clips with music and a caption; **"share this
+   board as an image"** in the app, with a small "made with Austavia" mark,
+   so every share is an advert (memory: launch marketing).
 
 ## Now, asked 2026-10-26: one of everything, then the habit tracker
 
