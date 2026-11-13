@@ -9,51 +9,38 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
-## Where we left off (2026-11-11) -- read this first
+## Where we left off (2026-11-13) -- read this first
 
-Sora's words, the last session: "we'll do the budget alert and delete my
-account button first, those are the most important. after that ... the b and
-c are for the process of making the app user friendly just before marketing.
-though before that i do want to plan a cybersecurity audit."
+Live: 0.8.701 everywhere (apps, austavia.app), the delete-account functions on
+production, austavia.com with Pro at EUR 7, Polar approved. In order:
 
-In this order:
-
-1. **Budget alert** (Sora, in the console). Google Cloud Console, Billing,
-   Budgets & alerts, Create budget: the project, an amount (about $5), emails
-   at 50/90/100 %. It warns; it stops nothing.
-2. **Delete my account** -- built (a650a0b), not deployed. Deploy functions
-   to staging (`firebase deploy --only functions --project staging`), delete a
-   throwaway account from `npm run dev:staging`, check every path is gone and
-   stays gone the next day, then production. Details under "Making money",
-   step 2.
-3. **Security audit**, planned 2026-11-11. Neither Polar (it reviews the
-   business, not the code) nor Google Play (data-safety form, deletion in the
-   app and on the web) requires a pentest; it is for our own sake. The harm
-   that is likely is cost and abuse, not reading someone else's notes:
-   1. Rules: emulator tests where account A tries to read, write and list B,
-      and to write its own `plan`, `blocked`, `storage`, `subscriptions`.
-   2. Cost abuse: one free account uploading as fast as it can. The 50 MB/day
-      cap covers database writes; check Storage uploads and downloads are
-      capped too.
-   3. Notes as a way in: pasted HTML, links and SVG in TipTap; an imported
-      folder must never run a script, above all in the desktop app.
-   4. Tauri: what the window may do (files, shell, windows) and its CSP.
-   5. Functions: the webhook signature (strict already), deleteAccount,
-      instance limits.
-   6. `npm audit`, `cargo audit`, no secrets in the repo or the build;
-      Firebase App Check so only the app reaches the API.
-   7. Later, with paying users: an outside review (a few hundred euros).
-4. **B**: in an empty mode, a button that adds the right block (step 3 under
-   "Making money").
-5. **C**: help for beginners -- explanations on hover / long press, a short
-   first-launch "how Austavia works", an example folder (step 2 there).
-6. **Then marketing** (memory: launch marketing).
-
-Alongside: Polar **approved** the account on 2026-11-11 and austavia.com and
-www are live. Still owed: the 0.8.68 web deploy (`dist/` built from the
-v0.8.68 tag, so the delete button is not on the web before its functions are
-on production), then the proof purchase on the legacy account, kept until the
-payout reaches the bank.
+1. **Try 0.8.701's merge on the real phone and PC** (section 0): a task on the
+   phone, a note on the PC, no copy. Each folder syncs once first.
+2. **Delete my account, once, on a throwaway account.** Live on production and
+   never pressed. Every path in functions/accountDeletion.js accountPaths gone,
+   and still gone the next day; a different Google account at the prompt
+   deletes nothing.
+3. **Budget alert** (Sora, in the console, if not done): Billing, Budgets &
+   alerts, about $5, emails at 50/90/100 %. It warns; it stops nothing.
+4. **The proof purchase**: Pro at EUR 7 from the app on the legacy account,
+   kept until the payout reaches the bank.
+5. **A cleaner checkout** (proposed 2026-11-12, waiting for Sora's yes):
+   the server opens the checkout with the account's email filled in and
+   locked (external_customer_id), and Manage subscription opens Polar's
+   portal already signed in (customer session), no email code. Needs the
+   product id and a token with checkouts:write and customer_sessions:write.
+6. **Security audit**: rules tested account A against B; cost abuse (Storage
+   uploads and downloads capped?); pasted HTML/SVG never runs a script,
+   above all in the desktop app; Tauri permissions and CSP; functions;
+   npm/cargo audit, App Check. Later, with paying users, an outside review.
+7. **Merging finer than a block**: two tasks in one task block, or two
+   habits, changed on two devices still make a copy. Merge task by task and
+   habit by habit, with a test:sync scenario each.
+8. **B**: in an empty mode, a button that adds the right block.
+9. **C**: help for beginners (hover / long-press explanations, a first-launch
+   "how Austavia works", an example folder), and the two that would lose a
+   newcomer: slow typing in long notes on a phone, pictures by reference.
+10. **Then marketing** (memory: launch marketing).
 
 ## Now, asked 2026-10-26: one of everything, then the habit tracker
 
