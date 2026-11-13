@@ -312,6 +312,26 @@ gh release create v0.8.51 --verify-tag \
 
 `--verify-tag` refuses rather than inventing a tag if the push was forgotten.
 
+**Then the same three files again under fixed names** -- full releases only.
+austavia.com's download buttons point at
+`https://github.com/Sora-ciel/Austavia/releases/latest/download/<name>`, which
+GitHub resolves to the newest release's file of that name, so one click
+downloads it (asked 2026-11-13: "clicking on the button to download the apk
+should instantly download the apk"). A release without them leaves the buttons
+broken -- the newest release has no such file:
+
+```bash
+d=$(mktemp -d)
+cp release/Austavia_0.8.51.apk "$d/Austavia.apk"
+cp release/Austavia_0.8.51_amd64.deb "$d/Austavia_amd64.deb"
+cp release/Austavia_0.8.51_x64-setup.exe "$d/Austavia_x64-setup.exe"
+gh release upload v0.8.51 "$d/Austavia.apk" "$d/Austavia_amd64.deb" "$d/Austavia_x64-setup.exe"
+```
+
+Check each opens a download:
+`curl -sIL -o /dev/null -w '%{http_code}\n' https://github.com/Sora-ciel/Austavia/releases/latest/download/Austavia.apk`
+says 200. A test release (`--prerelease`) is never "latest", so it needs none.
+
 Check afterwards that the newest release is the one marked `Latest`; a release
 created out of order is not, and `gh release edit <tag> --latest` fixes it.
 
