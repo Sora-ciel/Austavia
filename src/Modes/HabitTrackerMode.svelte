@@ -8,7 +8,7 @@
   // The shared one, rather than the copy that used to live here: that copy did
   // not understand 4- or 8-digit hex, so a theme using either fell through to
   // light text and could put it on a light background.
-  import { recentDays, daysToShow } from "../utils/habitDays.js";
+  import { recentDays, daysToShow, dayLabels } from "../utils/habitDays.js";
   import { createListReorder } from "../utils/listReorder.js";
   import HabitPage from "../components/HabitPage.svelte";
   import TaskGoalLine from "../components/TaskGoalLine.svelte";
@@ -76,19 +76,6 @@
   // dark blue every time.
   $: canvasCssVars = `--canvas-outer-bg: ${canvasTheme.outerBg}; --canvas-inner-bg: ${canvasTheme.innerBg}; --mode-text-color: ${modeTextColor};`;
 
-  // One letter on a phone, three on a computer. A whole "Wed" inside a square
-  // narrow enough for seven of them is unreadable anyway, and the column is
-  // named by the number under it.
-  const formatDayLabel = (date, narrow) =>
-    date.toLocaleDateString(undefined, { weekday: narrow ? "narrow" : "short" });
-
-  // Just the number on a phone. "Sep 20" does not fit and does not need to:
-  // the window is the last week, so nobody is wondering which month it is.
-  const formatDayNumber = (date, narrow) =>
-    narrow
-      ? String(date.getDate())
-      : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-
   // How many days are on screen follows the width of the window, the same way
   // the rest of the app decides which layout it is in. The window itself lives
   // in utils/habitDays.js: it ends today and runs backwards, where it used to
@@ -99,8 +86,9 @@
     key: day.key,
     date: day.date,
     isToday: day.isToday,
-    label: formatDayLabel(day.date, compact),
-    number: formatDayNumber(day.date, compact),
+    // The weekday names the day; the date is only its number (dayLabels).
+    label: dayLabels(day.date, { narrow: compact }).weekday,
+    number: dayLabels(day.date, { narrow: compact }).number,
     full: day.date.toLocaleDateString(undefined, {
       weekday: "long",
       month: "long",
@@ -600,14 +588,17 @@
   }
 
   .calendar-header {
-    font-size: 0.74rem;
     opacity: 0.75;
     text-align: center;
   }
 
   .day-button {
     aspect-ratio: 1;
-    justify-content: center;
+    /* Sizes inside follow the square's own width (cqi), so the three lines
+       always fit, whatever the width or the text size. They did not: four
+       lines at fixed sizes, and the mark at the bottom was cut off. */
+    container-type: inline-size;
+    justify-content: space-between;
     box-sizing: border-box;
     min-width: 0;
     /* Square whatever is written in it: without this the three lines inside
@@ -640,11 +631,21 @@
     color: var(--block-focus-outline, var(--mode-text-color, #ffffff));
   }
 
+  .calendar-header,
+  .day-number {
+    font-size: 22cqi;
+    line-height: 1;
+  }
+
+  .day-number {
+    opacity: 0.8;
+  }
+
   .day-status {
-    font-size: 0.95rem;
-    font-weight: 600;
-    min-height: 1.05em;
-    line-height: 1.05;
+    font-size: 44cqi;
+    font-weight: 700;
+    min-height: 1em;
+    line-height: 0.9;
   }
 
   /* Today: found at a glance, and the easiest square to hit. */
@@ -758,6 +759,13 @@
       gap: 0;
       min-width: 0;
       line-height: 1.15;
+      /* Letter and number together in the middle, as before the computer's
+         three lines (the mark is not shown here). */
+      justify-content: center;
+    }
+
+    .day-number {
+      opacity: 1;
     }
 
     .calendar-header {
@@ -1005,9 +1013,9 @@
                 on:click={event => { if (!guardClick(event)) toggleDay(habit.id, day.key); }}
               >
                 <span class="calendar-header">{day.label}</span>
-                <span>{day.number}</span>
-                <!-- Nothing on a day not pressed (asked 2026-11-10: the dot
-                     was "ugly"); the square keeps its size without it. -->
+                <!-- The mark in the middle, the biggest thing in the square
+                     (asked 2026-11-14: it was cut off). Nothing on a day not
+                     pressed (asked 2026-11-10: the dot was "ugly"). -->
                 <span class="day-status">
                   {habit.log?.[day.key] === "done"
                     ? "✓"
@@ -1017,6 +1025,7 @@
                     ? "–"
                     : ""}
                 </span>
+                <span class="day-number">{day.number}</span>
               </button>
             {/each}
           </div>

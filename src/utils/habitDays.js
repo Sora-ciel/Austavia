@@ -104,3 +104,18 @@ export function recentDays({ today = new Date(), count = DAYS_ON_PHONE } = {}) {
   }
   return days;
 }
+
+/**
+ * What a day's square says. Asked 2026-11-14, on a computer: "the dates are
+ * less, because we need space to see which day, and also see well the
+ * checked mark" -- the square held the weekday, "Nov", the date and the mark,
+ * and the mark was cut off. So the weekday names the day, the date is only
+ * its number (the full date is the square's tooltip), and the mark has the
+ * room. One letter of weekday on a phone, three on a computer.
+ */
+export function dayLabels(date, { narrow = false } = {}) {
+  return {
+    weekday: date.toLocaleDateString(undefined, { weekday: narrow ? 'narrow' : 'short' }),
+    number: String(date.getDate())
+  };
+}

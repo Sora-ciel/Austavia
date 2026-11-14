@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -91,4 +91,23 @@ test('nonsense in gives nothing out, rather than a row of Invalid Date', () => {
   assert.equal(dayKey(null), '');
   assert.equal(recentDays({ today: new Date(2026, 8, 20), count: 0 }).length, 1, 'at least today');
   assert.equal(recentDays({ today: new Date(2026, 8, 20), count: -5 }).length, 1);
+});
+
+// Asked 2026-11-14, Habit mode on a computer: "the dates are less, because we
+// need space to see which day, and also see well the checked mark". The square
+// held weekday, month, date and mark, and the mark was cut off.
+describe('a day square names its weekday and leaves room for the mark', async () => {
+  const { dayLabels } = await import('../src/utils/habitDays.js');
+  const friday = new Date(2026, 10, 13);
+
+  it('the date is only its number, with no month taking the room', () => {
+    assert.equal(dayLabels(friday).number, '13');
+  });
+
+  it('the weekday says which day it is: three letters on a computer, one on a phone', () => {
+    const wide = dayLabels(friday).weekday;
+    const narrow = dayLabels(friday, { narrow: true }).weekday;
+    assert.ok(wide.length >= 2 && wide.length <= 4, wide);
+    assert.equal([...narrow].length, 1, narrow);
+  });
 });
