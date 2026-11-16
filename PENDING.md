@@ -40,6 +40,17 @@ production, austavia.com with Pro at EUR 7, Polar approved. In order:
 9. **C**: help for beginners (hover / long-press explanations, a first-launch
    "how Austavia works", an example folder), and the two that would lose a
    newcomer: slow typing in long notes on a phone, pictures by reference.
+**Calendar, owed** (2026-11-16):
+   - Reminders on the computer and the web. The phone's come from Android's
+     alarm service with the app closed; a computer has nothing running once
+     Austavia is closed. Options: keep Austavia running in the tray when its
+     window is closed (Linux, Windows) and remind from there; on the web,
+     push from a scheduled function (costs a little per user).
+   - First press on a calendar that is not focused should only focus it: in
+     testing, the click meant to focus made an hour-long "Untitled" task.
+   - Repeat until a date or a number of times; repeat on several days of
+     the week (Mon, Wed, Fri). Reminders some minutes before, and for
+     whole-day blocks at a morning time.
 10. **Marketing has started** (decided 2026-11-13: posting now, beside the
    rest). Owed from the code side: a script that cuts a weekly screen
    recording into vertical clips with music and a caption; **"share this
@@ -636,6 +647,10 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| next | **Calendar reminders on the phone** (2026-11-16). Make a task 2 minutes ahead, close Austavia (swipe it away): the notification comes at its start. Restart the phone with a task later today: it still comes. If it comes minutes late, Settings > Apps > Austavia > Alarms & reminders allows exact ones. |
+| next | **Repeating tasks** (2026-11-16): Repeat every [n] [day/week/month] in a task's editor; "Delete this day" / "Delete all"; dragging one day moves them all. |
+| next | **A block scrolls inside only once focused, in Page mode and Simple Note** (2026-11-16); a click beside the blocks on a page unfocuses. |
+| next | **Habit squares on a computer** (2026-11-14): weekday, a big mark, the date's number; nothing cut off. |
 | 0.8.701 | **Merging instead of copying** (2026-11-12). A folder changed on both devices is merged block by block; "Name (from computer, ...)" only when both changed the same block (utils/folderMerge.js; npm run test:sync passes the four cases). Check on the real phone and PC: add a task on the phone, edit a note on the PC, open the other: both changes, no copy. Each folder needs one sync on 0.8.701 before it can be merged (until then the old copy rule, once). Not yet finer than a block: two different tasks in the same task block changed on both still make a copy. |
 | 0.8.70 | **Pictures in writing can be copied** (2026-11-12). Rename, Duplicate, Export and conflict copies refused a folder with a picture inside a note ("could not be fetched"): the link was fetched with `&amp;` and lost its token. Check: rename Arial on the PC; it goes through, and its notes' pictures show in the renamed folder. |
 | 0.8.69 | **A conflict copy that cannot fetch a picture** (2026-11-12). Arial on the PC was stuck: a conflict with the phone, and the copy refused because one picture could not be fetched, retried every 10 s. Now the copy is made with that picture kept as a link, and the sync log says why (HTTP 404 = gone from the cloud). Check: on the new PC build Arial uploads again, the "(from computer...)" folder appears, and the log line says what the picture's failure was. Also: no more "could not delete the old name" errors for the nest renamed from a sentence. |
