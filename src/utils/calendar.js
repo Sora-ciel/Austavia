@@ -327,3 +327,25 @@ export function weekLabel(days, { locale } = {}) {
 export function onDay(event, key) {
   return { ...event, date: key };
 }
+
+/**
+ * The starts to remind of, from `from` for `days` days: one per timed event
+ * on each day it happens, repeats included, soonest first. Whole-day blocks
+ * have no start and are left out. `at` is the local wall-clock moment.
+ */
+export function upcomingStarts(events, { from = new Date(), days = 14 } = {}) {
+  const list = normalizeEvents(events);
+  const out = [];
+  const firstKey = dateKey(from);
+  for (let i = 0; i < days; i += 1) {
+    const key = addDays(firstKey, i);
+    const [y, m, d] = key.split('-').map(Number);
+    for (const event of list) {
+      if (event.allDay || !occursOn(event, key)) continue;
+      const at = new Date(y, m - 1, d, Math.floor(event.start / 60), event.start % 60).getTime();
+      if (at < from.getTime()) continue;
+      out.push({ key: `${event.id}@${key}`, at, title: event.title, start: event.start, end: event.end });
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}

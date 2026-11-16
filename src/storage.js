@@ -324,6 +324,21 @@ async function hydratePayload(db, payload) {
   };
 }
 
+// Told of every folder written or removed on this device, whoever wrote it --
+// an edit, a download, a merge, a rename. For things that keep a note of what
+// folders hold without opening them all (utils/calendarReminders.js). A
+// listener that throws is logged and never stops a save.
+const folderListeners = new Set();
+export function onFolderSaved(listener) {
+  folderListeners.add(listener);
+  return () => folderListeners.delete(listener);
+}
+function tellFolderSaved(name, payload) {
+  for (const listener of folderListeners) {
+    try { listener(name, payload); } catch (error) { console.warn('A folder listener failed:', error); }
+  }
+}
+
 export async function saveBlocks(name, blocks) {
   const db = await getDB();
   // A payload with no stamp of its own is a change made on this device, and it
@@ -345,6 +360,7 @@ export async function saveBlocks(name, blocks) {
     await tx.objectStore(FILE_STORE_NAME).put(file.blob, file.key);
   }
   await tx.done;
+  tellFolderSaved(name, Array.isArray(blocks) ? { blocks } : blocks);
 }
 
 export async function loadBlocks(name) {
@@ -389,6 +405,7 @@ export async function deleteBlocks(name) {
   await db.delete(STORE_NAME, name);
   await clearSaveFiles(db, name);
   await db.delete(SNAPSHOT_STORE_NAME, name);
+  tellFolderSaved(name, null);
 }
 
 // ── Replaced copies ──────────────────────────────────────────────────

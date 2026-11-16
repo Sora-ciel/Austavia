@@ -46,8 +46,11 @@
     deleteBinEntry,
     putFolderSnapshots,
     deleteFolderSnapshot,
-    describeLocalStorage
+    describeLocalStorage,
+    onFolderSaved
   } from './storage.js';
+  import { calendarEventsOf, withFolder, remindersFor, readIndex, writeIndex } from './utils/calendarReminders.js';
+  import { remindersAvailable, setCalendarReminders } from './utils/calendarReminderBridge.js';
   import {
     isFirebaseConfigured,
     onAuthStateChange,
@@ -7201,8 +7204,56 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     };
   }
 
+  // A notification when a calendar task starts, the app closed or not (asked
+  // 2026-11-16; utils/calendarReminders.js). On the phone only for now: Android
+  // keeps the reminders and shows them itself. Every save and download notes
+  // the folder's calendar tasks; the next two weeks of starts are handed over
+  // a moment later, and again whenever the app comes back to the front, so
+  // the window keeps moving forward.
+  const BACKFILLED_KEY = 'austavia.calendarReminders.backfilled';
+  let reminderIndex = {};
+  let reminderTimer = null;
+
+  function pushRemindersSoon() {
+    clearTimeout(reminderTimer);
+    reminderTimer = setTimeout(() => setCalendarReminders(remindersFor(reminderIndex)), 1500);
+  }
+
+  async function startCalendarReminders() {
+    if (!remindersAvailable()) return;
+    const storage = typeof localStorage === 'undefined' ? null : localStorage;
+    reminderIndex = readIndex(storage);
+    onFolderSaved((name, payload) => {
+      const next = withFolder(reminderIndex, name, payload ? calendarEventsOf(payload) : []);
+      if (JSON.stringify(next[name] ?? null) === JSON.stringify(reminderIndex[name] ?? null)) return;
+      reminderIndex = next;
+      writeIndex(storage, reminderIndex);
+      pushRemindersSoon();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') pushRemindersSoon();
+    });
+    pushRemindersSoon();
+
+    // Folders not saved since this was added have no note yet: each is read
+    // once, quietly, after the app has settled.
+    let done = false;
+    try { done = storage?.getItem(BACKFILLED_KEY) === '1'; } catch { /* asked again next time */ }
+    if (done) return;
+    setTimeout(async () => {
+      for (const name of await listSavedBlocks()) {
+        if (reminderIndex[name]) continue;
+        try { reminderIndex = withFolder(reminderIndex, name, calendarEventsOf(await loadBlocks(name))); } catch { /* the next save notes it */ }
+      }
+      writeIndex(storage, reminderIndex);
+      try { storage?.setItem(BACKFILLED_KEY, '1'); } catch { /* read again next time */ }
+      pushRemindersSoon();
+    }, 20000);
+  }
+
   onMount(async () => {
     installSyncTestHook();
+    startCalendarReminders();
     Pc = window.innerWidth > MOBILE_BREAKPOINT;
     // Not awaited. It is a note to a future reader and must never sit between
     // the app starting and the person seeing their notes.

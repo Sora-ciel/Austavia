@@ -16,7 +16,7 @@ import { join, relative } from 'node:path';
 // a file that starts doing so fails this test until somebody has decided that.
 
 const DEVICE_ONLY = {
-  'App.svelte': 'last folder and mode, volume, shuffle, sync bookkeeping, type scale, theme extras, pending deletes',
+  'App.svelte': 'last folder and mode, volume, shuffle, sync bookkeeping, type scale, theme extras, pending deletes, a note of each folder\'s calendar tasks for reminders (a copy; the folder is the truth)',
   'advanced-param/RightControls.svelte': 'which panels are open',
   'components/AlarmRinger.svelte': 'alarms and rings answered on this device (asked per device)',
   'components/CalendarBlock.svelte': 'the height of an hour and day or 7 days, through utils/calendarView.js',

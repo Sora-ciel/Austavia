@@ -60,6 +60,23 @@
             android:name=".TimerNotificationReceiver"
             android:exported="false" />
 
+        <!-- A calendar task's start (CalendarReminders.java): our own alarms
+             only, so not exported. -->
+        <receiver
+            android:name=".CalendarReminderReceiver"
+            android:exported="false" />
+
+        <!-- Setting the calendar reminders again after a restart or an update.
+             Exported for the system's broadcasts; it does nothing else. -->
+        <receiver
+            android:name=".CalendarBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -86,4 +103,8 @@
          It used to arrive through a plugin's own manifest; it is declared here
          so it doesn't depend on one. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Calendar reminders (CalendarReminders.java): set again after a
+         restart, and on time where the person allows exact alarms. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>
