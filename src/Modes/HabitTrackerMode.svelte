@@ -577,8 +577,10 @@
     /* Every day the same square, today included (asked 2026-11-10: a bigger
        today "is ugly" -- it has a wider outline instead), and more days
        rather than bigger squares on a wider screen (utils/habitDays.js). */
-    --day: 52px;
-    --gap: 6px;
+    /* Bigger, so fewer days and a taller row (asked 2026-11-16); in step
+       with WIDE_DAY in utils/habitDays.js. */
+    --day: 76px;
+    --gap: 8px;
     grid-template-columns: repeat(var(--days, 7), minmax(0, 1fr));
     width: 100%;
     max-width: calc(var(--days, 7) * (var(--day) + var(--gap)));
@@ -631,21 +633,24 @@
     color: var(--block-focus-outline, var(--mode-text-color, #ffffff));
   }
 
-  .calendar-header,
-  .day-number {
-    font-size: 22cqi;
+  /* Weekday small, the date's number the biggest, the mark under it
+     (asked 2026-11-16). */
+  .calendar-header {
+    font-size: 17cqi;
     line-height: 1;
   }
 
   .day-number {
-    opacity: 0.8;
+    font-size: 36cqi;
+    font-weight: 700;
+    line-height: 1;
   }
 
   .day-status {
-    font-size: 44cqi;
+    font-size: 26cqi;
     font-weight: 700;
     min-height: 1em;
-    line-height: 0.9;
+    line-height: 1;
   }
 
   /* Today: found at a glance, and the easiest square to hit. */
@@ -1013,9 +1018,10 @@
                 on:click={event => { if (!guardClick(event)) toggleDay(habit.id, day.key); }}
               >
                 <span class="calendar-header">{day.label}</span>
-                <!-- The mark in the middle, the biggest thing in the square
-                     (asked 2026-11-14: it was cut off). Nothing on a day not
-                     pressed (asked 2026-11-10: the dot was "ugly"). -->
+                <!-- The date's number, the biggest thing in the square, above
+                     the mark (asked 2026-11-16). Nothing on a day not pressed
+                     (asked 2026-11-10: the dot was "ugly"). -->
+                <span class="day-number">{day.number}</span>
                 <span class="day-status">
                   {habit.log?.[day.key] === "done"
                     ? "✓"
@@ -1025,7 +1031,6 @@
                     ? "–"
                     : ""}
                 </span>
-                <span class="day-number">{day.number}</span>
               </button>
             {/each}
           </div>

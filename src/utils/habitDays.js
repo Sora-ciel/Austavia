@@ -35,7 +35,9 @@
 
 /** A phone has room for a week, and never fewer; a wide screen up to a month. */
 export const DAYS_ON_PHONE = 7;
-export const DAYS_ON_DESKTOP = 14;
+// When the width is not known. Ten since the squares grew (2026-11-16);
+// fourteen before.
+export const DAYS_ON_DESKTOP = 10;
 export const MOST_DAYS = 31;
 
 /** The width at or under which the row is laid out as on a phone -- the app's own breakpoint. */
@@ -46,7 +48,10 @@ export const COMPACT_WIDTH = 1024;
 const COMPACT_REST = 150;
 const COMPACT_DAY = 44;
 const WIDE_REST = 520;
-const WIDE_DAY = 58;
+// Bigger squares, so fewer days (asked 2026-11-16: "each square should be
+// bigger, rendering less days and making the height of each habit higher").
+// 76px and an 8px gap: HabitTrackerMode.svelte's --day and --gap.
+const WIDE_DAY = 84;
 
 /**
  * How many days belong on screen at this width: as many as fit, from a
@@ -111,7 +116,10 @@ export function recentDays({ today = new Date(), count = DAYS_ON_PHONE } = {}) {
  * checked mark" -- the square held the weekday, "Nov", the date and the mark,
  * and the mark was cut off. So the weekday names the day, the date is only
  * its number (the full date is the square's tooltip), and the mark has the
- * room. One letter of weekday on a phone, three on a computer.
+ * room. One letter of weekday on a phone, three on a computer. Then, 2026-11-16:
+ * "the date's number should be above the checked mark and should be the
+ * biggest thing in the square" -- the order and sizes are
+ * HabitTrackerMode.svelte's.
  */
 export function dayLabels(date, { narrow = false } = {}) {
   return {

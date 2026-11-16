@@ -23,7 +23,10 @@ test('a phone shows the last week, and a wider screen more days as it widens', (
   assert.equal(daysToShow({ width: 390 }), DAYS_ON_PHONE);
   assert.ok(daysToShow({ width: 800 }) > DAYS_ON_PHONE, 'a tablet has room for more than a week');
   assert.ok(daysToShow({ width: 1920 }) > daysToShow({ width: 1400 }), 'more width, more days');
-  assert.ok(daysToShow({ width: 1400 }) >= DAYS_ON_DESKTOP, 'a computer still shows at least a fortnight');
+  // Asked 2026-11-16: bigger squares, fewer days ("rendering less days"). A
+  // fortnight on a 1400px screen was the rule before; ten is now.
+  assert.ok(daysToShow({ width: 1400 }) >= DAYS_ON_DESKTOP, 'a computer still shows at least ten days');
+  assert.ok(daysToShow({ width: 1920 }) <= 17, 'bigger squares: fewer days than before on a wide screen');
   assert.ok(daysToShow({ width: 5000 }) <= 31, 'never more than a month');
   assert.equal(daysToShow(), DAYS_ON_DESKTOP, 'an unknown width is not a small one');
 });
