@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../src/utils/scrollOwnership.js';
@@ -73,4 +73,25 @@ test("a mode's own panel keeps the browser's scrolling, inertia and all", () => 
 test('with nothing scrollable under the pointer the canvas need not step in', () => {
   assert.equal(canvasMustTakeWheel({ scroller: false }), false);
   assert.equal(canvasMustTakeWheel(), false);
+});
+
+// Asked 2026-11-16, for Page mode and Simple Note: "if it's a block mode, then
+// you first need to focus the block to scroll inside it, else it scrolls the
+// mode". The same rule as the Canvas, carried out by utils/modeWheel.js.
+describe('in every mode that shows blocks, an unfocused block passes the wheel to the mode', async () => {
+  const { canvasMustTakeWheel, wheelPixels } = await import('../src/utils/scrollOwnership.js');
+
+  it('a calendar\'s hours in a block that is not focused: the mode scrolls', () => {
+    assert.equal(canvasMustTakeWheel({ scroller: true, insideBlock: true, blockFocused: false }), true);
+  });
+
+  it('once the block is focused, it scrolls inside', () => {
+    assert.equal(canvasMustTakeWheel({ scroller: true, insideBlock: true, blockFocused: true }), false);
+  });
+
+  it('a wheel step counted in lines or pages moves the mode as far as one in pixels would', () => {
+    assert.equal(wheelPixels(3, 1), 48);
+    assert.equal(wheelPixels(1, 2, 600), 600);
+    assert.equal(wheelPixels(100, 0), 100);
+  });
 });

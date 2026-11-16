@@ -1,4 +1,7 @@
 <script>
+  // A block scrolls inside only once focused; otherwise the page scrolls
+  // (asked 2026-11-16, utils/modeWheel.js).
+  import { modeWheel } from '../utils/modeWheel.js';
   /**
    * Page mode: a page like Notion's, made of the folder's own blocks.
    *
@@ -184,13 +187,22 @@
     if (!onEmptyPage(event.target)) return;
     const rows = canvasRef?.querySelectorAll('.page-row');
     const last = rows?.length ? rows[rows.length - 1].getBoundingClientRect() : null;
+    const pressOnPage = pagePress?.onPage === true;
+    const moved = pagePress ? Math.hypot(event.clientX - pagePress.x, event.clientY - pagePress.y) : 0;
     const writes = clickWrites({
-      pressOnPage: pagePress?.onPage === true,
-      moved: pagePress ? Math.hypot(event.clientX - pagePress.x, event.clientY - pagePress.y) : 0,
+      pressOnPage,
+      moved,
       below: !last || event.clientY > last.bottom
     });
     pagePress = null;
-    if (!writes) return;
+    if (!writes) {
+      // A click on the page beside the blocks lets go of the focused one, as
+      // on the Canvas: with the wheel going to a block only while it is
+      // focused (utils/modeWheel.js), a block that could never be let go of
+      // would keep the page from scrolling over it for good.
+      if (pressOnPage && moved < 6 && focusedBlockId) dispatch('focusToggle', { id: null });
+      return;
+    }
     const answer = clickBelow(shownRows);
     if (answer.focus) {
       caretAtEnd(answer.focus);
@@ -551,7 +563,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true }} use:modeWheel={{ blockSelector: '[data-block-id]', isFocused: block => block.classList.contains('focused') }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">

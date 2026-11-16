@@ -74,3 +74,14 @@ export function nestedScrollerTakesWheel({
 export function canvasMustTakeWheel(found) {
   return Boolean(found?.scroller) && !nestedScrollerTakesWheel(found);
 }
+
+/**
+ * How far one wheel step moves, in pixels, whatever unit the browser counted
+ * it in: pixels, lines (Firefox, some mice) or pages.
+ */
+export function wheelPixels(delta, deltaMode, pageSize = 800) {
+  const amount = Number(delta) || 0;
+  if (deltaMode === 1) return amount * 16;
+  if (deltaMode === 2) return amount * pageSize;
+  return amount;
+}

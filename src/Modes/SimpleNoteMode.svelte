@@ -1,4 +1,7 @@
 <script>
+  // A card scrolls inside only once focused; otherwise the notes scroll
+  // (asked 2026-11-16, utils/modeWheel.js).
+  import { modeWheel } from '../utils/modeWheel.js';
   import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import ModeWallpaper from '../components/ModeWallpaper.svelte';
   // The folder's wallpaper -- Canvas's picture and settings; see hasWallpaper
@@ -1097,7 +1100,7 @@ input[type="text"] {
 
 
 
-<div class="simple-wrapper" bind:this={canvasRef} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
+<div class="simple-wrapper" bind:this={canvasRef} use:modeWheel={{ blockSelector: '[data-simple-block]', isFocused: card => Boolean(card.querySelector(':scope > .container.focused')) }} style={`${canvasCssVars} --simple-note-columns: ${normalizedColumnCount};`}>
   <ModeWallpaper settings={backgroundSettings} />
   {#each renderColumns as column}
     <div class="simple-column">
