@@ -29,7 +29,8 @@
   import {
     DAY_MINUTES, dateKey, addDays, dayLabel, eventsOn, layoutDay, normalizeEvents,
     clickedSlot, draggedSlot, movedBy, resizedTo, withTypedTime, formatTime, formatLength,
-    weekOf, shortDayLabel, weekLabel, onDay
+    weekOf, shortDayLabel, weekLabel, onDay,
+    normalizeRepeat, describeRepeat, withDaySkipped, shiftedBy
   } from '../utils/calendar.js';
   import { readHourHeight, writeHourHeight, zoomedHour, readView, writeView } from '../utils/calendarView.js';
 
@@ -173,17 +174,19 @@
       const made = { id: newId(), date: g.dayKey, start: slot.start, end: slot.end, title: '', color: nextColor };
       save([...events, made]);
       await tick();
-      openEditor(made.id);
+      openEditor(made.id, made.date);
       return;
     }
     if (!g.moved) {
       preview = null;
-      openEditor(g.event.id);
+      openEditor(g.event.id, g.event.date);
       return;
     }
     const changed = preview;
     preview = null;
-    if (changed) save(events.map(e => (e.id === changed.id ? { ...e, date: changed.date, start: changed.start, end: changed.end } : e)));
+    // Moved to another day: the whole of it moves by as many days -- for a
+    // repeating one, every day of it (shiftedBy).
+    if (changed) save(events.map(e => (e.id === changed.id ? { ...shiftedBy(e, g.event.date, changed.date), start: changed.start, end: changed.end } : e)));
   }
 
   function onCancel() {
@@ -195,6 +198,7 @@
 
   // ── The editor: name, times to the minute, length, colour, whole day ──
   let editing = null; // event id
+  let editingDay = null; // the day it was opened on (a repeating one has many)
   let editorPos = { x: 0, y: 0 };
   let startText = '';
   let endText = '';
@@ -203,14 +207,17 @@
 
   $: editingEvent = editing ? events.find(e => e.id === editing) || null : null;
 
-  async function openEditor(eventId) {
+  async function openEditor(eventId, onDayKey = null) {
     const target = events.find(e => e.id === eventId);
     if (!target) return;
     editing = eventId;
+    editingDay = onDayKey || target.date;
     startText = formatTime(target.start);
     endText = formatTime(target.end);
     await tick();
-    const el = calEl?.querySelector(`[data-event="${eventId}"]`) || calEl;
+    // A repeating one is on several days of a week: the one that was opened.
+    const el = calEl?.querySelector(`[data-event="${eventId}"][data-day="${editingDay}"]`)
+      || calEl?.querySelector(`[data-event="${eventId}"]`) || calEl;
     const box = el?.getBoundingClientRect();
     if (box) {
       editorPos = {
@@ -258,11 +265,25 @@
     save(events.filter(e => e.id !== gone));
   }
 
+  /** A repeating one: only the day it was opened on goes. */
+  function removeEditingDay() {
+    const gone = editing;
+    const key = editingDay;
+    editing = null;
+    save(events.map(e => (e.id === gone ? withDaySkipped(e, key) : e)));
+  }
+
+  /** Repeat every `every` `unit`s ('' for never), from its own day. */
+  function setRepeat(unit, every) {
+    if (!unit) { edit({ repeat: undefined, skip: undefined }); return; }
+    edit({ repeat: normalizeRepeat({ ...(editingEvent?.repeat || {}), unit, every }) });
+  }
+
   async function addWholeDay(key) {
     const made = { id: newId(), date: key, start: 0, end: DAY_MINUTES, title: '', allDay: true, color: nextColor };
     save([...events, made]);
     await tick();
-    openEditor(made.id);
+    openEditor(made.id, made.date);
   }
 
   function editorKey(event) {
@@ -362,7 +383,7 @@
           <div class="cal-day-head" class:today={col.key === today}>
             <button class="cal-day-name" on:click|stopPropagation={() => { day = col.key; setView('day'); }}>{shortDayLabel(col.key)}</button>
             {#each col.allDay as e (e.id)}
-              <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
+              <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id, e.date)}>{e.title || 'Whole day'}</button>
             {/each}
             <button class="cal-allday-add small" title="Block the whole day" on:click|stopPropagation={() => addWholeDay(col.key)}>＋</button>
           </div>
@@ -371,7 +392,7 @@
     {:else}
       <div class="cal-allday">
         {#each columns[0].allDay as e (e.id)}
-          <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id)}>{e.title || 'Whole day'}</button>
+          <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id, e.date)}>{e.title || 'Whole day'}</button>
         {/each}
         <button class="cal-allday-add" on:click|stopPropagation={() => addWholeDay(day)}>＋ Whole day</button>
       </div>
@@ -407,6 +428,7 @@
                   class:open={editing === e.id}
                   class:short={at.end - at.start < 30 || top(at.end) - top(at.start) < 30}
                   data-event={e.id}
+                  data-day={e.date}
                   style="top: {top(at.start)}px; height: {Math.max(top(at.end) - top(at.start), 14)}px; left: calc({(column / shared) * 100}% + 2px); width: calc({100 / shared}% - 4px); background: {fill(e.color)};"
                   on:pointerdown|stopPropagation={(ev) => startGesture(ev, 'move', col.key, e)}
                 >
@@ -489,14 +511,70 @@
         on:change={(e) => setColor(e.detail)}
       />
     </div>
+    <!-- Asked 2026-11-16: "make a task repeat. every day, every two days,
+         every week at that day etc". Every [n] [days], from its first day. -->
+    <div class="cal-repeat">
+      <span class="cal-repeat-label">Repeat</span>
+      {#if editingEvent.repeat}
+        <span>every</span>
+        <input
+          class="cal-repeat-every"
+          type="number"
+          min="1"
+          max="365"
+          aria-label="Every how many"
+          value={editingEvent.repeat.every}
+          on:change={(e) => setRepeat(editingEvent.repeat.unit, e.target.value)}
+        />
+      {/if}
+      <select
+        aria-label="Repeat"
+        value={editingEvent.repeat?.unit || ''}
+        on:change={(e) => setRepeat(e.target.value, editingEvent.repeat?.every || 1)}
+      >
+        <option value="">Never</option>
+        <option value="day">{editingEvent.repeat?.every > 1 ? 'days' : 'day'}</option>
+        <option value="week">{editingEvent.repeat?.every > 1 ? 'weeks' : 'week'}</option>
+        <option value="month">{editingEvent.repeat?.every > 1 ? 'months' : 'month'}</option>
+      </select>
+    </div>
+    {#if editingEvent.repeat}
+      <p class="cal-repeat-says">{describeRepeat(editingEvent.repeat, editingEvent.date)}, from {dayLabel(editingEvent.date, { today })}</p>
+    {/if}
     <div class="cal-editor-foot">
-      <button class="cal-delete" on:click={removeEditing}>Delete</button>
+      {#if editingEvent.repeat}
+        <button class="cal-delete" on:click={removeEditingDay}>Delete this day</button>
+        <button class="cal-delete" on:click={removeEditing}>Delete all</button>
+      {:else}
+        <button class="cal-delete" on:click={removeEditing}>Delete</button>
+      {/if}
       <button class="cal-done" on:click={closeEditor}>Done</button>
     </div>
   </div>
 {/if}
 
 <style>
+  .cal-repeat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .cal-repeat-label {
+    opacity: 0.75;
+  }
+
+  .cal-repeat-every {
+    width: 3.2em;
+  }
+
+  .cal-repeat-says {
+    margin: 0;
+    font-size: 0.82em;
+    opacity: 0.75;
+  }
+
   .cal {
     flex: 1 1 auto;
     min-height: 0;

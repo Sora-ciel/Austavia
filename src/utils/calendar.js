@@ -62,6 +62,14 @@ export function normalizeEvent(event) {
     // Its colour (asked 2026-11-10), any CSS colour; '' for the writing's.
     color: typeof event.color === 'string' ? event.color : ''
   };
+  // Repeating (asked 2026-11-16), only when it is one this build can read: a
+  // repeat it cannot is left as the newer build wrote it (withUnknown) and the
+  // event shows on its own day, rather than on days somebody did not choose.
+  const repeat = normalizeRepeat(event.repeat);
+  if (repeat) {
+    known.repeat = repeat;
+    known.skip = Array.isArray(event.skip) ? event.skip.filter(key => DATE_RE.test(String(key))) : [];
+  }
   return withUnknown(known, event, Object.keys(known));
 }
 
@@ -131,9 +139,86 @@ export function dayLabel(key, { today = dateKey(), locale } = {}) {
   return date.toLocaleDateString(locale, options);
 }
 
-/** A day's events: the whole-day ones, and the timed ones in order. */
+// ── Repeating ──────────────────────────────────────────────────────────
+//
+// Asked 2026-11-16: "make it so that we can make a task repeat. every day,
+// every two days, every week at that day etc". A repeating event is stored
+// once, with its rule: `repeat: { every, unit }` (unit 'day', 'week' or
+// 'month'), from its own `date` on, and `skip`, the days taken out one by one
+// ("delete this day"). Each day works out whether it happens then -- nothing
+// is copied, so changing its name or time changes every day of it.
+
+export const REPEAT_UNITS = ['day', 'week', 'month'];
+
+/** A repeat rule this build can read, cleaned, or null. */
+export function normalizeRepeat(repeat) {
+  if (!repeat || typeof repeat !== 'object' || !REPEAT_UNITS.includes(repeat.unit)) return null;
+  const every = Math.max(1, Math.min(365, Math.floor(Number(repeat.every) || 1)));
+  const out = { ...repeat, every, unit: repeat.unit };
+  if (out.until !== undefined && !DATE_RE.test(String(out.until))) delete out.until;
+  return out;
+}
+
+const daysBetween = (fromKey, toKey) => {
+  const [a, b, c] = fromKey.split('-').map(Number);
+  const [d, e, f] = toKey.split('-').map(Number);
+  return Math.round((Date.UTC(d, e - 1, f) - Date.UTC(a, b - 1, c)) / 86400000);
+};
+
+/** Whether an event happens on a day: its own day, or a day its rule falls on. */
+export function occursOn(event, key) {
+  if (!event || !DATE_RE.test(String(key))) return false;
+  if (event.date === key) return !(event.repeat && event.skip?.includes(key));
+  const repeat = event.repeat;
+  if (!repeat || key < event.date) return false;
+  if (repeat.until && key > repeat.until) return false;
+  if (event.skip?.includes(key)) return false;
+  const days = daysBetween(event.date, key);
+  if (repeat.unit === 'day') return days % repeat.every === 0;
+  if (repeat.unit === 'week') return days % (7 * repeat.every) === 0;
+  // Monthly: the same date, every `every` months. A month without that date
+  // (the 31st in April) is passed over rather than moved.
+  const [y1, m1, d1] = event.date.split('-').map(Number);
+  const [y2, m2, d2] = key.split('-').map(Number);
+  const months = (y2 - y1) * 12 + (m2 - m1);
+  return d1 === d2 && months % repeat.every === 0;
+}
+
+/** How a repeat reads: "Every day", "Every 2 days", "Every week on Monday". */
+export function describeRepeat(repeat, dateKeyOf, { locale } = {}) {
+  const r = normalizeRepeat(repeat);
+  if (!r) return 'Never';
+  const n = r.every;
+  if (r.unit === 'day') return n === 1 ? 'Every day' : `Every ${n} days`;
+  if (r.unit === 'week') {
+    const [y, m, d] = String(dateKeyOf).split('-').map(Number);
+    const weekday = new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: 'long' });
+    return n === 1 ? `Every week on ${weekday}` : `Every ${n} weeks on ${weekday}`;
+  }
+  return n === 1 ? 'Every month' : `Every ${n} months`;
+}
+
+/** A repeating event with one day taken out ("delete this day"). */
+export function withDaySkipped(event, key) {
+  return { ...event, skip: [...new Set([...(event.skip || []), key])] };
+}
+
+/**
+ * An event dragged from one of its days to another: the whole of it moves by
+ * as many days, so a weekly one dragged from Monday to Tuesday is on Tuesdays.
+ */
+export function shiftedBy(event, fromKey, toKey) {
+  if (fromKey === toKey) return event;
+  return { ...event, date: addDays(event.date, daysBetween(fromKey, toKey)) };
+}
+
+/** A day's events: the whole-day ones, and the timed ones in order. A
+ * repeating event appears on each of its days with that day as its `date`;
+ * its own first day stays in `seriesDate`. */
 export function eventsOn(events, key) {
-  const day = normalizeEvents(events).filter(event => event.date === key);
+  const day = normalizeEvents(events)
+    .filter(event => occursOn(event, key))
+    .map(event => (event.date === key ? event : { ...event, date: key, seriesDate: event.date }));
   return {
     allDay: day.filter(event => event.allDay),
     timed: day.filter(event => !event.allDay).sort((a, b) => a.start - b.start || b.end - a.end)

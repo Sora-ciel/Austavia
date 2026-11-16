@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -119,4 +119,52 @@ test('day or 7 days is kept per calendar on this device', () => {
   writeView(storage, 'c1', 'week');
   assert.equal(readView(storage, 'c1'), 'week');
   assert.equal(readView(storage, 'c2'), 'day');
+});
+
+// Asked 2026-11-16: "make it so that we can make a task repeat. every day,
+// every two days, every week at that day etc".
+describe('a task can repeat', async () => {
+  const cal = await import('../src/utils/calendar.js');
+  const base = { id: 'r', date: '2026-11-16', start: 540, end: 600, title: 'Run' };
+  const on = (event, key) => cal.eventsOn([event], key).timed.map(e => e.title);
+
+  it('every day: on its day and every day after, never before', () => {
+    const e = { ...base, repeat: { every: 1, unit: 'day' } };
+    assert.deepEqual(on(e, '2026-11-15'), []);
+    for (const key of ['2026-11-16', '2026-11-17', '2026-12-31']) assert.deepEqual(on(e, key), ['Run']);
+  });
+
+  it('every two days: one day on, one day off', () => {
+    const e = { ...base, repeat: { every: 2, unit: 'day' } };
+    assert.deepEqual(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20'].map(k => on(e, k).length), [0, 1, 0, 1]);
+  });
+
+  it('every week, on that day of the week', () => {
+    const e = { ...base, repeat: { every: 1, unit: 'week' } }; // a Monday
+    assert.deepEqual(['2026-11-23', '2026-11-24', '2026-11-30'].map(k => on(e, k).length), [1, 0, 1]);
+    assert.match(cal.describeRepeat(e.repeat, e.date, { locale: 'en-US' }), /Every week on Monday/);
+  });
+
+  it('every month on the same date, passing over a month without it', () => {
+    const e = { ...base, date: '2026-01-31', repeat: { every: 1, unit: 'month' } };
+    assert.deepEqual(['2026-02-28', '2026-03-31', '2026-04-30'].map(k => on(e, k).length), [0, 1, 0]);
+  });
+
+  it('one day can be deleted and the rest stay', () => {
+    const e = cal.withDaySkipped({ ...base, repeat: { every: 1, unit: 'day' } }, '2026-11-18');
+    assert.deepEqual(['2026-11-17', '2026-11-18', '2026-11-19'].map(k => on(e, k).length), [1, 0, 1]);
+  });
+
+  it('dragging one of its days to the next day moves every day of it', () => {
+    const e = { ...base, repeat: { every: 1, unit: 'week' } };
+    const moved = cal.shiftedBy(e, '2026-11-30', '2026-12-01'); // a Monday's to Tuesday
+    assert.equal(moved.date, '2026-11-17');
+    assert.deepEqual(['2026-11-23', '2026-11-24'].map(k => on(moved, k).length), [0, 1]);
+  });
+
+  it('a repeat this version cannot read is kept, and the task shows on its own day only', () => {
+    const e = cal.normalizeEvent({ ...base, repeat: { unit: 'fortnightly-on-a-full-moon' } });
+    assert.deepEqual(e.repeat, { unit: 'fortnightly-on-a-full-moon' });
+    assert.deepEqual([on(e, '2026-11-16').length, on(e, '2026-11-17').length], [1, 0]);
+  });
 });
