@@ -50,6 +50,8 @@
     onFolderSaved
   } from './storage.js';
   import { releasesWhenPaused, RELEASE_AFTER_MS } from './utils/audioRelease.js';
+  import { holdsInlinePictures, dataPicturesIn, withPictureSources } from './utils/pictureRefs.js';
+  import { storePicture } from './utils/pictureStore.js';
   import { noteScrolls, putScrollsBack } from './utils/scrollKeep.js';
   import { calendarEventsOf, withFolder, remindersFor, readIndex, writeIndex } from './utils/calendarReminders.js';
   import { remindersAvailable, setCalendarReminders } from './utils/calendarReminderBridge.js';
@@ -4742,6 +4744,38 @@
     pushHistory(blocks, modeOrders);
   }
 
+  // Notes that still hold their pictures inside their writing -- everything
+  // pasted before pictures were kept by reference -- are converted when their
+  // folder opens (utils/pictureStore.js; asked 2026-11-17 so heavy folders
+  // stop lagging). In the background, a note at a time; each conversion is
+  // applied to the note as it is then, swapping only the pictures' sources,
+  // so whatever was typed meanwhile stays.
+  async function convertInlinePictures(folder) {
+    const due = blocks.filter(block => (block.type === 'text' || block.type === 'cleantext') && holdsInlinePictures(block.content));
+    for (const block of due) {
+      if (currentSaveName !== folder && openingFolderName !== folder) return;
+      let map;
+      try {
+        const inline = dataPicturesIn(block.content);
+        map = new Map();
+        for (const dataUrl of inline) {
+          const ref = await storePicture(dataUrl);
+          if (ref) map.set(dataUrl, ref);
+        }
+      } catch (error) {
+        console.warn('Could not keep a note\'s pictures by reference; it stays as it was:', error);
+        continue;
+      }
+      if (!map.size || currentSaveName !== folder) continue;
+      const now = blocks.find(b => b.id === block.id);
+      if (!now || typeof now.content !== 'string') continue;
+      const content = withPictureSources(now.content, map);
+      if (content === now.content) continue;
+      await updateBlockHandler({ detail: { id: block.id, content, changedKeys: ['content'], pushToHistory: false } });
+      logSync('save', folder, 'pictures in a note now kept by reference', { pictures: map.size });
+    }
+  }
+
   async function updateBlockHandler(event) {
     const detail = event.detail || {};
     const {
@@ -5195,6 +5229,7 @@
       // Only this folder's notes keep their undo; the last folder's are let
       // go rather than held in memory for as long as the app runs.
       keepTextHistoriesFor(blocks.map(block => block.id));
+      convertInlinePictures(name);
       await pushHistory(blocks, modeOrders, { persist: true });
       if (options.skipCloudUpload) {
         autoSyncDirty = false;
@@ -6638,7 +6673,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         let payload = await loadBlocks(name);
         if (!payload) continue;
         if (pictures) {
-          const embedded = await embedCloudFiles(payload);
+          // Pictures kept by reference go out as themselves (pictures: true).
+          const embedded = await embedCloudFiles(payload, { pictures: true });
           payload = embedded.payload;
           failed += embedded.failed;
         }
@@ -7263,6 +7299,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         try { await pullRemoteUpdatesIfNeeded(); } finally { autoSyncEnabled = false; }
       },
       base: name => cloudBases[name] || null,
+      storePicture: dataUrl => storePicture(dataUrl),
       // A folder shown in a mode, and a scroller's position in it.
       show: async (name, modeName) => { await load(name); setMode(modeName); await tick(); },
       scrollOf: selector => document.querySelector(selector)?.scrollTop ?? null,

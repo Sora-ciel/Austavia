@@ -1,3 +1,5 @@
+import { pictureRefsIn, PICTURE_REF_PREFIX } from './utils/pictureRefs.js';
+import { pictureDataUrl } from './utils/pictureStore.js';
 import { Capacitor } from '@capacitor/core';
 import { firebaseConfig, firebaseSyncNamespace, googleWebClientId } from '../firebase.ts';
 // The rules for what may be synced live apart from the code that does the
@@ -253,15 +255,38 @@ function inferExtensionFromMime(mime = '') {
  */
 async function uploadEmbeddedDataUrls(text, options) {
   const dataUrls = findEmbeddedDataUrls(text);
-  if (!dataUrls.length) return text;
+  const refs = pictureRefsIn(text);
+  if (!dataUrls.length && !refs.length) return text;
 
   let replaced = text;
   for (const dataUrl of dataUrls) {
     const uploadedUrl = await uploadAttachmentFromDataUrl(dataUrl, options);
     if (uploadedUrl) replaced = replaced.split(dataUrl).join(uploadedUrl);
   }
+  // A picture kept on this device by reference (utils/pictureStore.js): sent
+  // as its bytes, and the cloud copy carries the link -- what every other
+  // device and every older version already understands. This device's own
+  // copy keeps the reference.
+  for (const ref of refs) {
+    // Already sent this session to the same place: its link, without reading
+    // the picture back from the device on every save of the note.
+    const sentKey = `${options.fileId}|${options.blockId}|${options.field}|${ref}`;
+    const sent = uploadedPictureRefs.get(sentKey);
+    if (sent) { replaced = replaced.split(ref).join(sent); continue; }
+    const dataUrl = await pictureDataUrl(ref);
+    if (!dataUrl) {
+      console.warn('A picture in this note is not on this device; its reference is sent as it is:', ref);
+      continue;
+    }
+    const uploadedUrl = await uploadAttachmentFromDataUrl(dataUrl, options);
+    if (uploadedUrl) {
+      uploadedPictureRefs.set(sentKey, uploadedUrl);
+      replaced = replaced.split(ref).join(uploadedUrl);
+    }
+  }
   return replaced;
 }
+const uploadedPictureRefs = new Map();
 
 async function uploadBlockAttachments(fileId, payload, ctx, uid) {
   if (!Array.isArray(payload?.blocks)) return payload;
@@ -309,8 +334,8 @@ async function uploadBlockAttachments(fileId, payload, ctx, uid) {
         continue;
       }
 
-      // The picture is somewhere inside written text.
-      if (value.includes('data:')) {
+      // The picture is somewhere inside written text, inline or by reference.
+      if (value.includes('data:') || value.includes(PICTURE_REF_PREFIX)) {
         next[field] = await uploadEmbeddedDataUrls(value, {
           fileId,
           blockId,

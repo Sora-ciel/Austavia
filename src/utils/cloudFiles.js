@@ -105,9 +105,25 @@ function blobToDataUrl(blob) {
  * The folder with its cloud links fetched and put in as data. A link that
  * cannot be fetched is left as a link, and counted in `failed`.
  */
-export async function embedCloudFiles(payload, { audio = false } = {}) {
+export async function embedCloudFiles(payload, { audio = false, pictures = false } = {}) {
   const links = cloudLinksIn(payload, { audio });
   const map = new Map();
+  // Pictures kept on this device by reference (utils/pictureRefs.js), put back
+  // into the writing as their bytes -- for what leaves the device, an export.
+  // Copies on the device keep the references: they work for any folder here.
+  if (pictures) {
+    const { pictureRefsIn } = await import('./pictureRefs.js');
+    const { pictureDataUrl } = await import('./pictureStore.js');
+    const refs = new Set();
+    for (const block of payload?.blocks || []) {
+      for (const ref of pictureRefsIn(block?.content)) refs.add(ref);
+      for (const task of Array.isArray(block?.tasks) ? block.tasks : []) for (const ref of pictureRefsIn(task?.text)) refs.add(ref);
+    }
+    for (const ref of refs) {
+      const dataUrl = await pictureDataUrl(ref).catch(() => null);
+      if (dataUrl) map.set(ref, dataUrl);
+    }
+  }
   let failed = 0;
   // Why each one failed, so a sync log can say "HTTP 404" (the picture is
   // gone) rather than only that something did.

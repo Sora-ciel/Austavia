@@ -46,7 +46,9 @@ import { comparableBlock, withoutEmptyValues } from './syncRules.js';
 /** A folder's stamps: taken off a merge, so saving it stamps it as a change made here. */
 const PAYLOAD_STAMPS = ['modifiedAt', 'updatedAt', 'lastSyncedAt'];
 
-const PICTURE = /data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+|https:\/\/firebasestorage\.googleapis\.com\/[^\s"'<>)]+/gi;
+// A picture inline, as a cloud link or by reference (utils/pictureRefs.js): the
+// same picture whatever form it is in on each side.
+const PICTURE = /data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+|https:\/\/firebasestorage\.googleapis\.com\/[^\s"'<>)]+|austavia-picture:[A-Za-z0-9_-]+/gi;
 
 function stable(value) {
   if (typeof value === 'string') return JSON.stringify(value.replace(PICTURE, 'picture'));

@@ -60,10 +60,15 @@ export function findEmbeddedDataUrls(text) {
   return [...found];
 }
 
-/** True if anything anywhere in the payload is still inline base64. */
+/**
+ * True if anything anywhere in the payload is still inline base64, or a
+ * picture kept on this device by reference (utils/pictureRefs.js) -- either
+ * way the upload has a picture to send.
+ */
 export function payloadCarriesDataUrl(payload) {
   try {
-    return JSON.stringify(payload ?? null).includes('data:');
+    const text = JSON.stringify(payload ?? null);
+    return text.includes('data:') || text.includes('austavia-picture:');
   } catch {
     return false;
   }

@@ -84,6 +84,7 @@ async function device(name) {
     pull: () => call('pull'),
     log: () => call('log'),
     show: (folder, mode) => call('show', folder, mode),
+    storePicture: dataUrl => call('storePicture', dataUrl),
     scrollOf: selector => call('scrollOf', selector),
     scrollTo: (selector, top) => call('scrollTo', selector, top),
     async relaunch() {
@@ -233,6 +234,28 @@ try {
     if (Math.abs(after - set) > 4) throw new Error(`the page scrolled from ${set} to ${after}`);
     const got = await computer.read(folder);
     expect(noteIn({ blocks: got.blocks.map(b => (b.id === 'p39' ? { ...b, id: 'n' } : b)) }), '<p>changed on the phone</p>', 'the change arrived');
+  });
+
+  await scenario('a picture kept by reference on the computer reaches the phone as a picture', async () => {
+    const folder = 'Picture by reference';
+    const dataUrl = await computer.page.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 40; c.height = 20;
+      const g = c.getContext('2d'); g.fillStyle = '#3e63dd'; g.fillRect(0, 0, 40, 20);
+      return c.toDataURL('image/png');
+    });
+    const ref = await computer.storePicture(dataUrl);
+    if (!/^austavia-picture:/.test(ref || '')) throw new Error(`no reference: ${ref}`);
+    await computer.write(folder, folderOf([note('n', `<p>a picture</p><p><img src="${ref}"></p>`)]));
+    await computer.upload();
+    await phone.pull();
+    const there = noteIn(await phone.read(folder)) || '';
+    if (there.includes('austavia-picture:')) throw new Error('the phone got the reference, which means nothing there');
+    const link = (there.match(/src="([^"]+)"/) || [])[1] || '';
+    if (!/^https?:\/\//.test(link)) throw new Error(`the phone got no link: ${there.slice(0, 120)}`);
+    const shown = await phone.page.evaluate(async src => { const r = await fetch(src.replace(/&amp;/g, '&')); return r.ok ? (await r.blob()).size : -r.status; }, link);
+    if (!(shown > 0)) throw new Error(`the phone could not fetch the picture (${shown})`);
+    const here = noteIn(await computer.read(folder)) || '';
+    if (!here.includes(ref)) throw new Error('the computer\'s own copy lost its reference');
   });
 
   if (failures) {

@@ -4,6 +4,7 @@
   import StarterKit from '@tiptap/starter-kit';
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
+  import { storePicture, showPicture } from '../utils/pictureStore.js';
   import { ListItem } from '@tiptap/extension-list-item';
   // The same package the bullet list already comes from (via StarterKit).
   import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -233,8 +234,32 @@
   export function insertPicture(src) {
     if (!editor || editor.isDestroyed) return false;
     if (typeof src !== 'string' || !src.startsWith('data:image/')) return false;
-    editor.chain().focus().setImage({ src }).run();
+    if (!pictureRefs) {
+      editor.chain().focus().setImage({ src }).run();
+      return true;
+    }
+    storePicture(src)
+      .then(ref => { if (editor && !editor.isDestroyed) editor.chain().focus().setImage({ src: ref || src }).run(); })
+      .catch(() => { if (editor && !editor.isDestroyed) editor.chain().focus().setImage({ src }).run(); });
     return true;
+  }
+
+  // A picture put into a note is kept on the device and the note holds its
+  // reference (utils/pictureRefs.js, asked 2026-11-17 to stop writing in
+  // heavy folders lagging). Not in a task's line (`inline`), whose writing is
+  // shown as plain HTML when not being edited and would not find it. If the
+  // picture cannot be kept, it goes in as before.
+  $: pictureRefs = variant !== 'inline';
+  async function pictureSource(file) {
+    if (pictureRefs) {
+      try {
+        const ref = await storePicture(file);
+        if (ref) return ref;
+      } catch (error) {
+        console.warn('Could not keep the picture on the device; it goes into the note itself:', error);
+      }
+    }
+    return readAsDataUrl(file);
   }
 
   function handleHistoryKeys(view, event) {
@@ -673,7 +698,7 @@
     (async () => {
       for (const picture of pictures) {
         try {
-          const src = await readAsDataUrl(picture);
+          const src = await pictureSource(picture);
           if (src) editor.chain().focus().setImage({ src }).run();
         } catch (error) {
           console.error('Could not paste a picture:', error);
@@ -716,7 +741,7 @@
       let insertAt = at?.pos ?? null;
       for (const picture of pictures) {
         try {
-          const src = await readAsDataUrl(picture);
+          const src = await pictureSource(picture);
           if (!src) continue;
           const chain = editor.chain().focus();
           if (typeof insertAt === 'number') chain.setTextSelection(insertAt);
@@ -896,7 +921,9 @@
         wrap.appendChild(bar);
 
         const img = document.createElement('img');
-        img.src = node.attrs.src;
+        // A picture kept by reference is looked up; anything else is used
+        // as it is (utils/pictureStore.js).
+        showPicture(img, node.attrs.src);
         if (node.attrs.alt) img.alt = node.attrs.alt;
         if (node.attrs.title) img.title = node.attrs.title;
         if (node.attrs.width) img.style.width = node.attrs.width;
@@ -964,7 +991,7 @@
           // The image is a leaf — let ProseMirror handle every other update.
           update: updated => {
             if (updated.type.name !== node.type.name) return false;
-            img.src = updated.attrs.src;
+            if (img.dataset.pictureSrc !== updated.attrs.src) showPicture(img, updated.attrs.src);
             img.style.width = updated.attrs.width || '';
             const align = updated.attrs.align || 'inline';
             wrap.dataset.align = align;

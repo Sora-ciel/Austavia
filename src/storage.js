@@ -363,6 +363,23 @@ export async function saveBlocks(name, blocks) {
   tellFolderSaved(name, Array.isArray(blocks) ? { blocks } : blocks);
 }
 
+// ── Pictures kept by reference ───────────────────────────────────────
+// A picture in a note's writing, stored once by the hash of its bytes
+// (utils/pictureStore.js). Kept in the file store beside the folders' own
+// files, under a key no folder's can have (folders' keys start with their
+// name and a slash), so no new store and no database version change.
+const PICTURE_KEY = hash => `\u0001picture/${hash}`;
+
+export async function putPictureBlob(hash, blob) {
+  const db = await getDB();
+  await db.put(FILE_STORE_NAME, blob, PICTURE_KEY(hash));
+}
+
+export async function getPictureBlob(hash) {
+  const db = await getDB();
+  return (await db.get(FILE_STORE_NAME, PICTURE_KEY(hash))) || null;
+}
+
 export async function loadBlocks(name) {
   const db = await getDB();
   const localPayload = await db.get(STORE_NAME, name);
