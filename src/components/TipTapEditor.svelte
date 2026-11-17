@@ -5,6 +5,8 @@
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
   import { storePicture, showPicture } from '../utils/pictureStore.js';
+  import { attachSmoothCaret } from '../utils/smoothCaret.js';
+  let detachCaret = () => {};
   import { ListItem } from '@tiptap/extension-list-item';
   // The same package the bullet list already comes from (via StarterKit).
   import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -1069,6 +1071,9 @@
         dispatch('blur', event);
       },
     });
+    // Austavia's own caret: the letters' height, gliding as you write
+    // (utils/smoothCaret.js, asked 2026-11-17).
+    detachCaret = attachSmoothCaret(editor, element);
     lastPushedContent = content;
     initTextHistory(historyKey, content || '');
     // Put the reader back where they were, once there is somewhere to put them.
@@ -1135,6 +1140,7 @@
     releasePlace();
     separatorWatcher?.disconnect();
     window.removeEventListener('resize', fitSeparators);
+    detachCaret();
     editor?.destroy();
   });
 
@@ -1358,6 +1364,34 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /* Where Austavia's caret is placed from (utils/smoothCaret.js). */
+    position: relative;
+  }
+
+  /* The browser's caret, as tall as the whole line and jumping, is not drawn;
+     Austavia's is (utils/smoothCaret.js). In the writing's colour. */
+  :global(.ProseMirror.has-austavia-caret) {
+    caret-color: transparent;
+  }
+  :global(.austavia-caret) {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2px;
+    border-radius: 1px;
+    background: currentColor;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 3;
+    will-change: transform;
+    transition: transform var(--caret-glide, 80ms) cubic-bezier(0.2, 0.7, 0.2, 1), height var(--caret-glide, 80ms) ease;
+  }
+  :global(.austavia-caret.resting) {
+    animation: austavia-caret-blink 1.06s steps(1, end) infinite;
+  }
+  @keyframes -global-austavia-caret-blink {
+    0%, 55% { opacity: 1; }
+    56%, 100% { opacity: 0; }
   }
 
   /* Padding lives on the contenteditable itself (not the wrap around it) so
