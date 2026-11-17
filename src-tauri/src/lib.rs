@@ -1,3 +1,4 @@
+mod bench;
 mod audio_server;
 mod external_links;
 mod local_http;
@@ -122,7 +123,10 @@ pub fn run() {
       sign_in_window::open_sign_in_window,
       audio_server::serve_audio,
       external_links::open_in_browser,
-      popup_input::set_popup_input_area
+      popup_input::set_popup_input_area,
+      bench::bench_requested,
+      bench::bench_memory,
+      bench::bench_report
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

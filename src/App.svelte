@@ -3374,6 +3374,14 @@
   // ---- Save queue: prevents concurrent writes that cause missing chars ----
   let _saveInFlight = false;
   let _pendingSave = null;       // latest payload waiting to run
+  // This device's last write of a folder, kept so the next save need not
+  // read it back from disk to see whether anything changed. Forgotten the
+  // moment anything else writes the folder (a download, a merge, a rename).
+  let lastWritten = null;
+  let writingOwnSave = null;
+  onFolderSaved(name => {
+    if (name !== writingOwnSave && lastWritten?.folder === name) lastWritten = null;
+  });
   let _debounceTimer = null;     // for non-critical (typing) saves
   // When the current run of unsaved changes began. The deadline in
   // nextSaveDelay is measured from this and never moves, so no amount of
@@ -3510,16 +3518,25 @@
       // answers a name never saved with an empty folder, and a new folder, empty
       // as new folders are, then looked unchanged and was never written
       // (saveChangesNothing, 2026-11-04).
-      const stored = (await listSavedBlocks()).includes(folder);
-      const existing = stored ? await loadBlocks(folder) : null;
+      // What is on disk: remembered from this device's last write of the
+      // folder when nothing else has written it since (lastWritten), read
+      // back otherwise. Reading it back on every save -- a heavy folder's
+      // pictures included -- and fingerprinting it was a large part of typing
+      // in one (profiled 2026-11-17).
+      const known = lastWritten?.folder === folder ? lastWritten : null;
+      const stored = known ? true : (await listSavedBlocks()).includes(folder);
+      const existing = known || (stored ? await loadBlocks(folder) : null);
+      const after = saveContentFingerprint(payload.blocks, normalizedOrders, normalizedSettings);
       if (existing) {
-        const before = saveContentFingerprint(
-          existing.blocks,
-          ensureModeOrders(existing.blocks || [], existing.modeOrders),
-          normalizeModeSettings(existing.modeSettings)
-        );
-        const after = saveContentFingerprint(payload.blocks, normalizedOrders, normalizedSettings);
+        const before = known
+          ? known.fingerprint
+          : saveContentFingerprint(
+            existing.blocks,
+            ensureModeOrders(existing.blocks || [], existing.modeOrders),
+            normalizeModeSettings(existing.modeSettings)
+          );
         if (saveChangesNothing({ stored, before, after })) {
+          lastWritten = { folder, blocks: payload.blocks, modeOrders: normalizedOrders, modeSettings: normalizedSettings, fingerprint: after };
           logSync('skip', folder, 'nothing changed, folder left alone');
           return;
         }
@@ -3546,11 +3563,17 @@
         await keepReplacedCopy(folder, existing, payload, 'emptied on this device');
       }
 
-      await saveBlocks(folder, {
-        blocks: payload.blocks,
-        modeOrders: normalizedOrders,
-        modeSettings: normalizedSettings
-      });
+      writingOwnSave = folder;
+      try {
+        await saveBlocks(folder, {
+          blocks: payload.blocks,
+          modeOrders: normalizedOrders,
+          modeSettings: normalizedSettings
+        });
+      } finally {
+        writingOwnSave = null;
+      }
+      lastWritten = { folder, blocks: payload.blocks, modeOrders: normalizedOrders, modeSettings: normalizedSettings, fingerprint: after };
       savedList = await listSavedBlocks();
       autoSyncDirty = true;
     } finally {
@@ -7295,8 +7318,43 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     }, 20000);
   }
 
+  // The app timing itself on a heavy folder, only when asked (asked
+  // 2026-11-17; utils/benchmark.js): the desktop app started with
+  // AUSTAVIA_BENCH_OUT=<file>, or ?bench=1 in a browser.
+  async function benchmarkIfAsked() {
+    const tauri = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+    let asked = null;
+    if (tauri) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const raw = await invoke('bench_requested');
+        asked = raw ? JSON.parse(raw) : null;
+      } catch { asked = null; }
+    } else if (new URLSearchParams(location.search).has('bench')) {
+      asked = { out: null, env: {} };
+    }
+    if (!asked) return;
+    for (let i = 0; i < 60 && (folderOpening || !currentSaveName); i += 1) await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 3000));
+    const { runBenchmark } = await import('./utils/benchmark.js');
+    const invoke = tauri ? (await import('@tauri-apps/api/core')).invoke : null;
+    const report = await runBenchmark({
+      saveBlocks,
+      deleteBlocks,
+      load: name => load(name, { skipCloudUpload: true }),
+      setMode,
+      tick,
+      currentFolder: () => currentSaveName,
+      memoryKb: invoke ? () => invoke('bench_memory') : null
+    });
+    report.env = asked.env;
+    if (invoke) await invoke('bench_report', { json: JSON.stringify(report, null, 2) });
+    else { window.__benchResult = report; console.log('AUSTAVIA_BENCH', JSON.stringify(report)); }
+  }
+
   onMount(async () => {
     installSyncTestHook();
+    benchmarkIfAsked();
     startCalendarReminders();
     Pc = window.innerWidth > MOBILE_BREAKPOINT;
     // Not awaited. It is a note to a future reader and must never sit between

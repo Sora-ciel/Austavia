@@ -50,12 +50,22 @@ export const LIVE_KEYS = ['bgColor', 'textColor', '_baseBgColor', '_baseTextColo
  * A block's stored state as far as a rebuild is concerned -- apart from its
  * version and what it follows live -- comparable as a string.
  */
+// Remembered per block object: a block that did not change is the same object
+// after an edit elsewhere, and turning it into a string again -- a picture in
+// its writing included -- was most of a keystroke's cost in a heavy folder
+// (profiled 2026-11-17). A changed block is a new object, so is never stale.
+const stateOf = new WeakMap();
+
 export function blockState(block) {
   if (!block || typeof block !== 'object') return '';
+  const known = stateOf.get(block);
+  if (known !== undefined) return known;
   const rest = { ...block };
   delete rest._version;
   for (const key of LIVE_KEYS) delete rest[key];
-  return JSON.stringify(rest);
+  const state = JSON.stringify(rest);
+  stateOf.set(block, state);
+  return state;
 }
 
 /**
