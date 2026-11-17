@@ -23,6 +23,7 @@
   import TipTapEditor from '../components/TipTapEditor.svelte';
   import { htmlToText as htmlToPlainText } from '../utils/htmlToText.js';
   import Lightbox from '../components/Lightbox.svelte';
+  import CroppedPicture from '../components/CroppedPicture.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import { isPrimaryPointer } from '../utils/pointer.js';
   import MusicPlayer from '../components/MusicPlayer.svelte';
@@ -801,7 +802,8 @@
   flex: unset;
 }
 
-.container img {
+.container :global(img),
+.container :global(.cropped-picture) {
   width: 100%;
   height: auto;
   max-height: 1080px;
@@ -1141,14 +1143,13 @@ input[type="text"] {
             />
           {:else if block.type === 'image'}
             {#if hasImageSource(block)}
-              <img
+              <!-- With its crop, as the viewer left it (CroppedPicture). -->
+              <CroppedPicture
                 src={getImageSource(block)}
-                alt=""
-                data-focus-guard
-                on:click|stopPropagation={() => ensureFocus(block.id)}
-                on:dblclick|stopPropagation={() => openLightbox(block)}
-                on:touchend|stopPropagation={(event) => handleImageTouchEnd(event, block)}
-                style="cursor:zoom-in"
+                crop={block.crop}
+                on:click={() => ensureFocus(block.id)}
+                on:dblclick={() => openLightbox(block)}
+                on:touchend={(event) => handleImageTouchEnd(event.detail, block)}
               />
             {:else}
               <div class="image-empty-state" data-focus-guard>
