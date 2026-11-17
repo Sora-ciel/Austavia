@@ -524,20 +524,16 @@
     align-items: center;
   }
 
-  /* On a computer the buttons show on the habit the pointer is on, rather
-     than taking room on every row (asked 2026-11-10: "buttons ... at places
-     that are not optimized for a better use of space"). Rename is also a
-     double press on the name; Delete also the right-click menu. */
+  /* Always shown on a computer (asked 2026-11-17: "they are always allocated
+     space, so it doesn't make sense to not just always have them show").
+     From 2026-11-10 they had appeared only on the habit under the pointer;
+     the fade-in was also the likely cause of habits flickering on Linux,
+     where an opacity animation over a see-through theme can blank the row
+     for a frame. Rename is also a double press on the name; Delete also the
+     right-click menu. */
   .habit-actions {
     display: flex;
     gap: 6px;
-    opacity: 0;
-    transition: opacity 0.12s;
-  }
-
-  .habit-row:hover .habit-actions,
-  .habit-actions:focus-within {
-    opacity: 1;
   }
 
   .habit-name {
@@ -636,18 +632,19 @@
   /* Weekday small, the date's number the biggest, the mark under it
      (asked 2026-11-16). */
   .calendar-header {
-    font-size: 17cqi;
+    font-size: 22cqi;
     line-height: 1;
   }
 
+  /* The writing bigger and the mark the smallest thing (asked 2026-11-17). */
   .day-number {
-    font-size: 36cqi;
+    font-size: 40cqi;
     font-weight: 700;
     line-height: 1;
   }
 
   .day-status {
-    font-size: 26cqi;
+    font-size: 19cqi;
     font-weight: 700;
     min-height: 1em;
     line-height: 1;
