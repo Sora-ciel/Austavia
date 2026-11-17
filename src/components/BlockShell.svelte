@@ -154,8 +154,9 @@
 
     offset = grabOffset(canvasPoint(e, canvasScale), position);
 
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('mouseup', onDragEnd);
+    // Pointer events cover the mouse; listening to both handled every move
+    // twice. Touch stays for its non-passive move, which stops the page
+    // scrolling under a finger dragging a block.
     window.addEventListener('touchmove', onDragMove, { passive: false });
     window.addEventListener('touchend', onDragEnd);
     window.addEventListener('pointermove', onDragMove);
@@ -383,6 +384,11 @@
     outline: 2px solid transparent;
     transition: box-shadow 0.15s ease, outline 0.15s ease;
     font-family: var(--block-body-font, inherit);
+    /* Each block on a layer of its own, so moving one or typing in one does
+       not repaint its glow and the blocks around it -- what made dragging lag
+       in the Linux app (benchmark, 2026-11-17). Safe because everything that
+       floats over a block is moved to the app's root (utils/portal.js). */
+    will-change: transform;
   }
   .note.focused {
     outline: 2px solid var(--block-focus-outline, rgba(110, 168, 255, 0.85));
@@ -393,6 +399,7 @@
   .note.on-page,
   .note.on-page.focused {
     position: relative;
+    will-change: auto;
     border: none;
     border-radius: 4px;
     box-shadow: none;

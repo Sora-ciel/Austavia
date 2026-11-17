@@ -748,16 +748,19 @@
   border-radius: 20px;
   overflow: hidden;
   border: 2px solid var(--simple-note-border-color, var(--text));
-  /* The glow is drawn by ::before, on a layer of its own. On the card, the
-     Linux app repainted it on every keystroke: 95ms a keystroke in a heavy
-     folder, 20ms with the glow apart (benchmark, 2026-11-17). */
-  position: relative;
-  isolation: isolate;
+  box-shadow: var(--simple-note-block-shadow, 0 0 2px 1px var(--text),
+              0 0 6px 2px var(--text));
+  /* Each card on a layer of its own. In the Linux app a keystroke repainted
+     the card's glow and everything around it: 95ms a keystroke in a heavy
+     folder, 19ms on its own layer (benchmark, 2026-11-17). Safe here because
+     everything that floats over a card is moved to the app's root
+     (utils/portal.js), so a layer cannot misplace it. */
+  will-change: transform;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   outline: 2px solid transparent;
-  transition: outline 0.15s ease;
+  transition: box-shadow 0.15s ease, outline 0.15s ease;
 }
 
 /* A calendar's hours only scroll while its card is focused -- asked
@@ -769,19 +772,6 @@
    utils/scrollOwnership.js's; this is how Simple Note carries it out. */
 .container:not(.focused) :global(.cal-scroll) {
   pointer-events: none;
-}
-
-.container::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: inherit;
-  box-shadow: var(--simple-note-block-shadow, 0 0 2px 1px var(--text),
-              0 0 6px 2px var(--text));
-  pointer-events: none;
-  z-index: -1;
-  will-change: transform;
-  transition: box-shadow 0.15s ease;
 }
 
 .container.focused {

@@ -153,6 +153,38 @@ export async function runBenchmark(app, { modes = ['simple', 'page', 'default'],
       result.keystrokeCodeMs = stats(code);
       editor.commands.blur?.();
     }
+    // Dragging a block by its header on the Canvas: a pointer move every
+    // frame for two seconds, and how long each frame took (asked
+    // 2026-11-17: moving a block lags on Linux).
+    if (mode === 'default') {
+      const header = document.querySelector('.modes [data-block-id] .header');
+      if (header) {
+        const box = header.getBoundingClientRect();
+        let x = box.left + 30;
+        let y = box.top + box.height / 2;
+        const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: 'mouse', button: 0, buttons: 1, isPrimary: true };
+        header.dispatchEvent(new PointerEvent('pointerdown', { ...opts, clientX: x, clientY: y }));
+        header.dispatchEvent(new MouseEvent('mousedown', { ...opts, clientX: x, clientY: y }));
+        const frames = [];
+        const moves = [];
+        let last = await frame();
+        for (let i = 0; i < 120; i += 1) {
+          x += 3; y += 2;
+          const m0 = performance.now();
+          window.dispatchEvent(new PointerEvent('pointermove', { ...opts, clientX: x, clientY: y }));
+          window.dispatchEvent(new MouseEvent('mousemove', { ...opts, clientX: x, clientY: y }));
+          moves.push(performance.now() - m0);
+          const now = await frame();
+          frames.push(now - last);
+          last = now;
+        }
+        window.dispatchEvent(new PointerEvent('pointerup', { ...opts, clientX: x, clientY: y, buttons: 0 }));
+        window.dispatchEvent(new MouseEvent('mouseup', { ...opts, clientX: x, clientY: y, buttons: 0 }));
+        result.dragFrameMs = stats(frames);
+        result.dragMoveCodeMs = stats(moves);
+      }
+    }
+
     result.memoryMbOpen = await memory();
     report.modes[mode] = result;
     await wait(300);
