@@ -183,3 +183,17 @@ describe('the first press on a calendar that is not focused only focuses it', as
     assert.equal(pressOnlyFocuses({ big: true, focused: false }), false);
   });
 });
+
+// Asked 2026-11-17: "on phone we can widen the calendar with touch", like
+// Ctrl+wheel on a computer.
+describe('two fingers widen the hours on a phone', async () => {
+  const { pinchedHour, MIN_HOUR, MAX_HOUR } = await import('../src/utils/calendarView.js');
+  it('fingers moving apart make the hours taller, together shorter', () => {
+    assert.equal(pinchedHour(60, 100, 150), 90);
+    assert.equal(pinchedHour(60, 100, 50), 30);
+  });
+  it('never past the limits', () => {
+    assert.equal(pinchedHour(60, 100, 10000), MAX_HOUR);
+    assert.equal(pinchedHour(60, 100, 1), MIN_HOUR);
+  });
+});

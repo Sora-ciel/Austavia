@@ -32,7 +32,7 @@
     weekOf, shortDayLabel, weekLabel, onDay,
     normalizeRepeat, describeRepeat, withDaySkipped, shiftedBy, pressOnlyFocuses
   } from '../utils/calendar.js';
-  import { readHourHeight, writeHourHeight, zoomedHour, readView, writeView } from '../utils/calendarView.js';
+  import { readHourHeight, writeHourHeight, zoomedHour, pinchedHour, readView, writeView } from '../utils/calendarView.js';
 
   export let id;
   export let initialPosition = { x: 100, y: 100 };
@@ -96,6 +96,38 @@
     tick().then(() => {
       scrollEl.scrollTop = (minuteThere / 60) * hourHeight + headerHeight() - offset;
     });
+  }
+
+  // Two fingers widen or narrow the hours on a phone, as Ctrl+wheel does on a
+  // computer (asked 2026-11-17), the minute between the fingers staying
+  // between them. Not on a calendar block that is still waiting to be focused.
+  let pinch = null;
+  const fingersApart = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  function onTouchStart(event) {
+    if (event.touches.length !== 2 || pressOnlyFocuses({ big, focused })) { pinch = null; return; }
+    const [a, b] = event.touches;
+    const box = scrollEl.getBoundingClientRect();
+    const offset = (a.clientY + b.clientY) / 2 - box.top;
+    pinch = {
+      distance: fingersApart(a, b),
+      height: hourHeight,
+      offset,
+      minute: ((scrollEl.scrollTop + offset - headerHeight()) / hourHeight) * 60
+    };
+    if (gesture) onCancel();
+  }
+  function onTouchMove(event) {
+    if (!pinch || event.touches.length !== 2) return;
+    if (event.cancelable) event.preventDefault();
+    const [a, b] = event.touches;
+    hourHeight = pinchedHour(pinch.height, pinch.distance, fingersApart(a, b));
+    const { minute, offset } = pinch;
+    tick().then(() => { scrollEl.scrollTop = (minute / 60) * hourHeight + headerHeight() - offset; });
+  }
+  function onTouchEnd(event) {
+    if (!pinch || event.touches.length >= 2) return;
+    pinch = null;
+    writeHourHeight(storage, big, hourHeight);
   }
 
   const headerHeight = () => 0;
@@ -409,7 +441,15 @@
     {/if}
 
     <!-- svelte-ignore a11y-no-static-element-interactions -->
-    <div class="cal-scroll" bind:this={scrollEl} on:wheel={onWheel}>
+    <div
+      class="cal-scroll"
+      bind:this={scrollEl}
+      on:wheel={onWheel}
+      on:touchstart={onTouchStart}
+      on:touchmove|nonpassive={onTouchMove}
+      on:touchend={onTouchEnd}
+      on:touchcancel={onTouchEnd}
+    >
       <div class="cal-day" style="height: {24 * hourHeight}px;">
         <div class="cal-gutter">
           {#each Array(24) as _, h}

@@ -76,3 +76,14 @@ export function writeView(storage, blockId, view) {
   all[blockId] = view;
   writeAll(storage, VIEW_KEY, all);
 }
+
+/**
+ * The hours' height while two fingers pinch, from the height when they
+ * touched down and how far apart they were then and now. Asked 2026-11-17:
+ * "on phone we can widen the calendar with touch" -- what Ctrl+wheel does on
+ * a computer. Fingers apart: taller hours; together: shorter; within limits.
+ */
+export function pinchedHour(startHeight, startDistance, distance) {
+  if (!(startDistance > 0) || !(distance > 0)) return clampHour(startHeight);
+  return clampHour(startHeight * (distance / startDistance));
+}
