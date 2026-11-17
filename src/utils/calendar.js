@@ -349,3 +349,15 @@ export function upcomingStarts(events, { from = new Date(), days = 14 } = {}) {
   }
   return out.sort((a, b) => a.at - b.at);
 }
+
+/**
+ * Whether a press on a calendar only focuses it. Asked 2026-11-17: in a mode
+ * that shows blocks, where a calendar has to be focused before it scrolls,
+ * "it blocks also creating a block of time on the same click as the one to
+ * focus". So a press on a calendar block that is not focused focuses it and
+ * does nothing else -- no task made, moved or opened. Calendar mode's
+ * calendar (`big`) is never waiting to be focused.
+ */
+export function pressOnlyFocuses({ big = false, focused = false } = {}) {
+  return !big && !focused;
+}

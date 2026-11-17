@@ -168,3 +168,18 @@ describe('a task can repeat', async () => {
     assert.deepEqual([on(e, '2026-11-16').length, on(e, '2026-11-17').length], [1, 0]);
   });
 });
+
+// Asked 2026-11-17: "it blocks also creating a block of time on the same
+// click as the one to focus".
+describe('the first press on a calendar that is not focused only focuses it', async () => {
+  const { pressOnlyFocuses } = await import('../src/utils/calendar.js');
+  it('in a mode with blocks, an unfocused calendar takes the press as focus only', () => {
+    assert.equal(pressOnlyFocuses({ big: false, focused: false }), true);
+  });
+  it('once focused, a press makes or moves a task', () => {
+    assert.equal(pressOnlyFocuses({ big: false, focused: true }), false);
+  });
+  it('Calendar mode\'s own calendar never waits to be focused', () => {
+    assert.equal(pressOnlyFocuses({ big: true, focused: false }), false);
+  });
+});

@@ -30,7 +30,7 @@
     DAY_MINUTES, dateKey, addDays, dayLabel, eventsOn, layoutDay, normalizeEvents,
     clickedSlot, draggedSlot, movedBy, resizedTo, withTypedTime, formatTime, formatLength,
     weekOf, shortDayLabel, weekLabel, onDay,
-    normalizeRepeat, describeRepeat, withDaySkipped, shiftedBy
+    normalizeRepeat, describeRepeat, withDaySkipped, shiftedBy, pressOnlyFocuses
   } from '../utils/calendar.js';
   import { readHourHeight, writeHourHeight, zoomedHour, readView, writeView } from '../utils/calendarView.js';
 
@@ -129,6 +129,9 @@
 
   function startGesture(event, kind, dayKey, calEvent = null) {
     if (event.button !== undefined && event.button !== 0) return;
+    // The first press on a calendar that is not focused only focuses it
+    // (pressOnlyFocuses, asked 2026-11-17).
+    if (focusOnly()) return;
     shell?.ensureFocus();
     // On a phone a finger dragging on the empty day scrolls it, and a tap
     // makes an hour; the blocks themselves take the finger.
@@ -279,6 +282,13 @@
     edit({ repeat: normalizeRepeat({ ...(editingEvent?.repeat || {}), unit, every }) });
   }
 
+  /** True, and the calendar focused, when this press is only for focusing it. */
+  function focusOnly() {
+    if (!pressOnlyFocuses({ big, focused })) return false;
+    shell?.ensureFocus();
+    return true;
+  }
+
   async function addWholeDay(key) {
     const made = { id: newId(), date: key, start: 0, end: DAY_MINUTES, title: '', allDay: true, color: nextColor };
     save([...events, made]);
@@ -383,18 +393,18 @@
           <div class="cal-day-head" class:today={col.key === today}>
             <button class="cal-day-name" on:click|stopPropagation={() => { day = col.key; setView('day'); }}>{shortDayLabel(col.key)}</button>
             {#each col.allDay as e (e.id)}
-              <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id, e.date)}>{e.title || 'Whole day'}</button>
+              <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => { if (!focusOnly()) openEditor(e.id, e.date); }}>{e.title || 'Whole day'}</button>
             {/each}
-            <button class="cal-allday-add small" title="Block the whole day" on:click|stopPropagation={() => addWholeDay(col.key)}>＋</button>
+            <button class="cal-allday-add small" title="Block the whole day" on:click|stopPropagation={() => { if (!focusOnly()) addWholeDay(col.key); }}>＋</button>
           </div>
         {/each}
       </div>
     {:else}
       <div class="cal-allday">
         {#each columns[0].allDay as e (e.id)}
-          <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => openEditor(e.id, e.date)}>{e.title || 'Whole day'}</button>
+          <button class="cal-allday-chip" style="background: {fill(e.color)};" class:open={editing === e.id} on:click|stopPropagation={() => { if (!focusOnly()) openEditor(e.id, e.date); }}>{e.title || 'Whole day'}</button>
         {/each}
-        <button class="cal-allday-add" on:click|stopPropagation={() => addWholeDay(day)}>＋ Whole day</button>
+        <button class="cal-allday-add" on:click|stopPropagation={() => { if (!focusOnly()) addWholeDay(day); }}>＋ Whole day</button>
       </div>
     {/if}
 
