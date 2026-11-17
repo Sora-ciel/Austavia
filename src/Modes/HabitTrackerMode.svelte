@@ -632,19 +632,20 @@
   /* Weekday small, the date's number the biggest, the mark under it
      (asked 2026-11-16). */
   .calendar-header {
-    font-size: 22cqi;
+    font-size: 20cqi;
     line-height: 1;
   }
 
-  /* The writing bigger and the mark the smallest thing (asked 2026-11-17). */
+  /* The writing big, the date's number the biggest (asked 2026-11-17), and
+     the mark bigger again the same day ("make the checkmarks bigger"). */
   .day-number {
-    font-size: 40cqi;
+    font-size: 36cqi;
     font-weight: 700;
     line-height: 1;
   }
 
   .day-status {
-    font-size: 19cqi;
+    font-size: 30cqi;
     font-weight: 700;
     min-height: 1em;
     line-height: 1;
