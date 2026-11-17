@@ -15,6 +15,15 @@ const appVersion = JSON.parse(
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  // Not watched: the emulator's scratch folder fills with thousands of cache
+  // files during npm run test:sync, and watching them ran the machine out of
+  // file watchers and stopped the dev server (2026-11-17). Nor the native
+  // builds' folders, which are not the web app's.
+  server: {
+    watch: {
+      ignored: ['**/.emulator-tmp/**', '**/src-tauri/target/**', '**/android/**', '**/release/**']
+    }
+  },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion)
   }
