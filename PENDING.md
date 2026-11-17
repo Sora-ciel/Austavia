@@ -937,6 +937,22 @@ system was on the power-saver profile, WebKit's low-power cue to halve
 animation frames; GIO_USE_POWER_PROFILE_MONITOR did not change it. Owed:
 Sora to try Balanced and the benchmark run again.
 
+**Done 2026-11-17 (staging, 0.8.702):** steps 1 and 2 -- pictures pasted or
+dropped into notes are kept on the device by reference
+(utils/pictureRefs.js, utils/pictureStore.js), existing notes convert as
+their folder opens, uploads send links, export embeds. Measured on Sora's PC,
+Linux app, Wayland: opening a heavy folder in Page mode ~4s -> 0.6s; a
+keystroke in Page mode 17ms; in Simple Note 115-136ms -> 32ms (with its card
+glow moved to its own layer, which was most of it). Owed from here:
+- **Pictures nobody uses any more** stay in the device's store: a sweep that
+  lists every reference in every folder and deletes the rest (absolute, run
+  now and then -- CLAUDE.md, recompute).
+- **Tasks** still keep pictures inline (shown as plain HTML when not edited).
+- **Image blocks** (step 3) and the screenshot/download paths (step 4).
+- **Wayland or XWayland on Linux** -- Sora's choice: native Wayland scrolls a
+  heavy folder at a steady 16-17ms, XWayland (today's, so KDE draws the
+  title bar) at 22-28ms with drops.
+
 In order, each landing and released on its own:
 
 1. **A resolver** — one function that turns a picture reference into something
