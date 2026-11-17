@@ -15,8 +15,8 @@
 
 /** How tall the caret is against the letters: a little taller than the font size. */
 export const CARET_HEIGHT = 1.2;
-/** How long it takes to glide to its next place. */
-export const CARET_GLIDE_MS = 80;
+/** How long it takes to glide to its next place: 60ms, asked 2026-11-17 (80 first). */
+export const CARET_GLIDE_MS = 60;
 
 /**
  * Where to draw the caret inside its host, in the host's own pixels.
