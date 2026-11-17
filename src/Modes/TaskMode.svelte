@@ -5,9 +5,9 @@
   // in modeRegistry.js.
   export let backgroundSettings = {};
   import { createEventDispatcher, onMount, onDestroy, tick } from 'svelte';
-  import ColorField from '../components/ColorField.svelte';
   import BlockContextMenu from '../components/BlockContextMenu.svelte';
   import MarkdownIt from 'markdown-it';
+  import { tasksToMarkdown } from '../utils/taskMarkdown.js';
   import { sanitizeRichText, looksLikeHtml } from '../utils/sanitizeRichText.js';
   import TipTapEditor from '../components/TipTapEditor.svelte';
   // Open or closed, remembered on this device -- see the file.
@@ -432,17 +432,10 @@
     }
   }
 
-  // Serialize the list to plain markdown — unchecked and checked tasks as
-  // GitHub-style task items so it drops straight into any markdown editor.
-  function tasksToMarkdown(block) {
-    const title = (block?.title || 'Task List').trim();
-    const list = Array.isArray(block?.tasks) ? block.tasks : [];
-    const lines = [`# ${title}`, ''];
-    for (const t of list) lines.push(`- [${t.done ? 'x' : ' '}] ${t.text}`);
-    return lines.join('\n');
-  }
+  // "Copy as markdown": utils/taskMarkdown.js (not done first, then done).
 
   async function handleCtxAction(id) {
+    if (id === 'deleteList') { deleteTaskList(); return; }
     if (id === 'copyMd' && taskBlock) {
       const md = tasksToMarkdown(taskBlock);
       try { await navigator.clipboard.writeText(md); } catch {}
@@ -523,14 +516,6 @@
   }
   .new-list-btn:hover { opacity: 1; }
 
-  .task-title-row {
-    flex: 0 0 auto;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
   /* The open list's tab while its name is typed: the same pill, as wide as a
      name usually is, without the capitals so what is typed reads as typed. */
   .task-tab-rename {
@@ -543,19 +528,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--text, var(--mode-text-color, #fff)) 35%, transparent);
   }
 
-  .delete-list-btn {
-    flex-shrink: 0;
-    border: var(--block-border-width, 1px) solid rgba(255,80,80,.45);
-    background: transparent;
-    color: rgba(255,110,110,.85);
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-size: 0.74rem;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s;
-  }
-  .delete-list-btn:hover { background: rgba(255,80,80,.12); }
 
   /* ── Body (scrollable) ──────────────────────────────────────────── */
   .task-body {
@@ -941,23 +913,10 @@
         {/each}
       </div>
 
-      {#if taskBlock}
-        <div class="task-title-row">
-          <ColorField
-            value={taskBlock.bgColor || '#000000'}
-            title="Background Color"
-            on:input={e => setTaskColor('bgColor', e.detail)}
-            on:change={e => commitTaskColor('bgColor', e.detail)}
-          />
-          <ColorField
-            value={taskBlock.textColor || '#ffffff'}
-            title="Text Color"
-            on:input={e => setTaskColor('textColor', e.detail)}
-            on:change={e => commitTaskColor('textColor', e.detail)}
-          />
-          <button class="delete-list-btn" on:click={deleteTaskList}>Delete</button>
-        </div>
-      {/if}
+      <!-- The list's colours and Delete were here, beside its name; they are
+           in the list's menu instead -- right-click, or a long press on a
+           phone (asked 2026-11-17: "remove the color input and delete option
+           ... right click and long press already offer that option"). -->
     </div>
 
     <div class="task-body">
@@ -1186,7 +1145,7 @@
   <BlockContextMenu
     x={ctxMenu.x}
     y={ctxMenu.y}
-    items={[{ id: 'copyMd', label: 'Copy as Markdown' }]}
+    items={[{ id: 'copyMd', label: 'Copy as Markdown' }, { id: 'deleteList', label: 'Delete list' }]}
     colorEdit={true}
     bgColor={taskBlock.bgColor || '#000000'}
     textColor={taskBlock.textColor || '#ffffff'}
