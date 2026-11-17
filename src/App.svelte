@@ -8,7 +8,7 @@
   import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
-  import { canUndoText, canRedoText } from './utils/textHistory.js';
+  import { canUndoText, canRedoText, keepTextHistoriesFor } from './utils/textHistory.js';
   import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress } from './utils/taskGoals.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
@@ -5169,6 +5169,9 @@
 
       history = [];
       historyIndex = -1;
+      // Only this folder's notes keep their undo; the last folder's are let
+      // go rather than held in memory for as long as the app runs.
+      keepTextHistoriesFor(blocks.map(block => block.id));
       await pushHistory(blocks, modeOrders, { persist: true });
       if (options.skipCloudUpload) {
         autoSyncDirty = false;

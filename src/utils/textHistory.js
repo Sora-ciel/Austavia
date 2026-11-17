@@ -62,6 +62,21 @@ function insertedText(before, after) {
 // document's history for every block that has ever been open.
 const MAX_STEPS = 200;
 
+// And by size. A picture pasted into writing is stored in the text, so one
+// photograph makes every step of that note about 3.6 million characters, and
+// two hundred of them is over a gigabyte held for one block. Past this many
+// characters across a block's steps, the oldest go -- a note with a picture
+// in it keeps fewer steps, a note of words keeps them all. Reported 2026-11-17
+// as the app's memory climbing from 400MB to 1.1GB between heavy folders.
+export const MAX_HISTORY_CHARS = 20_000_000;
+
+function trimToSize(entry) {
+  let total = entry.past.reduce((sum, step) => sum + (step.content?.length || 0), 0)
+    + entry.future.reduce((sum, step) => sum + (step.content?.length || 0), 0);
+  while (total > MAX_HISTORY_CHARS && entry.past.length) total -= entry.past.shift().content?.length || 0;
+  while (total > MAX_HISTORY_CHARS && entry.future.length) total -= entry.future.pop().content?.length || 0;
+}
+
 function historyFor(key) {
   let entry = histories.get(key);
   if (!entry) {
@@ -97,6 +112,7 @@ export function initTextHistory(key, content) {
 function pushPast(entry) {
   entry.past.push({ content: entry.current, caret: entry.currentCaret });
   if (entry.past.length > MAX_STEPS) entry.past.shift();
+  trimToSize(entry);
 }
 
 /** Records a new state, coalescing a burst of typing into one step. */
@@ -215,4 +231,27 @@ export function syncTextHistory(key, content) {
 /** Drops a block's history once the block itself is gone. */
 export function forgetTextHistory(key) {
   histories.delete(key);
+}
+
+/**
+ * Keeps the histories of these blocks and lets every other go -- called when
+ * a folder opens, with its blocks. Nothing used to let go: every note ever
+ * opened stayed in memory with its past for as long as the app ran, so moving
+ * between heavy folders only ever added (2026-11-17, 400MB to 1.1GB). Undo
+ * still lasts across moves and mode switches within the folder open.
+ */
+export function keepTextHistoriesFor(keys) {
+  const kept = new Set(keys);
+  for (const key of [...histories.keys()]) if (!kept.has(key)) histories.delete(key);
+}
+
+/** How many blocks have a history, and its characters -- for diagnostics and tests. */
+export function textHistorySize() {
+  let chars = 0;
+  for (const entry of histories.values()) {
+    chars += (entry.current?.length || 0);
+    for (const step of entry.past) chars += step.content?.length || 0;
+    for (const step of entry.future) chars += step.content?.length || 0;
+  }
+  return { blocks: histories.size, chars };
 }

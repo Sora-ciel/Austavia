@@ -210,3 +210,25 @@ test('redo returns exactly what undo took away', async t => {
     assert.equal(redoText(key), null);
   });
 });
+
+// Reported 2026-11-17: the app's memory climbing from 400MB to 1.1GB between
+// heavy folders, as if it kept what it no longer used. It did: every note
+// ever opened kept its text and up to 200 earlier versions of it.
+import { keepTextHistoriesFor, textHistorySize, MAX_HISTORY_CHARS } from '../src/utils/textHistory.js';
+
+test('opening a folder lets go of the other folders\' notes', () => {
+  initTextHistory('heavy-a', 'x'.repeat(1000));
+  initTextHistory('heavy-b', 'y'.repeat(1000));
+  keepTextHistoriesFor(['heavy-b']);
+  assert.equal(canUndoText('heavy-a'), false);
+  const { chars } = textHistorySize();
+  assert.ok(chars < 1000 * 2, 'only the open folder\'s note is held');
+});
+
+test('a note with a picture in it keeps fewer undo steps, not a gigabyte of them', () => {
+  const photo = 'p'.repeat(3_600_000);
+  initTextHistory('photo-note', photo);
+  for (let i = 0; i < 30; i += 1) syncTextHistory('photo-note', `${photo}${i}`);
+  assert.ok(textHistorySize().chars <= MAX_HISTORY_CHARS + 4_000_000);
+  assert.equal(canUndoText('photo-note'), true, 'still undoable');
+});
