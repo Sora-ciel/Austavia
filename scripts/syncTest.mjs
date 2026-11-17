@@ -40,6 +40,24 @@ await new Promise((resolve, reject) => {
 // decide the next one.
 const ACCOUNT = `sync-test-${Date.now().toString(36)}`;
 
+// Warm the server up before any device opens it: after a code change it
+// compiles the whole app on the first visit, and the first device's own
+// timeouts used to run out waiting for that (2026-11-17, twice in a row).
+async function warmUp() {
+  for (let i = 0; i < 60; i += 1) {
+    try {
+      const res = await fetch(URL);
+      if (res.ok) {
+        await fetch(new globalThis.URL('/src/main.js', URL)).catch(() => {});
+        return;
+      }
+    } catch { /* not listening yet */ }
+    await sleep(1000);
+  }
+  throw new Error('the dev server never answered');
+}
+await warmUp();
+
 const browser = await chromium.launch({ executablePath: CHROMIUM, headless: true });
 let failures = 0;
 
@@ -51,7 +69,7 @@ async function device(name) {
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForFunction(() => window.__austaviaTest, null, { timeout: 180000 });
   await page.evaluate(id => window.__austaviaTest.signIn(id), ACCOUNT);
-  await page.waitForFunction(() => window.__austaviaTest.ready(), null, { timeout: 60000 });
+  await page.waitForFunction(() => window.__austaviaTest.ready(), null, { timeout: 180000 });
   await page.evaluate(() => window.__austaviaTest.manual());
   const call = (fn, ...args) => page.evaluate(([f, a]) => window.__austaviaTest[f](...a), [fn, args]);
   return {
@@ -65,6 +83,9 @@ async function device(name) {
     upload: () => call('upload'),
     pull: () => call('pull'),
     log: () => call('log'),
+    show: (folder, mode) => call('show', folder, mode),
+    scrollOf: selector => call('scrollOf', selector),
+    scrollTo: (selector, top) => call('scrollTo', selector, top),
     async relaunch() {
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__austaviaTest?.ready(), null, { timeout: 60000 });
@@ -178,6 +199,40 @@ try {
     const got = await phone.read(folder);
     expect(tasksIn(got), ['first', 'from phone'], 'the phone\'s tasks');
     expect(noteIn(got), '<p>written offline</p>', 'the phone\'s note');
+  });
+
+  await scenario('a page open and scrolled on the computer stays where it was when the phone\'s change arrives', async () => {
+    const folder = 'Long page';
+    const long = Array.from({ length: 40 }, (_, i) => note(`p${i}`, `<p>Line ${i}</p><p>more</p><p>and more</p>`));
+    // Page mode shows the blocks its layout lists, one per row here.
+    const onPage = blocks => ({ ...folderOf(blocks), modeSettings: { page: { rows: blocks.map(b => ({ cells: [{ blockId: b.id }] })) } } });
+    await phone.write(folder, onPage(long));
+    await phone.upload();
+    await computer.pull();
+    await computer.show(folder, 'page');
+    await sleep(800);
+    const set = await computer.scrollTo('.page-mode', 900);
+    if (!(set > 0)) {
+      const seen = await computer.page.evaluate(() => {
+        const el = document.querySelector('.page-mode');
+        return el ? `${el.scrollHeight}/${el.clientHeight} blocks:${el.querySelectorAll('[data-block-id]').length} text:${el.innerText.slice(0, 80)}` : `no .page-mode; modes:${document.querySelector('.modes')?.className}`;
+      });
+      throw new Error(`the page could not be scrolled (got ${set}; ${seen})`);
+    }
+    await phone.write(folder, onPage([...long.slice(0, 39), note('p39', '<p>changed on the phone</p>')]));
+    await phone.upload();
+    // As the app does: the pull steps aside while the computer has its own
+    // save unsent (opening a folder re-saves it), and the upload that follows
+    // merges the phone's change in and draws the page again.
+    await computer.pull();
+    await computer.upload();
+    await sleep(800);
+    const remounts = (await computer.log()).filter(e => e.folder === folder && /merged|taking it/.test(e.message)).length;
+    if (remounts < 2) throw new Error('the phone\'s change was never taken in, so nothing was drawn again');
+    const after = await computer.scrollOf('.page-mode');
+    if (Math.abs(after - set) > 4) throw new Error(`the page scrolled from ${set} to ${after}`);
+    const got = await computer.read(folder);
+    expect(noteIn({ blocks: got.blocks.map(b => (b.id === 'p39' ? { ...b, id: 'n' } : b)) }), '<p>changed on the phone</p>', 'the change arrived');
   });
 
   if (failures) {

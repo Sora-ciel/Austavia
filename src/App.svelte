@@ -50,6 +50,7 @@
     onFolderSaved
   } from './storage.js';
   import { releasesWhenPaused, RELEASE_AFTER_MS } from './utils/audioRelease.js';
+  import { noteScrolls, putScrollsBack } from './utils/scrollKeep.js';
   import { calendarEventsOf, withFolder, remindersFor, readIndex, writeIndex } from './utils/calendarReminders.js';
   import { remindersAvailable, setCalendarReminders } from './utils/calendarReminderBridge.js';
   import {
@@ -5797,9 +5798,21 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   }
 
 
+  // The open folder again, after a sync changed it: drawn again where it was
+  // -- scrolled where it was, the same block focused -- rather than from the
+  // top (asked 2026-11-17, utils/scrollKeep.js). A picture still loading can
+  // push things down after the first frame, so it is put back twice.
+  let modesEl;
   async function remountCurrentSaveIfLoaded() {
     if (!currentSaveName || !savedList.includes(currentSaveName)) return;
+    const scrolls = noteScrolls(modesEl);
+    const focused = focusedBlockId;
     await load(currentSaveName, { skipCloudUpload: true });
+    if (focused && blocks.some(block => block.id === focused)) focusedBlockId = focused;
+    await tick();
+    putScrollsBack(modesEl, scrolls);
+    requestAnimationFrame(() => putScrollsBack(modesEl, scrolls));
+    setTimeout(() => putScrollsBack(modesEl, scrolls), 400);
   }
 
   // After a cloud pull the folder that was open may not exist on this device
@@ -7224,6 +7237,10 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         try { await pullRemoteUpdatesIfNeeded(); } finally { autoSyncEnabled = false; }
       },
       base: name => cloudBases[name] || null,
+      // A folder shown in a mode, and a scroller's position in it.
+      show: async (name, modeName) => { await load(name); setMode(modeName); await tick(); },
+      scrollOf: selector => document.querySelector(selector)?.scrollTop ?? null,
+      scrollTo: (selector, top) => { const el = document.querySelector(selector); if (el) el.scrollTop = top; return el?.scrollTop ?? null; },
       log: () => getSyncLog().map(e => ({ kind: e.kind, folder: e.folder, message: e.message }))
     };
   }
@@ -8845,6 +8862,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
        stopped, in the capture phase before anything else sees them. -->
   <div
     class="modes"
+    bind:this={modesEl}
     style={wallpaperHeight ? `--wallpaper-height: ${wallpaperHeight}px;` : ''}
     class:sync-lock-active={workspaceHeld}
     role="region"
