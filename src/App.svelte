@@ -49,6 +49,7 @@
     describeLocalStorage,
     onFolderSaved
   } from './storage.js';
+  import { releasesWhenPaused, RELEASE_AFTER_MS } from './utils/audioRelease.js';
   import { calendarEventsOf, withFolder, remindersFor, readIndex, writeIndex } from './utils/calendarReminders.js';
   import { remindersAvailable, setCalendarReminders } from './utils/calendarReminderBridge.js';
   import {
@@ -1763,6 +1764,8 @@
     showCoverFor(trackId);
     await tick();
     if (audioEl) {
+      clearTimeout(audioReleaseTimer);
+      audioReleased = false;
       audioEl.src = nowPlayingUrl;
       audioEl.volume = gainForVolume(musicVolume);
       try {
@@ -1776,9 +1779,33 @@
     rememberPlaybackPosition();
   }
 
+  // A paused song lets go of the sound system in the desktop apps, so the
+  // task bar's speaker shows only while something is heard (asked
+  // 2026-11-17; utils/audioRelease.js). The position is kept in resumeSeekTo,
+  // which the element's loadedmetadata already applies.
+  let audioReleased = false;
+  let audioReleaseTimer = null;
+  function releaseAudioSoon() {
+    clearTimeout(audioReleaseTimer);
+    const desktopApp = typeof window !== 'undefined' && !!(window.__TAURI_INTERNALS__ || window.__TAURI__);
+    if (!releasesWhenPaused({ desktopApp, androidApp: onAndroidApp() })) return;
+    audioReleaseTimer = setTimeout(() => {
+      if (!audioEl || !audioEl.paused || !nowPlayingUrl || audioReleased) return;
+      resumeSeekTo = audioEl.currentTime || 0;
+      audioReleased = true;
+      audioEl.removeAttribute('src');
+      audioEl.load();
+    }, RELEASE_AFTER_MS);
+  }
+
   function toggleMusic() {
     if (!audioEl || !nowPlayingId) return;
     if (audioEl.paused) {
+      clearTimeout(audioReleaseTimer);
+      if (audioReleased) {
+        audioReleased = false;
+        audioEl.src = nowPlayingUrl;
+      }
       audioEl.play().then(() => (isPlaying = true)).catch(() => (isPlaying = false));
     } else {
       audioEl.pause();
@@ -1787,6 +1814,8 @@
   }
 
   function stopMusic() {
+    clearTimeout(audioReleaseTimer);
+    audioReleased = false;
     audioEl?.pause();
     isPlaying = false;
     nowPlayingId = null;
@@ -2098,6 +2127,8 @@
     showCoverFor(saved.trackId);
     await tick();
     if (audioEl) {
+      clearTimeout(audioReleaseTimer);
+      audioReleased = false;
       audioEl.src = nowPlayingUrl;
       audioEl.volume = gainForVolume(musicVolume);
     }
@@ -8953,11 +8984,11 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   bind:this={audioEl}
   on:ended={() => stepMusic(1)}
   on:play={() => (isPlaying = true)}
-  on:pause={() => { isPlaying = false; rememberPlaybackPosition(); }}
+  on:pause={() => { isPlaying = false; rememberPlaybackPosition(); releaseAudioSoon(); }}
   on:loadedmetadata={() => { applyResumePosition(); syncMusicTime(); tellTheNotification(); }}
   on:durationchange={() => { syncMusicTime(); tellTheNotification(); }}
   on:seeked={() => { syncMusicTime(); tellTheNotification(); }}
-  on:timeupdate={() => { syncMusicTime(); throttledRememberPosition(); reportPositionIfItMoved(); }}
+  on:timeupdate={() => { if (audioReleased) return; syncMusicTime(); throttledRememberPosition(); reportPositionIfItMoved(); }}
   preload="metadata"
   hidden
 ></audio>
