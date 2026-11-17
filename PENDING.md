@@ -913,6 +913,30 @@ one photograph is 3.6 million characters. That one fact causes four costs:
   copies to about two
 - storage pressure, alongside a music library of ~1900 tracks on the same origin
 
+**Measured 2026-11-17** with the built-in benchmark (utils/benchmark.js: run
+the staging app with `AUSTAVIA_BENCH_OUT=/tmp/b.json`, or any build with
+`?bench=1`), ten notes each holding a 1600x1200 photograph:
+
+| | Chromium (web) | Linux app |
+| --- | --- | --- |
+| a frame, scrolling or idle | 6.9ms | 32ms (capped, see below) |
+| a keystroke, Simple Note | 14ms | 115ms (35ms of it our code) |
+| a keystroke, Page mode | 11ms | 21-27ms |
+| opening the folder | ~2s | 3-4s |
+
+A CPU profile of typing in Simple Note: TipTap's getHTML of a note with a
+picture in it, the undo history's plainText regex over it, and (fixed the
+same day) every block stringified per change and every save reading the
+folder back from disk. What is left scales with the pictures in the
+writing, which is what this item removes.
+
+**The Linux 32ms cap is not ours**: a bare WebKitGTK 2.52 window (a Python
+probe) is capped the same, under X11 and Wayland, on the Intel or NVIDIA
+render node, with DMA-BUF or compositing off, CPU or no acceleration. The
+system was on the power-saver profile, WebKit's low-power cue to halve
+animation frames; GIO_USE_POWER_PROFILE_MONITOR did not change it. Owed:
+Sora to try Balanced and the benchmark run again.
+
 In order, each landing and released on its own:
 
 1. **A resolver** — one function that turns a picture reference into something
