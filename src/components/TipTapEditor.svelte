@@ -1384,7 +1384,7 @@
     opacity: 0;
     z-index: 3;
     will-change: transform;
-    transition: transform var(--caret-glide, 60ms) cubic-bezier(0.2, 0.7, 0.2, 1), height var(--caret-glide, 60ms) ease;
+    transition: transform var(--caret-glide, 80ms) cubic-bezier(0.2, 0.7, 0.2, 1), height var(--caret-glide, 80ms) ease;
   }
   :global(.austavia-caret.resting) {
     animation: austavia-caret-blink 1.06s steps(1, end) infinite;

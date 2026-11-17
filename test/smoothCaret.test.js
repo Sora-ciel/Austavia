@@ -27,5 +27,17 @@ test('on the zoomed Canvas it lands in the block\'s own pixels', () => {
 });
 
 test('it glides quickly: smoother, never behind the writing for long', () => {
-  assert.ok(CARET_GLIDE_MS > 0 && CARET_GLIDE_MS <= 120);
+  assert.equal(CARET_GLIDE_MS, 80);
+});
+
+// Asked 2026-11-17: moving the caret by a click or by keys should not glide --
+// at 80ms you can see it travel frame by frame. Only writing glides it.
+import { caretGlides } from '../src/utils/smoothCaret.js';
+
+test('the caret glides while you write', () => {
+  assert.equal(caretGlides({ textChanged: true }), true);
+});
+
+test('a click or the arrow keys put it straight where it goes', () => {
+  assert.equal(caretGlides({ textChanged: false }), false);
 });

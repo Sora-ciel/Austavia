@@ -15,8 +15,21 @@
 
 /** How tall the caret is against the letters: a little taller than the font size. */
 export const CARET_HEIGHT = 1.2;
-/** How long it takes to glide to its next place: 60ms, asked 2026-11-17 (80 first). */
-export const CARET_GLIDE_MS = 60;
+/** How long it takes to glide to its next place while typing (80ms; 60 was tried the same day and put back). */
+export const CARET_GLIDE_MS = 80;
+
+/**
+ * Whether the caret glides to its next place or is simply there. Asked
+ * 2026-11-17: when the caret is moved -- by a click or by keys -- it should
+ * not glide: across a whole line, 80ms is long enough to see it travel frame
+ * by frame. It glides only when writing moved it.
+ */
+/** How soon after a change to the writing a move still counts as writing. */
+export const WRITING_WINDOW_MS = 200;
+
+export function caretGlides({ textChanged = false } = {}) {
+  return textChanged;
+}
 
 /**
  * Where to draw the caret inside its host, in the host's own pixels.
@@ -54,6 +67,10 @@ export function attachSmoothCaret(editor, host) {
   let frame = 0;
   let restTimer = 0;
   let placed = false;
+  // When the writing last changed. Several redraws follow one keystroke (the
+  // note's height changing, the selection settling), and each must glide as
+  // the keystroke does; a move with no writing near it does not.
+  let typedAt = -Infinity;
 
   function hide() {
     caret.style.opacity = '0';
@@ -72,8 +89,10 @@ export function attachSmoothCaret(editor, host) {
     const fontSize = parseFloat(getComputedStyle(el || view.dom).fontSize) || 16;
     const box = caretBox({ rect, host: hostRect, scale, fontSize, scroll: { left: host.scrollLeft, top: host.scrollTop } });
     if (!box) { hide(); return; }
-    // The first time it appears it is put there; after that it glides.
-    caret.style.transition = placed ? '' : 'none';
+    // It glides only when writing moved it; put there otherwise -- the first
+    // time it appears, after a click, after the arrow keys (caretGlides).
+    const textChanged = performance.now() - typedAt < WRITING_WINDOW_MS;
+    caret.style.transition = placed && caretGlides({ textChanged }) ? '' : 'none';
     caret.style.height = `${box.height}px`;
     caret.style.transform = `translate(${box.x}px, ${box.y}px)`;
     caret.style.opacity = '1';
@@ -89,6 +108,13 @@ export function attachSmoothCaret(editor, host) {
   }
 
   const onBlur = () => { placed = false; hide(); };
+  // Writing is what the browser calls input -- typing, deleting, pasting --
+  // and never an arrow key or a click. The document's own changes are not
+  // the signal: the editor adjusts it by itself shortly after typing (a
+  // separator re-measured), which made an arrow key glide.
+  const onInput = () => { typedAt = performance.now(); };
+  view.dom.addEventListener('beforeinput', onInput);
+  view.dom.addEventListener('input', onInput);
   editor.on('selectionUpdate', schedule);
   editor.on('transaction', schedule);
   editor.on('focus', schedule);
@@ -102,6 +128,8 @@ export function attachSmoothCaret(editor, host) {
     clearTimeout(restTimer);
     editor.off('selectionUpdate', schedule);
     editor.off('transaction', schedule);
+    view.dom.removeEventListener('beforeinput', onInput);
+    view.dom.removeEventListener('input', onInput);
     editor.off('focus', schedule);
     editor.off('blur', onBlur);
     resized?.disconnect();
