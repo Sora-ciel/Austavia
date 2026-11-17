@@ -255,3 +255,14 @@ export function textHistorySize() {
   }
   return { blocks: histories.size, chars };
 }
+
+/** Every version the undo histories hold, for finding what they still use. */
+export function textHistoryContents() {
+  const out = [];
+  for (const entry of histories.values()) {
+    if (entry.current) out.push(entry.current);
+    for (const step of entry.past) out.push(step.content);
+    for (const step of entry.future) out.push(step.content);
+  }
+  return out;
+}

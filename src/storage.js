@@ -370,14 +370,64 @@ export async function saveBlocks(name, blocks) {
 // name and a slash), so no new store and no database version change.
 const PICTURE_KEY = hash => `\u0001picture/${hash}`;
 
+const PICTURE_PREFIX = '\u0001picture/';
+const blobOfPicture = value => (value instanceof Blob ? value : value?.blob instanceof Blob ? value.blob : null);
+
+// Kept with the time it was stored, so a clean-up never takes one that is
+// being pasted or uploaded right now (utils/pictureCleanup.js).
 export async function putPictureBlob(hash, blob) {
   const db = await getDB();
-  await db.put(FILE_STORE_NAME, blob, PICTURE_KEY(hash));
+  await db.put(FILE_STORE_NAME, { blob, at: Date.now() }, PICTURE_KEY(hash));
 }
 
 export async function getPictureBlob(hash) {
   const db = await getDB();
-  return (await db.get(FILE_STORE_NAME, PICTURE_KEY(hash))) || null;
+  return blobOfPicture(await db.get(FILE_STORE_NAME, PICTURE_KEY(hash)));
+}
+
+export async function deletePictureBlob(hash) {
+  const db = await getDB();
+  await db.delete(FILE_STORE_NAME, PICTURE_KEY(hash));
+}
+
+/** Every picture kept: [{ hash, at, size }]. */
+export async function listStoredPictures() {
+  const db = await getDB();
+  const range = IDBKeyRange.bound(PICTURE_PREFIX, `${PICTURE_PREFIX}\uffff`);
+  const out = [];
+  let cursor = await db.transaction(FILE_STORE_NAME).store.openCursor(range);
+  while (cursor) {
+    const value = cursor.value;
+    out.push({ hash: String(cursor.key).slice(PICTURE_PREFIX.length), at: Number(value?.at) || 0, size: blobOfPicture(value)?.size || 0 });
+    cursor = await cursor.continue();
+  }
+  return out;
+}
+
+/**
+ * Every picture reference anything on the device holds: the folders (their
+ * records and their files), the bin, the kept copies. Read as text, without
+ * opening any folder the way the app does. `refsIn` finds them in a string.
+ */
+export async function textsOnDevice(visit) {
+  const db = await getDB();
+  for (const store of [STORE_NAME, BIN_STORE_NAME, SNAPSHOT_STORE_NAME]) {
+    for (const value of await db.getAll(store)) {
+      try { visit(JSON.stringify(value)); } catch { /* not text */ }
+    }
+  }
+  // The folders' own files: writing too long to sit in the record.
+  let cursor = await db.transaction(FILE_STORE_NAME).store.openCursor();
+  const texts = [];
+  while (cursor) {
+    const key = String(cursor.key);
+    const value = cursor.value;
+    if (!key.startsWith('\u0001') && value instanceof Blob && value.size < 50 * 1024 * 1024 && !/^(image|audio|video)\//.test(value.type)) texts.push(value);
+    cursor = await cursor.continue();
+  }
+  for (const blob of texts) {
+    try { visit(await blob.text()); } catch { /* unreadable */ }
+  }
 }
 
 export async function loadBlocks(name) {

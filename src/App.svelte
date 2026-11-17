@@ -8,7 +8,7 @@
   import ControlsLayoutPage from './advanced-param/ControlsLayoutPage.svelte';
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
-  import { canUndoText, canRedoText, keepTextHistoriesFor } from './utils/textHistory.js';
+  import { canUndoText, canRedoText, keepTextHistoriesFor, textHistoryContents } from './utils/textHistory.js';
   import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress } from './utils/taskGoals.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
@@ -51,7 +51,7 @@
   } from './storage.js';
   import { releasesWhenPaused, RELEASE_AFTER_MS } from './utils/audioRelease.js';
   import { holdsInlinePictures, dataPicturesIn, withPictureSources } from './utils/pictureRefs.js';
-  import { storePicture } from './utils/pictureStore.js';
+  import { storePicture, cleanUpPictures } from './utils/pictureStore.js';
   import { noteScrolls, putScrollsBack } from './utils/scrollKeep.js';
   import { calendarEventsOf, withFolder, remindersFor, readIndex, writeIndex } from './utils/calendarReminders.js';
   import { remindersAvailable, setCalendarReminders } from './utils/calendarReminderBridge.js';
@@ -7389,7 +7389,27 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     else { window.__benchResult = report; console.log('AUSTAVIA_BENCH', JSON.stringify(report)); }
   }
 
+  // Pictures nothing uses any more, deleted (asked 2026-11-17; the rule is
+  // utils/pictureCleanup.js): a while after the app starts, and twice a day
+  // while it stays open. What is only in memory counts as in use.
+  async function cleanUpUnusedPictures() {
+    try {
+      const result = await cleanUpPictures({ alsoInUse: [JSON.stringify(blocks), ...textHistoryContents()] });
+      if (result.deleted) {
+        logSync('save', '', 'pictures nothing uses any more were deleted from this device', {
+          deleted: result.deleted,
+          freedMb: Math.round(result.freedBytes / 1048576 * 10) / 10,
+          kept: result.kept
+        });
+      }
+    } catch (error) {
+      console.warn('Could not clean up unused pictures:', error);
+    }
+  }
+
   onMount(async () => {
+    setTimeout(cleanUpUnusedPictures, 90 * 1000);
+    setInterval(cleanUpUnusedPictures, 12 * 60 * 60 * 1000);
     installSyncTestHook();
     benchmarkIfAsked();
     startCalendarReminders();

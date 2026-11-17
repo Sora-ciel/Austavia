@@ -8,8 +8,9 @@
  * - referencesForInlinePictures: writing that still holds pictures inside it,
  *   rewritten to hold references (the existing heavy notes, as they open).
  */
-import { putPictureBlob, getPictureBlob } from '../storage.js';
-import { refFor, hashOfRef, isPictureRef, dataPicturesIn, withPictureSources } from './pictureRefs.js';
+import { putPictureBlob, getPictureBlob, listStoredPictures, deletePictureBlob, textsOnDevice } from '../storage.js';
+import { picturesToDelete } from './pictureCleanup.js';
+import { refFor, hashOfRef, isPictureRef, dataPicturesIn, withPictureSources, pictureRefsIn } from './pictureRefs.js';
 
 const shown = new Map(); // ref -> object URL, for as long as the app runs
 
@@ -97,4 +98,26 @@ export async function referencesForInlinePictures(html) {
     if (ref) map.set(dataUrl, ref);
   }
   return withPictureSources(html, map);
+}
+
+/**
+ * Deletes the pictures nothing uses any more (utils/pictureCleanup.js).
+ * `alsoInUse`: texts held only in memory -- the open folder as edited, the
+ * undo histories -- which count as in use too.
+ */
+export async function cleanUpPictures({ alsoInUse = [], now = Date.now() } = {}) {
+  const inUse = new Set();
+  const note = text => { for (const ref of pictureRefsIn(text)) inUse.add(hashOfRef(ref)); };
+  await textsOnDevice(note);
+  for (const text of alsoInUse) note(text);
+  const stored = await listStoredPictures();
+  const gone = picturesToDelete({ stored, inUse, now });
+  let freed = 0;
+  for (const hash of gone) {
+    freed += stored.find(p => p.hash === hash)?.size || 0;
+    await deletePictureBlob(hash);
+    const ref = refFor(hash);
+    if (shown.has(ref)) { URL.revokeObjectURL(shown.get(ref)); shown.delete(ref); }
+  }
+  return { kept: stored.length - gone.length, deleted: gone.length, freedBytes: freed };
 }
