@@ -944,14 +944,13 @@ their folder opens, uploads send links, export embeds. Measured on Sora's PC,
 Linux app, Wayland: opening a heavy folder in Page mode ~4s -> 0.6s; a
 keystroke in Page mode 17ms; in Simple Note 115-136ms -> 32ms (with its card
 glow moved to its own layer, which was most of it). Owed from here:
-- **Pictures nobody uses any more** stay in the device's store: a sweep that
-  lists every reference in every folder and deletes the rest (absolute, run
-  now and then -- CLAUDE.md, recompute).
 - **Tasks** still keep pictures inline (shown as plain HTML when not edited).
 - **Image blocks** (step 3) and the screenshot/download paths (step 4).
-- **Wayland or XWayland on Linux** -- Sora's choice: native Wayland scrolls a
-  heavy folder at a steady 16-17ms, XWayland (today's, so KDE draws the
-  title bar) at 22-28ms with drops.
+- **Linux stays on XWayland** (Sora, 2026-11-17), so KDE draws the title
+  bar. What that costs, measured: scrolling a heavy folder 20-26ms a frame
+  against Wayland's 17; dragging a Canvas block 20-22ms against 17. If it is
+  ever reconsidered, the title bar would have to be drawn by the app.
+- **Unused pictures** are cleaned up (86fffa8).
 
 In order, each landing and released on its own:
 
