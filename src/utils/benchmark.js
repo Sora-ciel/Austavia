@@ -102,6 +102,18 @@ export async function runBenchmark(app, { modes = ['simple', 'page', 'default'],
     await frame();
     result.openMs = Math.round(performance.now() - start);
 
+    // The notes' pictures moved out of their writing (pictures by reference):
+    // waited for, and timed, the first time the folder opens.
+    if (report.convertMs === undefined) {
+      const c0 = performance.now();
+      for (let i = 0; i < 300; i += 1) {
+        const inline = [...document.querySelectorAll('.modes .ProseMirror')].some(el => (el.editor?.getHTML?.() || '').includes('data:image/'));
+        if (!inline) break;
+        await wait(100);
+      }
+      report.convertMs = Math.round(performance.now() - c0);
+    }
+
     // Scrolling: 2.5 seconds of steady scrolling, every frame's length.
     const scroller = [...document.querySelectorAll('.modes *')].find(el =>
       el.scrollHeight > el.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(el).overflowY));
@@ -146,28 +158,38 @@ export async function runBenchmark(app, { modes = ['simple', 'page', 'default'],
     await wait(300);
   }
 
-  // Simple Note again, with every shadow, filter and transition off: how much
-  // of a keystroke is painting effects rather than the writing itself.
+  // Simple Note again under a few style changes, to find what a keystroke's
+  // drawing time is spent on (2026-11-17).
   if (modes.includes('simple')) {
-    const style = document.createElement('style');
-    style.textContent = '.modes *, .modes *::before, .modes *::after { box-shadow: none !important; filter: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; transition: none !important; animation: none !important; outline: none !important; }';
-    document.head.appendChild(style);
-    app.setMode('simple');
-    await app.tick();
-    await frame();
-    const editor = document.querySelector('.modes .ProseMirror')?.editor;
-    if (editor) {
-      editor.commands.focus('end');
-      const keys = [];
-      for (let i = 0; i < 40; i += 1) {
-        const s0 = performance.now();
-        editor.commands.insertContent('a');
-        await frame();
-        keys.push(performance.now() - s0);
+    // Kept as a place to try style changes; the one that mattered, the
+    // card's glow on a layer of its own, is in SimpleNoteMode now.
+    const variants = {
+      noShadows: '.modes *, .modes *::before, .modes *::after { box-shadow: none !important; text-shadow: none !important; }'
+    };
+    report.simpleVariants = {};
+    for (const [name, css] of Object.entries(variants)) {
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+      app.setMode('simple');
+      await app.tick();
+      await frame();
+      await frame();
+      const editor = document.querySelector('.modes .ProseMirror')?.editor;
+      if (editor) {
+        editor.commands.focus('end');
+        const keys = [];
+        for (let i = 0; i < 30; i += 1) {
+          const s0 = performance.now();
+          editor.commands.insertContent('a');
+          await frame();
+          keys.push(performance.now() - s0);
+        }
+        report.simpleVariants[name] = stats(keys).median;
       }
-      report.simpleWithoutEffects = { keystrokeMs: stats(keys) };
+      style.remove();
+      await frame();
     }
-    style.remove();
   }
 
   // Memory across moving between folders: back and forth three times.
