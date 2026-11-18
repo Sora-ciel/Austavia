@@ -750,6 +750,12 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow-y: auto;
+    /* The scrollbar's room is kept whether or not the page scrolls. Without
+       it, a page that only started scrolling when the phone's keyboard came
+       up -- tapping into a text block -- gained a scrollbar, the balance
+       below gained its width, and everything moved a few pixels to the right
+       and back (reported 2026-11-17). */
+    scrollbar-gutter: stable;
     overflow-x: hidden;
     background: var(--canvas-inner-bg, #000);
     color: var(--mode-text-color, #fff);
