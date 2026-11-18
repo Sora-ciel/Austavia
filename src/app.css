@@ -363,6 +363,19 @@ input[type="range"].filled::-moz-range-track {
   );
 }
 
+/* A text field being typed in: its outline in its own writing's colour,
+   a pixel wider -- not the browser's blue ring, which no theme chose. Asked
+   2026-11-17 for Task mode's add-a-task field ("the highlight should be the
+   same color as the text, so that it basically widens the contour"); set
+   here once so every field does the same (CLAUDE.md, one of everything). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: currentColor;
+  box-shadow: 0 0 0 1px currentColor;
+}
+
 /* Re-enable for form elements */
 textarea,
 input,
