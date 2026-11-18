@@ -43,6 +43,13 @@ function openAudio() {
   return audio;
 }
 
+// Rings sounding through the context now; it rests when none is.
+let sounding = 0;
+function restAudio() {
+  if (sounding > 0) return;
+  try { audio?.suspend?.(); } catch { /* nothing to rest */ }
+}
+
 let primed = false;
 function primeOnFirstTouch() {
   if (primed || typeof window === 'undefined') return;
@@ -52,6 +59,12 @@ function primeOnFirstTouch() {
     if (audio?.state === 'running') {
       window.removeEventListener('pointerdown', wake, true);
       window.removeEventListener('keydown', wake, true);
+      // Allowed to sound now; quiet until something rings. A running context
+      // holds a stream open to the sound server, and the desktop shows that
+      // as the app making sound -- the speaker icon that stayed in the Linux
+      // task bar with nothing playing (found 2026-11-17 with pactl: an
+      // uncorked "Playback Stream" from the moment of the first click).
+      restAudio();
     }
   };
   window.addEventListener('pointerdown', wake, true);
@@ -152,6 +165,7 @@ function synthRing(seconds) {
   try {
     const audio = openAudio();
     if (!audio) return null;
+    sounding += 1;
     const master = audio.createGain();
     master.connect(audio.destination);
     const start = audio.currentTime + 0.02;
@@ -170,9 +184,17 @@ function synthRing(seconds) {
         tone.stop(at + BEEP_LENGTH);
       }
     }
-    return () => {
+    let ended = false;
+    const end = () => {
+      if (ended) return;
+      ended = true;
       try { master.gain.setValueAtTime(0, audio.currentTime); master.disconnect(); } catch { /* already stopped */ }
+      sounding = Math.max(0, sounding - 1);
+      restAudio();
     };
+    // Rests on its own at the end of the ring, if nobody stops it first.
+    setTimeout(end, (seconds + 1) * 1000);
+    return end;
   } catch {
     return null;
   }
