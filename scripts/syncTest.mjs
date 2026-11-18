@@ -258,6 +258,30 @@ try {
     if (!here.includes(ref)) throw new Error('the computer\'s own copy lost its reference');
   });
 
+  await scenario('a folder renamed on the phone while the computer added a task to it: one folder, both tasks', async () => {
+    // Reported 2026-11-17: "Home" renamed to "A Home" on the phone, the PC's
+    // tasks in "Home" lost -- the rename looked like a delete there.
+    await shared(phone, computer, 'Home');
+    await phone.rename('Home', 'A Home');
+    // Edited as the app edits: its settings, the folder's id with them, kept.
+    const renamed = await phone.read('A Home');
+    await phone.write('A Home', { ...renamed, blocks: [task('t', ['first', 'from phone']), note('n', '<p>hello</p>')] });
+    await phone.upload();
+    await phone.upload(); // the old name's delete goes once the new name is up
+    await computer.write('Home', folderOf([task('t', ['first']), note('n', '<p>hello from computer</p>')]));
+    await computer.pull();
+    const folders = await computer.folders();
+    if (folders.includes('Home')) throw new Error(`"Home" is still on the computer: ${folders.join(', ')}`);
+    if (!folders.includes('A Home')) throw new Error(`no "A Home" on the computer: ${folders.join(', ')}`);
+    expect(await copiesOf(computer, 'A Home'), [], 'copies on the computer');
+    const got = await computer.read('A Home');
+    expect(tasksIn(got), ['first', 'from phone'], 'the computer\'s tasks');
+    expect(noteIn(got), '<p>hello from computer</p>', 'the computer\'s note');
+    await computer.upload();
+    await phone.pull();
+    expect(noteIn(await phone.read('A Home')), '<p>hello from computer</p>', 'the phone has the computer\'s change');
+  });
+
   if (failures) {
     console.log('\nThe computer\'s sync log, last 60:');
     for (const e of (await computer.log()).slice(-60)) console.log(`  ${e.kind} [${e.folder}] ${e.message}`);

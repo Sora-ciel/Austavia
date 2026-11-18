@@ -5346,8 +5346,63 @@
    * across devices (utils/cloudBin.js). Returns 'normal' when the ordinary
    * sync should go on with it, anything else when it has been dealt with.
    */
-  async function applyCloudBin(name, entry, binned, localFolders) {
+  /**
+   * A folder gone from the cloud because another device renamed it: found by
+   * its id, which a rename carries (utils/folderIdentity.js), on a folder the
+   * cloud has and this device does not. Then this device's copy is renamed
+   * to match and merged with the cloud's, so what was changed here meanwhile
+   * stays.
+   *
+   * Reported 2026-11-17: "Home" renamed to "A Home" on the phone while the
+   * PC had its own changes in "Home" -- the PC took the rename as a delete,
+   * and its changes were lost. "The name of the folder should mix with the
+   * different tasks from the PC." Returns true when it was a rename.
+   */
+  async function followRename(oldName, remoteIndex, localFolders) {
+    const localPayload = await loadBlocks(oldName);
+    if (!localPayload) return false;
+    const id = folderIdOf(oldName, localPayload.modeSettings);
+    for (const [newName, entry] of Object.entries(remoteIndex || {})) {
+      // The new name may already be here, downloaded a moment ago as if it
+      // were a new folder: what is merged in is still this device's copy of
+      // the old name, against the cloud's copy of the new.
+      if (newName === oldName || entry?.deletedAt || entry?.binnedAt) continue;
+      const remotePayload = await loadRemoteFile(newName);
+      if (!remotePayload || folderIdOf(newName, remotePayload.modeSettings) !== id) continue;
+
+      // This device's copy under the new name, its own stamps kept so the
+      // merge can tell what changed where; the id goes with it.
+      const renamed = { ...localPayload, modeSettings: settingsForRename(localPayload.modeSettings, oldName) };
+      await saveBlocks(newName, renamed);
+      if (cloudBases[oldName]) cloudBases = { ...cloudBases, [newName]: cloudBases[oldName] };
+      if (cloudSeen[oldName]) noteCloudSeen(newName, cloudSeen[oldName]);
+      if (cloudSyncMemoryByFile[oldName]) rememberCloudSyncForFile(newName, cloudSyncMemoryByFile[oldName]);
+      const wasOpen = currentSaveName === oldName;
+      await deleteBlocks(oldName);
+      if (wasOpen) { currentSaveName = newName; persistLastSaveName(newName); }
+      savedList = await listSavedBlocks();
+      logSync('save', newName, `renamed from "${oldName}" on another device, so renamed here too`);
+
+      const remoteAt = entry?.modifiedAt || entry?.updatedAt;
+      const merged = await mergeWithCloud(newName, renamed, remotePayload, remoteAt);
+      if (!merged) await keepBothVersions(newName, renamed, entry);
+      if (wasOpen) await remountCurrentSaveIfLoaded();
+      return true;
+    }
+    return false;
+  }
+
+  async function applyCloudBin(name, entry, binned, localFolders, remoteIndex = null) {
     const localStamp = localFolders.includes(name) ? stampOf(await loadSaveMeta(name)) : null;
+    // Deleted in the cloud, here on this device: a rename elsewhere is
+    // looked for first, whatever the times say. Changed here after the
+    // delete, the folder used to be kept as a folder of its own -- the rename
+    // undone, the same folder twice ("A home" and "A Home", 2026-11-17).
+    if (remoteIndex && localStamp !== null && Number(entry?.deletedAt) > 0
+      && await followRename(name, remoteIndex, localFolders)) {
+      await refreshBin();
+      return 'renamed';
+    }
     const binEntry = newestBinEntry(binned, name);
     const action = cloudBinAction({ entry, localStamp, binEntry });
     if (action === 'normal' || action === 'none') return action;
@@ -5365,11 +5420,13 @@
           logSync('download', name, action === 'refresh-bin' ? 'a newer copy of a folder in the bin, kept in the bin' : 'in the bin on another device, so in the bin here too');
         }
       } else if (action === 'delete-local') {
-        // Deleted for ever elsewhere. A kept copy goes to Advanced settings
-        // first, so a delete nobody here asked for can still be undone.
+        // Deleted for ever elsewhere. A kept copy goes to Advanced settings,
+        // so a delete nobody here asked for can still be undone -- written
+        // after the folder is removed: removing a folder removes its kept
+        // copies, and keeping it first lost it at once (2026-11-17).
         const payload = await loadBlocks(name);
-        await keepReplacedCopy(name, payload, { blocks: [] }, 'deleted for ever on another device');
         await removeLocalFolder(name);
+        await keepReplacedCopy(name, payload, { blocks: [] }, 'deleted for ever on another device');
         logSync('save', name, 'deleted for ever on another device, so deleted here');
       } else if (action === 'drop-bin-entry') {
         for (const item of binned.filter(item => item.name === name)) await deleteBinEntry(item.id);
@@ -5949,7 +6006,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       if (leaveInCloud(fileName, { owedDeletes, localFolders: savedList })) continue;
       // In the bin, here or elsewhere, or deleted for ever: the bin decides.
       pullAt(`checking "${fileName}"`);
-      if (await applyCloudBin(fileName, remoteMeta, binEntries, savedList) !== 'normal') continue;
+      if (await applyCloudBin(fileName, remoteMeta, binEntries, savedList, remoteIndex) !== 'normal') continue;
       // The stamp, not the folder. This used to open every folder in the
       // account on every tick -- hydrating every attachment into base64 -- to
       // compare two integers.
@@ -6529,7 +6586,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       const owedDeletes = readOwedDeletes();
       for (const remoteName of remoteNames) {
         if (leaveInCloud(remoteName, { owedDeletes, localFolders: localNames })) continue;
-        if (await applyCloudBin(remoteName, remoteIndex[remoteName], binEntries, await listSavedBlocks()) !== 'normal') continue;
+        if (await applyCloudBin(remoteName, remoteIndex[remoteName], binEntries, await listSavedBlocks(), remoteIndex) !== 'normal') continue;
         const mine = localMeta[remoteName];
         const remoteAt = Number(remoteIndex[remoteName]?.modifiedAt || remoteIndex[remoteName]?.updatedAt || 0);
         const localAt = Number(mine?.modifiedAt || mine?.updatedAt || 0);
