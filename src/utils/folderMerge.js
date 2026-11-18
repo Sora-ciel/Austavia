@@ -91,6 +91,48 @@ function blockFingerprint(block) {
   return fingerprint(rest);
 }
 
+/**
+ * A block's fields, fingerprinted one by one, as a save compares them: so two
+ * devices that changed different fields of one block -- its position on one,
+ * its writing on the other -- are merged rather than called a conflict.
+ * Asked 2026-11-17 after exactly that: a text block moved on the PC while its
+ * text was pasted on the phone, and the text went to a copy.
+ */
+function fieldPrints(block) {
+  const { historyTriggers, ...rest } = comparableBlock(block);
+  const out = {};
+  for (const [key, value] of Object.entries(rest)) out[key] = fingerprint(value);
+  return out;
+}
+
+/**
+ * One block changed on both sides, merged field by field from its fields as
+ * they were (`baseFields`). Returns the merged block, whether it holds
+ * anything of this device's, and the fields changed on both differently.
+ */
+function mergeBlockFields(baseFields, local, remote) {
+  const localFields = fieldPrints(local);
+  const remoteFields = fieldPrints(remote);
+  const merged = { ...remote };
+  const clashes = [];
+  let fromLocal = false;
+  for (const key of new Set([...Object.keys(localFields), ...Object.keys(remoteFields), ...Object.keys(baseFields)])) {
+    const l = localFields[key];
+    const r = remoteFields[key];
+    if (l === r) continue;
+    if (r === baseFields[key]) {
+      // Changed here only: this device's field.
+      if (l === undefined) delete merged[key];
+      else merged[key] = local[key];
+      fromLocal = true;
+    } else if (l !== baseFields[key]) {
+      clashes.push(key);
+    }
+    // Otherwise changed on the other device only: its field, already there.
+  }
+  return { block: merged, fromLocal, clashes };
+}
+
 function settingFingerprint(key, value) {
   // The folder's id is given by a rename; it is not a change to anything.
   if (key === 'folder' && value && typeof value === 'object') {
@@ -118,8 +160,12 @@ export function baseOf(payload) {
     settings[key] = settingFingerprint(key, value);
   }
   const parts = {};
-  for (const [id, block] of blocks) parts[id] = blockFingerprint(block);
-  return { blocks: parts, settings, orders: fingerprint(payload?.modeOrders || {}) };
+  const fields = {};
+  for (const [id, block] of blocks) {
+    parts[id] = blockFingerprint(block);
+    fields[id] = fieldPrints(block);
+  }
+  return { blocks: parts, fields, settings, orders: fingerprint(payload?.modeOrders || {}) };
 }
 
 /**
@@ -159,6 +205,16 @@ export function mergeFolder({ base, local, remote }) {
   let fromLocal = false;
   const blocks = [];
   const place = (id, verdict) => {
+    // Changed on both: field by field, where the fields as they were are
+    // known (bases written from 2026-11-17 on) and both still have it.
+    if (verdict.conflict && base.fields?.[id] && localBlocks.has(id) && remoteBlocks.has(id)) {
+      const fields = mergeBlockFields(base.fields[id], localBlocks.get(id), remoteBlocks.get(id));
+      if (!fields.clashes.length) {
+        if (fields.fromLocal) fromLocal = true;
+        blocks.push(fields.block);
+        return;
+      }
+    }
     if (verdict.conflict) conflicts.push(`block ${id}`);
     const block = verdict.take === 'local' ? localBlocks.get(id) : remoteBlocks.get(id);
     if (verdict.take === 'local') fromLocal = true;

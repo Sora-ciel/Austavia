@@ -161,9 +161,43 @@ describe('what opening a folder adds to a block is no change', () => {
     assert.deepEqual(out.payload.blocks[0].tasks, ['a', 'b']);
   });
 
-  it('a colour somebody picked is still a change', () => {
+  it('a colour somebody picked is still a change -- kept beside the other device\'s task, field by field', () => {
     const picked = { ...START, blocks: [{ ...task('t', ['a']), bgColor: '#f00' }, START.blocks[1]] };
     const phone = { ...START, blocks: [task('t', ['a', 'b']), START.blocks[1]] };
-    assert.deepEqual(mergeFolder({ base: baseOf(START), local: picked, remote: phone }).conflicts, ['block t']);
+    const out = mergeFolder({ base: baseOf(START), local: picked, remote: phone });
+    assert.deepEqual(out.conflicts, []);
+    assert.equal(out.payload.blocks[0].bgColor, '#f00');
+    assert.deepEqual(out.payload.blocks[0].tasks, ['a', 'b']);
+  });
+});
+
+// Asked 2026-11-17, after a text block was moved on the PC while its text was
+// pasted on the phone, and the text went to a "(from phone ...)" copy.
+describe('one block changed on both, in different fields, is merged field by field', () => {
+  const block = (extra = {}) => ({ id: 'b', type: 'text', content: '', position: { x: 100, y: 100 }, ...extra });
+  const start = { blocks: [block()], modeSettings: {}, modeOrders: {} };
+
+  it('moved on one device, written in on the other: both kept, no copy', () => {
+    const pc = { ...start, blocks: [block({ position: { x: 1030, y: 440 } })] };
+    const phone = { ...start, blocks: [block({ content: '<p>pasted text</p>' })] };
+    const out = mergeFolder({ base: baseOf(start), local: phone, remote: pc });
+    assert.deepEqual(out.conflicts, []);
+    assert.deepEqual(out.payload.blocks[0].position, { x: 1030, y: 440 });
+    assert.equal(out.payload.blocks[0].content, '<p>pasted text</p>');
+    assert.equal(out.fromLocal, true);
+  });
+
+  it('the same field changed on both is still the name thing', () => {
+    const pc = { ...start, blocks: [block({ content: '<p>pc</p>' })] };
+    const phone = { ...start, blocks: [block({ content: '<p>phone</p>' })] };
+    assert.deepEqual(mergeFolder({ base: baseOf(start), local: phone, remote: pc }).conflicts, ['block b']);
+  });
+
+  it('a fingerprint from before fields were kept: the block as a whole, as before', () => {
+    const old = baseOf(start);
+    delete old.fields;
+    const pc = { ...start, blocks: [block({ position: { x: 1, y: 1 } })] };
+    const phone = { ...start, blocks: [block({ content: '<p>x</p>' })] };
+    assert.deepEqual(mergeFolder({ base: old, local: phone, remote: pc }).conflicts, ['block b']);
   });
 });

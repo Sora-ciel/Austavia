@@ -282,6 +282,28 @@ try {
     expect(noteIn(await phone.read('A Home')), '<p>hello from computer</p>', 'the phone has the computer\'s change');
   });
 
+  await scenario('a note moved on the computer while text was pasted into it on the phone: both kept, no copy', async () => {
+    // Reported 2026-11-17 in Arial Staging: the text went to a copy.
+    const folder = 'Moved and written';
+    await shared(phone, computer, folder);
+    const start = await phone.read(folder);
+    const withText = start.blocks.map(b => (b.id === 'n' ? { ...b, content: '<p>pasted on the phone</p>' } : b));
+    await phone.write(folder, { ...start, blocks: withText });
+    const there = await computer.read(folder);
+    const moved = there.blocks.map(b => (b.id === 'n' ? { ...b, position: { x: 1030, y: 440 } } : b));
+    await computer.write(folder, { ...there, blocks: moved });
+    await computer.upload();
+    await phone.upload(); // finds the cloud moved: merges
+    await phone.upload(); // and sends the merge
+    await computer.pull();
+    expect(await copiesOf(phone, folder), [], 'copies on the phone');
+    for (const dev of [phone, computer]) {
+      const n = (await dev.read(folder)).blocks.find(b => b.id === 'n');
+      expect(n.content, '<p>pasted on the phone</p>', `${dev.name}'s text`);
+      expect([n.position?.x, n.position?.y], [1030, 440], `${dev.name}'s position`);
+    }
+  });
+
   if (failures) {
     console.log('\nThe computer\'s sync log, last 60:');
     for (const e of (await computer.log()).slice(-60)) console.log(`  ${e.kind} [${e.folder}] ${e.message}`);
