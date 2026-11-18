@@ -9,6 +9,22 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
+
+- [ ] **Phone, Page mode: renaming the folder from the page title** seems not
+  to work by Enter or by leaving the field -- it does work, but very slowly
+  and nothing shows that it happened.
+- [ ] **Task mode: the add-a-task field's focus highlight is blue**; it should
+  be the writing's colour, widening the outline.
+- [ ] **Phone: tapping into a text block shifts the whole page a few pixels to
+  the right**, back when leaving it; and the folder's title cannot be changed.
+- [ ] **Linux: the speaker icon stays after pausing** -- the first fix (letting
+  go of the paused song) did not do it. Found 2026-11-17 with `pactl list
+  sink-inputs`: the paused song's stream is corked; a second, unnamed
+  "Playback Stream" is uncorked all the time, which is what KDE shows. A Web
+  Audio context makes such a stream (utils/ringTone.js opens one); find when
+  it is opened and close or suspend it when nothing rings.
+
 ## Where we left off (2026-11-13) -- read this first
 
 Live: 0.8.701 everywhere (apps, austavia.app), the delete-account functions on
