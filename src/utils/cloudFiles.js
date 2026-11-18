@@ -139,5 +139,8 @@ export async function embedCloudFiles(payload, { audio = false, pictures = false
       console.warn('Could not fetch a picture to keep with the folder:', link, error);
     }
   }
-  return { payload: map.size ? withLinksReplaced(payload, map) : payload, embedded: map.size, failed, reasons };
+  // `map` (link -> its bytes as a data: URL) too, for applying the same to the
+  // folder as it is later rather than to this copy -- a rename's background
+  // copy of its pictures (App.svelte, copyPicturesAfterRename).
+  return { payload: map.size ? withLinksReplaced(payload, map) : payload, embedded: map.size, failed, reasons, map };
 }

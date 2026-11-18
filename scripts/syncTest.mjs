@@ -304,6 +304,33 @@ try {
     }
   });
 
+  await scenario('a folder with a picture renamed on the phone: the name changes at once, the picture still shows everywhere', async () => {
+    // Asked 2026-11-17: renaming on the phone was slow and showed nothing.
+    const dataUrl = await phone.page.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 30; c.height = 30;
+      const g = c.getContext('2d'); g.fillStyle = '#e5484d'; g.fillRect(0, 0, 30, 30);
+      return c.toDataURL('image/png');
+    });
+    const ref = await phone.storePicture(dataUrl);
+    await phone.write('Pictured', folderOf([note('n', `<p><img src="${ref}"></p>`)]));
+    await phone.upload();
+    const t0 = Date.now();
+    await phone.rename('Pictured', 'Pictured renamed');
+    const took = Date.now() - t0;
+    if (took > 3000) throw new Error(`the rename took ${took}ms`);
+    // The pictures follow in the background; then the uploads.
+    await sleep(3000);
+    await phone.upload();
+    await phone.upload();
+    await computer.pull();
+    const folders = await computer.folders();
+    if (folders.includes('Pictured')) throw new Error('the old name is still on the computer');
+    const html = noteIn(await computer.read('Pictured renamed')) || '';
+    const link = (html.match(/src="([^"]+)"/) || [])[1] || '';
+    const status = await computer.page.evaluate(async src => (await fetch(src.replace(/&amp;/g, '&'))).status, link);
+    if (status !== 200) throw new Error(`the picture does not load after the rename (${status}): ${link.slice(0, 90)}`);
+  });
+
   if (failures) {
     console.log('\nThe computer\'s sync log, last 60:');
     for (const e of (await computer.log()).slice(-60)) console.log(`  ${e.kind} [${e.folder}] ${e.message}`);

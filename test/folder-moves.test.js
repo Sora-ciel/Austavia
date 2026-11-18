@@ -44,3 +44,23 @@ describe('an old name that could never be in the cloud', () => {
     assert.deepEqual(deletesToRun({ pending: [name, 'Damn'], localFolders: ['Renamed'] }), ['Damn']);
   });
 });
+
+// Asked 2026-11-17: renaming from the page title on the phone "is very slow,
+// it doesn't show when you do it". The name changes at once; the pictures
+// are copied after, and the old name is not deleted from the cloud until then.
+import { readRenameCopies, withRenameCopy, withoutRenameCopy } from '../src/utils/folderMoves.js';
+
+describe('a rename shows at once, its pictures follow', () => {
+  it('the old name is not deleted from the cloud while its pictures are still being copied', () => {
+    assert.deepEqual(deletesToRun({ pending: ['Home'], localFolders: ['A Home'], waiting: ['Home'] }), []);
+    assert.deepEqual(deletesToRun({ pending: ['Home'], localFolders: ['A Home'], waiting: [] }), ['Home']);
+  });
+
+  it('a copy cut short by the app closing is remembered, and forgotten once done', () => {
+    let list = withRenameCopy([], 'Home', 'A Home');
+    list = readRenameCopies(JSON.stringify(list));
+    assert.deepEqual(list, [{ from: 'Home', to: 'A Home' }]);
+    assert.deepEqual(withoutRenameCopy(list, 'Home'), []);
+    assert.deepEqual(readRenameCopies('junk'), []);
+  });
+});

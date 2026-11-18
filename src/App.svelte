@@ -91,11 +91,11 @@
   import { binEntryOf, sortBin, restoreName, leaveInCloud, cloudDeletesAfterEmptying } from './utils/folderBin.js';
   import { cloudBinAction, newestBinEntry, stampOf, syncFingerprint } from './utils/cloudBin.js';
   import { uniqueName, buildExport, readExport, planImport } from './utils/folderTransfer.js';
-  import { embedCloudFiles } from './utils/cloudFiles.js';
+  import { embedCloudFiles, withLinksReplaced } from './utils/cloudFiles.js';
   import { extrasOf, withExtras, lookOf } from './utils/themeExtras.js';
   import { solidColor } from './utils/cssColor.js';
   import { deliverFile, isNativeAndroid as onAndroidApp, lastResult as deliveryLastResult } from './utils/fileDelivery.js';
-  import { PENDING_DELETES_KEY, readPending, withPending, settlePending, deletesToRun } from './utils/folderMoves.js';
+  import { PENDING_DELETES_KEY, readPending, withPending, settlePending, deletesToRun, RENAME_COPIES_KEY, readRenameCopies, withRenameCopy, withoutRenameCopy } from './utils/folderMoves.js';
   import { reconcileThemes } from './utils/themeSync.js';
   import {
     themeKey,
@@ -6928,6 +6928,58 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    * one, and links into it would break. Offline, that fetch fails, and the
    * rename waits rather than risk them.
    */
+  // Renames whose pictures are still being copied to the new name (utils/
+  // folderMoves.js): kept on the device, so a copy cut short carries on.
+  function readRenameCopiesStored() {
+    try { return readRenameCopies(localStorage.getItem(RENAME_COPIES_KEY)); } catch { return []; }
+  }
+  function writeRenameCopies(list) {
+    try { localStorage.setItem(RENAME_COPIES_KEY, JSON.stringify(list)); } catch { /* tried again next launch */ }
+  }
+
+  /**
+   * A renamed folder's cloud pictures, copied to its new name: fetched, then
+   * put into the folder as it is by then (whatever was done meanwhile stays),
+   * so the next upload sends them to the new name's place. Until then the old
+   * name is not deleted from the cloud. A copy that cannot finish -- offline --
+   * is tried again at the next launch.
+   */
+  const copyingRenames = new Set();
+  async function copyPicturesAfterRename(from, to) {
+    if (copyingRenames.has(from)) return;
+    copyingRenames.add(from);
+    try {
+      if (!(await listSavedBlocks()).includes(to)) {
+        writeRenameCopies(withoutRenameCopy(readRenameCopiesStored(), from));
+        return;
+      }
+      const { map, failed } = await embedCloudFiles(await loadBlocks(to), { audio: true });
+      if (failed) {
+        logSync('error', to, `${failed} picture${failed === 1 ? '' : 's'} could not be copied to the new name yet; tried again later`);
+        return;
+      }
+      if (map?.size) {
+        if (currentSaveName === to) {
+          const next = withLinksReplaced({ blocks, modeOrders, modeSettings }, map);
+          blocks = next.blocks;
+          modeSettings = next.modeSettings;
+          await persistAutosave(blocks, modeOrders, modeSettings, { immediate: true });
+        } else {
+          const stored = await loadBlocks(to);
+          const next = withLinksReplaced(stored, map);
+          await saveBlocks(to, { blocks: next.blocks, modeOrders: next.modeOrders, modeSettings: next.modeSettings });
+        }
+        autoSyncDirty = true;
+        logSync('save', to, `pictures copied to the new name (${map.size})`);
+      }
+      writeRenameCopies(withoutRenameCopy(readRenameCopiesStored(), from));
+    } catch (error) {
+      logSync('error', to, 'the pictures could not be copied to the new name yet; tried again later', { error: String(error?.message || error) });
+    } finally {
+      copyingRenames.delete(from);
+    }
+  }
+
   async function renameFolder(event) {
     const to = String(event.detail?.to ?? '').trim();
     const from = currentSaveName;
@@ -6947,21 +6999,21 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     try {
       await flushWaitingSave();
       const current = await loadBlocks(from);
-      const { payload, failed } = await embedCloudFiles(current, { audio: true });
-      if (failed) {
-        await appAlert(`${failed} picture${failed === 1 ? '' : 's'} in this folder could not be fetched, so it was not renamed. Try again when online.`);
-        return;
-      }
-      // The same folder under a new name: its id goes with it, so a nest's
-      // link to it still leads to it (utils/folderIdentity.js).
-      await saveBlocks(to, { blocks: payload.blocks, modeOrders: payload.modeOrders, modeSettings: settingsForRename(payload.modeSettings, from) });
+      // The same folder under a new name, at once: its pictures still show
+      // from the old name's place in the cloud, and are copied to the new one
+      // after (copyPicturesAfterRename). Fetching them all first is what made
+      // a rename on the phone slow and invisible (asked 2026-11-17). Its id
+      // goes with it, so a nest's link still leads to it (folderIdentity.js).
+      await saveBlocks(to, { blocks: current.blocks, modeOrders: current.modeOrders, modeSettings: settingsForRename(current.modeSettings, from) });
       await deleteBlocks(from);
       writeOwedDeletes(withPending(readOwedDeletes(), from));
+      writeRenameCopies(withRenameCopy(readRenameCopiesStored(), from, to));
       savedList = await listSavedBlocks();
       persistLastSaveName(to);
       logSync('save', to, `renamed from "${from}"`);
       autoSyncDirty = true;
       await load(to);
+      copyPicturesAfterRename(from, to);
     } catch (error) {
       console.error('Rename failed:', error);
       await appAlert(`The folder could not be renamed: ${error?.message || error}`);
@@ -7087,7 +7139,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
    */
   async function payOwedDeletes(uploadFailed) {
     let owed = settlePending(readOwedDeletes(), savedList);
-    for (const name of deletesToRun({ pending: owed, localFolders: savedList, uploadFailed })) {
+    const waiting = readRenameCopiesStored().map(item => item.from);
+    for (const name of deletesToRun({ pending: owed, localFolders: savedList, uploadFailed, waiting })) {
       try {
         await deleteRemoteFile(name);
         owed = owed.filter(item => item !== name);
@@ -7466,6 +7519,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
   onMount(async () => {
     setTimeout(cleanUpUnusedPictures, 90 * 1000);
+    // Renames whose pictures were still being copied when the app closed.
+    setTimeout(() => { for (const item of readRenameCopiesStored()) copyPicturesAfterRename(item.from, item.to); }, 30 * 1000);
     setInterval(cleanUpUnusedPictures, 12 * 60 * 60 * 1000);
     installSyncTestHook();
     benchmarkIfAsked();

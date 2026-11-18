@@ -54,8 +54,41 @@ export function skipDownload(name, list) {
   return list.includes(name);
 }
 
-/** What to delete from the cloud now: nothing while an upload is failing. */
-export function deletesToRun({ pending = [], localFolders = [], uploadFailed = false } = {}) {
+/**
+ * What to delete from the cloud now: nothing while an upload is failing, and
+ * no old name whose pictures are still being copied to the new one (`waiting`)
+ * -- the renamed folder still shows them from the old name's place until then.
+ */
+export function deletesToRun({ pending = [], localFolders = [], uploadFailed = false, waiting = [] } = {}) {
   if (uploadFailed) return [];
-  return settlePending(pending, localFolders);
+  const held = new Set(waiting);
+  return settlePending(pending, localFolders).filter(name => !held.has(name));
+}
+
+/**
+ * Renames whose pictures are still being copied to the new name, kept on the
+ * device ([{ from, to }]) so a copy cut short by the app closing carries on.
+ *
+ * Asked 2026-11-17: renaming a folder from its page title on the phone "seems
+ * to actually work but weirdly it's very slow, it doesn't show when you do
+ * it" -- every picture was fetched again before the name changed. Now the
+ * name changes at once and the pictures follow (App.svelte).
+ */
+export const RENAME_COPIES_KEY = 'austavia.renameCopies';
+
+export function readRenameCopies(raw) {
+  try {
+    const list = JSON.parse(raw || '[]');
+    return Array.isArray(list) ? list.filter(item => item && typeof item.from === 'string' && typeof item.to === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function withRenameCopy(list, from, to) {
+  return [...list.filter(item => item.from !== from), { from, to }];
+}
+
+export function withoutRenameCopy(list, from) {
+  return list.filter(item => item.from !== from);
 }
