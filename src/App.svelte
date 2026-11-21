@@ -1,7 +1,8 @@
 <script>
   import { followTouch } from './utils/touchFollow.js';
   import { onMount, onDestroy, tick, setContext } from 'svelte';
-  import { writable } from 'svelte/store';
+  import { writable, get } from 'svelte/store';
+  import { foldersWithNests } from './utils/nestedExport.js';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
   import { splitDrop } from './utils/dropKinds.js';
   import { readLayout, writeLayout, offeredModes, stripLayout, stripPick, gestureStart, inBarBand, isPhoneShape } from './utils/controlsLayout.js';
@@ -6729,8 +6730,19 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   let importState = null; // { file, fileName }
   let importBusy = false;
 
-  function exportJSON() {
+  // How many levels of nests the open folder has, for the export to offer
+  // (utils/nestedExport.js); null while it is counted.
+  let exportNestDepth = null;
+  async function exportJSON() {
     exportDialogOpen = true;
+    exportNestDepth = null;
+    try {
+      await flushWaitingSave();
+      const { deepest } = await foldersWithNests({ start: [currentSaveName], depth: Infinity, load: loadBlocks, directory: get(folderDirectory) });
+      exportNestDepth = deepest;
+    } catch {
+      exportNestDepth = 0;
+    }
   }
 
   /** An edit still waiting out its debounce, written before a folder is read whole. */
@@ -6750,11 +6762,15 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   });
 
   async function runExport(event) {
-    const { scope, settings, pictures, currentTheme, customThemes: withCustomThemes, music } = event.detail || {};
+    const { scope, settings, pictures, currentTheme, customThemes: withCustomThemes, music, nestDepth = 0 } = event.detail || {};
     exportBusy = true;
     try {
       await flushWaitingSave();
-      const names = scope === 'all' ? [...savedList] : [currentSaveName].filter(Boolean);
+      // This folder, and the folders its nests lead to, as many levels down
+      // as was chosen (utils/nestedExport.js).
+      const names = scope === 'all'
+        ? [...savedList]
+        : (await foldersWithNests({ start: [currentSaveName].filter(Boolean), depth: nestDepth, load: loadBlocks, directory: get(folderDirectory) })).names;
       const folders = [];
       let failed = 0;
       for (const name of names) {
@@ -6789,7 +6805,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           }
         }
       });
-      const baseName = scope === 'all' ? 'Austavia folders' : currentSaveName || 'Austavia';
+      const baseName = scope === 'all' || names.length > 1 ? (scope === 'all' ? 'Austavia folders' : `${currentSaveName} and nested`) : currentSaveName || 'Austavia';
       if (music) {
         // With the music, the file is a zip: the folders as they would have
         // been, beside the audio -- see utils/musicTransfer.js.
@@ -9281,6 +9297,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   <ExportDialog
     currentFolder={currentSaveName}
     folderCount={savedList.length}
+    nestLevels={exportNestDepth}
     themeCount={customThemes.length}
     currentThemeName={activeTheme?.name || 'Your unsaved theme'}
     {musicLibrary}
