@@ -25,6 +25,17 @@ Built and seen working in a browser; to confirm on the phone:
   (d55a746).
 - [x] Page mode on a computer: in edit mode a block is moved by holding it
   anywhere; the dots always show there (ae07879).
+- [x] The "Syncing with the cloud" pop-up, and the hold on editing, come
+  off after 5 s whatever the sync is doing (ce5ee48). The "could not sync"
+  notice with its Dismiss button is left as it was -- not asked.
+- [x] Page mode: the clock's ⋯ sits left of its alarm corner (ba76721).
+- [x] Export: this folder with its nests' folders -- none, 1 level, up to a
+  chosen level, all (b0865a9). Seen in the dialog; the file itself not
+  downloaded in testing.
+- [ ] **Owed, found doing the above**: an export without "Folder settings"
+  leaves out each folder's hidden id, so after an import a nest's links
+  find their folders only where the id was the old name-based one. Carry
+  `modeSettings.folder.id` whatever is ticked.
 
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 
