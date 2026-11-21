@@ -3,7 +3,8 @@
   import BlockContextMenu from './BlockContextMenu.svelte';
   import { fileNameForMedia } from '../utils/downloadNaming.js';
   import CropEditor from './CropEditor.svelte';
-  import { croppedBlob, blobToDataUrl } from '../utils/cropImage.js';
+  import { croppedBlob } from '../utils/cropImage.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
   import { deliverFile, isNativeAndroid } from '../utils/fileDelivery.js';
 
   // Array of image/video URLs to display
@@ -287,7 +288,7 @@
     try {
       const blob = await croppedBlob(src, crop);
       if (id === 'save') await saveBlob(blob, true);
-      else if (id === 'newImage') dispatch('newImage', { src: await blobToDataUrl(blob) });
+      else if (id === 'newImage') dispatch('newImage', { src: await readAsDataUrl(blob) });
     } catch (error) {
       console.warn('Could not crop this picture:', error);
     }

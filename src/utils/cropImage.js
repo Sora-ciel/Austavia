@@ -60,12 +60,3 @@ export async function croppedBlob(src, crop) {
   return new Promise((resolve, reject) => canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('could not draw the crop'))), 'image/png'));
 }
 
-/** A blob as a data: address, to store inside a new picture block as any pasted picture is. */
-export function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}

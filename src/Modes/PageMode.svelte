@@ -47,6 +47,7 @@
   } from '../utils/pageLayout.js';
   import { createLongPress } from '../utils/longPress.js';
   import { idleScrollbar } from '../utils/idleScrollbar.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -425,21 +426,17 @@
       pictureInput.click();
     }
   }
-  function onPictureChosen(event) {
+  async function onPictureChosen(event) {
     const file = event.target.files?.[0];
     const target = pictureFor;
     pictureFor = null;
     if (!file || !target) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const src = reader.result;
-      if (target.replace) {
-        dispatch('update', { id: target.replace, src, resolvedSrc: null, changedKeys: ['src', 'resolvedSrc'], pushToHistory: true, bumpVersion: true });
-      } else {
-        dispatch('addBlock', { type: 'image', afterId: target.afterId, fields: { src } });
-      }
-    };
-    reader.readAsDataURL(file);
+    const src = await readAsDataUrl(file);
+    if (target.replace) {
+      dispatch('update', { id: target.replace, src, resolvedSrc: null, changedKeys: ['src', 'resolvedSrc'], pushToHistory: true, bumpVersion: true });
+    } else {
+      dispatch('addBlock', { type: 'image', afterId: target.afterId, fields: { src } });
+    }
   }
 
   // Moving: hold the handle and drag. Where it lands is decided by

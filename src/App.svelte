@@ -227,6 +227,7 @@
   import { coverForNotification } from './utils/coverArtwork.js';
   import { shouldShowNotification, dismissalFor } from './utils/notificationPresence.js';
   import { notePictureArrived, NOTHING_YET } from './utils/picturePasteReport.js';
+  import { readAsDataUrl } from './utils/dataUrl.js';
   const BLOCK_THEME_STORAGE_KEY = 'blockTheme';
   const BLOCK_THEME_ID_STORAGE_KEY = 'blockThemeId';
   const CUSTOM_THEMES_STORAGE_KEY = 'customThemes';
@@ -4906,15 +4907,6 @@
 
 
 
-  function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
-  }
-
   /**
    * Whether a picture going into the writing fits in what is left.
    *
@@ -5003,7 +4995,7 @@
     if (verdict.message) syncFailureNotice = verdict.message;
     pendingStorageBytes += Math.max(0, Number(file.size) || 0);
 
-    const src = await readFileAsDataUrl(file);
+    const src = await readAsDataUrl(file);
     if (typeof src !== 'string') return;
 
     const isVideo = file.type.startsWith('video/');
@@ -5059,7 +5051,7 @@
       let insertAt = at?.pos ?? null;
       for (const file of mediaFiles.filter(f => f.type?.startsWith('image/'))) {
         try {
-          const src = await readFileAsDataUrl(file);
+          const src = await readAsDataUrl(file);
           if (typeof src !== 'string') continue;
           const chain = writing.editor.chain().focus();
           if (typeof insertAt === 'number') chain.setTextSelection(insertAt);

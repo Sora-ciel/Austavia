@@ -22,6 +22,7 @@
     pictureAction
   } from '../utils/clipboardPicture.js';
   import { usesPortraitBackground, noteImageFilterCss, backgroundLayerStyle } from '../utils/modeBackground.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   const MOBILE_BREAKPOINT = 1024;
 
@@ -67,20 +68,6 @@
   let noteEditor;
   let pictureInput;
 
-  /** A blob as something the editor can hold. */
-  function asDataUrl(blob) {
-    return new Promise((resolve) => {
-      try {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(blob);
-      } catch {
-        resolve('');
-      }
-    });
-  }
-
   /**
    * The clipboard first, the file picker if it will not oblige.
    *
@@ -98,7 +85,7 @@
     if (canRead) {
       try {
         const found = pictureAmong(await clipboard.read());
-        if (found) src = await asDataUrl(await found.item.getType(found.type));
+        if (found) src = await readAsDataUrl(await found.item.getType(found.type));
       } catch {
         // Refused, unsupported, or nothing readable. All the same from here.
         failed = true;
@@ -133,7 +120,7 @@
     // Cleared so that choosing the same file twice in a row still counts.
     if (event.currentTarget) event.currentTarget.value = '';
     if (!file || !String(file.type || '').startsWith('image/')) return;
-    const src = await asDataUrl(file);
+    const src = await readAsDataUrl(file).catch(() => '');
     if (src && await roomForPicture(src)) noteEditor?.insertPicture(src);
   }
 

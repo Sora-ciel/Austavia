@@ -11,6 +11,7 @@
   import BlockShell from './BlockShell.svelte';
   import { normalizeCrop, croppedAspect } from '../utils/crop.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   const appDialogs = getContext('appDialogs');
   const dispatch = createEventDispatcher();
@@ -74,26 +75,21 @@
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      src = reader.result;
-      resolvedSrc = null;
-      attachmentRequiresAuth = false;
-      attemptedInitialAutoFit = true;
-
-      if (!file.type.startsWith('video/')) {
-        const img = new Image();
-        img.src = src;
-        img.onload = () => fitTo(img.width, img.height, ['src', 'size']);
-      } else {
-        const videoEl = document.createElement('video');
-        videoEl.src = src;
-        videoEl.onloadedmetadata = () => fitTo(videoEl.videoWidth, videoEl.videoHeight, ['src', 'size']);
-      }
-    };
-
-    reader.readAsDataURL(file);
     e.target.value = '';
+    src = await readAsDataUrl(file);
+    resolvedSrc = null;
+    attachmentRequiresAuth = false;
+    attemptedInitialAutoFit = true;
+
+    if (!file.type.startsWith('video/')) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => fitTo(img.width, img.height, ['src', 'size']);
+    } else {
+      const videoEl = document.createElement('video');
+      videoEl.src = src;
+      videoEl.onloadedmetadata = () => fitTo(videoEl.videoWidth, videoEl.videoHeight, ['src', 'size']);
+    }
   }
 
   function getFittedMediaSize(width, height) {

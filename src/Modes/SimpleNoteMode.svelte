@@ -34,6 +34,7 @@
   import { galleryOf } from '../utils/gallery.js';
   import { cropBlockUpdate } from '../utils/cropImage.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -488,28 +489,24 @@
     input.click();
   }
 
-  function handleImageChange(event, block) {
+  async function handleImageChange(event, block) {
     ensureFocus(block.id);
     const file = event.target.files?.[0];
     if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateBlock(
-        block.id,
-        {
-          src: reader.result,
-          resolvedSrc: null,
-          attachmentRequiresAuth: false,
-          _version: (block._version || 0) + 1
-        },
-        {
-          changedKeys: ['src', 'resolvedSrc', 'attachmentRequiresAuth', '_version']
-        }
-      );
-    };
-    reader.readAsDataURL(file);
     event.target.value = '';
+    const src = await readAsDataUrl(file);
+    updateBlock(
+      block.id,
+      {
+        src,
+        resolvedSrc: null,
+        attachmentRequiresAuth: false,
+        _version: (block._version || 0) + 1
+      },
+      {
+        changedKeys: ['src', 'resolvedSrc', 'attachmentRequiresAuth', '_version']
+      }
+    );
   }
 
   function handleImageTouchEnd(event, block) {

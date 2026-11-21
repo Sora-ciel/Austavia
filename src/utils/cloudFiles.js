@@ -20,6 +20,8 @@
  * `cloudLinksIn` and `withLinksReplaced` decide; `embedCloudFiles` fetches.
  */
 
+import { readAsDataUrl } from './dataUrl.js';
+
 const CLOUD_FILE = /^https:\/\/firebasestorage\.googleapis\.com\//;
 const IMG_SRC = /(<img\b[^>]*?\bsrc\s*=\s*["'])([^"']+)(["'])/gi;
 
@@ -92,15 +94,6 @@ export function withLinksReplaced(payload, map) {
   return { ...payload, blocks, modeSettings };
 }
 
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
  * The folder with its cloud links fetched and put in as data. A link that
  * cannot be fetched is left as a link, and counted in `failed`.
@@ -132,7 +125,7 @@ export async function embedCloudFiles(payload, { audio = false, pictures = false
     try {
       const response = await fetch(fetchableLink(link));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      map.set(link, await blobToDataUrl(await response.blob()));
+      map.set(link, await readAsDataUrl(await response.blob()));
     } catch (error) {
       failed += 1;
       reasons.push(String(error?.message || error));

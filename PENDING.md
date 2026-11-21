@@ -37,9 +37,8 @@ misses. In order of what it would save:
 4. **The full-screen picture viewer is wired three times** (~40 lines):
    Canvas, Page and Simple Note each open the Lightbox with the same props,
    and Canvas, Simple Note and Lightbox each fetch a picture to save it.
-5. **Small helpers copied** (~100 lines together): a blob or file read as a
-   data URL (5 copies -- storage.js, cloudFiles.js, cropImage.js,
-   TipTapEditor, TaskMode); the picture type to file extension
+5. **Small helpers copied** (~60 lines left; the data URL reader, which was
+   14 copies, is now utils/dataUrl.js): the picture type to file extension
    (firebaseClient.js, storage.js); the Firebase listener set-up in
    firebaseClient.js (4x); `updateBlock` in Simple Note and Single Note;
    the visible-again re-timer in ClockAlarm and ClockFace; a week's done

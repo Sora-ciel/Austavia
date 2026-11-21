@@ -27,6 +27,7 @@
   import { stepOver, sideOfClick, needsDrawnCaret, isInlineAtom } from '../utils/atomCaret.js';
   import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
   import { slashAt } from '../utils/slashMenu.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -758,15 +759,6 @@
     })();
 
     return true;
-  }
-
-  function readAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
   }
 
   const AggregateMarkdown = Extension.create({

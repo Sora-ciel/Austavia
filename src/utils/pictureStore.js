@@ -11,6 +11,7 @@
 import { putPictureBlob, getPictureBlob, listStoredPictures, deletePictureBlob, textsOnDevice } from '../storage.js';
 import { picturesToDelete } from './pictureCleanup.js';
 import { refFor, hashOfRef, isPictureRef, dataPicturesIn, withPictureSources, pictureRefsIn } from './pictureRefs.js';
+import { readAsDataUrl } from './dataUrl.js';
 
 const shown = new Map(); // ref -> object URL, for as long as the app runs
 
@@ -80,12 +81,7 @@ export function showPicture(img, src) {
 export async function pictureDataUrl(ref) {
   const blob = await pictureBlob(ref);
   if (!blob) return null;
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+  return readAsDataUrl(blob);
 }
 
 /** Writing with every picture held inside it kept on the device and replaced by its reference. */

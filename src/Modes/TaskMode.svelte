@@ -21,6 +21,7 @@
   import TaskGoalLine from '../components/TaskGoalLine.svelte';
   import TaskGoalEditor from '../components/TaskGoalEditor.svelte';
   import { settleTask, startTimer, pauseTimer, addProgress, setGoal, removeGoal, goalNow } from '../utils/taskGoals.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   // Same renderer tiptap-markdown uses, so a task reads the way the same
   // markdown would anywhere else in the app. html:false leaves raw tags
@@ -42,20 +43,11 @@
   // Turn it into the markdown the renderer above already understands. The
   // data: URL is swapped for a Storage link on the next sync, same as any
   // other attachment, so it doesn't sit in the database as base64.
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-  }
-
   async function imageMarkdownFromPaste(event) {
     const items = [...(event.clipboardData?.files || [])];
     const image = items.find(file => file.type.startsWith('image/'));
     if (!image) return null;
-    return `![](${await fileToDataUrl(image)})`;
+    return `![](${await readAsDataUrl(image)})`;
   }
 
   function insertAtCaret(input, current, snippet) {

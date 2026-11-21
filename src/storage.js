@@ -1,5 +1,6 @@
 import { openDB } from 'idb';
 import { nextStamp } from './utils/stamps.js';
+import { readAsDataUrl } from './utils/dataUrl.js';
 
 const DB_NAME = 'codex-db';
 const STORE_NAME = 'blocks';
@@ -191,15 +192,6 @@ function makeFileKey(saveName, blockId, field, ext) {
   return `${saveName}/${blockId}/${field}.${ext}`;
 }
 
-async function blobToDataUrl(blob) {
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(reader.error || new Error('Failed to read blob'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 function cloneBlock(block) {
   return {
     ...block,
@@ -302,7 +294,7 @@ async function hydratePayload(db, payload) {
       if (!blob) continue;
 
       if (ref.encoding === 'binary') {
-        block[field] = await blobToDataUrl(blob);
+        block[field] = await readAsDataUrl(blob);
       } else if (ref.encoding === 'json') {
         const text = await blob.text();
         try {

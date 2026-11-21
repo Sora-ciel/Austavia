@@ -7,6 +7,7 @@
   import { snapToNeutral } from '../utils/sliderSnap.js';
   import { addBackgroundPatch, usesPortraitBackground } from '../utils/modeBackground.js';
   import { fitControls } from '../utils/controlsOverflow.js';
+  import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let mode;
   export let modeLabels = {};
@@ -367,20 +368,16 @@
   function setBgSetting(patch) {
     dispatch('modeSettingChange', { [backgroundSettingsKey]: patch });
   }
-  function onBgFileChange(event) {
+  async function onBgFileChange(event) {
     const file = event.target?.files?.[0];
     if (!file) return;
     // Captured now: the slot follows the window width, which can change
     // while the answer is being waited for.
     const key = bgImageKey;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const src = String(reader.result || '');
-      if (!(await mayUseBackground(src.length))) return;
-      setBgSetting(addBackgroundPatch(backgroundSettings, key, src));
-    };
-    reader.readAsDataURL(file);
     event.target.value = '';
+    const src = await readAsDataUrl(file);
+    if (!(await mayUseBackground(src.length))) return;
+    setBgSetting(addBackgroundPatch(backgroundSettings, key, src));
   }
   function clearBgImage() {
     // Clearing the slot is enough for an image the reader picked, but a

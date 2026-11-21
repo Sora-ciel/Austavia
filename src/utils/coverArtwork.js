@@ -43,6 +43,8 @@
  * second notification in flight cannot push it over.
  */
 
+import { readAsDataUrl } from './dataUrl.js';
+
 /**
  * ## Quality: the picture is left alone unless it cannot be sent
  *
@@ -131,7 +133,7 @@ export async function coverForNotification(blob) {
 
   // As it is, if it will go. This is the ordinary case and it costs the picture
   // nothing at all.
-  const original = await asDataUrl(blob);
+  const original = await readAsDataUrl(blob).catch(() => '');
   if (fitsOnAnIntent(original)) return original;
 
   if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') return '';
@@ -169,15 +171,3 @@ export async function coverForNotification(blob) {
   }
 }
 
-function asDataUrl(blob) {
-  return new Promise(resolve => {
-    try {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(blob);
-    } catch {
-      resolve('');
-    }
-  });
-}

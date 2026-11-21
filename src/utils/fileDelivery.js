@@ -20,6 +20,8 @@
  * `deliveryRoute` decides; `deliverFile` does it.
  */
 
+import { readAsDataUrl } from './dataUrl.js';
+
 export function isNativeAndroid() {
   const capacitor = typeof window !== 'undefined' ? window.Capacitor : null;
   return !!capacitor?.isNativePlatform?.() && capacitor.getPlatform?.() === 'android';
@@ -30,13 +32,8 @@ export function deliveryRoute({ nativeAndroid = false } = {}) {
   return nativeAndroid ? 'share' : 'download';
 }
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+async function blobToBase64(blob) {
+  return (await readAsDataUrl(blob)).split(',')[1] || '';
 }
 
 function download(blob, name) {
