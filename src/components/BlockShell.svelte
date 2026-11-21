@@ -74,6 +74,11 @@
    * which keeps the height it has on the Canvas.
    */
   export let pageKeepsHeight = false;
+  /**
+   * On a page, the type draws its controls itself rather than over the
+   * block's top right: a clock, whose own alarm corner is there.
+   */
+  export let ownPageTools = false;
   $: onPage = placement === 'page';
   // On a page a block is drawn in the page's colours, not its own: asked
   // 2026-11-04, "text blocks and other blocks and all won't have the colors
@@ -311,7 +316,7 @@
   {#if onPage}
     <!-- No header on a page: the type's own controls (a picture's ⏏) show
          over the block's corner while the pointer is on it. -->
-    {#if $$slots['header-controls']}
+    {#if $$slots['header-controls'] && !ownPageTools}
       <div class="page-tools" role="presentation" on:click|stopPropagation on:keydown|stopPropagation>
         <slot name="header-controls" {commit} {ensureFocus} />
       </div>

@@ -95,6 +95,7 @@
   {canvasScale}
   {placement}
   pageKeepsHeight
+  ownPageTools
   label="Clock"
   fields={{ hour12, showSeconds, showDate, alarmTime, alarmEnabled }}
   minWidth={140}
@@ -126,7 +127,26 @@
       {alarmEnabled}
       beforeAct={ensureFocus}
       on:alarm={(e) => saveAlarm(commit, e.detail)}
-    />
+    >
+      <!-- On a page there is no header, and the shell's tools over the top
+           right sat on the alarm corner (reported 2026-11-21: "it puts itself
+           in front of the different mode of the timer. it should show on the
+           left of the right upper mode"). So there the ⋯ is beside the
+           corner, inside the clock. The same button as the header's: a slot
+           cannot be given or not given by placement, so it is written twice. -->
+      <svelte:fragment slot="beside-alarm">
+        {#if placement === 'page'}
+          <button
+            class="clock-settings-btn clock-page-tools"
+            title="Clock settings"
+            aria-label="Clock settings"
+            aria-expanded={settingsOpen}
+            data-focus-guard
+            on:click|stopPropagation={() => { ensureFocus(); toggleSettings(); }}
+          >⋯</button>
+        {/if}
+      </svelte:fragment>
+    </ClockAlarm>
 
     {#if settingsOpen}
       <!-- Three switches and nothing else. A clock with a settings page is a
@@ -166,6 +186,17 @@
     position: relative;
     width: 100%;
     height: 100%;
+  }
+
+  /* Shown while the pointer is on the block, as the shell's page tools are. */
+  .clock-page-tools {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  :global(.note.on-page:hover) .clock-page-tools,
+  :global(.note.on-page:focus-within) .clock-page-tools,
+  .clock-page-tools[aria-expanded='true'] {
+    opacity: 1;
   }
 
   .clock-settings-btn {

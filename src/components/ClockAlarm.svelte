@@ -241,7 +241,10 @@
     {/if}
   </button>
 
-  <!-- Top right is the alarm. -->
+  <!-- Top right is the alarm, and on its left whatever the block puts
+       there: its ⋯ on a page, where it has no header (ClockBlock). -->
+  <div class="corner-tr-group">
+  <slot name="beside-alarm" />
   <button
     class="corner corner-tr"
     class:active={corner.kind === 'alarm' || status.state === 'ringing' || status.state === 'snoozed'}
@@ -263,6 +266,7 @@
       {#if corner.kind === 'alarm'}<span>{corner.text}</span>{/if}
     {/if}
   </button>
+  </div>
 
   <div class="stage">
     {#if page === 'alarm'}
@@ -442,7 +446,14 @@
   }
 
   .corner-tl { grid-area: tl; justify-self: start; }
-  .corner-tr { grid-area: tr; justify-self: end; }
+  .corner-tr-group {
+    grid-area: tr;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
   .bottom-left {
     grid-area: bl;
     justify-self: start;
