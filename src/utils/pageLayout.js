@@ -291,6 +291,19 @@ export function clickWrites({ pressOnPage = false, moved = 0, below = true } = {
 }
 
 /**
+ * Whether a picture's tools (size, crop, replace) show: in edit mode, and
+ * only on the picture that was last touched or changed there. Asked
+ * 2026-11-21: "the options of size on images should show after you changed
+ * or touched the image in edit mode. it shouldn't be there just from putting
+ * edit mode. because it makes it hard to handle." The call site remembers
+ * the touched block, forgets it on a press on the empty page, and leaving
+ * edit mode forgets it too.
+ */
+export function editToolsShown({ editMode = false, touchedId = null, blockId } = {}) {
+  return Boolean(editMode) && touchedId != null && touchedId === blockId;
+}
+
+/**
  * What a click on the empty page below everything does: write. Into the last
  * row's text block when the page ends with writing (`{ focus: id }`), or into
  * a new text block at the end when it ends with anything else, or is empty

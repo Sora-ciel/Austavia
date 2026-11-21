@@ -43,10 +43,10 @@
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, clickWrites, dropSide,
     PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
-    setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES, showsWriteLine, dropsWhenLeft
+    setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES, showsWriteLine, dropsWhenLeft, editToolsShown
   } from '../utils/pageLayout.js';
   import { createLongPress } from '../utils/longPress.js';
-  import { idleScrollbar } from '../utils/idleScrollbar.js';
+  import { idleScrollbar, PAGE_SCROLLBAR_IDLE_MS } from '../utils/idleScrollbar.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let openFolder = '';
@@ -182,6 +182,7 @@
   const onEmptyPage = target => !target?.closest?.('.page-cell, button, input, a, .page-title');
   function onPagePointerDown(event) {
     pagePress = { onPage: onEmptyPage(event.target), x: event.clientX, y: event.clientY };
+    if (pagePress.onPage) toolsFor = null;
   }
 
   function onPageClick(event) {
@@ -374,6 +375,10 @@
   const onWriting = target => Boolean(target?.closest?.('.ProseMirror, input, textarea, [contenteditable="true"]'));
   let heldBlock = null;
   let swallowClick = false;
+  // The block whose edit tools show: the one last touched or moved in edit
+  // mode (editToolsShown, pageLayout.js).
+  let toolsFor = null;
+  $: if (!editMode) toolsFor = null;
   const hold = createLongPress({
     onLongPress: point => {
       if (!heldBlock || heldBlock === TITLE_ID) return;
@@ -403,7 +408,8 @@
   const cellPointerUp = () => hold.finish();
   const cellPointerCancel = () => hold.cancel();
 
-  function cellClickCapture(event) {
+  function cellClickCapture(event, blockId) {
+    if (editMode) toolsFor = blockId;
     if (!swallowClick) return;
     swallowClick = false;
     event.preventDefault();
@@ -462,6 +468,7 @@
     if (!dragging) {
       if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < DRAG_THRESHOLD) return;
       dragging = press.blockId;
+      if (editMode) toolsFor = dragging;
     }
     event.preventDefault();
     // What is under the pointer: a block, else a column's empty space under
@@ -600,7 +607,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true }} use:modeWheel={{ blockSelector: '[data-block-id]', isFocused: block => block.classList.contains('focused') }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true, idleMs: PAGE_SCROLLBAR_IDLE_MS }} use:modeWheel={{ blockSelector: '[data-block-id]', isFocused: block => block.classList.contains('focused') }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">
@@ -624,7 +631,7 @@
                 on:pointermove={cellPointerMove}
                 on:pointerup={cellPointerUp}
                 on:pointercancel={cellPointerCancel}
-                on:click|capture={cellClickCapture}
+                on:click|capture={(event) => cellClickCapture(event, block.id)}
                 on:contextmenu={(event) => cellContextMenu(event, block.id)}
                 on:focusout={(event) => cellFocusOut(event, block.id)}
               >
@@ -691,7 +698,7 @@
                     />
                   </label>
                 {/if}
-                {#if editMode && block.type === 'image'}
+                {#if block.type === 'image' && editToolsShown({ editMode, touchedId: toolsFor, blockId: block.id })}
                   <!-- A picture's tools in edit mode, and only there: its size
                        stays as it is outside it (asked 2026-11-11). One press
                        for a size, or the round grip on its edge dragged, the

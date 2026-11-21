@@ -16,6 +16,8 @@
  * no room, and it is 0 there.
  */
 export const SCROLLBAR_IDLE_MS = 5000;
+/** Page mode's, much shorter: asked 2026-11-21, "the scrollwheel in page mode should disappear after 0.8sec of not scrolling". */
+export const PAGE_SCROLLBAR_IDLE_MS = 800;
 export const SCROLLBAR_EDGE_PX = 60;
 
 export function idleScrollbar(node, { balance = false, idleMs = SCROLLBAR_IDLE_MS, edgePx = SCROLLBAR_EDGE_PX } = {}) {
