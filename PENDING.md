@@ -9,6 +9,65 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Bloat, measured 2026-11-21
+
+Asked: "check if our app is bloated ... if we reuse things but have them in
+different lines of code, making it bigger than if it was a component."
+Measured with a scan for runs of 6+ meaningful lines repeated anywhere in
+src/ and functions/ (comments and blank lines ignored): **67 runs, ~540
+lines, of ~57,000** -- under 1% copied word for word. The real weight is
+features written more than once in different words, which a line scan
+misses. In order of what it would save:
+
+1. **The task list is written three times** (~600 lines). TaskBlock.svelte,
+   TaskMode.svelte and SimpleNoteMode.svelte each have their own rows, add,
+   tick, delete, double-click edit, objective line, drag to reorder, the
+   markdown renderer (`new MarkdownIt` x3) and the CSS for it. Task mode
+   also draws its row twice, To Do and Done (~70 lines each). CLAUDE.md
+   says a mode mounts its block ("a mode only shows blocks"): one
+   `TaskList` component -- the rows and what they do -- used by the block,
+   by Task mode for each section, and by Simple Note through Block.svelte.
+2. **Simple Note draws five block types itself** (~250 lines): text,
+   image, music, clock, embed and task have their own markup there, while
+   every other type already goes through `<Block placement="page">`, as
+   Page mode does for all of them. Moving those five onto Block.svelte
+   removes the copies and means a fix to a block reaches Simple Note too.
+3. **NotePicker draws each entry twice** (~70 lines): its tile and its row
+   are each written out twice, for two lists. One snippet each.
+4. **The full-screen picture viewer is wired three times** (~40 lines):
+   Canvas, Page and Simple Note each open the Lightbox with the same props,
+   and Canvas, Simple Note and Lightbox each fetch a picture to save it.
+5. **Small helpers copied** (~100 lines together): a blob or file read as a
+   data URL (5 copies -- storage.js, cloudFiles.js, cropImage.js,
+   TipTapEditor, TaskMode); the picture type to file extension
+   (firebaseClient.js, storage.js); the Firebase listener set-up in
+   firebaseClient.js (4x); `updateBlock` in Simple Note and Single Note;
+   the visible-again re-timer in ClockAlarm and ClockFace; a week's done
+   and skipped count in habitStats.js and habitStreaks.js; a custom theme
+   made from a payload, twice in App.svelte.
+
+Not bloat, left alone: App.svelte's size (9,400 lines) is mostly the one
+place the sync, undo and folders live -- splitting it is a separate
+decision; the many small per-file CSS repeats (a button's reset) are a
+few lines each and app.css already holds the shared base.
+
+### Built and not used by the app (kept only by their tests)
+
+Not counted above. Each is small (3-10 lines); decide per item whether it
+is for later or can go:
+- Superseded by the strip and sheet gestures (2026-11-10), most likely can
+  go: `neighbourMode`, `swipeDirection`, `slideSteps`, `modeAfterSteps`
+  (utils/controlsLayout.js).
+- Unclear, to decide: `currentStreak`, `bestStreak` (habitStreaks.js --
+  `habitStreaks` is what is used); `habitsToAdopt` (habitStore.js);
+  `describeSnapshot` (folderSnapshots.js); `skipDownload` (folderMoves.js);
+  `canGoBack` (shuffleHistory.js); `forgetTextHistory`, `textHistorySize`
+  (textHistory.js); `themeChanged` (themeSync.js); `withoutFile`,
+  `modeSurfaceKey` (scrollMemory.js); `scaleFor`, `isDefault`, `baseFor`
+  (typeScale.js, `baseFor` not even tested); `typeOfDataUrl`
+  (clipboardPicture.js); `getCurrentUser`, `resolveAttachmentURL`
+  (firebaseClient.js, neither tested).
+
 ## Sora's list, 2026-11-21
 
 Built and seen working in a browser; to confirm on the phone:
