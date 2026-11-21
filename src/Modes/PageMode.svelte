@@ -850,12 +850,17 @@
     flex-direction: column;
   }
 
-  /* The folder's name, as the page's title: big, and pressed to rename. */
+  /* The folder's name, as the page's title: big, and pressed to rename.
+     No more room under it than over it (asked 2026-11-21: the space below
+     "shouldn't be bigger than above", and the block under it started too
+     low). With 14px here, the next block's writing began 38px under the
+     title's baseline, against 25px from the top of the page to its letters;
+     with none, 24px -- the blocks' own few pixels of padding are the gap. */
   .page-title {
     display: block;
     width: 100%;
     box-sizing: border-box;
-    margin: 0 0 14px;
+    margin: 0;
     padding: 2px 2px;
     border: 1px solid transparent;
     border-radius: 6px;
