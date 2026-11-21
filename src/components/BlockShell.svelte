@@ -443,7 +443,12 @@
   /* A little below the trimmed top (asked again 2026-11-10: "the
      uppercase letters are still a bit higher than where the image starts"):
      the capitals' flat tops are drawn just above the cap line. */
+  /* As tall as its lines and no taller: one line when it holds nothing or
+     one line, the number written when more (asked 2026-11-21). The Canvas's
+     80px floor -- three lines -- left a gap under a one-line block, and a
+     picture below started that much lower. */
   :global(.note.on-page .tiptap-inner) {
+    min-height: 0;
     padding: 0.14em 2px 2px;
     text-box-trim: trim-start;
     text-box-edge: cap alphabetic;
