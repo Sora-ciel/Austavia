@@ -333,13 +333,20 @@ export function showsWriteLine(shownRows = []) {
 // picture, a divider, a box to tick, or anything Austavia marks as its own.
 const SOMETHING_WITHOUT_WORDS = /<(img|hr|iframe|video|audio|input|table)\b|data-austavia-node=|data-type="task/i;
 
+// A line made on purpose: a break inside a line, or a second line.
+const LINE_BREAK = /<br\b/i;
+const LINES = /<(p|h[1-6]|li|blockquote|pre)\b/gi;
+
 /**
- * Whether a block of writing holds nothing: no words, no picture, no part of
- * any kind -- only empty lines. `htmlToText` turns its writing into words.
+ * Whether a block of writing holds nothing: one empty line, no more -- no
+ * words, no picture, no part of any kind. Line breaks are something (asked
+ * 2026-11-21: "a text with only line breaks or text should still count as a
+ * text block"). `htmlToText` turns its writing into words.
  */
 export function holdsNothing(html, htmlToText = value => String(value || '').replace(/<[^>]*>/g, '')) {
   const text = String(html || '');
   if (SOMETHING_WITHOUT_WORDS.test(text)) return false;
+  if (LINE_BREAK.test(text) || (text.match(LINES) || []).length > 1) return false;
   return !String(htmlToText(text) || '').replace(/\u00a0/g, ' ').trim();
 }
 

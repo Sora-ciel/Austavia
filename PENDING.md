@@ -101,8 +101,8 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] Page mode, edit mode: a picture's tools show only once it was
   touched or moved (e872364).
 - [ ] Page mode: less room around text blocks and the title.
-- [ ] A text block holding only line breaks counts as a block -- it is not
-  taken for empty and dropped.
+- [x] A text block holding only line breaks counts as a block -- it is not
+  taken for empty and dropped (holdsNothing, pageLayout.js).
 - [x] The scrollbar fades after 0.2 s, everywhere (it was 0.8 s in Page
   mode, 5 s elsewhere), over 0.7 s. One mechanism for every scroller
   (utils/idleScrollbar.js, app.css --sb-alpha). The fade itself could not

@@ -27,7 +27,16 @@ test('a page ending in writing shows no second line: the text block is where wri
 test('a text block made from the last line and left empty does not stay a block', () => {
   assert.equal(dropsWhenLeft({ madeFromLine: true, html: '<p></p>', htmlToText }), true);
   assert.equal(dropsWhenLeft({ madeFromLine: true, html: '', htmlToText }), true);
-  assert.equal(dropsWhenLeft({ madeFromLine: true, html: '<p> </p><p><br></p>', htmlToText }), true);
+});
+
+// Asked later the same day, replacing what the test above used to say about
+// empty lines: "a text with only line breaks or text should still count as a
+// text block." Somebody who pressed Enter made room on purpose.
+test('a text block holding only line breaks counts as a block, and stays', () => {
+  assert.equal(dropsWhenLeft({ madeFromLine: true, html: '<p></p><p></p>', htmlToText }), false);
+  assert.equal(dropsWhenLeft({ madeFromLine: true, html: '<p> </p><p><br></p>', htmlToText }), false);
+  assert.equal(dropsWhenLeft({ madeFromLine: true, html: '<p><br></p>', htmlToText }), false);
+  assert.equal(holdsNothing('<p></p><p></p><p></p>', htmlToText), false);
 });
 
 test('a text block made from the last line and written in stays', () => {
