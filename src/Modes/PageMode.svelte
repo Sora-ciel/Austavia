@@ -865,7 +865,7 @@
     width: 100%;
     box-sizing: border-box;
     margin: 0;
-    padding: 2px 2px;
+    padding: 0 2px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: transparent;
@@ -900,10 +900,14 @@
     flex-direction: column;
   }
 
+  /* 1px above and below: blocks of writing one under another are as far
+     apart as the lines inside one (asked 2026-11-21, "too much margin in
+     block of text and title ... we should have less"). At 3px they were 9px
+     apart against 6px between lines. */
   .page-cell {
     position: relative;
     min-width: 0;
-    padding: 3px 0;
+    padding: 1px 0;
     cursor: auto;
     /* Selected words take the page's colour. A highlight reverses a region's
        two colours (app.css), and a block on a page has no background of its

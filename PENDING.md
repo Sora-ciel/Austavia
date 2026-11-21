@@ -100,7 +100,8 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] Page mode: no more room under the title than over it (af6d7b1).
 - [x] Page mode, edit mode: a picture's tools show only once it was
   touched or moved (e872364).
-- [ ] Page mode: less room around text blocks and the title.
+- [x] Page mode: less room around text blocks and the title -- blocks of
+  writing 5px apart (were 9), as lines are; the title 2px tighter.
 - [x] A text block holding only line breaks counts as a block -- it is not
   taken for empty and dropped (holdsNothing, pageLayout.js).
 - [x] The scrollbar fades after 0.2 s, everywhere (it was 0.8 s in Page
