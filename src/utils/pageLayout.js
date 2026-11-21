@@ -303,6 +303,43 @@ export function clickBelow(shownRows = []) {
   return { add: 'text' };
 }
 
+/**
+ * The line at the end of the page to write on: not a block, only what a
+ * click there will become one (asked 2026-11-21: "when they are empty they
+ * do not create a block of text yet ... only have that line as not a block at
+ * the last block of the page"). It shows where a click below makes a new
+ * text block -- the page ends with something other than writing; where it
+ * ends with a text block, that block is where writing goes on, and an empty
+ * one shows the same line itself, as its placeholder.
+ */
+export function showsWriteLine(shownRows = []) {
+  return Boolean(clickBelow(shownRows).add);
+}
+
+// What a block of writing can hold that is something without any words: a
+// picture, a divider, a box to tick, or anything Austavia marks as its own.
+const SOMETHING_WITHOUT_WORDS = /<(img|hr|iframe|video|audio|input|table)\b|data-austavia-node=|data-type="task/i;
+
+/**
+ * Whether a block of writing holds nothing: no words, no picture, no part of
+ * any kind -- only empty lines. `htmlToText` turns its writing into words.
+ */
+export function holdsNothing(html, htmlToText = value => String(value || '').replace(/<[^>]*>/g, '')) {
+  const text = String(html || '');
+  if (SOMETHING_WITHOUT_WORDS.test(text)) return false;
+  return !String(htmlToText(text) || '').replace(/\u00a0/g, ' ').trim();
+}
+
+/**
+ * A text block made by writing on the page's last line, and let go of with
+ * nothing in it: it goes again, so a click that was never written after
+ * leaves no empty block behind (asked 2026-11-21). Only the one made for that
+ * click -- an empty block somebody put somewhere on purpose stays.
+ */
+export function dropsWhenLeft({ madeFromLine = false, html = '', htmlToText } = {}) {
+  return Boolean(madeFromLine) && holdsNothing(html, htmlToText);
+}
+
 /** Which side of a block a point is on, for dropping beside or between: within a quarter of its width of an edge is beside. */
 export function dropSide({ left, right, top, bottom, x, y }) {
   const width = right - left;

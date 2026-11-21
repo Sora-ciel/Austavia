@@ -43,7 +43,7 @@
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, clickWrites, dropSide,
     PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
-    setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES
+    setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES, showsWriteLine, dropsWhenLeft
   } from '../utils/pageLayout.js';
   import { createLongPress } from '../utils/longPress.js';
   import { idleScrollbar } from '../utils/idleScrollbar.js';
@@ -217,7 +217,36 @@
   $: if (wantCaretIn === 'new' && focusedBlockId && shownRows.some(row => row.blocks.some(b => b.id === focusedBlockId))) {
     const id = focusedBlockId;
     wantCaretIn = null;
+    madeFromLine = id;
     tick().then(() => editorOf(id)?.commands.focus('end'));
+  }
+
+  // The line at the page's end is not a block until written on (asked
+  // 2026-11-21): the block a click there made, let go of empty, goes again
+  // (pageLayout.js dropsWhenLeft).
+  let madeFromLine = null;
+  $: writeLine = showsWriteLine(shownRows);
+  $: letGoOf(focusedBlockId);
+  function letGoOf(nowFocused) {
+    if (!madeFromLine || nowFocused === madeFromLine) return;
+    dropIfLeftEmpty();
+  }
+  // Let go of without another block taken -- a tap on the bar, the keyboard
+  // put away -- is the writing losing the focus.
+  function cellFocusOut(event, blockId) {
+    if (blockId !== madeFromLine || event.currentTarget.contains(event.relatedTarget)) return;
+    dropIfLeftEmpty();
+  }
+  function dropIfLeftEmpty() {
+    const id = madeFromLine;
+    madeFromLine = null;
+    const block = blocks.find(b => b.id === id);
+    // The editor's own writing: the block's copy of it is sent on a delay,
+    // flushed by the very blur that brings us here, so it can still be empty.
+    const html = editorOf(id)?.getHTML() ?? block?.content;
+    if (block && dropsWhenLeft({ madeFromLine: true, html, htmlToText })) {
+      dispatch('delete', { id });
+    }
   }
 
   // ── The title: the folder's name, renamed by pressing it ─────────────
@@ -353,7 +382,18 @@
     }
   });
 
+  // In edit mode a block is held as a whole (asked 2026-11-11), so on a
+  // computer it is moved by holding it anywhere, as by its dot (asked
+  // 2026-11-21: "on pc screen, blocks in page mode should be able to move
+  // with editing mode also"). Not by a finger: there a drag scrolls the page,
+  // and a long press is the block's menu.
+  const OWN_CONTROLS = '.page-edit-tools, .page-width-grip, .page-handle, .page-title';
   function cellPointerDown(event, blockId) {
+    if (editMode && event.pointerType !== 'touch' && isPrimaryPointer(event) && !event.target.closest?.(OWN_CONTROLS)) {
+      event.preventDefault();
+      handleDown(event, blockId);
+      return;
+    }
     if (event.pointerType !== 'touch' || onWriting(event.target)) return;
     heldBlock = blockId;
     hold.start({ x: event.clientX, y: event.clientY });
@@ -589,6 +629,7 @@
                 on:pointercancel={cellPointerCancel}
                 on:click|capture={cellClickCapture}
                 on:contextmenu={(event) => cellContextMenu(event, block.id)}
+                on:focusout={(event) => cellFocusOut(event, block.id)}
               >
                 <button
                   class="page-handle"
@@ -688,8 +729,9 @@
 
     <!-- The rest of the page: a click here writes. -->
     <div class="page-below">
-      {#if !shownRows.length}
-        <p class="page-empty">Click anywhere to write.</p>
+      {#if writeLine}
+        <!-- Not a block: where a click makes one (pageLayout.js showsWriteLine). -->
+        <p class="page-write-line">Write, or type / for a block…</p>
       {/if}
       <button class="page-add-btn" on:click|stopPropagation={openAddMenu}>＋ Block…</button>
     </div>
@@ -1034,6 +1076,17 @@
     z-index: 2;
   }
 
+  /* In edit mode the dots are always there, not only under the pointer:
+     moving blocks is what it is for (asked 2026-11-21). */
+  .page-mode.edit-mode .page-handle {
+    opacity: 0.6;
+  }
+  @media (hover: hover) {
+    .page-mode.edit-mode .page-cell {
+      cursor: grab;
+    }
+  }
+
   /* Just a dot (asked 2026-11-11, smaller than the 7px first tried). */
   .page-handle-dot {
     width: 4px;
@@ -1081,9 +1134,12 @@
     background: color-mix(in srgb, currentColor 12%, transparent);
   }
 
-  /* Between two columns the handle sits in the gap, not over the left one. */
+  /* Between two columns the handle fills the gap and no more: on neither
+     block, so it is never over something of the block on its left (asked
+     2026-11-21). */
   .page-row.several > .page-col + .page-col .page-handle {
-    left: -19px;
+    left: -14px;
+    width: 14px;
   }
 
   .page-below {
@@ -1091,9 +1147,19 @@
     padding-top: 8px;
   }
 
-  .page-empty {
-    margin: 0 0 10px;
-    opacity: 0.5;
+  /* Drawn as an empty text block's placeholder is (TipTapEditor), so the
+     line at the end and an empty block read as the same thing (asked
+     2026-11-21). */
+  .page-write-line {
+    /* Where the block it makes will start: a block's cell is padded 3px,
+       the space below the rows 8px. */
+    margin: -5px 0 10px;
+    padding: 0.14em 2px 2px;
+    font-family: 'Inter', system-ui, Arial, Helvetica, sans-serif;
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: color-mix(in srgb, currentColor 40%, transparent);
+    pointer-events: none;
   }
 
   .page-add-btn {
@@ -1122,18 +1188,31 @@
     pointer-events: none;
   }
 
-  /* A phone has no margin for the handle: it shows at the block's top
-     right, over it. Its rows are its own layout (pageLayout.js): stacked
-     until something is moved on a phone, side by side if put so. */
+  /* A phone's rows are its own layout (pageLayout.js): stacked until
+     something is moved on a phone, side by side if put so. */
   .page-mode.narrow .page-column {
     padding: 12px 14px 0;
   }
   .page-mode.narrow .page-row {
     gap: 10px;
   }
-  .page-mode.narrow .page-handle {
-    left: auto;
-    right: 0;
-    opacity: 0.35;
+  /* The dot is on a block's left on a phone too, as everywhere (asked
+     2026-11-21; it was at the top right, over the block, which put the dot of
+     a block on the right inside the one on its left). Edit mode, where it
+     shows, makes the room for it: a margin on the left and gaps a finger
+     wide between blocks side by side, the dot in them and on neither. */
+  .page-mode.narrow.edit-mode .page-column {
+    padding-left: 28px;
+  }
+  .page-mode.narrow.edit-mode .page-row {
+    gap: 24px;
+  }
+  .page-mode.narrow.edit-mode .page-handle {
+    left: -26px;
+    width: 26px;
+  }
+  .page-mode.narrow.edit-mode .page-row.several > .page-col + .page-col .page-handle {
+    left: -24px;
+    width: 24px;
   }
 </style>
