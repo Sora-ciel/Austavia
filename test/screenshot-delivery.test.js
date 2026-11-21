@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import {
   captureScale,
   screenScale,
+  listScale,
   listCaptureHeight,
   withinTime,
   CAPTURE_LIMITS,
@@ -173,7 +174,7 @@ it('a list that fits is drawn whole', () => {
 // quality" -- 384 pixels across on a phone 1080 wide. Asked: "lower the max
 // height to have actually the width of the phone".
 it('a list on a phone is drawn as sharp as the phone draws, holding fewer rows to do it', () => {
-  const sharpness = screenScale(2.8125); // a 1080-pixel-wide phone, 384 points across
+  const sharpness = listScale(2.8125); // a 1080-pixel-wide phone, 384 points across
   assert.equal(sharpness, 2.8125);
   const height = listCaptureHeight({ width: 384, height: 390 * 54, phone: true, scale: sharpness });
   const scale = captureScale({ width: 384, height, phone: true, wanted: sharpness });
@@ -181,7 +182,23 @@ it('a list on a phone is drawn as sharp as the phone draws, holding fewer rows t
   assert.ok(height >= 54 * 50, `still about fifty rows: ${Math.round(height / 54)}`);
 });
 
-it('a screen that draws less than twice the page is still drawn at twice; none past three', () => {
-  assert.equal(screenScale(1), 2);
-  assert.equal(screenScale(4), 3);
+it("a list's length is worked out at least at twice the page, and at most three times", () => {
+  assert.equal(listScale(1), 2);
+  assert.equal(listScale(4), 3);
+});
+
+// Asked 2026-11-21, and wanted: "the amount it screens should have a two
+// times resolution than the base screen" -- on the PC and the phone alike.
+it('a screenshot is drawn at twice the resolution of the screen it is taken on', () => {
+  assert.equal(screenScale(1), 2, 'a computer screen');
+  assert.equal(screenScale(2.8125), 5.625, 'a phone');
+  // What a device can hold still wins: a phone-sized view fits at twice.
+  assert.equal(captureScale({ width: 384, height: 800, phone: true, wanted: screenScale(2.8125) }), 5.625);
+});
+
+it('a long list keeps the length it had, and is drawn as much sharper as that allows', () => {
+  const height = listCaptureHeight({ width: 384, height: 390 * 54, phone: true, scale: listScale(2.8125) });
+  const scale = captureScale({ width: 384, height, phone: true, wanted: screenScale(2.8125) });
+  assert.ok(height >= 54 * 50, 'still about fifty rows');
+  assert.ok(scale >= 2.8125, `never less sharp than the screen: ${scale}`);
 });

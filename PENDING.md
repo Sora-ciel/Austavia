@@ -110,7 +110,9 @@ Built and seen working in a browser; to confirm on the phone:
   be watched in the test browser (it draws no frames while hidden): check
   it on the PC and the phone.
 - [ ] The screenshot button works in Page mode.
-- [ ] Screenshots at twice the screen's resolution.
+- [x] Screenshots at twice the screen's resolution (screenScale): a
+  phone's ~2.8 is now ~5.6; a long list keeps its length and is drawn as
+  much sharper as the phone's limit allows.
 - [ ] Linux: choosing a picture (background or anything else) opens the
   system's file picker, not WebKitGTK's own.
 

@@ -19,7 +19,7 @@
     audioAcceptFor
   } from '../utils/audioTags.js';
   import { windowRange } from '../utils/listWindow.js';
-  import { SCREENSHOT_EVENT, rowsForCapture, screenScale } from '../utils/screenshotDelivery.js';
+  import { SCREENSHOT_EVENT, rowsForCapture, listScale } from '../utils/screenshotDelivery.js';
   import { playbackPool, openingPlaylist } from '../utils/playlistPlayback.js';
   import {
     sizeGroups,
@@ -285,7 +285,7 @@
     // load as rows appear, and these have only just appeared (seen on the
     // phone 2026-10-28: half a screenshot of blank notes).
     if (capturing && Array.isArray(event.detail?.waits)) {
-      const rows = visibleTracks.slice(0, rowsForCapture(rowHeight, screenScale(window.devicePixelRatio)));
+      const rows = visibleTracks.slice(0, rowsForCapture(rowHeight, listScale(window.devicePixelRatio)));
       event.detail.waits.push(loadCoversFor(rows));
     }
   };
@@ -294,7 +294,7 @@
     return () => window.removeEventListener(SCREENSHOT_EVENT, onScreenshot);
   });
   $: rowWindow = capturing
-    ? { start: 0, end: Math.min(visibleTracks.length, rowsForCapture(rowHeight, screenScale(window.devicePixelRatio))), padTop: 0, padBottom: 0 }
+    ? { start: 0, end: Math.min(visibleTracks.length, rowsForCapture(rowHeight, listScale(window.devicePixelRatio))), padTop: 0, padBottom: 0 }
     : windowRange({
         scrollTop: listScrollTop - rowsOffset,
         viewportHeight: listViewport,

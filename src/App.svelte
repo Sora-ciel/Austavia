@@ -162,7 +162,7 @@
     EMPTY as EMPTY_SHUFFLE
   } from './utils/shuffleHistory.js';
   import { steadyWallpaperHeight, isTyping, keyboardIsUp } from './utils/wallpaperViewport.js';
-  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, screenScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
+  import { screenshotFileName, canCopyImage, deliveryMessage, captureScale, screenScale, listScale, listCaptureHeight, withinTime, CAPTURE_DEADLINES, SCREENSHOT_EVENT } from './utils/screenshotDelivery.js';
   import { playerClickAction } from './utils/playerClicks.js';
   import { pasteKind, plainTextAsHtml, pasteIsForWriting } from './utils/pasteIntent.js';
   import { sanitizeRichText } from './utils/sanitizeRichText.js';
@@ -4494,11 +4494,14 @@
       // shrunk to fit whole instead.
       const width = Math.max(target.scrollWidth, target.clientWidth, 1);
       const fullHeight = Math.max(target.scrollHeight, target.clientHeight, 1);
-      // As sharp as this screen draws (screenScale): a phone's ~2.8, not 1.
-      const sharpness = screenScale(typeof window === 'undefined' ? 1 : window.devicePixelRatio);
+      // Twice as sharp as this screen draws (screenScale); a list's length
+      // is worked out at the screen's own sharpness (listScale), so it holds
+      // as many rows as before and is drawn as sharp as that length allows.
+      const ratio = typeof window === 'undefined' ? 1 : window.devicePixelRatio;
+      const sharpness = screenScale(ratio);
       const height = mode === 'default'
         ? fullHeight
-        : listCaptureHeight({ width, height: fullHeight, phone: capturingOnPhone(), scale: sharpness });
+        : listCaptureHeight({ width, height: fullHeight, phone: capturingOnPhone(), scale: listScale(ratio) });
       const scale = captureScale({ width, height, phone: capturingOnPhone(), wanted: sharpness });
 
       // Every mode's wallpaper is painted in underneath the capture rather than
