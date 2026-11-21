@@ -9,6 +9,23 @@ phone is several times worse for anything about layout or serialising.
 
 ---
 
+## Sora's list, 2026-11-21
+
+Built and seen working in a browser; to confirm on the phone:
+- [x] Page mode, edit mode: a block's dot is on its left everywhere, and
+  between two blocks side by side it sits in the gap, on neither (ae07879).
+- [x] Page mode: the line at the end to write on is not a block until
+  written on; a block made from it and left empty goes again (ae07879).
+- [x] Swiping between modes survives a sync redrawing under the finger
+  (658460c). Only the cause found by reading is fixed: a touch's events
+  stay with the element it began on, and a redrawn element no longer
+  passes them to the window. If a swipe still fails during a sync, it is
+  something else -- note what was on screen.
+- [x] Page mode: a text block is as tall as its lines, no three-line floor
+  (d55a746).
+- [x] Page mode on a computer: in edit mode a block is moved by holding it
+  anywhere; the dots always show there (ae07879).
+
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 
 All four built in Arial Staging 0.8.702; to confirm on the devices:
