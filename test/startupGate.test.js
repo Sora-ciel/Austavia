@@ -160,3 +160,12 @@ test('online, a sync under way still holds it until the cloud copy is here', () 
   assert.equal(workspaceHeldBySync({ bootstrapping: true, online: true }), true);
   assert.equal(workspaceHeldBySync({ online: true }), false);
 });
+
+// Asked 2026-11-21: "the pop up showing the sync to the cloud doesn't always
+// come off. When it can't sync, whether by connection issues or lack thereof.
+// It should disappear after 5sec."
+test('the syncing pop-up comes off after five seconds, even when the sync has not answered', () => {
+  assert.equal(workspaceHeldBySync({ bootstrapping: true, heldMs: 4999 }), true);
+  assert.equal(workspaceHeldBySync({ bootstrapping: true, heldMs: 5000 }), false);
+  assert.equal(workspaceHeldBySync({ gateHolds: true, gating: true, resuming: true, heldMs: 6000 }), false);
+});

@@ -153,7 +153,16 @@ export function shouldCheckOnReturn({ trigger = 'focus', wasHidden = false } = {
  * started again. The launch sync now waits for a connection instead
  * (App.svelte), and this is what lets the workspace open meanwhile.
  */
-export function workspaceHeldBySync({ gateHolds = false, bootstrapping = false, gating = false, resuming = false, online = true } = {}) {
+export function workspaceHeldBySync({ gateHolds = false, bootstrapping = false, gating = false, resuming = false, online = true, heldMs = 0 } = {}) {
   if (!online) return false;
+  // Not for longer than this, whatever is still under way: a connection that
+  // is there but answers nothing (asked 2026-11-21, "when it can't sync,
+  // whether by connection issues or lack thereof. It should disappear after
+  // 5sec"). The sync carries on behind; what is written meanwhile is merged
+  // with what it brings (utils/folderMerge.js).
+  if (heldMs >= SYNC_HOLD_MAX_MS) return false;
   return gateHolds || bootstrapping || gating || resuming;
 }
+
+/** The longest the workspace is held shut, with its "Syncing with the cloud" pop-up. */
+export const SYNC_HOLD_MAX_MS = 5000;

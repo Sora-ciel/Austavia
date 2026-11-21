@@ -197,7 +197,8 @@
     releasedWithoutSyncing,
     shouldCheckOnReturn,
     GATE_TIMEOUT_MS,
-    workspaceHeldBySync
+    workspaceHeldBySync,
+    SYNC_HOLD_MAX_MS
   } from './utils/startupGate.js';
   import { owesUpload, shouldTakeCloudCopy, receivedFromCloud, editedDuringDownload, aheadOfCloud } from './utils/syncOwing.js';
   import {
@@ -1024,12 +1025,35 @@
   // Mounting is what the request was about: pointer-events on a mounted mode
   // still leaves an editor holding a document, and the lock only ever covered
   // the part after Firebase had answered anyway.
-  $: workspaceHeld = workspaceHeldBySync({
+  // How long it has been held, counted from when it began: the hold, and
+  // its pop-up, come off after SYNC_HOLD_MAX_MS whatever is still going.
+  let heldSince = null;
+  let heldMs = 0;
+  let heldTimer = null;
+  $: rawHeld = workspaceHeldBySync({
     gateHolds: workspaceGate.hold,
     bootstrapping: cloudBootstrapInProgress,
     gating: cloudSyncGateInProgress,
     resuming: resumeCheckInProgress,
     online: deviceOnline
+  });
+  $: countHold(rawHeld);
+  function countHold(held) {
+    if (!held) {
+      heldSince = null;
+      heldMs = 0;
+      clearTimeout(heldTimer);
+      heldTimer = null;
+      return;
+    }
+    if (heldSince !== null) return;
+    heldSince = Date.now();
+    heldTimer = setTimeout(() => { heldMs = Date.now() - heldSince; }, SYNC_HOLD_MAX_MS);
+  }
+  $: workspaceHeld = rawHeld && workspaceHeldBySync({
+    gateHolds: true,
+    online: deviceOnline,
+    heldMs
   });
 
   $: gateMessage = cloudBootstrapInProgress || cloudSyncGateInProgress
