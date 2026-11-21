@@ -6908,7 +6908,8 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           await saveBlocks(write.name, {
             blocks: importedBlocks,
             modeOrders: ensureModeOrders(importedBlocks, write.modeOrders),
-            modeSettings: normalizeModeSettings(settingsForCopy(write.modeSettings))
+            // Its own id, given by planImport (utils/folderTransfer.js).
+            modeSettings: normalizeModeSettings(write.modeSettings)
           });
           logSync('save', write.name, 'made by an import');
         }

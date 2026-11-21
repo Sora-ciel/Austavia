@@ -37,6 +37,7 @@
  */
 
 import { lookOf } from './themeExtras.js';
+import { folderIdOf, settingsForCopy } from './folderIdentity.js';
 
 export const EXPORT_FORMAT = 'austavia-export';
 export const EXPORT_VERSION = 2;
@@ -81,6 +82,10 @@ export function buildExport({ folders = [], include = {}, themes = null, now = D
     folders: (folders || []).map(folder => {
       const out = {
         name: folder.name,
+        // Whatever else is left out: a nest's links name folders by it, so
+        // without it a folder brought in with its nests could not be found
+        // by them (2026-11-21).
+        id: folderIdOf(folder.name, folder.modeSettings),
         blocks: Array.isArray(folder.blocks) ? folder.blocks : [],
         modeOrders: folder.modeOrders && typeof folder.modeOrders === 'object' ? folder.modeOrders : {}
       };
@@ -116,6 +121,7 @@ export function readExport(text, fileName = '') {
   const fallbackName = nameFromFile(fileName) || 'Imported';
   const folderOf = (raw, name) => ({
     name: String(name ?? '').trim() || fallbackName,
+    id: typeof raw?.id === 'string' && raw.id ? raw.id : null,
     blocks: Array.isArray(raw?.blocks) ? raw.blocks : [],
     modeOrders: raw?.modeOrders && typeof raw.modeOrders === 'object' ? raw.modeOrders : {},
     modeSettings: raw?.modeSettings && typeof raw.modeSettings === 'object' ? raw.modeSettings : null
@@ -173,7 +179,8 @@ export function planImport({
   existingFolders = [],
   currentFolder = '',
   existingThemes = [],
-  officialThemeIds = []
+  officialThemeIds = [],
+  newId = () => globalThis.crypto.randomUUID()
 } = {}) {
   if (!file || file.error) return { error: file?.error || 'Nothing to import.' };
   const chosen = (file.folders || []).filter(folder => !folders || folders.includes(folder.name));
@@ -191,15 +198,26 @@ export function planImport({
       replaces: true
     }];
   } else {
+    // Each new folder is a folder of its own, with an id of its own -- the
+    // ones it was exported with may still be here, and two folders with one
+    // id would be taken for one (a rename followed into the wrong one). The
+    // nests among the folders brought in are pointed at the new ids, so a
+    // folder exported with what is nested in it still finds it (2026-11-21).
+    const newIds = new Map();
+    for (const folder of chosen) {
+      newIds.set(folder.id || folderIdOf(folder.name, folder.modeSettings), newId());
+    }
     const taken = [...existingFolders];
     writes = chosen.map(folder => {
       const name = uniqueName(folder.name, taken);
       taken.push(name);
+      const id = newIds.get(folder.id || folderIdOf(folder.name, folder.modeSettings));
+      const kept = settings ? settingsForCopy(folder.modeSettings) || {} : {};
       return {
         name,
-        blocks: folder.blocks,
+        blocks: withLinksTo(folder.blocks, newIds),
         modeOrders: folder.modeOrders,
-        modeSettings: settings ? folder.modeSettings : null,
+        modeSettings: { ...kept, folder: { ...(kept.folder || {}), id } },
         replaces: false
       };
     });
@@ -243,6 +261,15 @@ export function planImport({
   }
 
   return { writes, themes: addedThemes, switchTo };
+}
+
+/** The blocks with every nest's links to a folder in `ids` pointed at its new id. */
+function withLinksTo(blocks, ids) {
+  return (Array.isArray(blocks) ? blocks : []).map(block => {
+    if (block?.type !== 'nest' || !Array.isArray(block.links)) return block;
+    if (!block.links.some(link => ids.has(link?.folderId))) return block;
+    return { ...block, links: block.links.map(link => (ids.has(link?.folderId) ? { ...link, folderId: ids.get(link.folderId) } : link)) };
+  });
 }
 
 /** Two themes look the same when everything they paint with is the same. */

@@ -32,10 +32,10 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] Export: this folder with its nests' folders -- none, 1 level, up to a
   chosen level, all (b0865a9). Seen in the dialog; the file itself not
   downloaded in testing.
-- [ ] **Owed, found doing the above**: an export without "Folder settings"
-  leaves out each folder's hidden id, so after an import a nest's links
-  find their folders only where the id was the old name-based one. Carry
-  `modeSettings.folder.id` whatever is ticked.
+- [x] An export carries each folder's id whatever is ticked, and an import
+  gives the folders it brings ids of their own, with the nests among them
+  pointed at those -- so nested folders are found after an import (to
+  confirm: export a folder with its nests, import it, open a nest tile).
 
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 

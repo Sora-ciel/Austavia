@@ -90,9 +90,38 @@ describe('importing', () => {
   });
 
   it('takes only the folders chosen, with or without their settings', () => {
-    const plan = planImport({ file, folders: ['Work'], settings: false, existingFolders: [] });
+    const plan = planImport({ file, folders: ['Work'], settings: false, existingFolders: [], newId: () => 'new' });
     assert.deepEqual(plan.writes.map(w => w.name), ['Work']);
-    assert.equal(plan.writes[0].modeSettings, null);
+    // Without its settings, only the id it is given.
+    assert.deepEqual(plan.writes[0].modeSettings, { folder: { id: 'new' } });
+  });
+
+  // Asked 2026-11-21 ("yep fix it too"): a folder exported with its nested
+  // folders, without its settings, found none of them after an import.
+  describe('a folder brought in with what is nested in it', () => {
+    const nested = readExport(JSON.stringify(buildExport({
+      folders: [
+        { name: 'Home', blocks: [{ id: 'n', type: 'nest', links: [{ folderId: 'id-work', name: 'Work' }, { folderId: 'id-elsewhere', name: 'Other' }] }], modeSettings: { folder: { id: 'id-home' } } },
+        { name: 'Work', blocks: [], modeSettings: { folder: { id: 'id-work' } } }
+      ],
+      include: { settings: false },
+      now: 0
+    })), 'x.json');
+    let n = 0;
+    const plan = planImport({ file: nested, settings: false, existingFolders: ['Home', 'Work'], newId: () => `fresh-${n += 1}` });
+    const [home, work] = plan.writes;
+
+    it('still finds its nested folders through its nests, without its settings', () => {
+      assert.equal(home.blocks[0].links[0].folderId, work.modeSettings.folder.id);
+    });
+
+    it('takes ids of its own, so the folders it came from are not taken for it', () => {
+      assert.deepEqual([home.modeSettings.folder.id, work.modeSettings.folder.id], ['fresh-1', 'fresh-2']);
+    });
+
+    it('leaves a link to a folder it did not bring as it was', () => {
+      assert.equal(home.blocks[0].links[1].folderId, 'id-elsewhere');
+    });
   });
 
   it('can put one folder in place of the open one, keeping its settings unless they are brought', () => {
