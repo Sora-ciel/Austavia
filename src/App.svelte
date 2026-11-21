@@ -1,4 +1,5 @@
 <script>
+  import { followTouch } from './utils/touchFollow.js';
   import { onMount, onDestroy, tick, setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import { folderCard, pageCover } from './utils/folderDirectory.js';
@@ -4100,8 +4101,9 @@
   // top to open under it.
   let barEdge = 0;
 
+  let stopFollowingBar = () => {};
   function barTouchStart(event) {
-    barGesture = null;
+    cancelBarGesture();
     if (event.touches?.length !== 1 || !onPhone || keyboardOpen) return;
     if (event.target.closest?.(OPENED_FROM_BAR)) return;
     // A field in the bar is for typing in, not sliding from.
@@ -4109,6 +4111,9 @@
     const touch = event.touches[0];
     if (!startsOnBar(touch, event.target)) return;
     barGesture = { kind: null, startX: touch.clientX, startY: touch.clientY };
+    // The rest of the slide is heard on the element it began on, so a sync
+    // redrawing that element mid-slide does not lose it (utils/touchFollow.js).
+    stopFollowingBar = followTouch(event.target, { move: barTouchMove, end: barTouchEnd, cancel: cancelBarGesture });
   }
   function barTouchMove(event) {
     if (!barGesture) return;
@@ -4145,6 +4150,8 @@
     if (target && target !== mode) setMode(target);
   }
   function cancelBarGesture() {
+    stopFollowingBar();
+    stopFollowingBar = () => {};
     barGesture = null;
     strip = null;
     stripIndex = null;
@@ -8756,15 +8763,13 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 <!-- The bar's finger gestures are listened for on the window, never on a
      layer of their own, and never stop a touch: a tap anywhere -- in the
      band above the bar too -- reaches what is under it. barTouchStart says
-     which touches are the bar's. -->
+     which touches are the bar's, and the rest of each is followed on the
+     element it began on (utils/touchFollow.js). -->
 <svelte:window
   on:resize={rememberShape}
   on:orientationchange={rememberShape}
   on:keydown={modeShortcut}
   on:touchstart|passive={barTouchStart}
-  on:touchmove|nonpassive={barTouchMove}
-  on:touchend|nonpassive={barTouchEnd}
-  on:touchcancel|passive={cancelBarGesture}
 />
 
 <div
