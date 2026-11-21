@@ -1,5 +1,9 @@
 import { mount } from 'svelte'
 import './app.css'
+import { installIdleScrollbars } from './utils/idleScrollbar.js'
+
+// Every scrollbar shows only while its scroller is scrolling.
+installIdleScrollbars()
 
 // The same page opens as the app, or -- with ?popup=clock -- as one of the
 // small always-on-top windows for a clock block's timer or alarm on the

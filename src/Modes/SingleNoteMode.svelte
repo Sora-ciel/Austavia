@@ -1,5 +1,4 @@
 <script>
-  import { idleScrollbar } from '../utils/idleScrollbar.js';
   import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import { createEventDispatcher, onMount } from 'svelte';
   import TipTapEditor from '../components/TipTapEditor.svelte';
@@ -137,9 +136,6 @@
   function updateViewport() {
     isMobileViewport = usesPortraitBackground({ width: window.innerWidth, height: window.innerHeight });
   }
-  // The scrollbar fades after a few seconds of not scrolling and comes back
-  // on a scroll or the pointer near the right edge: utils/idleScrollbar.js,
-  // shared with Page mode.
 
   onMount(() => {
     updateViewport();
@@ -406,14 +402,6 @@
     );
   }
 
-  /* Untouched for a few seconds: fade the thumb away but keep the gutter, so
-     the page never reflows when it comes back. */
-  .single-note:global(.sb-idle) {
-    --sb-thumb: transparent;
-  }
-  .single-note :global(*) {
-    transition: scrollbar-color 0.35s ease;
-  }
 
 
   /* Per-file background image sitting behind the text */
@@ -693,7 +681,6 @@
   class:has-bg-image={bgImage}
   bind:this={canvasRef}
   style={canvasCssVars + noteImageVars}
-  use:idleScrollbar
 >
   {#if bgImage}
     <div class="note-bg-clip">

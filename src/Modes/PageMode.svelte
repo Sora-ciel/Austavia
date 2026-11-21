@@ -46,7 +46,7 @@
     setPlaceField, placesById, withTitle, TITLE_ID, pageBlockMenu, PICTURE_SIZES, showsWriteLine, dropsWhenLeft, editToolsShown
   } from '../utils/pageLayout.js';
   import { createLongPress } from '../utils/longPress.js';
-  import { idleScrollbar, PAGE_SCROLLBAR_IDLE_MS } from '../utils/idleScrollbar.js';
+  import { scrollbarBalance } from '../utils/idleScrollbar.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
 
   export let openFolder = '';
@@ -607,7 +607,7 @@
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 <svelte:window bind:innerWidth />
 
-<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:idleScrollbar={{ balance: true, idleMs: PAGE_SCROLLBAR_IDLE_MS }} use:modeWheel={{ blockSelector: '[data-block-id]', isFocused: block => block.classList.contains('focused') }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
+<div class="page-mode" class:dragging={Boolean(dragging)} class:edit-mode={editMode} class:narrow bind:this={canvasRef} style={pageVars} use:scrollbarBalance use:modeWheel={{ blockSelector: '[data-block-id]', isFocused: block => block.classList.contains('focused') }} on:pointerdown={onPagePointerDown} on:click={onPageClick}>
   <ModeWallpaper settings={backgroundSettings} />
 
   <div class="page-column">
@@ -814,13 +814,10 @@
     padding-left: var(--sb-balance, 0px);
   }
 
-  /* The scrollbar fades while nobody is scrolling (idleScrollbar), and is a
-     third of the app's usual width (asked 2026-11-11, "around half or third
-     width"); the page is balanced by what it measures, so it stays centred. */
-  .page-mode:global(.sb-idle) {
-    --sb-thumb: transparent;
-  }
-  /* The standard properties app.css sets on everything make Chrome, and the
+  /* The scrollbar shows only while scrolling, as everywhere (app.css,
+     utils/idleScrollbar.js), and is a third of the app's usual width (asked
+     2026-11-11, "around half or third width"); the page is balanced by what
+     it measures, so it stays centred. The standard properties app.css sets on everything make Chrome, and the
      Android app's web view, ignore the width below; off here, it takes. The
      colours below are the same theme variables, so the fading still works. */
   .page-mode {

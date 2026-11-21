@@ -125,10 +125,16 @@ textarea::placeholder {
    color); everything inherits those, so a scrollbar inside a block matches
    the block while one on a mode surface matches the theme. .app seeds both
    from the theme, so anything that declares neither is themed rather than
-   falling to the neutral below. */
+   falling to the neutral below.
+
+   A thumb shows only while its scroller is scrolling: drawn at --sb-alpha of
+   its colour, which utils/idleScrollbar.js raises on the scroller being
+   scrolled and fades back. Every element starts at 0 here, so a scroller
+   inside one being scrolled does not inherit its 1. */
 * {
+  --sb-alpha: 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--sb-thumb, rgba(255, 255, 255, 0.4)) var(--sb-track, transparent);
+  scrollbar-color: color-mix(in srgb, var(--sb-thumb, rgba(255, 255, 255, 0.4)) calc(var(--sb-alpha) * 100%), transparent) var(--sb-track, transparent);
 }
 *::-webkit-scrollbar {
   width: 10px;
@@ -138,7 +144,7 @@ textarea::placeholder {
   background: var(--sb-track, transparent);
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--sb-thumb, rgba(255, 255, 255, 0.4));
+  background: color-mix(in srgb, var(--sb-thumb, rgba(255, 255, 255, 0.4)) calc(var(--sb-alpha) * 100%), transparent);
   border-radius: 8px;
   border: 2px solid var(--sb-track, transparent);
   background-clip: padding-box;

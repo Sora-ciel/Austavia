@@ -95,6 +95,24 @@ Built and seen working in a browser; to confirm on the phone:
   pointed at those -- so nested folders are found after an import (to
   confirm: export a folder with its nests, import it, open a nest tile).
 
+### Asked later the same day, in this order
+
+- [x] Page mode: no more room under the title than over it (af6d7b1).
+- [x] Page mode, edit mode: a picture's tools show only once it was
+  touched or moved (e872364).
+- [ ] Page mode: less room around text blocks and the title.
+- [ ] A text block holding only line breaks counts as a block -- it is not
+  taken for empty and dropped.
+- [x] The scrollbar fades after 0.2 s, everywhere (it was 0.8 s in Page
+  mode, 5 s elsewhere), over 0.7 s. One mechanism for every scroller
+  (utils/idleScrollbar.js, app.css --sb-alpha). The fade itself could not
+  be watched in the test browser (it draws no frames while hidden): check
+  it on the PC and the phone.
+- [ ] The screenshot button works in Page mode.
+- [ ] Screenshots at twice the screen's resolution.
+- [ ] Linux: choosing a picture (background or anything else) opens the
+  system's file picker, not WebKitGTK's own.
+
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 
 All four built in Arial Staging 0.8.702; to confirm on the devices:
