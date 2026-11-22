@@ -1015,7 +1015,12 @@
         // History off: the editor's own would be a second, competing undo
         // stack that dies with the component. Text history is kept per block
         // in utils/textHistory.js instead, so it outlives a remount.
-        StarterKit.configure({ history: false, listItem: false }),
+        // The trailing node keeps an empty line at the end, so there is
+        // somewhere to type after a list or a divider -- but not after a
+        // heading: a block that was one heading line grew an empty line the
+        // moment it was tapped, and kept it (reported 2026-11-22, "a big
+        // height margin change" for one line of h1 between two pictures).
+        StarterKit.configure({ history: false, listItem: false, trailingNode: { notAfter: ['heading'] } }),
         AnyBlockListItem,
         TaskList,
         AnyBlockTaskItem,
