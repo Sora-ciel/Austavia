@@ -485,6 +485,15 @@
     padding: 7px 8px;
   }
 
+  .starter-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .starter-buttons .create-theme-btn {
+    margin-bottom: 0;
+  }
+
   .create-theme-btn.active-toggle {
     background: color-mix(in srgb, var(--right-button-text, #ffffff) 22%, transparent);
     border-color: var(--right-button-text, #ffffff);
@@ -750,12 +759,17 @@
           <button class="create-theme-btn" type="button" on:click={handleCreateNewFile}>
             ➕ New File
           </button>
-          <button class="create-theme-btn" type="button" title="A folder that shows how every mode works" on:click={() => { openStarterFolder('newcomer'); if (!pc) isOpen = false; }}>
-            📖 Newcomer folder
-          </button>
-          <button class="create-theme-btn" type="button" title="A planner for study or work, ready to use" on:click={() => { openStarterFolder('planner'); if (!pc) isOpen = false; }}>
-            🗂 Study &amp; work planner
-          </button>
+          <!-- The starter folders together, closer than the rest (asked
+               2026-11-22: "less space ... between newcomer folder and study
+               planner"). -->
+          <div class="starter-buttons">
+            <button class="create-theme-btn" type="button" title="A folder that shows how every mode works" on:click={() => { openStarterFolder('newcomer'); if (!pc) isOpen = false; }}>
+              📖 Newcomer folder
+            </button>
+            <button class="create-theme-btn" type="button" title="A planner for study or work, ready to use" on:click={() => { openStarterFolder('planner'); if (!pc) isOpen = false; }}>
+              🗂 Study &amp; work planner
+            </button>
+          </div>
           {#if savedList.length}
             <ul>
               {#each savedList as name}
