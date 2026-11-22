@@ -209,7 +209,8 @@
   <div
     class="media-container"
     class:on-page={placement === 'page'}
-    style={placement === 'page' && pageAspect > 0
+    class:empty={!mediaSrc && !hasStorageAttachment}
+    style={placement === 'page' && pageAspect > 0 && mediaSrc
       ? `flex: none; aspect-ratio: ${pageAspect}; width: calc(70vh * ${pageAspect}); max-width: 100%;`
       : ''}
   >
@@ -264,9 +265,20 @@
         {/if}
       </div>
     {:else}
-      <div style="flex-grow:1; display:flex; align-items:center; justify-content:center; color:#777;">
-        No image loaded
-      </div>
+      <!-- Empty: the whole block is the way to add a picture, with a big
+           sign in its middle -- asked 2026-11-22, "make it so that the logo
+           is in the center and bigger to click and add an image. and that if
+           you click anywhere inside the block it lets you add an image". It
+           was the words "No image loaded" and a small ⏏ in the header. -->
+      <label class="media-empty" data-focus-guard on:click|stopPropagation on:pointerdown|stopPropagation on:touchstart|stopPropagation>
+        <input type="file" accept="image/*,video/mp4" on:change={onMediaChange} data-focus-guard />
+        <svg class="media-empty-sign" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="3" />
+          <circle cx="9" cy="9.5" r="1.8" />
+          <path d="M4 17l5-5 4 4 2.5-2.5L20 17" />
+        </svg>
+        <span class="media-empty-label">Add a picture</span>
+      </label>
     {/if}
   </div>
 </BlockShell>
@@ -274,6 +286,50 @@
 <style>
   input[type="file"] {
     display: none;
+  }
+
+  /* The empty block, all of it pressable; drawn in the block's own writing
+     colour, as everything in a block is (CLAUDE.md, theme colours). */
+  /* Empty, the whole width of its place: the sizing below is for a picture's
+     shape, and there is none yet. */
+  .media-container.empty {
+    display: flex;
+    width: 100%;
+    /* As tall as its contents on a page, which has no height to share out;
+       the whole block on the Canvas. */
+    flex: 1 0 auto;
+  }
+  .media-empty {
+    flex: 1 1 auto;
+    min-height: 140px;
+    box-sizing: border-box;
+    border: 1.5px dashed color-mix(in srgb, var(--text) 35%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+  }
+  .media-empty:hover {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+  .media-empty-sign {
+    width: 56px;
+    height: 56px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.75;
+  }
+  .media-empty-label {
+    font-size: 0.95rem;
+    opacity: 0.75;
   }
 
   /* The whole button, the header's size (BlockShell), its sign centred. */
