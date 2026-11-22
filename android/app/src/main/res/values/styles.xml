@@ -13,6 +13,14 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- The round handle under the caret, and the ones at the ends of a
+             selection, white rather than Android's blue (asked 2026-11-22).
+             Android draws them from these and a page cannot change them while
+             it runs, so they cannot follow the theme's writing colour. -->
+        <item name="colorAccent">#FFFFFF</item>
+        <item name="colorControlActivated">#FFFFFF</item>
+        <item name="android:colorAccent">#FFFFFF</item>
+        <item name="android:colorControlActivated">#FFFFFF</item>
     </style>
 
 
