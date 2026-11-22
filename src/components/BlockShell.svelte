@@ -452,11 +452,25 @@
      one line, the number written when more (asked 2026-11-21). The Canvas's
      80px floor -- three lines -- left a gap under a one-line block, and a
      picture below started that much lower. */
+  /* And on a page the room between blocks is the same whatever the writing
+     is -- a heading or a line of text -- and small: asked 2026-11-22, "around
+     2px ... the same for all h's and for normal text". A heading's own
+     margins are kept between lines inside a block, not at its ends; the
+     writing is trimmed to its letters at both ends -- the capitals' tops,
+     and the bottom of letters that hang below the line (g, y), so those do
+     not reach into a picture under it -- and the space is the page's 1px a
+     side and nothing more. */
   :global(.note.on-page .tiptap-inner) {
     min-height: 0;
-    padding: 0.14em 2px 2px;
-    text-box-trim: trim-start;
-    text-box-edge: cap alphabetic;
+    padding: 0 2px;
+    text-box-trim: trim-both;
+    text-box-edge: cap text;
+  }
+  :global(.note.on-page .tiptap-inner > :first-child) {
+    margin-top: 0;
+  }
+  :global(.note.on-page .tiptap-inner > :last-child) {
+    margin-bottom: 0;
   }
   .header {
     padding: 6px 10px;
@@ -521,6 +535,14 @@
      back. The drag falls through to the canvas, and a tap lands on the block
      itself, which is what focuses it. */
   .note:not(.focused) :global(.tiptap-wrap) {
+    pointer-events: none;
+  }
+  /* A calendar's hours, the same way: they scroll only once its block is
+     focused, by finger as by wheel (reported 2026-11-22: in Page mode a
+     calendar "still slides on mobile" without being touched first). Simple
+     Note draws its cards itself and carries its own copy of this. Not the
+     full-size calendar of Calendar mode (`big`), which is the whole mode. */
+  .note:not(.focused) :global(.cal-scroll:not(.big)) {
     pointer-events: none;
   }
 
