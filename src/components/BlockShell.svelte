@@ -458,14 +458,13 @@
      margins are kept between lines inside a block, not at its ends; the
      writing is trimmed to its letters at both ends -- the capitals' tops,
      and the bottom of letters that hang below the line (g, y), so those do
-     not reach into a picture under it. Then 3px of its own above and below:
-     with the page's 1px a side, 5px of empty space between the letters and
-     the next block, and 8px between two blocks of writing, near a line's
-     gap. 2px was tried first ("not enough"), then 4px; Sora chose "5 or 6",
-     and 6 would put two blocks of writing 10px apart. */
+     not reach into a picture under it. Then room of its own: 5px of empty
+     space above the letters and 4px below them, with the page's 1px a side
+     -- 2px was tried first ("not enough"), then 4px, then 5px; Sora settled
+     on 5 above and 4 below ("make it 4px on the bottom only"). */
   :global(.note.on-page .tiptap-inner) {
     min-height: 0;
-    padding: 3px 2px;
+    padding: 3px 2px 2px;
     text-box-trim: trim-both;
     text-box-edge: cap text;
   }
