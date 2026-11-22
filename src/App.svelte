@@ -14,6 +14,7 @@
   import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress, dayKey } from './utils/taskGoals.js';
   import { newcomerFolder, NEWCOMER_FOLDER_NAME } from './utils/newcomerFolder.js';
   import { plannerFolder, PLANNER_FOLDER_NAME } from './utils/plannerFolder.js';
+  import { placeWaitingBlocks, isUnplaced, UNPLACED } from './utils/canvasPlacement.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -4287,6 +4288,28 @@
     return page.id;
   }
 
+  // Blocks made in another mode, placed once the Canvas is open and can say
+  // where it is looking (utils/canvasPlacement.js). Saved without a step of
+  // its own in the history: it is where the block goes, not an edit.
+  let placingWaiting = false;
+  $: if (mode === 'default' && canvasRef && !folderOpening && !placingWaiting && blocks.some(isUnplaced)) placeWaitingOnCanvas();
+  async function placeWaitingOnCanvas() {
+    placingWaiting = true;
+    try {
+      await tick();
+      if (mode !== 'default') return;
+      const next = placeWaitingBlocks(blocks, (placed, width, height) => findFreePosition(placed, width, height));
+      if (next === blocks) return;
+      const before = new Map(blocks.map(block => [block.id, block]));
+      // Moved from outside the block, so it is drawn again where it now is.
+      blocks = next.map(block => (isUnplaced(before.get(block.id)) ? { ...block, _version: (block._version || 0) + 1 } : block));
+      await persistAutosave(blocks, modeOrders);
+      hasUnsnapshottedChanges = true;
+    } finally {
+      placingWaiting = false;
+    }
+  }
+
   /** A new block of a kind, as the menu makes it; not yet in the folder. */
   function makeBlock(type = "text", fields = {}) {
     // Single Note holds only notes, and as many as you like -- it shows them
@@ -4299,9 +4322,12 @@
     const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 140 : type === 'calendar' ? 480 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
-    const position = mode === 'default'
+    // Made in another mode, it waits to be placed when the Canvas opens
+    // (utils/canvasPlacement.js); until then it sits under everything else.
+    const onCanvas = mode === 'default';
+    const position = onCanvas
       ? (findViewportCenterPosition(blocks, blockW, blockH) ?? findFreePosition(blocks, blockW, blockH))
-      : { x: 100, y: 100 };
+      : findFreePosition(blocks, blockW, blockH);
     const newBlock = applyHistoryTriggers({
       id: crypto.randomUUID(),
       type,
@@ -4320,6 +4346,7 @@
       size: { width: blockW, height: blockH },
       ...newBlockColors,
       ...fields,
+      ...(onCanvas ? {} : { [UNPLACED]: true }),
       _version: 0
     });
     return newBlock;
@@ -5011,9 +5038,10 @@
       type: 'image',
       content: '',
       src,
-      position: mode === 'default' ? findFreePosition(blocks, imgW, imgH) : { x: 100, y: 100 },
+      position: findFreePosition(blocks, imgW, imgH),
       size: { width: imgW, height: imgH },
       ...newBlockColors,
+      ...(mode === 'default' ? {} : { [UNPLACED]: true }),
       _version: 0
     });
 
@@ -5153,9 +5181,10 @@
       type: 'text',
       content,
       src: '',
-      position: mode === 'default' ? findFreePosition(blocks, txtW, txtH) : { x: 100, y: 100 },
+      position: findFreePosition(blocks, txtW, txtH),
       size: { width: txtW, height: txtH },
       ...newBlockColors,
+      ...(mode === 'default' ? {} : { [UNPLACED]: true }),
       _version: 0
     });
     blocks = [...blocks, newBlock];
