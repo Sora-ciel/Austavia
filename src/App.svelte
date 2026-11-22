@@ -11,7 +11,8 @@
   import { playableAudio } from './utils/mp4Faststart.js';
   import { isTextEntry, undoTarget } from './utils/undoShortcut.js';
   import { canUndoText, canRedoText, keepTextHistoriesFor, textHistoryContents } from './utils/textHistory.js';
-  import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress } from './utils/taskGoals.js';
+  import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress, dayKey } from './utils/taskGoals.js';
+  import { newcomerFolder, NEWCOMER_FOLDER_NAME } from './utils/newcomerFolder.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -5193,6 +5194,21 @@
     savedList = await listSavedBlocks();
   }
 
+  /**
+   * The newcomer folder (utils/newcomerFolder.js), made if it is not there,
+   * and opened. From Saved Files, and on a device's first start.
+   */
+  async function makeNewcomerFolder() {
+    if (savedList.includes(NEWCOMER_FOLDER_NAME)) return;
+    await saveBlocks(NEWCOMER_FOLDER_NAME, newcomerFolder({ today: dayKey(Date.now()) }));
+    savedList = await listSavedBlocks();
+    autoSyncDirty = true;
+  }
+  async function openNewcomerFolder() {
+    await makeNewcomerFolder();
+    await load(NEWCOMER_FOLDER_NAME);
+  }
+
   async function clear() {
     blocks = [];
     focusedBlockId = null;
@@ -7708,6 +7724,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
 
     savedList = await listSavedBlocks();
     const storedLastSave = loadStoredLastSaveName();
+    // A device with no folders at all starts in the newcomer folder rather
+    // than on an empty canvas (PENDING, "Help for beginners").
+    if (!savedList.length && !storedLastSave) {
+      try {
+        await makeNewcomerFolder();
+        currentSaveName = NEWCOMER_FOLDER_NAME;
+      } catch (error) {
+        console.warn('Could not make the newcomer folder:', error);
+      }
+    }
     refreshBin();
     const safeModeFromShift = await detectShiftSafeModeDuringStartup();
     const safeModeActive = safeModeFromShift;
@@ -9084,6 +9110,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         binCount={binEntries.length}
         {openBin}
         {createNewFile}
+        {openNewcomerFolder}
         {controlColors}
         themes={availableThemes}
         {selectedThemeId}

@@ -113,6 +113,9 @@ Built and seen working in a browser; to confirm on the phone:
 - [ ] On a phone, putting the keyboard away takes the caret away, in every
   part of the app; the block stays focused (utils/keyboardCaret.js). Seen
   only in tests: confirm on the phone -- write, press back, no caret.
+- [ ] The newcomer folder (Saved Files > Newcomer folder; also on a
+  fresh device): seen in a browser in Page, Canvas, Task, Calendar and
+  Habit Tracker. Read it on the phone.
 - [x] Screenshots at twice the screen's resolution (screenScale): a
   phone's ~2.8 is now ~5.6; a long list keeps its length and is drawn as
   much sharper as the phone's limit allows.
@@ -747,7 +750,12 @@ that holds the detail; cross a line off in the same commit that finishes it.
    question in `POLAR.md`.
 5. **Linux**: the first sign-in press failing, then the frame rate -- measured
    before changed (3b).
-6. **A starter folder for newcomers, made from Sora's own drawings.** Artists'
+6. **A starter folder for newcomers, made from Sora's own drawings.** The
+   folder itself is built (2026-11-21, utils/newcomerFolder.js: a note per
+   mode, a task list, a calendar, a clock, habits, a page; made on a device
+   with no folders, and from Saved Files > Newcomer folder). Still owed:
+   Sora's drawings in it. Note: a fresh install that then signs in uploads
+   it to the account like any folder. Artists'
    work cannot be shipped; Sora's own art can, and is the brand anyway. Opens
    on first launch instead of an empty canvas; the pictures are bundled with
    the app and covered in `ASSETS-LICENSE.md`.

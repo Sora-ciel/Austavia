@@ -20,6 +20,8 @@
   export let binCount = 0;
   export let openBin = () => {};
   export let createNewFile;
+  /** The folder that shows how every mode works -- see utils/newcomerFolder.js. */
+  export let openNewcomerFolder = async () => {};
   export let controlColors = {};
   export let themes = [];
   export let selectedThemeId = 'default-dark';
@@ -747,6 +749,9 @@
           <h4>📂 Saved Files</h4>
           <button class="create-theme-btn" type="button" on:click={handleCreateNewFile}>
             ➕ New File
+          </button>
+          <button class="create-theme-btn" type="button" title="A folder that shows how every mode works" on:click={() => { openNewcomerFolder(); if (!pc) isOpen = false; }}>
+            📖 Newcomer folder
           </button>
           {#if savedList.length}
             <ul>
