@@ -105,11 +105,14 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] A text block holding only line breaks counts as a block -- it is not
   taken for empty and dropped (holdsNothing, pageLayout.js).
 - [x] The scrollbar fades after 0.2 s, everywhere (it was 0.8 s in Page
-  mode, 5 s elsewhere), over 0.7 s. One mechanism for every scroller
+  mode, 5 s elsewhere), over 0.7 s. Then: no wait at all, and a 0.35 s fade. One mechanism for every scroller
   (utils/idleScrollbar.js, app.css --sb-alpha). The fade itself could not
   be watched in the test browser (it draws no frames while hidden): check
   it on the PC and the phone.
 - [ ] The screenshot button works in Page mode.
+- [ ] On a phone, putting the keyboard away takes the caret away, in every
+  part of the app; the block stays focused (utils/keyboardCaret.js). Seen
+  only in tests: confirm on the phone -- write, press back, no caret.
 - [x] Screenshots at twice the screen's resolution (screenScale): a
   phone's ~2.8 is now ~5.6; a long list keeps its length and is drawn as
   much sharper as the phone's limit allows.

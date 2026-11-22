@@ -1,9 +1,12 @@
 import { mount } from 'svelte'
 import './app.css'
 import { installIdleScrollbars } from './utils/idleScrollbar.js'
+import { installKeyboardCaret } from './utils/keyboardCaret.js'
 
 // Every scrollbar shows only while its scroller is scrolling.
 installIdleScrollbars()
+// On a phone, putting the keyboard away takes the caret with it.
+installKeyboardCaret()
 
 // The same page opens as the app, or -- with ?popup=clock -- as one of the
 // small always-on-top windows for a clock block's timer or alarm on the
