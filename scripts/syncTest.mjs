@@ -65,6 +65,9 @@ async function device(name) {
   const context = await browser.newContext();
   const page = await context.newPage();
   page.on('pageerror', error => console.log(`  [${name}] page error: ${error.message}`));
+  // What the app says when it goes wrong, so a device that never becomes
+  // ready says why rather than only timing out.
+  page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') console.log(`  [${name}] ${message.type()}: ${message.text().slice(0, 300)}`); });
   // The first visit is slow: Vite prepares the whole app for it.
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForFunction(() => window.__austaviaTest, null, { timeout: 180000 });

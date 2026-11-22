@@ -16,6 +16,7 @@
   import { plannerFolder, PLANNER_FOLDER_NAME } from './utils/plannerFolder.js';
   import { placeWaitingBlocks, isUnplaced, UNPLACED } from './utils/canvasPlacement.js';
   import { idsInPages, isOnCanvas, canvasChoice } from './utils/canvasShown.js';
+  import { markedStarter, startersAtSignIn } from './utils/starterFolders.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -5254,7 +5255,9 @@
   async function makeStarterFolder(kind) {
     const starter = STARTER_FOLDERS[kind];
     if (!starter || savedList.includes(starter.name)) return;
-    await saveBlocks(starter.name, starter.make({ today: dayKey(Date.now()) }));
+    // Marked, so signing in can tell it from somebody's own folder
+    // (utils/starterFolders.js).
+    await saveBlocks(starter.name, markedStarter(starter.make({ today: dayKey(Date.now()) }), kind));
     savedList = await listSavedBlocks();
     autoSyncDirty = true;
   }
@@ -6621,15 +6624,26 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         // upload, and they're already backed up under the other one.
         await wipeLocalSaves();
       } else if (!previousUid && localBeforeSync.length) {
+        // A starter folder nobody has changed is not asked about: an account
+        // that has folders already does not want another guide, and a new
+        // one keeps it (utils/starterFolders.js).
+        const payloads = {};
+        for (const name of localBeforeSync) {
+          try { payloads[name] = await loadBlocks(name); } catch { payloads[name] = null; }
+        }
+        const accountHasFolders = Object.keys((await loadRemoteIndex()) || {}).length > 0;
+        const plan = startersAtSignIn({ payloads, accountHasFolders });
+        for (const name of plan.drop) await removeLocalFolder(name);
+        const toAsk = plan.ask;
         // Folders that belong to no account yet — made while signed out, or
         // kept behind at the last sign-out. Adding them to this account is a
         // real decision, so ask instead of silently adopting them.
-        const count = localBeforeSync.length;
+        const count = toAsk.length;
         const folderWord = count === 1 ? 'folder' : 'folders';
-        const choice = await appChoice(
+        const choice = !count ? 'none' : await appChoice(
           `This device has ${count} ${folderWord} that ${count === 1 ? "isn't" : "aren't"} ` +
           `linked to any account yet ` +
-          `(${localBeforeSync.slice(0, 3).join(', ')}${count > 3 ? ', …' : ''}).\n\n` +
+          `(${toAsk.slice(0, 3).join(', ')}${count > 3 ? ', …' : ''}).\n\n` +
           `• Add to this account — uploads them to your cloud and keeps them here.\n` +
           `• Delete them — removes them from this device; your cloud folders are untouched.`,
           [
@@ -6637,11 +6651,16 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
             { id: 'delete', label: 'Delete them', variant: 'danger' }
           ]
         );
-        // Dismissing keeps them — never lose folders to a stray tap.
+        // Dismissing keeps them — never lose folders to a stray tap. Only the
+        // folders asked about are deleted; a starter kept is adopted with
+        // the rest.
         if (choice === 'delete') {
-          await wipeLocalSaves();
+          for (const name of toAsk) await removeLocalFolder(name);
+          // Nothing left: as before, the device starts clean.
+          if (!(await listSavedBlocks()).length) await wipeLocalSaves();
         } else {
-          await adoptLocalFoldersIntoAccount(localBeforeSync);
+          const kept = await listSavedBlocks();
+          if (kept.length) await adoptLocalFoldersIntoAccount(kept);
         }
       }
       persistSyncedUid(authUser.uid);
