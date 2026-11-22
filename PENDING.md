@@ -129,8 +129,8 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] Phone: after putting the keyboard away, the coloured caret (Austavia's
   own, utils/smoothCaret.js) stays; the browser's goes. Now told by
   KEYBOARD_CLOSED_EVENT (904483a). To confirm.
-- [ ] Android: the round handle under the caret in the writing's colour,
-  everywhere -- if Android lets a page set it.
+- [x] Android: the round handle under the caret -- cannot follow the
+  writing (Android's theme draws it); made white, as Sora chose (c656895).
 - [ ] Page mode: the write line showed after a picture and above an empty
   text block. Not reproduced in a browser: a picture then an empty text
   block shows only the block's own placeholder. Needs Sora's screenshot.
@@ -140,6 +140,16 @@ Built and seen working in a browser; to confirm on the phone:
   pressed left the page before the click reached the player, so no button
   was found above it. Judged by the click's path now (playerClicks.js);
   the timeline's room 5px each side (was 12, into the buttons). To confirm.
+
+## Confirmed by Sora, 2026-11-22
+
+- Signing in and out on a device holding an untouched starter folder: no
+  question, works (f03852a).
+- Everything owed a try on the PC: tested and confirmed.
+- Left for after marketing starts (decided the same day): the
+  delete-account test on a throwaway account, the budget alert, the
+  security audit, the Polar payout proof, the cleaner checkout, the bloat
+  rewrite.
 
 ## Pages on the Canvas, decided 2026-11-22
 
