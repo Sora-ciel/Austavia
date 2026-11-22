@@ -151,7 +151,10 @@ almost ready use with the utmost best style using bgs that look a bit
 professional and maybe another that has more of a home/anime style".
 Decided with Sora the same day, in this order:
 
-1. **The guide block**: one text block, with screenshots of the real app
+1. **The guide block** -- built (utils/newcomerFolder.js GUIDE_HTML, 14
+   screens in public/guide/ from `npm run guide:shots`). The screens show
+   the newcomer folder itself; retake them from the planner (2) once it
+   exists, as it will look better. Was: one text block, with screenshots of the real app
    taken by Claude, bundled with the app (public/guide/), not stored per
    account -- so it costs nobody storage and works offline. It covers what
    Austavia is, folders and blocks, every mode, Menu and adding blocks,
