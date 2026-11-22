@@ -53,3 +53,24 @@ test('when the keyboard goes, the writing that had it is let go of, wherever it 
   vv.height = 780; resize();
   assert.equal(blurred, 1);
 });
+
+// Reported the same day: "there's still the colored caret when closing the
+// keyboard" -- Austavia's own caret (smoothCaret.js) is told, not left to
+// work it out from focus.
+test("when the keyboard goes, Austavia's own caret is told to go too", async () => {
+  const { KEYBOARD_CLOSED_EVENT } = await import('../src/utils/keyboardCaret.js');
+  let resize = null;
+  const said = [];
+  const vv = { width: 384, height: 780, addEventListener: (_, fn) => { resize = fn; }, removeEventListener: () => {} };
+  const win = {
+    visualViewport: vv,
+    matchMedia: () => ({ matches: true }),
+    document: { activeElement: null },
+    CustomEvent: class { constructor(type) { this.type = type; } },
+    dispatchEvent: event => said.push(event.type)
+  };
+  installKeyboardCaret(win);
+  vv.height = 480; resize();
+  vv.height = 780; resize();
+  assert.deepEqual(said, [KEYBOARD_CLOSED_EVENT]);
+});

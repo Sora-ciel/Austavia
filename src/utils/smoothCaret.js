@@ -13,6 +13,8 @@
  * `caretBox` is the plain part (tested); `attachSmoothCaret` draws it.
  */
 
+import { KEYBOARD_CLOSED_EVENT } from './keyboardCaret.js';
+
 /** How tall the caret is against the letters: a little taller than the font size. */
 export const CARET_HEIGHT = 1.2;
 /** How long it takes to glide to its next place while typing (80ms; 60 was tried the same day and put back). */
@@ -77,9 +79,13 @@ export function attachSmoothCaret(editor, host) {
     caret.classList.remove('resting');
   }
 
+  // Put away with the phone's keyboard (utils/keyboardCaret.js): hidden
+  // until this writing is touched or typed in again, whatever focus says.
+  let keyboardAway = false;
+
   function place() {
     frame = 0;
-    if (editor.isDestroyed || !view.hasFocus() || !editor.state.selection.empty) { hide(); return; }
+    if (keyboardAway || editor.isDestroyed || !view.hasFocus() || !editor.state.selection.empty) { hide(); return; }
     let rect;
     try { rect = view.coordsAtPos(editor.state.selection.head); } catch { hide(); return; }
     const hostRect = host.getBoundingClientRect();
@@ -112,7 +118,11 @@ export function attachSmoothCaret(editor, host) {
   // and never an arrow key or a click. The document's own changes are not
   // the signal: the editor adjusts it by itself shortly after typing (a
   // separator re-measured), which made an arrow key glide.
-  const onInput = () => { typedAt = performance.now(); };
+  const onInput = () => { typedAt = performance.now(); keyboardAway = false; };
+  const onKeyboardClosed = () => { keyboardAway = true; placed = false; hide(); };
+  const onTouched = () => { keyboardAway = false; };
+  window.addEventListener(KEYBOARD_CLOSED_EVENT, onKeyboardClosed);
+  view.dom.addEventListener('pointerdown', onTouched);
   view.dom.addEventListener('beforeinput', onInput);
   view.dom.addEventListener('input', onInput);
   editor.on('selectionUpdate', schedule);
@@ -134,6 +144,8 @@ export function attachSmoothCaret(editor, host) {
     editor.off('blur', onBlur);
     resized?.disconnect();
     window.removeEventListener('resize', schedule);
+    window.removeEventListener(KEYBOARD_CLOSED_EVENT, onKeyboardClosed);
+    view.dom.removeEventListener('pointerdown', onTouched);
     view.dom.classList?.remove('has-austavia-caret');
     caret.remove();
   };

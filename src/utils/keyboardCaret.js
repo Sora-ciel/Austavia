@@ -17,6 +17,15 @@
  * listens and acts.
  */
 
+/**
+ * Said on the window when the keyboard has gone, for a caret the browser
+ * does not draw -- Austavia's own (utils/smoothCaret.js) -- to go too. Its
+ * writing may keep the browser's focus a moment longer than the blur says
+ * (reported the same day: "there's still the colored caret when closing the
+ * keyboard"), so it is told, not left to work it out.
+ */
+export const KEYBOARD_CLOSED_EVENT = 'austavia:keyboard-closed';
+
 /** A keyboard is at least this tall; anything less is a bar coming and going. */
 export const KEYBOARD_MIN_PX = 120;
 
@@ -57,6 +66,7 @@ export function installKeyboardCaret(win = window) {
     if (!step.closed) return;
     const active = win.document.activeElement;
     if (holdsCaret(active)) active.blur();
+    win.dispatchEvent?.(new win.CustomEvent(KEYBOARD_CLOSED_EVENT));
   };
   measure();
   vv.addEventListener('resize', measure);
