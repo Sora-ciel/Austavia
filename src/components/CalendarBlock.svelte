@@ -443,6 +443,7 @@
     <!-- svelte-ignore a11y-no-static-element-interactions -->
     <div
       class="cal-scroll"
+      class:big
       bind:this={scrollEl}
       on:wheel={onWheel}
       on:touchstart={onTouchStart}

@@ -766,7 +766,10 @@
    refused in code: the wheel then reaches the page, which the browser scrolls
    smoothly as it always does (scrolling it from code went in jumps), and a
    click lands on the card, which is what focuses it. The rule is
-   utils/scrollOwnership.js's; this is how Simple Note carries it out. */
+   utils/scrollOwnership.js's; this is how Simple Note carries it out. Its
+   own copy because it draws its cards itself, not in BlockShell, which has
+   the same rule for every other mode (Simple Note's move onto Block.svelte
+   is in PENDING, "Bloat"). */
 .container:not(.focused) :global(.cal-scroll) {
   pointer-events: none;
 }
