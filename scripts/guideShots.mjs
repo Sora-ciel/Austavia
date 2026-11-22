@@ -6,8 +6,9 @@
 // then look at public/guide/ before committing.
 //
 // It starts its own dev server, opens the app in a fresh browser -- which
-// makes the newcomer folder, as a new device does -- and photographs each
-// mode and panel at a computer's size and a phone's.
+// makes the newcomer folder, as a new device does -- opens the study and
+// work planner, and photographs each mode and panel at a computer's size and
+// a phone's.
 //
 // Needs Chromium (/snap/bin/chromium, or CHROMIUM=...) and ImageMagick
 // (`magick`) for the WebP files. OUT=<dir> writes elsewhere, for a look first.
@@ -50,6 +51,20 @@ async function device({ width, height, phone = false }) {
   page.on('pageerror', error => console.log(`  page error: ${error.message}`));
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForSelector('.app', { timeout: 180000 });
+  await pause(2500);
+  // The screens show the study and work planner (utils/plannerFolder.js): a
+  // folder in use explains the app better than one about the app.
+  await page.evaluate(async () => {
+    const storage = await import('/src/storage.js');
+    const { plannerFolder, PLANNER_FOLDER_NAME } = await import('/src/utils/plannerFolder.js');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    await storage.saveBlocks(PLANNER_FOLDER_NAME, plannerFolder({ today }));
+    localStorage.setItem('lastLoadedSave', PLANNER_FOLDER_NAME);
+    localStorage.setItem('lastSaveName', PLANNER_FOLDER_NAME);
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.app', { timeout: 60000 });
   await pause(2500);
   await closeSettings(page);
   return { context, page };
@@ -97,7 +112,12 @@ try {
   for (const mode of ['default', 'simple', 'single', 'page', 'task', 'calendar', 'habit', 'playlist']) {
     await inMode(pc.page, mode);
     // The calendar opens at the time it is now; the morning has the events.
-    if (mode === 'calendar') await morning(pc.page);
+    // In seven days, so the shot shows a planned week whatever today is.
+    if (mode === 'calendar') {
+      await pc.page.getByRole('button', { name: '7 days', exact: true }).first().click().catch(() => {});
+      await pause(500);
+      await morning(pc.page);
+    }
     await shoot(pc.page, `pc-${mode}`);
   }
   await inMode(pc.page, 'page');

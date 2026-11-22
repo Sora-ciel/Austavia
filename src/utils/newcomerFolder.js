@@ -52,7 +52,7 @@ const screen = (name, alt) => `<p><img src="/guide/${name}.webp" alt="${alt}"></
 export const GUIDE_HTML =
   h('How Austavia works')
   + p('Austavia keeps your notes, tasks, plans, habits and music together, in <strong>folders</strong>. Everything in a folder is a <strong>block</strong>: this guide, the task list, the calendar, the clock. A <strong>mode</strong> is a way of looking at the same blocks -- switch modes and nothing moves or disappears, it is only shown differently.')
-  + screen('pc-default', 'Canvas, with the blocks of this folder')
+  + screen('pc-default', 'Canvas')
   + h3('Adding blocks')
   + p('Press <strong>Add block</strong> at the top (<strong>Menu</strong> at the bottom on a phone) and pick one: writing, a picture, music, a web page, a clock and alarm, a calendar, a task list, a nest of other folders, or a page.')
   + screen('pc-add-block', 'The Add block list')
