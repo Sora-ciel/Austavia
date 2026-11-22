@@ -113,8 +113,10 @@ Built and seen working in a browser; to confirm on the phone:
 - [x] Screenshots at twice the screen's resolution (screenScale): a
   phone's ~2.8 is now ~5.6; a long list keeps its length and is drawn as
   much sharper as the phone's limit allows.
-- [ ] Linux: choosing a picture (background or anything else) opens the
-  system's file picker, not WebKitGTK's own.
+- [x] Linux: choosing a picture (background or anything else) opens the
+  system's file picker, not WebKitGTK's own -- GTK_USE_PORTAL=1 at start
+  (lib.rs). WebKitGTK 2.52 uses GtkFileChooserNative, which honours it.
+  To confirm on the PC: the picker is KDE's.
 
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 

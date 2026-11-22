@@ -88,10 +88,30 @@ fn let_kde_draw_the_title_bar() {
 #[cfg(not(target_os = "linux"))]
 fn let_kde_draw_the_title_bar() {}
 
+/// Choosing a file opens the desktop's own file picker.
+///
+/// Reported 2026-11-21: "when adding an image whether for backgrounds or
+/// other things, it should open the file search instead of a weird kind of
+/// file search." WebKitGTK asks GTK for a file, and GTK draws its own dialog
+/// unless told to go through the desktop's portal -- which then shows KDE's
+/// picker under KDE and GNOME's under GNOME, as every other app does. A
+/// GTK_USE_PORTAL already set by hand is left alone. Without a portal running
+/// GTK falls back to its own dialog, so nothing is lost where there is none.
+#[cfg(target_os = "linux")]
+fn use_the_desktops_file_picker() {
+  if std::env::var_os("GTK_USE_PORTAL").is_none() {
+    std::env::set_var("GTK_USE_PORTAL", "1");
+  }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn use_the_desktops_file_picker() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   keep_playing_while_minimised();
   let_kde_draw_the_title_bar();
+  use_the_desktops_file_picker();
   // Copies of music the web engine leaves in /tmp (src/temp_blobs.rs).
   temp_blobs::start();
 
