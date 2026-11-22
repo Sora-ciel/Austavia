@@ -96,16 +96,26 @@ export function newcomerFolder({ today, newId = () => crypto.randomUUID() } = {}
   const ids = {};
   const id = key => (ids[key] ||= newId());
 
-  // The Canvas: two columns of writing, the working blocks to their right.
-  const COL = 340;
-  const at = (col, y) => ({ x: 40 + col * COL, y });
-  const notes = NEWCOMER_NOTES.map((note, index) => ({
+  // The Canvas as Sora laid it out (2026-11-22, "I think it's a bit better
+  // turned like that"): the welcome wide across the top with the clock, the
+  // calendar and the task list beside it; the modes' notes under it.
+  const CANVAS = {
+    welcome: { position: { x: 20, y: 3 }, size: { width: 799, height: 448 } },
+    canvas: { position: { x: 23, y: 463 }, size: { width: 366, height: 434 } },
+    single: { position: { x: 395, y: 459 }, size: { width: 320, height: 440 } },
+    simple: { position: { x: 726, y: 460 }, size: { width: 320, height: 440 } },
+    page: { position: { x: 40, y: 960 }, size: { width: 320, height: 440 } },
+    more: { position: { x: 380, y: 960 }, size: { width: 320, height: 440 } },
+    clock: { position: { x: 835, y: 12 }, size: { width: 260, height: 150 } },
+    calendar: { position: { x: 1101, y: 12 }, size: { width: 488, height: 886 } },
+    tasks: { position: { x: 1594, y: 10 }, size: { width: 305, height: 883 } }
+  };
+  const notes = NEWCOMER_NOTES.map(note => ({
     id: id(note.key),
     type: 'text',
     content: note.content,
     src: '',
-    position: at(index % 2, 40 + Math.floor(index / 2) * 460),
-    size: { width: 320, height: 440 }
+    ...CANVAS[note.key]
   }));
 
   const tasks = {
@@ -126,8 +136,7 @@ export function newcomerFolder({ today, newId = () => crypto.randomUUID() } = {}
       },
       { id: newId(), text: 'Open the newcomer folder', done: true }
     ],
-    position: at(2, 40),
-    size: { width: 320, height: 380 }
+    ...CANVAS.tasks
   };
 
   const clock = {
@@ -140,8 +149,7 @@ export function newcomerFolder({ today, newId = () => crypto.randomUUID() } = {}
     showDate: true,
     alarmTime: '07:00',
     alarmEnabled: false,
-    position: at(2, 450),
-    size: { width: 260, height: 150 }
+    ...CANVAS.clock
   };
 
   const calendar = {
@@ -166,8 +174,7 @@ export function newcomerFolder({ today, newId = () => crypto.randomUUID() } = {}
         skip: []
       }
     ],
-    position: at(3, 40),
-    size: { width: 340, height: 480 }
+    ...CANVAS.calendar
   };
 
   // A week of marks, so the tracker has something to show on its first day.
@@ -192,6 +199,6 @@ export function newcomerFolder({ today, newId = () => crypto.randomUUID() } = {}
 
   return {
     blocks: [...notes, tasks, clock, calendar],
-    modeSettings: { page, habit: { habits } }
+    modeSettings: { page, habit: { habits }, simple: { columnCount: 2 } }
   };
 }
