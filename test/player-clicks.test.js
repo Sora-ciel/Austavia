@@ -93,3 +93,23 @@ describe('the timeline', () => {
     assert.equal(playerClickAction('player', element('div', { parent: player }), player), 'open-playlist');
   });
 });
+
+// Reported 2026-11-21: "sometimes in the player i click on the button to pause
+// or play and it clicks as if i clicked out of it to go to playlist mode."
+// The icon pressed is swapped by the button's own handler, so by the time
+// the player hears the click it is out of the page, with no button above it.
+describe('a press on an icon that is replaced as it is pressed', () => {
+  const tagged = (tag, extra = {}) => ({ tag, ...extra, matches(selector) { return (['button', 'input'].includes(tag) && selector.includes(tag)) || (extra.control && selector.includes('[data-player-control]')); } });
+  it('still counts as the button it was on: the click keeps its path', () => {
+    const player = tagged('div');
+    const play = tagged('button');
+    const icon = tagged('svg');
+    icon.closest = () => null; // out of the page: no button above it any more
+    assert.equal(playerClickAction('player', icon, player, [icon, play, player]), null);
+  });
+  it('and a press on the empty player still goes to Playlist mode', () => {
+    const player = tagged('div');
+    const space = tagged('div');
+    assert.equal(playerClickAction('player', space, player, [space, player]), 'open-playlist');
+  });
+});

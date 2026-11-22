@@ -30,8 +30,22 @@ export const PLAYER_CONTROLS = 'button, input, select, textarea, label, a, [role
  * controls. `container` is the player itself: the mini player strip is a
  * role="button" of its own, and a click on its empty space must not count as
  * landing on a control just because the strip is one.
+ *
+ * `path` is the click's own path (event.composedPath()), and is what is read
+ * when given. Reported 2026-11-21: pressing play or pause sometimes opened
+ * Playlist mode. The button's handler swaps its icon -- pause for play --
+ * and the icon the finger landed on is out of the page before the click
+ * reaches the player, so asking it for its button found none. The path is
+ * fixed when the click starts, button and all.
  */
-export function landsOnControl(target, container = null) {
+export function landsOnControl(target, container = null, path = null) {
+  if (Array.isArray(path) && path.length) {
+    for (const node of path) {
+      if (node === container) return false;
+      if (typeof node?.matches === 'function' && node.matches(PLAYER_CONTROLS)) return true;
+    }
+    return false;
+  }
   const hit = target && typeof target.closest === 'function' ? target.closest(PLAYER_CONTROLS) : null;
   return Boolean(hit && hit !== container);
 }
@@ -40,8 +54,8 @@ export function landsOnControl(target, container = null) {
  * What a click on a player's surface does: 'open-player' on the mini player,
  * 'open-playlist' on the player, and nothing on a control of either.
  */
-export function playerClickAction(surface, target, container = null) {
-  if (landsOnControl(target, container)) return null;
+export function playerClickAction(surface, target, container = null, path = null) {
+  if (landsOnControl(target, container, path)) return null;
   if (surface === 'mini') return 'open-player';
   if (surface === 'player') return 'open-playlist';
   return null;

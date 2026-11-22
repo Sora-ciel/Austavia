@@ -124,6 +124,23 @@ Built and seen working in a browser; to confirm on the phone:
   (lib.rs). WebKitGTK 2.52 uses GtkFileChooserNative, which honours it.
   To confirm on the PC: the picker is KDE's.
 
+### Reported later still, 2026-11-21
+
+- [x] Phone: after putting the keyboard away, the coloured caret (Austavia's
+  own, utils/smoothCaret.js) stays; the browser's goes. Now told by
+  KEYBOARD_CLOSED_EVENT (904483a). To confirm.
+- [ ] Android: the round handle under the caret in the writing's colour,
+  everywhere -- if Android lets a page set it.
+- [ ] Page mode: the write line showed after a picture and above an empty
+  text block. Not reproduced in a browser: a picture then an empty text
+  block shows only the block's own placeholder. Needs Sora's screenshot.
+- [x] The music player: pressing play/pause sometimes acts as a press
+  outside it and opens Playlist mode; and the timeline's hit area is too
+  tall. Cause, found by reading: the button swaps its icon, and the icon
+  pressed left the page before the click reached the player, so no button
+  was found above it. Judged by the click's path now (playerClicks.js);
+  the timeline's room 5px each side (was 12, into the buttons). To confirm.
+
 ## Sora's list, 2026-11-17 (kept here after the in-app list lost tasks)
 
 All four built in Arial Staging 0.8.702; to confirm on the devices:

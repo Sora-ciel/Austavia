@@ -8404,9 +8404,12 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Room above and below the line that still counts as the line. */
-  padding: 12px 0;
-  margin: -12px 0;
+  /* Room above and below the line that still counts as the line -- 5px,
+     inside the 10px between the rows: at 12px it reached into the buttons
+     under it (reported 2026-11-21, "the hitbox of the timeline is a bit too
+     wide"). */
+  padding: 5px 0;
+  margin: -5px 0;
   cursor: pointer;
   touch-action: none;
 }
@@ -8925,7 +8928,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         aria-expanded={playerExpanded}
         aria-label={playerExpanded ? 'Hide the player' : 'Open the player'}
         on:click={(event) => {
-          if (playerClickAction('mini', event.target, event.currentTarget) === 'open-player') {
+          if (playerClickAction('mini', event.target, event.currentTarget, event.composedPath()) === 'open-player') {
             playerExpanded = !playerExpanded;
           }
         }}
@@ -8979,7 +8982,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
           title="Open Playlist"
           use:clickOutside={{ onOutside: () => (playerExpanded = false), ignore: () => [playerToggleRef] }}
           on:click={(event) => {
-            if (playerClickAction('player', event.target, event.currentTarget) === 'open-playlist') {
+            if (playerClickAction('player', event.target, event.currentTarget, event.composedPath()) === 'open-playlist') {
               playerExpanded = false;
               setMode('playlist');
             }
