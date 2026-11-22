@@ -9,13 +9,16 @@
  * should disappear after 0.8sec of not scrolling", then the same day: "the
  * scrollbar thing should change to 0.2s and be the case for everywhere.
  * though the animation of the scrollbar disappearing should be longer."
+ * Then, later that day: "make the scroll bar disappear in 0 sec and make the
+ * fade go a bit faster. like half time." So the fade starts as the scrolling
+ * stops and lasts 0.35 s.
  *
  * ## How
  *
  * Every scroller's thumb is drawn at `--sb-alpha` of its colour (app.css),
  * and every element starts at 0. A scroll or a wheel on a scroller sets its
- * own --sb-alpha to 1; 0.2 s after the last one it fades back to 0 over a
- * longer stretch (`scrollbarAlpha` decides, `installIdleScrollbars` acts).
+ * own --sb-alpha to 1; from the last one it fades back to 0 (`scrollbarAlpha`
+ * decides, `installIdleScrollbars` acts).
  * The value is set on the scroller alone, inline, so a scroller inside it
  * keeps its own -- the `*` rule in app.css is what stops it inheriting.
  *
@@ -29,8 +32,8 @@
  * Only the thumb's colour changes, never the gutter, so nothing reflows as
  * it comes and goes.
  */
-export const SCROLLBAR_IDLE_MS = 200;
-export const SCROLLBAR_FADE_MS = 700;
+export const SCROLLBAR_IDLE_MS = 0;
+export const SCROLLBAR_FADE_MS = 350;
 export const SCROLLBAR_EDGE_PX = 24;
 
 /** How much of a scrollbar shows, `since` ms after the last scroll: whole, then fading out. */

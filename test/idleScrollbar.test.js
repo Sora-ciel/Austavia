@@ -4,19 +4,19 @@ import assert from 'node:assert/strict';
 import { scrollbarAlpha, installIdleScrollbars, SCROLLBAR_IDLE_MS, SCROLLBAR_FADE_MS } from '../src/utils/idleScrollbar.js';
 
 // Asked 2026-11-21, and wanted -- not an accident: "the scrollbar thing
-// should change to 0.2s and be the case for everywhere. though the animation
-// of the scrollbar disappearing should be longer." (It had been 0.8 s in
-// Page mode earlier the same day, and 5 s in Single Note before that.)
+// should change to 0.2s and be the case for everywhere." Then, the same day:
+// "make the scroll bar disappear in 0 sec and make the fade go a bit faster.
+// like half time." (The fade had been 0.7 s; before that day it was 0.8 s in
+// Page mode and 5 s in Single Note.)
 
-test('a scrollbar starts to go 0.2 seconds after the scrolling stops', () => {
-  assert.equal(SCROLLBAR_IDLE_MS, 200);
+test('a scrollbar starts to go as soon as the scrolling stops', () => {
+  assert.equal(SCROLLBAR_IDLE_MS, 0);
   assert.equal(scrollbarAlpha(0), 1);
-  assert.equal(scrollbarAlpha(200), 1);
-  assert.ok(scrollbarAlpha(260) < 1);
+  assert.ok(scrollbarAlpha(50) < 1);
 });
 
-test('and takes longer to fade than it waited', () => {
-  assert.ok(SCROLLBAR_FADE_MS > SCROLLBAR_IDLE_MS);
+test('and fades out in 0.35 seconds, half the fade it had', () => {
+  assert.equal(SCROLLBAR_FADE_MS, 350);
   const midway = scrollbarAlpha(SCROLLBAR_IDLE_MS + SCROLLBAR_FADE_MS / 2);
   assert.ok(midway > 0.3 && midway < 0.7, `half way through the fade it is half there (${midway})`);
   assert.equal(scrollbarAlpha(SCROLLBAR_IDLE_MS + SCROLLBAR_FADE_MS), 0);
