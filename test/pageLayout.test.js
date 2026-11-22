@@ -239,6 +239,13 @@ test('any other block offers to add a picture or a block below, and to delete it
   assert.deepEqual(ids, ['addPicture', 'addBlock', 'takeOff', 'delete']);
 });
 
+// Asked 2026-11-22 (PENDING, "Pages on the Canvas"): any block can be shown
+// on the Canvas or hidden from it, from its menu.
+test('a block on a page can be shown on the Canvas, or hidden from it, from its menu', () => {
+  assert.ok(pageBlockMenu({ type: 'text' }, { onCanvas: false }).some(item => item.id === 'showOnCanvas'));
+  assert.ok(pageBlockMenu({ type: 'text' }, { onCanvas: true }).some(item => item.id === 'hideFromCanvas'));
+});
+
 test('edit mode sizes a picture in one press: a third, half, three quarters, full, or natural', () => {
   assert.deepEqual(PICTURE_SIZES.map(s => s.width), [1 / 3, 0.5, 0.75, 1, null]);
 });

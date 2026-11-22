@@ -451,8 +451,13 @@ export function placesById(rows) {
  * after a long press". A picture's size is not here: it is edit mode's, and
  * stays there ("i want it stuck when out of edit mode").
  */
-export function pageBlockMenu(block) {
+export function pageBlockMenu(block, { onCanvas = null } = {}) {
   const picture = block?.type === 'image';
+  // Whether it is on the Canvas too, and the choice to change it
+  // (utils/canvasShown.js, asked 2026-11-22). Left out when not known.
+  const canvas = onCanvas === null ? [] : [onCanvas
+    ? { id: 'hideFromCanvas', label: 'Hide from Canvas' }
+    : { id: 'showOnCanvas', label: 'Show on Canvas' }];
   return [
     ...(picture ? [
       { id: 'replacePicture', label: 'Replace picture' },
@@ -461,6 +466,7 @@ export function pageBlockMenu(block) {
     { id: 'addPicture', label: 'Add a picture below' },
     { id: 'addBlock', label: 'Add a block below…' },
     { id: 'takeOff', label: 'Take off page' },
+    ...canvas,
     { id: 'delete', label: picture ? 'Delete picture' : 'Delete block', variant: 'danger' }
   ];
 }

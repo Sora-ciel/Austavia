@@ -1,9 +1,12 @@
 <script>
+  import { blocksOffCanvas } from '../utils/canvasShown.js';
+  import { blockPickName } from '../utils/pageLayout.js';
+  import { htmlToText } from '../utils/htmlToText.js';
   import ControlIcon from '../components/ControlIcon.svelte';
   import { createEventDispatcher, onMount, afterUpdate } from "svelte";
   import { getModeDefinition, getModeOptions, hasWallpaper } from "../Modes/modeRegistry.js";
   import ModeIcon from "../components/ModeIcon.svelte";
-  import { getBlockDefinitions } from "../components/blockRegistry.js";
+  import { getBlockDefinitions, getBlockDefinition } from "../components/blockRegistry.js";
   import { snapToNeutral } from '../utils/sliderSnap.js';
   import { addBackgroundPatch, usesPortraitBackground } from '../utils/modeBackground.js';
   import { fitControls } from '../utils/controlsOverflow.js';
@@ -13,6 +16,8 @@
   export let modeLabels = {};
   export let currentSaveName;
   export let focusedBlockId = null;
+  /** The folder's blocks: on the Canvas, Add block also offers those it does not show. */
+  export let blocks = [];
   export let simpleNoteColumnCount = 2;
   export let singleNoteSettings = {};
   export let canvasBackgroundSettings = {};
@@ -238,6 +243,16 @@
   function addBlock(type) {
     if (!canAddBlock(type)) return;
     dispatch("addBlock", type);
+  }
+
+  // On the Canvas, the folder's blocks it does not show -- inside a page, or
+  // hidden from it -- offered back under Add block (utils/canvasShown.js,
+  // asked 2026-11-22: "you can easily add a block that just doesn't show yet
+  // on canvas").
+  $: offCanvas = mode === 'default' ? blocksOffCanvas(blocks) : [];
+  function showOnCanvas(id) {
+    showAddBlockMenu = false;
+    dispatch("showOnCanvas", id);
   }
 
   function clear() {
@@ -476,6 +491,17 @@ onMount(() => {
 
 </script>
 
+{#snippet fromThisFolder()}
+  {#if offCanvas.length}
+    <div class="add-from-folder" role="presentation">From this folder</div>
+    {#each offCanvas as block (block.id)}
+      <!-- Its kind beside its name: a course's notes and its task list are
+           both called "Mathematics". -->
+      <button class="add-from-folder-item" title="Show on the Canvas" on:click={() => showOnCanvas(block.id)}>↩ {blockPickName(block, htmlToText)} <span class="add-from-folder-kind">{getBlockDefinition(block.type).label}</span></button>
+    {/each}
+  {/if}
+{/snippet}
+
 
 
 <style>
@@ -635,6 +661,25 @@ onMount(() => {
     position: relative;
     display: inline-flex;
     align-items: center;
+  }
+
+  /* Blocks the Canvas does not show, under the kinds to add. */
+  .add-from-folder {
+    margin: 6px 4px 2px;
+    padding-top: 6px;
+    border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+  .add-from-folder-kind {
+    opacity: 0.55;
+    font-size: 0.8em;
+  }
+  .add-from-folder-item {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 260px;
   }
 
   .add-block-list {
@@ -1224,6 +1269,7 @@ onMount(() => {
           {#each addBlockDefinitions as blockDef}
             <button on:click={() => addBlock(blockDef.type)}>{blockDef.icon} {blockDef.label}</button>
           {/each}
+          {@render fromThisFolder()}
         </div>
       {/if}
     </div>
@@ -1256,6 +1302,7 @@ onMount(() => {
       {#each addBlockDefinitions as blockDef}
         <button on:click={() => addBlock(blockDef.type)}>{blockDef.icon} {blockDef.label}</button>
       {/each}
+      {@render fromThisFolder()}
     </div>
 
     <input

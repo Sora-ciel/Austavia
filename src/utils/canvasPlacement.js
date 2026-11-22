@@ -26,13 +26,16 @@ export const isUnplaced = block => block?.[UNPLACED] === true;
  * height)` answers a free spot among `placed`. Each one placed joins the
  * placed ones, so two waiting blocks do not land on each other. Returns the
  * same array when nothing waits.
+ *
+ * `shown` says which blocks the Canvas shows (canvasShown.js): only those
+ * are placed, and only those take up room. One not shown waits on.
  */
-export function placeWaitingBlocks(blocks, findPosition) {
-  if (!blocks.some(isUnplaced)) return blocks;
-  const placed = blocks.filter(block => !isUnplaced(block));
+export function placeWaitingBlocks(blocks, findPosition, { shown = () => true } = {}) {
+  if (!blocks.some(block => isUnplaced(block) && shown(block))) return blocks;
+  const placed = blocks.filter(block => !isUnplaced(block) && shown(block));
   const out = [];
   for (const block of blocks) {
-    if (!isUnplaced(block)) { out.push(block); continue; }
+    if (!isUnplaced(block) || !shown(block)) { out.push(block); continue; }
     const width = block.size?.width ?? 300;
     const height = block.size?.height ?? 200;
     const { [UNPLACED]: _, ...rest } = block;

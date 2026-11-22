@@ -160,6 +160,13 @@ live preview:
 4. **From this folder** in the Canvas's Add block: the blocks not shown
    there; one picked is placed clear of the rest (canvasPlacement.js).
 
+All four built (utils/canvasShown.js, PageBlock.svelte's preview), and
+seen working in a browser on the planner: nine loose blocks and five page
+previews; Show on Canvas too from a preview's block, Hide from Canvas, From
+this folder, writing in a preview saved. To confirm on the phone: a narrow
+page block previews its page as a phone would; the long press menu offers
+the same choice.
+
 ## Starter folders, decided 2026-11-22
 
 Asked: "one block that explains everything ... with screens inside showing

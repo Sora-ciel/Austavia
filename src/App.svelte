@@ -15,6 +15,7 @@
   import { newcomerFolder, NEWCOMER_FOLDER_NAME } from './utils/newcomerFolder.js';
   import { plannerFolder, PLANNER_FOLDER_NAME } from './utils/plannerFolder.js';
   import { placeWaitingBlocks, isUnplaced, UNPLACED } from './utils/canvasPlacement.js';
+  import { idsInPages, isOnCanvas, canvasChoice } from './utils/canvasShown.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -3119,7 +3120,19 @@
   $: refreshFolderDirectory(savedList, currentSaveName);
   const folderPages = writable([]);
   $: folderPages.set(blocks.filter(b => b.type === 'page').map(b => ({ id: b.id, title: b.title || '', cover: pageCover(b, blocks) })));
+  // For a page block's live preview on the Canvas (PageBlock.svelte): the
+  // folder's blocks, which one is focused, and where its blocks' changes go
+  // -- the same handlers every mode's blocks use.
+  const folderBlocks = writable([]);
+  $: folderBlocks.set(blocks);
+  const focusedBlock = writable(null);
+  $: focusedBlock.set(focusedBlockId);
   setContext('folders', {
+    blocks: folderBlocks,
+    focused: focusedBlock,
+    update: event => updateBlockHandler(event),
+    remove: event => deleteBlockHandler(event),
+    focusToggle: event => handleFocusToggle(event),
     directory: folderDirectory,
     current: openFolderName,
     pages: folderPages,
@@ -4292,13 +4305,15 @@
   // where it is looking (utils/canvasPlacement.js). Saved without a step of
   // its own in the history: it is where the block goes, not an edit.
   let placingWaiting = false;
-  $: if (mode === 'default' && canvasRef && !folderOpening && !placingWaiting && blocks.some(isUnplaced)) placeWaitingOnCanvas();
+  $: canvasInPages = idsInPages(blocks);
+  $: if (mode === 'default' && canvasRef && !folderOpening && !placingWaiting && blocks.some(b => isUnplaced(b) && isOnCanvas(b, canvasInPages))) placeWaitingOnCanvas();
   async function placeWaitingOnCanvas() {
     placingWaiting = true;
     try {
       await tick();
       if (mode !== 'default') return;
-      const next = placeWaitingBlocks(blocks, (placed, width, height) => findFreePosition(placed, width, height));
+      const inPages = idsInPages(blocks);
+      const next = placeWaitingBlocks(blocks, (placed, width, height) => findFreePosition(placed, width, height), { shown: block => isOnCanvas(block, inPages) });
       if (next === blocks) return;
       const before = new Map(blocks.map(block => [block.id, block]));
       // Moved from outside the block, so it is drawn again where it now is.
@@ -4318,8 +4333,10 @@
     if (mode === "single") type = "text";
     // A clock is read at a glance, so it starts the size of one rather than the
     // size of a note.
-    const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : type === 'calendar' ? 340 : 300;
-    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 140 : type === 'calendar' ? 480 : 200;
+    // A page shows its page on the Canvas (PageBlock.svelte), so it starts
+    // big enough to read some of it.
+    const blockW = type === 'clock' ? 260 : type === 'nest' ? 380 : type === 'calendar' ? 340 : type === 'page' ? 380 : 300;
+    const blockH = type === 'clock' ? 150 : type === 'nest' ? 260 : type === 'page' ? 420 : type === 'calendar' ? 480 : 200;
     // Added deliberately from the menu, so put it where the user is looking —
     // unlike a burst of dropped media, which tiles with findFreePosition.
     // Made in another mode, it waits to be placed when the Canvas opens
@@ -8905,6 +8922,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
       colors={controlColors.left}
       {mayUseBackground}
       on:addBlock={(e) => addBlock(e.detail)}
+      on:showOnCanvas={(e) => { const fields = canvasChoice(true); updateBlockHandler({ detail: { id: e.detail, ...fields, changedKeys: Object.keys(fields), pushToHistory: true } }); }}
       on:clear={clear}
       on:exportJSON={exportJSON}
       on:importJSON={(e) => importJSON(e.detail)}

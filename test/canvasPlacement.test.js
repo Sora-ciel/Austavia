@@ -36,3 +36,15 @@ test('blocks already on the Canvas are left exactly where they are', () => {
   const blocks = [{ id: 'a', position: { x: 5, y: 6 }, size: { width: 300, height: 200 } }];
   assert.equal(placeWaitingBlocks(blocks, nextFree), blocks);
 });
+
+test('a block the Canvas does not show is neither placed nor in the way', () => {
+  const blocks = [
+    { id: 'hidden', position: { x: 0, y: 0 }, size: { width: 900, height: 900 } },
+    { id: 'waits', position: { x: 0, y: 0 }, size: { width: 300, height: 200 }, [UNPLACED]: true },
+    { id: 'new', position: { x: 0, y: 0 }, size: { width: 300, height: 200 }, [UNPLACED]: true }
+  ];
+  const shown = block => block.id === 'new';
+  const out = placeWaitingBlocks(blocks, nextFree, { shown });
+  assert.equal(out[1][UNPLACED], true, 'not shown: it waits on');
+  assert.equal(out[2].position.x, 10, 'the hidden block takes no room');
+});

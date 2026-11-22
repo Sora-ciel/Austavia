@@ -135,6 +135,8 @@
     {...common}
     initialTitle={block.title}
     initialRows={block.rows}
+    initialNarrowRows={block.narrowRows}
+    blockWidth={block.size?.width || 0}
     on:delete
     on:update
     on:focusToggle

@@ -12,7 +12,8 @@
  * a weekly plan, a course, a project, a reading list, notes -- holding its
  * own writing and task list, so opening one is opening a part of the plan.
  * Everything is an ordinary block or setting: rename, change or delete any
- * of it.
+ * of it. On the Canvas the pages show as previews of themselves beside the
+ * home's blocks (PageBlock.svelte); what is inside them is not loose there.
  *
  * The wallpaper is bundled with the app (public/starter/, made by
  * scripts/starterBackgrounds.sh): dark slate with soft light and a faint dot
@@ -81,7 +82,7 @@ export function plannerFolder({ today, newId = () => crypto.randomUUID() } = {})
       task('Reply to the group about Thursday'),
       task('Review this week\'s notes', { goal: timeGoal(20) })
     ]
-  }, at(24, 226, 420, 440));
+  }, at(24, 226, 420, 634));
   add('clock', 'clock', { hour12: false, showSeconds: false, showDate: true, alarmTime: '07:30', alarmEnabled: false }, at(460, 24, 300, 160));
   add('week', 'calendar', {
     title: 'This week',
@@ -117,7 +118,7 @@ export function plannerFolder({ today, newId = () => crypto.randomUUID() } = {})
       task('Plan next week on Sunday')
     ]
   }, at(1000, 560, 380, 300));
-  page('plan', 'Weekly plan', [['plan-text'], ['plan-tasks']], at(24, 752, 200, 110));
+  page('plan', 'Weekly plan', [['plan-text'], ['plan-tasks']], at(1000, 24, 400, 420));
 
   add('course-text', 'text', {
     content: h('Mathematics')
@@ -135,7 +136,7 @@ export function plannerFolder({ today, newId = () => crypto.randomUUID() } = {})
       task('Ask about exercise 3.9')
     ]
   }, at(1400, 560, 380, 300));
-  page('course', 'Course: Mathematics', [['course-text'], ['course-tasks']], at(244, 752, 200, 110));
+  page('course', 'Course: Mathematics', [['course-text'], ['course-tasks']], at(1416, 24, 400, 420));
 
   add('project-text', 'text', {
     content: h('Report')
@@ -154,14 +155,14 @@ export function plannerFolder({ today, newId = () => crypto.randomUUID() } = {})
       task('Send the outline for feedback')
     ]
   }, at(1800, 560, 380, 300));
-  page('project', 'Project: Report', [['project-text'], ['project-tasks']], at(24, 878, 200, 110));
+  page('project', 'Project: Report', [['project-text'], ['project-tasks']], at(1000, 460, 400, 400));
 
   add('reading-text', 'text', {
     content: h('Reading list')
       + checklist(['A book for the course', 'An article for the report', 'Something just for you'])
       + p('Add one when you hear of it; tick it when it is done.')
   }, at(2200, 24, 380, 360));
-  page('reading', 'Reading list', [['reading-text']], at(244, 878, 200, 110));
+  page('reading', 'Reading list', [['reading-text']], at(1416, 460, 400, 190));
 
   add('notes-text', 'text', {
     content: h('Notes')
@@ -173,10 +174,12 @@ export function plannerFolder({ today, newId = () => crypto.randomUUID() } = {})
       + h3('Next steps')
       + checklist(['Who does what, by when'])
   }, at(2200, 400, 380, 460));
-  page('notes', 'Notes', [['notes-text']], at(24, 1004, 200, 110));
+  page('notes', 'Notes', [['notes-text']], at(1416, 666, 400, 194));
 
   // The home page: what to do today beside the clock, the week, the pages.
-  add('pages-heading', 'text', { content: h3('Pages') }, at(24, 682, 420, 60));
+  // A heading for the home page; on the Canvas the pages are beside it, so
+  // it stays off the Canvas (utils/canvasShown.js).
+  add('pages-heading', 'text', { content: h3('Pages'), onCanvas: false }, at(24, 682, 420, 60));
   const home = {
     rows: [
       { cells: [{ blockId: id('intro') }] },

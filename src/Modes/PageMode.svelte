@@ -40,6 +40,7 @@
   import { htmlToText } from '../utils/htmlToText.js';
   import { modeTextColor as modeTextColorFor } from '../utils/modeSurface.js';
   import { isPrimaryPointer } from '../utils/pointer.js';
+  import { idsInPages, isOnCanvas, canvasChoice } from '../utils/canvasShown.js';
   import {
     blocksOnPage, blocksOffPage, putOnPage, takeOffPage, placeOnPage, clickBelow, clickWrites, dropSide,
     PAGE_BLOCK_TYPES, blockPickName, rowsFor, editPage, isNarrow, setCellWidth,
@@ -356,6 +357,10 @@
     menu = null;
     if (!blockId) return;
     if (id === 'takeOff') changeContent(r => takeOffPage(r, blockId, { blocks }));
+    else if (id === 'showOnCanvas' || id === 'hideFromCanvas') {
+      const fields = canvasChoice(id === 'showOnCanvas');
+      dispatch('update', { id: blockId, ...fields, changedKeys: Object.keys(fields), pushToHistory: true });
+    }
     else if (id === 'delete') dispatch('delete', { id: blockId });
     else if (id === 'crop') cropping = blocks.find(b => b.id === blockId) || null;
     else if (id === 'replacePicture') choosePicture({ replace: blockId });
@@ -768,7 +773,7 @@
   <BlockContextMenu
     x={menu.x}
     y={menu.y}
-    items={pageBlockMenu(menuBlock)}
+    items={pageBlockMenu(menuBlock, { onCanvas: menuBlock ? isOnCanvas(menuBlock, idsInPages(blocks)) : null })}
     on:action={(e) => menuAction(e.detail)}
     on:close={() => (menu = null)}
   />

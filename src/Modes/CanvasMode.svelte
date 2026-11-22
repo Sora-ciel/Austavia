@@ -13,6 +13,7 @@
   import { nestedScrollerTakesWheel, canvasMustTakeWheel } from '../utils/scrollOwnership.js';
   import { scrollerUnderPointer } from '../utils/scrollerUnderPointer.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
+  import { blocksOnCanvas, canvasChoice } from '../utils/canvasShown.js';
 
 
   export let mode;
@@ -30,6 +31,9 @@
   // two modes cannot drift apart.
   export let backgroundSettings = {};
   export let blocks;
+  // What the Canvas shows: not the blocks inside a page, which their page
+  // block previews, nor any hidden from it (utils/canvasShown.js).
+  $: shown = blocksOnCanvas(blocks);
 
   export let canvasRef;
   export let focusedBlockId;
@@ -66,7 +70,7 @@
   // Every picture of the folder, in order, and which block each is
   // (utils/gallery.js), so the viewer can crop the one shown.
   function openCanvasLightbox(event) {
-    gallery = galleryOf(blocks, event.detail.src);
+    gallery = galleryOf(shown, event.detail.src);
     lbOpen = true;
   }
 
@@ -134,7 +138,7 @@
   // held like top is written down and tested.
   function measureCanvasFromBlocks() {
     const margins = getHorizontalMargins();
-    return canvasExtent(blocks, {
+    return canvasExtent(shown, {
       marginLeft: margins.left,
       marginRight: margins.right,
       marginBottom: BLOCK_MARGIN_BOTTOM,
@@ -386,6 +390,12 @@
     if (block.type === 'text' || block.type === 'cleantext') {
       if (block.content) items.push({ id: 'copyText', label: 'Copy text' });
     }
+    // Off the Canvas only: still in the folder, its pages and every other
+    // mode; Add block > From this folder brings it back. A block pressed
+    // inside a page's preview is not loose on the Canvas: it can be put there.
+    items.push(shown.some(b => b.id === block.id)
+      ? { id: 'hideFromCanvas', label: 'Hide from Canvas' }
+      : { id: 'showOnCanvas', label: 'Show on Canvas too' });
     items.push({ id: 'delete', label: 'Delete block', variant: 'danger' });
     return items;
   }
@@ -409,7 +419,10 @@
     closeCanvasCtxMenu();
     if (!block) return;
 
-    if (actionId === 'delete') {
+    if (actionId === 'hideFromCanvas' || actionId === 'showOnCanvas') {
+      const fields = canvasChoice(actionId === 'showOnCanvas');
+      updateBlockHandler({ detail: { id: block.id, ...fields, changedKeys: Object.keys(fields), pushToHistory: true } });
+    } else if (actionId === 'delete') {
       deleteBlockHandler({ detail: { id: block.id } });
     } else if (actionId === 'saveMedia') {
       const src = typeof block.src === 'string' ? block.src : (block.resolvedSrc || '');
@@ -637,7 +650,7 @@
         style:transform={`scale(${scale})`}
       >
       <div class="canvas-content" style:transform={`translateX(${contentOffsetX}px)`}>
-      {#each blocks as block (`${block.id}-${block._version || 0}`)}
+      {#each shown as block (`${block.id}-${block._version || 0}`)}
         <Block
           {block}
           focused={block.id === focusedBlockId}
