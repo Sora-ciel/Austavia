@@ -453,16 +453,18 @@
      80px floor -- three lines -- left a gap under a one-line block, and a
      picture below started that much lower. */
   /* And on a page the room between blocks is the same whatever the writing
-     is -- a heading or a line of text -- and small: asked 2026-11-22, "around
-     2px ... the same for all h's and for normal text". A heading's own
+     is -- a heading or a line of text -- and small: asked 2026-11-22, "the
+     same for all h's and for normal text". A heading's own
      margins are kept between lines inside a block, not at its ends; the
      writing is trimmed to its letters at both ends -- the capitals' tops,
      and the bottom of letters that hang below the line (g, y), so those do
-     not reach into a picture under it -- and the space is the page's 1px a
-     side and nothing more. */
+     not reach into a picture under it. Then 2px of its own above and below:
+     with the page's 1px a side, 4px of empty space between the letters and
+     the next block (2px was tried first and was too tight: "maybe 4 or 5
+     pixel"), and 6px between two blocks of writing, about a line's gap. */
   :global(.note.on-page .tiptap-inner) {
     min-height: 0;
-    padding: 0 2px;
+    padding: 2px 2px;
     text-box-trim: trim-both;
     text-box-edge: cap text;
   }
