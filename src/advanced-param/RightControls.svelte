@@ -20,8 +20,8 @@
   export let binCount = 0;
   export let openBin = () => {};
   export let createNewFile;
-  /** The folder that shows how every mode works -- see utils/newcomerFolder.js. */
-  export let openNewcomerFolder = async () => {};
+  /** A starter folder, made if needed and opened: 'newcomer' or 'planner' -- see App's STARTER_FOLDERS. */
+  export let openStarterFolder = async () => {};
   export let controlColors = {};
   export let themes = [];
   export let selectedThemeId = 'default-dark';
@@ -750,8 +750,11 @@
           <button class="create-theme-btn" type="button" on:click={handleCreateNewFile}>
             ➕ New File
           </button>
-          <button class="create-theme-btn" type="button" title="A folder that shows how every mode works" on:click={() => { openNewcomerFolder(); if (!pc) isOpen = false; }}>
+          <button class="create-theme-btn" type="button" title="A folder that shows how every mode works" on:click={() => { openStarterFolder('newcomer'); if (!pc) isOpen = false; }}>
             📖 Newcomer folder
+          </button>
+          <button class="create-theme-btn" type="button" title="A planner for study or work, ready to use" on:click={() => { openStarterFolder('planner'); if (!pc) isOpen = false; }}>
+            🗂 Study &amp; work planner
           </button>
           {#if savedList.length}
             <ul>

@@ -13,6 +13,7 @@
   import { canUndoText, canRedoText, keepTextHistoriesFor, textHistoryContents } from './utils/textHistory.js';
   import { settleTask, goalNow, startTimer as startGoalTimer, pauseTimer as pauseGoalTimer, addProgress, dayKey } from './utils/taskGoals.js';
   import { newcomerFolder, NEWCOMER_FOLDER_NAME } from './utils/newcomerFolder.js';
+  import { plannerFolder, PLANNER_FOLDER_NAME } from './utils/plannerFolder.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -5195,18 +5196,25 @@
   }
 
   /**
-   * The newcomer folder (utils/newcomerFolder.js), made if it is not there,
-   * and opened. From Saved Files, and on a device's first start.
+   * The starter folders: the newcomer folder with the guide
+   * (utils/newcomerFolder.js) and the study and work planner
+   * (utils/plannerFolder.js). One is made if it is not there, and opened.
+   * From Saved Files; the newcomer folder also on a device's first start.
    */
-  async function makeNewcomerFolder() {
-    if (savedList.includes(NEWCOMER_FOLDER_NAME)) return;
-    await saveBlocks(NEWCOMER_FOLDER_NAME, newcomerFolder({ today: dayKey(Date.now()) }));
+  const STARTER_FOLDERS = {
+    newcomer: { name: NEWCOMER_FOLDER_NAME, make: newcomerFolder },
+    planner: { name: PLANNER_FOLDER_NAME, make: plannerFolder }
+  };
+  async function makeStarterFolder(kind) {
+    const starter = STARTER_FOLDERS[kind];
+    if (!starter || savedList.includes(starter.name)) return;
+    await saveBlocks(starter.name, starter.make({ today: dayKey(Date.now()) }));
     savedList = await listSavedBlocks();
     autoSyncDirty = true;
   }
-  async function openNewcomerFolder() {
-    await makeNewcomerFolder();
-    await load(NEWCOMER_FOLDER_NAME);
+  async function openStarterFolder(kind) {
+    await makeStarterFolder(kind);
+    if (STARTER_FOLDERS[kind]) await load(STARTER_FOLDERS[kind].name);
   }
 
   async function clear() {
@@ -7728,7 +7736,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
     // than on an empty canvas (PENDING, "Help for beginners").
     if (!savedList.length && !storedLastSave) {
       try {
-        await makeNewcomerFolder();
+        await makeStarterFolder('newcomer');
         currentSaveName = NEWCOMER_FOLDER_NAME;
       } catch (error) {
         console.warn('Could not make the newcomer folder:', error);
@@ -9113,7 +9121,7 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         binCount={binEntries.length}
         {openBin}
         {createNewFile}
-        {openNewcomerFolder}
+        {openStarterFolder}
         {controlColors}
         themes={availableThemes}
         {selectedThemeId}
