@@ -141,6 +141,25 @@ Built and seen working in a browser; to confirm on the phone:
   was found above it. Judged by the click's path now (playerClicks.js);
   the timeline's room 5px each side (was 12, into the buttons). To confirm.
 
+## Pages on the Canvas, decided 2026-11-22
+
+Asked: "the block in page should by default stay as just a page block that
+shows all the blocks inside in canvas mode ... a way to easily make it so
+that in canvas it shows certains by the one you choose ... and if you want
+to show something that by default doesn't show on canvas then you can
+easily add a block that just doesn't show yet on canvas". Decided, with the
+live preview:
+
+1. **Default**: a block inside a page block's page is not loose on the
+   Canvas; everything else is, as before.
+2. **The page block on the Canvas** shows its page live -- its blocks in
+   their page layout, scrollable, writable once focused.
+3. **Show on Canvas / Hide from Canvas** in every block's menu (right-click,
+   long press). Hiding never deletes. The choice is a field on the block,
+   so it syncs; older versions show everything.
+4. **From this folder** in the Canvas's Add block: the blocks not shown
+   there; one picked is placed clear of the rest (canvasPlacement.js).
+
 ## Starter folders, decided 2026-11-22
 
 Asked: "one block that explains everything ... with screens inside showing
