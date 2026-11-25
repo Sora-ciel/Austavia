@@ -1121,6 +1121,7 @@
     // So it waits for the content to be tall enough, and gives up after about
     // half a second rather than watching for ever.
     putTheReaderBack(initialScrollTop);
+    skipOffscreenOnceSettled();
 
     // The other thing that changes the room on a line is the line getting
     // wider or narrower — a block resized, a window resized, a panel opened.
@@ -1139,6 +1140,33 @@
   // Sync external content changes (e.g. switching notes)
   $: if (editor && content !== lastPushedContent) applyIncomingContent(content);
 
+  // A long note skips laying out the paragraphs off screen while it is
+  // written in (content-visibility, .skip-offscreen). Measured on the phone
+  // 2026-11-25 typing as Samsung's keyboard does into a 20K-character note:
+  // 26-28ms a letter without, 22-23ms with -- the same as a bare text box,
+  // where it had been a frame behind. Asked: "I'm aiming at no feel of
+  // latency".
+  //
+  // Switched on only once the note has opened and its reading position is
+  // back: until then it is laid out whole, so every paragraph's height is
+  // real, the browser remembers it (contain-intrinsic-size: auto), and the
+  // scrollbar and the remembered position are exact rather than estimated.
+  const LONG_WRITING = 30; // paragraphs, below which there is nothing to skip
+  let settleTimer = 0;
+  function skipOffscreenOnceSettled() {
+    clearTimeout(settleTimer);
+    let tries = 40;
+    const check = () => {
+      if (!editor || editor.isDestroyed || !wrapEl) return;
+      if (pendingScroll && tries-- > 0) { settleTimer = setTimeout(check, 100); return; }
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!editor || editor.isDestroyed || !wrapEl) return;
+        wrapEl.classList.toggle('skip-offscreen', editor.state.doc.childCount >= LONG_WRITING);
+      }));
+    };
+    check();
+  }
+
   function applyIncomingContent(next) {
     // Anything typed and not yet sent goes up first. setContent below replaces
     // the whole document, so characters still waiting would be wiped out of the
@@ -1151,6 +1179,8 @@
     // Whichever is still owed: a position from before this component had
     // anything to show, or wherever the reader actually was a moment ago.
     const wasAt = pendingScroll || wrapEl?.scrollTop || 0;
+    // Laid out whole again for the new writing, so its heights are real.
+    wrapEl?.classList.remove('skip-offscreen');
     editor.commands.setContent(next || '', false);
     // Sent now rather than in fifty milliseconds, for the reason written up in
     // applyHistory: the three lines below were written to run after the update
@@ -1158,6 +1188,7 @@
     // markdown into the HTML the app keeps now.
     updates.flush();
     putTheReaderBack(wasAt);
+    skipOffscreenOnceSettled();
     lastPushedContent = next;
     // The change came from outside — a cloud download, or the workspace undo
     // restoring a snapshot — so the history is told about it rather than
@@ -1166,6 +1197,7 @@
   }
 
   onDestroy(() => {
+    clearTimeout(settleTimer);
     // Before the editor goes, or there is nothing left to serialise. Switching
     // modes and moving a block on the canvas both come through here, and either
     // one landing mid-word would have taken the word with it.
@@ -1615,6 +1647,20 @@
      the whole of it. */
   :global(.tiptap-inner li:has(> h1, > h2, > h3)) {
     font-weight: 700;
+  }
+
+  /* A long note, once open: paragraphs off screen are not laid out again on
+     every letter, at the height they last had (skipOffscreenOnceSettled).
+     The browser records that height only for an element that already asks
+     for it while it is drawn, so every paragraph asks from the first layout
+     -- which on its own changes nothing -- and the skipping is switched on
+     after. Asked on the second only, the heights were guesses: a 11,981px
+     note measured 9,297 and reopened 87 paragraphs from where it was left. */
+  :global(.tiptap-inner > *) {
+    contain-intrinsic-size: auto 1.6em;
+  }
+  :global(.tiptap-wrap.skip-offscreen .tiptap-inner > *) {
+    content-visibility: auto;
   }
 
   /* Empty placeholder */
