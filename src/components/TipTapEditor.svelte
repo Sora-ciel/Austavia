@@ -11,7 +11,8 @@
   // The same package the bullet list already comes from (via StarterKit).
   import { TaskList, TaskItem } from '@tiptap/extension-list';
   import { Markdown } from 'tiptap-markdown';
-  import { shortcutFor, markShortcutFor, separatorFillsLine } from '../utils/markdownShortcuts.js';
+  import { shortcutFor, markShortcutFor } from '../utils/markdownShortcuts.js';
+  import { fitSeparatorsTogether } from '../utils/separatorFit.js';
   import { imagesFrom, hasImage } from '../utils/pastedImages.js';
   import { pasteKind } from '../utils/pasteIntent.js';
   import {
@@ -94,9 +95,9 @@
     if (!applyingHistory) recordText(historyKey, value, editor.state.selection.from);
     dispatch('change', value);
     // A separator's width is the room left on its line, and writing is what
-    // changes that room. Measuring it forces a layout, so it belongs off the
-    // key event alongside everything else here.
-    fitSeparators();
+    // changes that room. Measuring it forces a layout, so it is done just
+    // before the next frame, with every divider at once (fitSeparatorsSoon).
+    fitSeparatorsSoon();
   }
 
   // Where two versions of the text first differ. Undoing an insertion diverges
@@ -316,22 +317,26 @@
   // filling and the line grows by its own width every time. A pixel is left
   // spare so a rounding error cannot push it onto the next line — where it
   // would measure a full line's worth of room and stay there.
-  function fitSeparator(dom) {
-    const line = dom?.parentElement;
-    if (!line) return;
-
-    dom.style.width = '0px';
-    if (!separatorFillsLine({ hasContentAfter: hasContentAfter(dom) })) {
-      dom.style.width = '3em';
-      return;
-    }
-
-    const room = line.getBoundingClientRect().right - dom.getBoundingClientRect().left;
-    dom.style.width = `${Math.max(0, Math.floor(room) - 1)}px`;
-  }
-
+  //
+  // All of them together (utils/separatorFit.js): one at a time made the
+  // phone lay the whole note out once per divider on every change -- most of
+  // the lag typing on the phone, measured 2026-11-25.
+  const separatorOps = {
+    inLine: dom => Boolean(dom?.isConnected && dom.parentElement),
+    hasContentAfter,
+    setWidth: (dom, width) => { if (dom.style.width !== width) dom.style.width = width; },
+    room: dom => dom.parentElement.getBoundingClientRect().right - dom.getBoundingClientRect().left
+  };
   function fitSeparators() {
-    for (const dom of drawnSeparators) fitSeparator(dom);
+    fitSeparatorsTogether([...drawnSeparators], separatorOps);
+  }
+  // A divider drawn is fitted with the others on the next frame, so a note
+  // opening with many of them is laid out once, not once per divider.
+  let separatorFitQueued = false;
+  function fitSeparatorsSoon() {
+    if (separatorFitQueued) return;
+    separatorFitQueued = true;
+    requestAnimationFrame(() => { separatorFitQueued = false; fitSeparators(); });
   }
 
   // A separator that sits in a line rather than breaking it.
@@ -381,7 +386,7 @@
         dom.setAttribute('data-inline-separator', '');
         dom.contentEditable = 'false';
         drawnSeparators.add(dom);
-        fitSeparator(dom);
+        fitSeparatorsSoon();
 
         return {
           dom,
@@ -1085,10 +1090,10 @@
     // being drawn, and a window resize arrives either way. Between them the
     // width is right whichever way the line changed.
     if (typeof ResizeObserver !== 'undefined' && element) {
-      separatorWatcher = new ResizeObserver(fitSeparators);
+      separatorWatcher = new ResizeObserver(fitSeparatorsSoon);
       separatorWatcher.observe(element);
     }
-    window.addEventListener('resize', fitSeparators);
+    window.addEventListener('resize', fitSeparatorsSoon);
   });
 
   // Sync external content changes (e.g. switching notes)
@@ -1128,7 +1133,7 @@
     updates.stop();
     releasePlace();
     separatorWatcher?.disconnect();
-    window.removeEventListener('resize', fitSeparators);
+    window.removeEventListener('resize', fitSeparatorsSoon);
     detachCaret();
     editor?.destroy();
   });
