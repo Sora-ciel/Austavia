@@ -35,6 +35,7 @@
   import { cropBlockUpdate } from '../utils/cropImage.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
+  import { pictureUrl, pictureUrls } from '../utils/pictureStore.js';
 
   export let openFolder = '';
   export let blocks = [];
@@ -328,10 +329,10 @@
     } else if (actionId === 'changeImage') {
       openImagePicker(block.id);
     } else if (actionId === 'saveMedia') {
-      const src = getImageSource(block);
+      const src = pictureUrl(getImageSource(block));
       if (src) downloadSrc(src, 'image');
     } else if (actionId === 'copyMedia') {
-      const src = getImageSource(block);
+      const src = pictureUrl(getImageSource(block));
       if (src) await copyImageSrc(src);
     } else if (actionId === 'copyText') {
       const text = htmlToPlainText(block.content);
@@ -1151,7 +1152,7 @@ input[type="text"] {
             {#if hasImageSource(block)}
               <!-- With its crop, as the viewer left it (CroppedPicture). -->
               <CroppedPicture
-                src={getImageSource(block)}
+                src={pictureUrl(getImageSource(block), $pictureUrls)}
                 crop={block.crop}
                 on:click={() => ensureFocus(block.id)}
                 on:dblclick={() => openLightbox(block)}

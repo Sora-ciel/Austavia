@@ -12,6 +12,7 @@
   import { normalizeCrop, croppedAspect } from '../utils/crop.js';
   import { isDoubleTap } from '../utils/doubleTap.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
+  import { keptPicture, pictureUrl, pictureUrls, resolvePicture } from '../utils/pictureStore.js';
 
   const appDialogs = getContext('appDialogs');
   const dispatch = createEventDispatcher();
@@ -49,7 +50,9 @@
   let attachmentRequiresAuth = initialAttachmentRequiresAuth;
   let aspectRatio = size.width / (size.height - HEADER_HEIGHT);
 
-  $: mediaSrc = typeof src === 'string' ? src : resolvedSrc || '';
+  // A picture kept on the device by reference (utils/pictureStore.js) is
+  // shown from there; '' for the moment it takes to look up.
+  $: mediaSrc = typeof src === 'string' ? pictureUrl(src, $pictureUrls) : resolvedSrc || '';
   $: hasStorageAttachment = src && typeof src === 'object' && src.type === 'storage';
   let attemptedInitialAutoFit = false;
 
@@ -76,14 +79,17 @@
     }
 
     e.target.value = '';
-    src = await readAsDataUrl(file);
+    // A picture is kept on the device and the block holds its reference; a
+    // video stays in the block as it was.
+    const video = file.type.startsWith('video/');
+    src = video ? await readAsDataUrl(file) : await keptPicture(file);
     resolvedSrc = null;
     attachmentRequiresAuth = false;
     attemptedInitialAutoFit = true;
 
-    if (!file.type.startsWith('video/')) {
+    if (!video) {
       const img = new Image();
-      img.src = src;
+      img.src = (await resolvePicture(src).catch(() => null)) || pictureUrl(src) || src;
       img.onload = () => fitTo(img.width, img.height, ['src', 'size']);
     } else {
       const videoEl = document.createElement('video');
@@ -166,7 +172,9 @@
   }
   function openViewer() {
     shell?.ensureFocus();
-    if (mediaSrc) dispatch('lightbox', { src: mediaSrc });
+    // The picture as the block stores it -- a reference, say -- so the viewer
+    // finds it among the folder's pictures (utils/gallery.js).
+    if (mediaSrc) dispatch('lightbox', { src: typeof src === 'string' ? src : mediaSrc });
   }
   // A finger: a double-click is not reliably sent for two taps.
   const taps = new Map();

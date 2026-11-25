@@ -110,6 +110,8 @@ export async function embedCloudFiles(payload, { audio = false, pictures = false
     const refs = new Set();
     for (const block of payload?.blocks || []) {
       for (const ref of pictureRefsIn(block?.content)) refs.add(ref);
+      // A picture block's own picture, kept by reference too.
+      for (const ref of pictureRefsIn(typeof block?.src === 'string' ? block.src : '')) refs.add(ref);
       for (const task of Array.isArray(block?.tasks) ? block.tasks : []) for (const ref of pictureRefsIn(task?.text)) refs.add(ref);
     }
     for (const ref of refs) {

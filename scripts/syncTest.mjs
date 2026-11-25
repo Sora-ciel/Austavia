@@ -261,6 +261,27 @@ try {
     if (!here.includes(ref)) throw new Error('the computer\'s own copy lost its reference');
   });
 
+  await scenario('a picture block kept by reference on the computer reaches the phone as a picture', async () => {
+    // 2026-11-25 (PENDING 2, step 3): picture blocks kept by reference, as
+    // pictures in writing are, so typing beside them stops freezing.
+    const folder = 'Picture block by reference';
+    const dataUrl = await computer.page.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 40; c.height = 20;
+      const g = c.getContext('2d'); g.fillStyle = '#dd3e63'; g.fillRect(0, 0, 40, 20);
+      return c.toDataURL('image/png');
+    });
+    const ref = await computer.storePicture(dataUrl);
+    await computer.write(folder, folderOf([{ id: 'pic', type: 'image', src: ref, position: { x: 0, y: 0 }, size: { width: 300, height: 200 } }]));
+    await computer.upload();
+    await phone.pull();
+    const there = ((await phone.read(folder)).blocks || []).find(b => b.id === 'pic')?.src || '';
+    if (typeof there !== 'string' || !/^https?:\/\//.test(there)) throw new Error(`the phone got no link: ${String(there).slice(0, 120)}`);
+    const shown = await phone.page.evaluate(async src => { const r = await fetch(src); return r.ok ? (await r.blob()).size : -r.status; }, there);
+    if (!(shown > 0)) throw new Error(`the phone could not fetch the picture (${shown})`);
+    const here = ((await computer.read(folder)).blocks || []).find(b => b.id === 'pic')?.src;
+    if (here !== ref) throw new Error('the computer\'s own copy lost its reference');
+  });
+
   await scenario('a folder renamed on the phone while the computer added a task to it: one folder, both tasks', async () => {
     // Reported 2026-11-17: "Home" renamed to "A Home" on the phone, the PC's
     // tasks in "Home" lost -- the rename looked like a delete there.

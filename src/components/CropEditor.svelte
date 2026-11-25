@@ -6,6 +6,7 @@
    * rules are utils/crop.js. Apply dispatches `apply` with the crop, or null
    * for the whole picture.
    */
+  import { pictureUrl, pictureUrls } from '../utils/pictureStore.js';
   import { createEventDispatcher, onMount } from 'svelte';
   import { portal } from '../utils/portal.js';
   import { normalizeCrop, movedCrop, resizedCrop, startFrame } from '../utils/crop.js';
@@ -63,7 +64,7 @@
 <div class="crop-overlay" use:portal role="dialog" aria-label="Crop the picture">
   <div class="crop-stage">
     <div class="crop-picture">
-      <img src={src} alt="" bind:this={imgEl} draggable="false" />
+      <img src={pictureUrl(src, $pictureUrls)} alt="" bind:this={imgEl} draggable="false" />
       <!-- The parts left out, dimmed, and the frame of the part kept. -->
       <div class="crop-shade" style="left:0; top:0; width:100%; height:{frame.y * 100}%;"></div>
       <div class="crop-shade" style="left:0; top:{(frame.y + frame.h) * 100}%; width:100%; bottom:0;"></div>

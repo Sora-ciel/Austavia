@@ -1,4 +1,5 @@
 <script>
+  import { pictureUrl, pictureUrls } from '../utils/pictureStore.js';
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import BlockContextMenu from './BlockContextMenu.svelte';
   import { fileNameForMedia } from '../utils/downloadNaming.js';
@@ -34,7 +35,9 @@
   let panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
   let mouseRatio = 0.5; // 0–1 across viewport width
 
-  $: src = images[index] ?? '';
+  // A picture block kept by reference is looked up (utils/pictureStore.js);
+  // everything here -- showing, saving, cropping -- then works on the address.
+  $: src = pictureUrl(images[index] ?? '', $pictureUrls);
 
   // Remote URLs carry a query string (`?alt=media&token=…` on synced files),
   // so testing the raw string with endsWith missed every video that had been

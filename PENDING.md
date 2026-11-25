@@ -1159,7 +1159,15 @@ Linux app, Wayland: opening a heavy folder in Page mode ~4s -> 0.6s; a
 keystroke in Page mode 17ms; in Simple Note 115-136ms -> 32ms (with its card
 glow moved to its own layer, which was most of it). Owed from here:
 - **Tasks** still keep pictures inline (shown as plain HTML when not edited).
-- **Image blocks** (step 3) and the screenshot/download paths (step 4).
+- **Image blocks** (step 3) -- **done 2026-11-25.** Reported: typing near
+  pictures still slow on Android. Measured at a phone's speed (Chromium,
+  CPU x4) typing 60 letters beside six photo blocks: 28 freezes, 4.7s in
+  all, longest 350ms, photos inside the folder; after the change, an old
+  folder converts as it opens (6 of 6, all still shown) and typing beside
+  it freezes 0 times. One keeping pass in App.svelte for every way a
+  picture enters a block; videos stay inside. test:sync has a scenario.
+  To confirm on the phone. Left: step 4, the screenshot/download paths
+  (they work, through the same lookup, but read the picture each time).
 - **Linux stays on XWayland** (Sora, 2026-11-17), so KDE draws the title
   bar. What that costs, measured: scrolling a heavy folder 20-26ms a frame
   against Wayland's 17; dragging a Canvas block 20-22ms against 17. If it is

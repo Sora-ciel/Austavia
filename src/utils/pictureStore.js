@@ -7,7 +7,17 @@
  * - pictureBlob / pictureDataUrl: the bytes back, for an upload or an export.
  * - referencesForInlinePictures: writing that still holds pictures inside it,
  *   rewritten to hold references (the existing heavy notes, as they open).
+ * - keptPicture: the one way a picture goes into anything -- writing or a
+ *   picture block -- kept by reference, or as itself if it cannot be.
+ * - pictureUrl / pictureUrls: what to show for a picture block's src, for
+ *   every place that shows one (the block, the viewer, cropping).
+ *
+ * Picture blocks joined on 2026-11-25 (PENDING 2, step 3): typing beside six
+ * photo blocks, at a phone's speed, froze the page 28 times in 60 letters --
+ * 4.7s in all, the longest 350ms -- because every save carried the photos.
+ * By reference: once, 53ms.
  */
+import { writable } from 'svelte/store';
 import { putPictureBlob, getPictureBlob, listStoredPictures, deletePictureBlob, textsOnDevice } from '../storage.js';
 import { picturesToDelete } from './pictureCleanup.js';
 import { refFor, hashOfRef, isPictureRef, dataPicturesIn, withPictureSources, pictureRefsIn } from './pictureRefs.js';
@@ -62,6 +72,70 @@ export async function resolvePicture(ref) {
   const url = URL.createObjectURL(blob);
   shown.set(ref, url);
   return url;
+}
+
+/** The addresses of the pictures looked up so far, so what shows one redraws when it arrives. */
+export const pictureUrls = writable(new Map());
+const looking = new Set();
+const missing = new Set();
+
+/**
+ * What to show for a source, now: a reference's address once known (looked
+ * up meanwhile, '' until then), anything else as it is. Pass $pictureUrls so
+ * the caller reads it again when the picture arrives.
+ */
+export function pictureUrl(src, urls = null) {
+  if (!isPictureRef(src)) return src || '';
+  const known = urls?.get(src) || shown.get(src);
+  if (known) return known;
+  if (!looking.has(src) && !missing.has(src)) {
+    looking.add(src);
+    resolvePicture(src)
+      .then(url => {
+        if (url) pictureUrls.update(map => new Map(map).set(src, url));
+        else missing.add(src);
+      })
+      .catch(() => missing.add(src))
+      .finally(() => looking.delete(src));
+  }
+  return '';
+}
+
+/**
+ * A picture going into anything, kept on this device: its reference. A
+ * video, or a picture that cannot be kept, goes in as itself (a data URL),
+ * as everything did before.
+ */
+export async function keptPicture(source) {
+  const blob = await blobOf(source).catch(() => null);
+  if (blob && /^image\//.test(blob.type || '')) {
+    try {
+      const ref = await storePicture(blob);
+      if (ref) return ref;
+    } catch (error) {
+      console.warn('Could not keep the picture on the device; it goes in as itself:', error);
+    }
+  }
+  if (typeof source === 'string') return source;
+  return source instanceof Blob ? readAsDataUrl(source) : '';
+}
+
+/**
+ * Picture blocks still holding their picture inside the folder, moved onto
+ * references -- the existing ones, as their folder opens. `keep` is
+ * keptPicture (passed in to be tested). Returns { blocks, changed }: the ids
+ * whose src changed, and from what, so the caller replaces only those still
+ * holding the same picture.
+ */
+export async function pictureBlocksKept(blocks, keep = keptPicture) {
+  const changed = new Map(); // id -> { from, to }
+  for (const block of Array.isArray(blocks) ? blocks : []) {
+    const src = block?.src;
+    if (block?.type !== 'image' || typeof src !== 'string' || !src.startsWith('data:image/')) continue;
+    const to = await keep(src);
+    if (to && to !== src) changed.set(block.id, { from: src, to });
+  }
+  return changed;
 }
 
 /** Points an <img> at a source: a reference is looked up, anything else used as it is. */

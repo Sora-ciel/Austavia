@@ -17,6 +17,7 @@
   import { placeWaitingBlocks, isUnplaced, UNPLACED } from './utils/canvasPlacement.js';
   import { idsInPages, isOnCanvas, canvasChoice } from './utils/canvasShown.js';
   import { markedStarter, startersAtSignIn } from './utils/starterFolders.js';
+  import { pictureBlocksKept } from './utils/pictureStore.js';
   import { answerRing } from './utils/taskGoalRings.js';
   import { HABITS_OWNER } from './utils/goalNotices.js';
   import { addressForAudio, releaseAudioAddress } from './utils/audioAddress.js';
@@ -4323,6 +4324,43 @@
       hasUnsnapshottedChanges = true;
     } finally {
       placingWaiting = false;
+    }
+  }
+
+  // Picture blocks holding their picture inside the folder -- the existing
+  // ones as their folder opens, and any that arrive that way (a paste, a
+  // drop, a crop kept as a new picture, an older version's save) -- moved
+  // onto references, as pictures in writing already are (PENDING 2, step 3).
+  // One pass for every way in. Saved without a history step, as it changes
+  // how the picture is kept, not the picture. A picture that cannot be kept
+  // is not tried again this session, or the pass would never stop.
+  let keepingPictures = false;
+  const pictureNotKept = new Set();
+  const heldPicture = block => block?.type === 'image' && typeof block.src === 'string' &&
+    block.src.startsWith('data:image/') && !pictureNotKept.has(`${block.id}:${block.src.length}`);
+  $: if (!folderOpening && !keepingPictures && blocks.some(heldPicture)) keepPictureBlocks();
+  async function keepPictureBlocks() {
+    keepingPictures = true;
+    try {
+      const waiting = blocks.filter(heldPicture);
+      const changed = await pictureBlocksKept(waiting);
+      for (const block of waiting) if (!changed.has(block.id)) pictureNotKept.add(`${block.id}:${block.src.length}`);
+      if (!changed.size) return;
+      let any = false;
+      blocks = blocks.map(block => {
+        const change = changed.get(block.id);
+        if (!change || block.src !== change.from) return block;
+        any = true;
+        return { ...block, src: change.to, _version: (block._version || 0) + 1 };
+      });
+      if (any) {
+        await persistAutosave(blocks, modeOrders);
+        hasUnsnapshottedChanges = true;
+      }
+    } catch (error) {
+      console.warn('Could not keep picture blocks by reference:', error);
+    } finally {
+      keepingPictures = false;
     }
   }
 

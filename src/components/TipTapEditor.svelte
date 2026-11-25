@@ -4,7 +4,7 @@
   import StarterKit from '@tiptap/starter-kit';
   import Placeholder from '@tiptap/extension-placeholder';
   import Image from '@tiptap/extension-image';
-  import { storePicture, showPicture } from '../utils/pictureStore.js';
+  import { storePicture, showPicture, keptPicture } from '../utils/pictureStore.js';
   import { attachSmoothCaret } from '../utils/smoothCaret.js';
   let detachCaret = () => {};
   import { ListItem } from '@tiptap/extension-list-item';
@@ -254,15 +254,7 @@
   // picture cannot be kept, it goes in as before.
   $: pictureRefs = variant !== 'inline';
   async function pictureSource(file) {
-    if (pictureRefs) {
-      try {
-        const ref = await storePicture(file);
-        if (ref) return ref;
-      } catch (error) {
-        console.warn('Could not keep the picture on the device; it goes into the note itself:', error);
-      }
-    }
-    return readAsDataUrl(file);
+    return pictureRefs ? keptPicture(file) : readAsDataUrl(file);
   }
 
   function handleHistoryKeys(view, event) {

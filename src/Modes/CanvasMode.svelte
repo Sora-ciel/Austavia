@@ -14,6 +14,7 @@
   import { scrollerUnderPointer } from '../utils/scrollerUnderPointer.js';
   import { recallScroll, rememberScroll } from '../utils/scrollMemory.js';
   import { blocksOnCanvas, canvasChoice } from '../utils/canvasShown.js';
+  import { pictureUrl } from '../utils/pictureStore.js';
 
 
   export let mode;
@@ -425,7 +426,7 @@
     } else if (actionId === 'delete') {
       deleteBlockHandler({ detail: { id: block.id } });
     } else if (actionId === 'saveMedia') {
-      const src = typeof block.src === 'string' ? block.src : (block.resolvedSrc || '');
+      const src = typeof block.src === 'string' ? pictureUrl(block.src) : (block.resolvedSrc || '');
       if (src) {
         const a = document.createElement('a');
         a.href = src;
@@ -435,7 +436,7 @@
         document.body.removeChild(a);
       }
     } else if (actionId === 'copyMedia') {
-      const src = typeof block.src === 'string' ? block.src : (block.resolvedSrc || '');
+      const src = typeof block.src === 'string' ? pictureUrl(block.src) : (block.resolvedSrc || '');
       if (src) {
         try {
           const res = await fetch(src);
