@@ -96,8 +96,8 @@
     dispatch('change', value);
     // A separator's width is the room left on its line, and writing is what
     // changes that room. Measuring it forces a layout, so it is done just
-    // before the next frame, with every divider at once (fitSeparatorsSoon).
-    fitSeparatorsSoon();
+    // before the next frame, for the lines written on (fitChangedLinesSoon).
+    fitChangedLinesSoon();
   }
 
   // Where two versions of the text first differ. Undoing an insertion diverges
@@ -327,16 +327,55 @@
     setWidth: (dom, width) => { if (dom.style.width !== width) dom.style.width = width; },
     room: dom => dom.parentElement.getBoundingClientRect().right - dom.getBoundingClientRect().left
   };
+  //
+  // And only the dividers that can have moved: typing changes the room on
+  // its own line and no other, so a change refits the dividers on the lines
+  // it touched (noteChangedLines), while a resize or a divider drawn refits
+  // them all. Asked 2026-11-25, after the batching: "I'm aiming at no feel
+  // of latency".
+  let refitAll = false;
+  const changedLines = new Set();
   function fitSeparators() {
-    fitSeparatorsTogether([...drawnSeparators], separatorOps);
+    const all = refitAll;
+    const lines = [...changedLines];
+    refitAll = false;
+    changedLines.clear();
+    const doms = all ? [...drawnSeparators] : [...drawnSeparators].filter(dom => lines.some(line => line.contains(dom)));
+    if (doms.length) fitSeparatorsTogether(doms, separatorOps);
   }
-  // A divider drawn is fitted with the others on the next frame, so a note
-  // opening with many of them is laid out once, not once per divider.
+  // On the next frame, with whatever else asked meanwhile: a note opening with
+  // many dividers is laid out once, not once per divider.
   let separatorFitQueued = false;
-  function fitSeparatorsSoon() {
+  function queueSeparatorFit() {
     if (separatorFitQueued) return;
     separatorFitQueued = true;
     requestAnimationFrame(() => { separatorFitQueued = false; fitSeparators(); });
+  }
+  function fitSeparatorsSoon() {
+    refitAll = true;
+    queueSeparatorFit();
+  }
+  function fitChangedLinesSoon() {
+    if (changedLines.size) queueSeparatorFit();
+  }
+  /** The lines a change touched, as elements, for refitting their dividers only. */
+  function noteChangedLines(transaction) {
+    if (!drawnSeparators.size || !transaction?.docChanged || !editor?.view) return;
+    const view = editor.view;
+    const size = transaction.doc.content.size;
+    transaction.steps.forEach((step, i) => {
+      const later = transaction.mapping.slice(i + 1);
+      step.getMap().forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+        for (const pos of [later.map(newStart, -1), later.map(newEnd, 1)]) {
+          try {
+            const at = view.domAtPos(Math.max(0, Math.min(size, pos)));
+            const node = at.node.nodeType === 1 ? at.node : at.node.parentElement;
+            const line = node?.closest?.('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre') || node;
+            if (line) changedLines.add(line);
+          } catch { refitAll = true; }
+        }
+      });
+    });
   }
 
   // A separator that sits in a line rather than breaking it.
@@ -1048,9 +1087,10 @@
         handlePaste: handleImagePaste,
         handleDrop: handleImageDrop,
       },
-      onUpdate() {
+      onUpdate({ transaction }) {
         // Noted, and nothing more, so the keystroke can return and the browser
         // can draw the character. The work is in sendUpdate above.
+        noteChangedLines(transaction);
         updates.noteChange();
       },
       onFocus({ event }) {
