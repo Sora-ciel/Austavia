@@ -30,11 +30,12 @@ test('it glides quickly: smoother, never behind the writing for long', () => {
   assert.equal(CARET_GLIDE_MS, 80);
 });
 
-// Asked 2026-11-25, and wanted: "on phone the animation of the caret should
-// have less ms, because the phone seems to take more latency".
+// Asked 2026-11-25, and wanted: first "on phone the animation of the caret
+// should have less ms, because the phone seems to take more latency", then
+// "remove the animation on phone".
 import { caretGlideMs } from '../src/utils/smoothCaret.js';
-test('on a phone the caret glides in half the time, as the phone is slower to draw', () => {
-  assert.equal(caretGlideMs({ touch: true }), 40);
+test('on a phone the caret does not glide at all: it is where the letter went', () => {
+  assert.equal(caretGlideMs({ touch: true }), 0);
   assert.equal(caretGlideMs({ touch: false }), CARET_GLIDE_MS);
 });
 
