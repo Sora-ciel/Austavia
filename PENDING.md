@@ -1074,6 +1074,33 @@ exists. Staged so each step lands on its own:
 
 Desktop and web keep the `<audio>` element; only Android changes. Not started.
 
+## Native writing layer on Android, decided 2026-11-25
+
+Sora: native feel is the target ("2ms more [than a native field] and it
+would be something I could complain about"); measured, the web view costs
+two frames for any text box (see "The gap to native"). Expected with the
+layer: ~40ms, steady, like the native field. In stages, each measured on
+the phone with scripts/phone/touchToScreen before going on:
+
+1. **Plain paragraphs in Single Note, Android app.** While the caret is in
+   a paragraph of plain text, a native EditText sits exactly over it (same
+   font, size, colour, line height); Samsung's keyboard types into it. The
+   text goes into the note on a pause, on leaving the line, on Enter (the
+   paragraph split) and on Backspace at its start (merged). The web
+   paragraph's own text is hidden meanwhile; its height follows the
+   field's lines. Scrolling hands the text back and hides the field.
+   Must measure ~40ms, steady.
+2. Bold, italic, headings in the line; selection and caret matching.
+3. Lists, boxes to tick, dividers; text blocks in Page mode.
+4. Everything else (pictures, embeds) stays in the web view.
+
+Cons of the writing-speed changes of 2026-11-25, to keep in mind: a
+divider can be a frame late or stale until its line is edited if its room
+changes without an edit there (a picture loading beside it); a long note's
+remembered paragraph heights go stale after a width change until they are
+on screen; **owed: check a screenshot of a long note** (content-visibility
+may leave skipped paragraphs blank in html2canvas).
+
 ## Typing on the phone, measured on the phone (2026-11-25)
 
 Sora: typing still lags on the phone; folders could one day be 1 GB, on
