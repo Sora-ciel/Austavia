@@ -1104,6 +1104,33 @@ Next on composition's extra frame: a CPU profile of composing on the
 phone, to see which of our transaction listeners (smooth caret, text
 history, input rules, slash menu) costs it.
 
+### The gap to native, measured exactly (2026-11-25)
+
+Sora's line: a native Android text field is "the max ms that I wouldn't
+complain on. 2ms more and it would be something I could complain about".
+Measured from Android's own clocks, the finger lifting from a key
+(getevent on the touchscreen) to the app's frame reaching the screen
+(SurfaceFlinger --latency), Sora typing, Samsung A15, 90Hz:
+
+| | where most keys land | median |
+| --- | --- | --- |
+| native EditText (staging's NativeTypingTestActivity) | 33-44ms, 240 of 258 | 40ms |
+| a bare <textarea> in the web view | 55-66ms, 93 of 130 | 62ms |
+| Austavia's editor (animations off) | 55-77ms, spread | ~62ms |
+
+So the web view itself costs two frames (~22ms), steadily, for any text
+box at all; our editor matches it on the typical key and adds a frame on
+some (jitter). No web-side change gets below 62ms. Native feel needs a
+native writing layer: Samsung's keyboard types into a native field laid
+over the line being written, the text flowing into the note behind it.
+Its scope and stages are to be decided with Sora. Web-side, still worth
+it: the editor's extra frame on some keys (steadiness), and the rare
+~0.9s freezes seen in round 4 of the recording.
+
+Tools: scripts/phoneBench.mjs, and scripts/phone/touchToScreen.sh (records
+touches and frames until `<dir>/stop` exists; run with the activity name,
+e.g. MainActivity) with scripts/phone/touchToScreen.py <dir>... (the spread).
+
 ## 1. Typing in a long note
 
 Two separate causes, measured on a note of 15,930 characters — the size of a
