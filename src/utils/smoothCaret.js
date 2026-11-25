@@ -19,6 +19,18 @@ import { KEYBOARD_CLOSED_EVENT } from './keyboardCaret.js';
 export const CARET_HEIGHT = 1.2;
 /** How long it takes to glide to its next place while typing (80ms; 60 was tried the same day and put back). */
 export const CARET_GLIDE_MS = 80;
+/**
+ * On a phone, half that: asked 2026-11-25, "on phone the animation of the
+ * caret should have less ms, because the phone seems to take more latency".
+ * A phone draws each letter later than a computer does, and the glide came
+ * on top of that wait.
+ */
+export const PHONE_CARET_GLIDE_MS = 40;
+
+/** The glide for this screen: a touch screen's is the phone's. */
+export function caretGlideMs({ touch = false } = {}) {
+  return touch ? PHONE_CARET_GLIDE_MS : CARET_GLIDE_MS;
+}
 
 /**
  * Whether the caret glides to its next place or is simply there. Asked
@@ -62,7 +74,8 @@ export function attachSmoothCaret(editor, host) {
   const caret = document.createElement('span');
   caret.className = 'austavia-caret';
   caret.setAttribute('aria-hidden', 'true');
-  caret.style.setProperty('--caret-glide', `${CARET_GLIDE_MS}ms`);
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches === true;
+  caret.style.setProperty('--caret-glide', `${caretGlideMs({ touch })}ms`);
   host.appendChild(caret);
   view.dom.classList.add('has-austavia-caret');
 
