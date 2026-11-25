@@ -1089,7 +1089,15 @@ the phone with scripts/phone/touchToScreen before going on:
    paragraph split) and on Backspace at its start (merged). The web
    paragraph's own text is hidden meanwhile; its height follows the
    field's lines. Scrolling hands the text back and hides the field.
-   Must measure ~40ms, steady.
+   Must measure ~40ms, steady. **In progress (2026-11-25):** built
+   (utils/nativeWriting.js, NativeWritingPlugin.java); first measurement
+   39.8ms, landing where the native field does (54 keys); Sora: "not
+   clunky anymore". Fixed after trying: invisible text (colour read after
+   hiding), two carets (the web editor kept focus), the field drawn over
+   the controls (now clipped to the note's visible area and following
+   re-layouts). Still owed in stage 1: Sora's next round of UI faults; the
+   Inter font (needs the TTF -- download to be asked); a longer
+   measurement.
 2. Bold, italic, headings in the line; selection and caret matching.
 3. Lists, boxes to tick, dividers; text blocks in Page mode.
 4. Everything else (pictures, embeds) stays in the web view.

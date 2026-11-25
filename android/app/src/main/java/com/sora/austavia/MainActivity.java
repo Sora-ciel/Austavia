@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SaveToDevicePlugin.class);
         registerPlugin(SystemBarsPlugin.class);
         registerPlugin(CalendarRemindersPlugin.class);
+        registerPlugin(NativeWritingPlugin.class);
         super.onCreate(savedInstanceState);
         keepTheWebViewAboveTheKeyboard();
         letTheStagingAppBeInspected();
