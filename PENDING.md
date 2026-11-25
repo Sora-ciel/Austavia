@@ -861,6 +861,10 @@ list below with what was observed.
 
 | Shipped | What to look for |
 | --- | --- |
+| 0.8.702 staging | **Typing on the phone** (2026-11-25): a long note with dividers and pictures keeps up, no pauses; the caret does not glide on the phone. Measured on the A15 in the recording: keys waiting 92ms -> 2ms. |
+| 0.8.702 staging | **Picture blocks by reference** (2026-11-25): an old folder's picture blocks switch over as it opens and still show; on another device they arrive as links and show there too. |
+| 0.8.702 staging | **Screenshot of a long note** (2026-11-25): the whole note, to the end (off-screen paragraphs are laid out for it). |
+| 0.8.702 staging | **Pages on the Canvas** (2026-11-22): page previews, Show on Canvas too / Hide from Canvas, From this folder; blocks made elsewhere placed clear of the rest. |
 | next | **Calendar reminders on the phone** (2026-11-16). Make a task 2 minutes ahead, close Austavia (swipe it away): the notification comes at its start. Restart the phone with a task later today: it still comes. If it comes minutes late, Settings > Apps > Austavia > Alarms & reminders allows exact ones. |
 | next | **Repeating tasks** (2026-11-16): Repeat every [n] [day/week/month] in a task's editor; "Delete this day" / "Delete all"; dragging one day moves them all. |
 | next | **A block scrolls inside only once focused, in Page mode and Simple Note** (2026-11-16); a click beside the blocks on a page unfocuses. |
