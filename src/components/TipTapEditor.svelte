@@ -29,9 +29,6 @@
   import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
   import { slashAt } from '../utils/slashMenu.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
-  import { attachNativeWriting } from '../utils/nativeWriting.js';
-  import { Plugin as PmPlugin, PluginKey as PmPluginKey, TextSelection as PmTextSelection } from '@tiptap/pm/state';
-  import { Decoration as PmDecoration, DecorationSet as PmDecorationSet } from '@tiptap/pm/view';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -54,13 +51,6 @@
    * (`slashKey`); the menu itself is the page's.
    */
   export let slash = false;
-  /**
-   * Plain paragraphs written in a native field laid over them, in the
-   * Android app (utils/nativeWriting.js, NativeWritingPlugin.java): asked of
-   * Single Note, 2026-11-25. Nothing changes anywhere else.
-   */
-  export let nativeWriting = false;
-  let detachNativeWriting = () => {};
 
   const dispatch = createEventDispatcher();
 
@@ -1118,15 +1108,6 @@
     // Austavia's own caret: the letters' height, gliding as you write
     // (utils/smoothCaret.js, asked 2026-11-17).
     detachCaret = attachSmoothCaret(editor, element);
-    const nativePlugin = typeof window !== 'undefined' && window.Capacitor?.getPlatform?.() === 'android'
-      ? window.Capacitor?.Plugins?.NativeWriting : null;
-    if (nativeWriting && nativePlugin) {
-      detachNativeWriting = attachNativeWriting(editor, {
-        plugin: nativePlugin,
-        scroller: wrapEl,
-        pm: { Plugin: PmPlugin, PluginKey: PmPluginKey, Decoration: PmDecoration, DecorationSet: PmDecorationSet, TextSelection: PmTextSelection }
-      });
-    }
     lastPushedContent = content;
     initTextHistory(historyKey, content || '');
     // Put the reader back where they were, once there is somewhere to put them.
@@ -1226,7 +1207,6 @@
     separatorWatcher?.disconnect();
     window.removeEventListener('resize', fitSeparatorsSoon);
     detachCaret();
-    detachNativeWriting();
     editor?.destroy();
   });
 
@@ -1681,13 +1661,6 @@
   }
   :global(.tiptap-wrap.skip-offscreen .tiptap-inner > *) {
     content-visibility: auto;
-  }
-
-  /* The paragraph a native field is laid over (utils/nativeWriting.js): its
-     own text hidden, so only the field's shows; the room kept. */
-  :global(.tiptap-inner .native-writing-under) {
-    color: transparent !important;
-    caret-color: transparent;
   }
 
   /* Empty placeholder */

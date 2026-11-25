@@ -745,7 +745,6 @@
         historyKey={noteBlock.id}
         initialScrollTop={recallScroll(fileKey, noteBlock.id)}
         placeholder="Write your note here..."
-        nativeWriting
         on:change={(e) => {
           updateBlock(noteBlock.id, { content: e.detail }, { pushToHistory: false, changedKeys: ['content'] });
         }}

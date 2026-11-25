@@ -1122,27 +1122,20 @@ the phone with scripts/phone/touchToScreen before going on:
    paragraph split) and on Backspace at its start (merged). The web
    paragraph's own text is hidden meanwhile; its height follows the
    field's lines. Scrolling hands the text back and hides the field.
-   Must measure ~40ms, steady. **In progress (2026-11-25):** built
-   (utils/nativeWriting.js, NativeWritingPlugin.java); first measurement
-   39.8ms, landing where the native field does (54 keys); Sora: "not
-   clunky anymore". Fixed after trying: invisible text (colour read after
-   hiding), two carets (the web editor kept focus), the field drawn over
-   the controls (now clipped to the note's visible area and following
-   re-layouts). Still owed in stage 1: Sora's next round of UI faults; the
-   Inter font (needs the TTF -- download to be asked); a longer
-   measurement.
+   Must measure ~40ms, steady.
 2. Bold, italic, headings in the line; selection and caret matching.
 3. Lists, boxes to tick, dividers; text blocks in Page mode.
 4. Everything else (pictures, embeds) stays in the web view.
 
-**Frozen at stage 1 (decided 2026-11-25, reviewing the day):** the layer
-is the one change of the day with a running cost -- a second way of
-writing, Android only, every feature it covers built twice. So: finish
-stage 1 (Sora's UI faults, the Inter font, a longer measurement), keep it
-to plain paragraphs in Single Note, and take stages 2-3 up only after the
-storage work in "Where Austavia is going". It lives in nativeWriting.js
-and NativeWritingPlugin.java and can be taken out whole. In a release:
-staging only, or behind a setting, until it has had real use.
+**Set aside (Sora, 2026-11-25): no version uses it.** Stage 1 was built
+(fe9f9ef) and measured at the native field's speed (39.8ms against
+39.6ms; "not clunky anymore"), but still misbehaved on screen too often
+-- invisible text, two carets, drawn over the controls, fixed one by one,
+and more after. Reverted whole (321ae28) so a pre-release is usable; the
+code stays in git history for when this is taken up again, after the
+storage work in "Where Austavia is going". What was learned stays true:
+the web view costs two frames on the phone, and only a native field gets
+under them.
 
 Small debts of the day: the native test screen in the staging app
 (NativeTypingTestActivity, remove once the layer is settled); rare ~0.9s
