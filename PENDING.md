@@ -1074,6 +1074,39 @@ exists. Staged so each step lands on its own:
 
 Desktop and web keep the `<audio>` element; only Android changes. Not started.
 
+## Where Austavia is going (set with Sora, 2026-11-25)
+
+In Sora's words: "an app where you can add modes and blocks to
+personalize it ... with three base structures: the app itself (controls
+etc.), then the modes and the blocks. They should be able to have a
+folder of 1gb or even more and not lag on pc and phone. that's the most
+important part ... and the syncs made so that it uses the least amount of
+storage and bandwidth. so it syncs per block. and even the snapshot."
+Confirmed as played back:
+
+- **Smooth first, equally on phone and PC**, even with folders of 1 GB+
+  and very big files in them. Personalising never costs speed.
+- **Smoothness is a rule, checked automatically**: every new mode or block
+  meets the same speed bar (the benchmarks, run as checks, not on request).
+- **Typing on the PC gets the phone's treatment**: measured against a
+  native field there, fixed the same way if it falls short (not yet
+  measured).
+- **A folder is never loaded or saved whole**: blocks read when shown, and
+  saved, synced and snapshotted one by one -- bandwidth and storage for
+  what changed only.
+- **Start-up does not grow with the number of modes**: a mode's code loads
+  when it is opened (today all of it is one 1.2 MB file, 420 KB gzipped).
+
+Doable -- Notion and Obsidian work this way, and merging is already block
+by block -- but the biggest change since the start: block-by-block storage
+touches sync (the most fragile part), export, import, deleting, the bin,
+renames, the storage limit and snapshots, and for a while both shapes must
+be understood at once (a phone is always a version behind). Only in small
+steps, each released and confirmed before the next; months, not days.
+Modes that show everything (Canvas, Simple Note, Page) must draw only
+what is on screen; a single huge note needs storing in parts, last.
+**Next: lay out the ways to order this, for Sora to pick.**
+
 ## Native writing layer on Android, decided 2026-11-25
 
 Sora: native feel is the target ("2ms more [than a native field] and it
@@ -1101,6 +1134,19 @@ the phone with scripts/phone/touchToScreen before going on:
 2. Bold, italic, headings in the line; selection and caret matching.
 3. Lists, boxes to tick, dividers; text blocks in Page mode.
 4. Everything else (pictures, embeds) stays in the web view.
+
+**Frozen at stage 1 (decided 2026-11-25, reviewing the day):** the layer
+is the one change of the day with a running cost -- a second way of
+writing, Android only, every feature it covers built twice. So: finish
+stage 1 (Sora's UI faults, the Inter font, a longer measurement), keep it
+to plain paragraphs in Single Note, and take stages 2-3 up only after the
+storage work in "Where Austavia is going". It lives in nativeWriting.js
+and NativeWritingPlugin.java and can be taken out whole. In a release:
+staging only, or behind a setting, until it has had real use.
+
+Small debts of the day: the native test screen in the staging app
+(NativeTypingTestActivity, remove once the layer is settled); rare ~0.9s
+freezes seen in round 4 of the recording, not yet traced (ours).
 
 Cons of the writing-speed changes of 2026-11-25, to keep in mind: a
 divider can be a frame late or stale until its line is edited if its room
