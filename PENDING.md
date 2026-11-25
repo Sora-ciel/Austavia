@@ -1074,6 +1074,36 @@ exists. Staged so each step lands on its own:
 
 Desktop and web keep the `<audio>` element; only Android changes. Not started.
 
+## Typing on the phone, measured on the phone (2026-11-25)
+
+Sora: typing still lags on the phone; folders could one day be 1 GB, on
+PC and phone, without lag -- improved app-wide, slowly. Measured on the
+Samsung A15 (Chrome 157 WebView) over USB: the staging app is inspectable
+(MainActivity), ?bench=typing and ?bench=hold&pictures=N run in it
+(utils/benchmark.js), driven by scripts in the session -- to be kept as
+scripts/phoneBench.mjs. Letter typed to letter drawn, two frames:
+
+| | median |
+| --- | --- |
+| a bare textarea or contenteditable (the floor) | 26ms |
+| Single Note, 20K chars, 30 photos, plain letters | 27ms |
+| the same, 100 photos (opening 0.85s) | 31ms |
+| the same, composing words as Samsung's keyboard does | 38ms |
+| text-only note of 256K chars (app inserting) | 38ms, saving 47ms |
+
+So our share is about one frame, and mostly in composition; the rest is
+the keyboard and the phone. Picture blocks by reference (801fc9b) took
+away the freezes. What scales with size, for the 1 GB goal, in order:
+1. Draw only what is on screen (content-visibility on a note's
+   paragraphs first; sections mounted as scrolled for very long notes).
+2. Undo by the editor's steps, not copies of the text (textHistory.js).
+3. Save only what changed: a note in chunks, saved on a pause, not every
+   50ms; getHTML only of the changed chunk.
+4. Sync by chunk, merged chunk by chunk.
+Next on composition's extra frame: a CPU profile of composing on the
+phone, to see which of our transaction listeners (smooth caret, text
+history, input rules, slash menu) costs it.
+
 ## 1. Typing in a long note
 
 Two separate causes, measured on a note of 15,930 characters — the size of a

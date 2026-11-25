@@ -7648,22 +7648,35 @@ ${failures.length} could not be uploaded: ${failures.map(f => f.fileName).join('
         asked = raw ? JSON.parse(raw) : null;
       } catch { asked = null; }
     } else if (new URLSearchParams(location.search).has('bench')) {
-      asked = { out: null, env: {} };
+      asked = { out: null, env: {}, kind: new URLSearchParams(location.search).get('bench') };
     }
     if (!asked) return;
     for (let i = 0; i < 60 && (folderOpening || !currentSaveName); i += 1) await new Promise(r => setTimeout(r, 500));
     await new Promise(r => setTimeout(r, 3000));
-    const { runBenchmark } = await import('./utils/benchmark.js');
+    const { runBenchmark, runTypingBreakdown, holdTypingNote } = await import('./utils/benchmark.js');
     const invoke = tauri ? (await import('@tauri-apps/api/core')).invoke : null;
-    const report = await runBenchmark({
-      saveBlocks,
-      deleteBlocks,
-      load: name => load(name, { skipCloudUpload: true }),
-      setMode,
-      tick,
-      currentFolder: () => currentSaveName,
-      memoryKb: invoke ? () => invoke('bench_memory') : null
-    });
+    const modeBefore = mode;
+    // Nothing of the test folder goes to the cloud: sync waits until the end.
+    const syncWas = autoSyncEnabled;
+    autoSyncEnabled = false;
+    let report;
+    try {
+      const app = {
+        saveBlocks,
+        deleteBlocks,
+        load: name => load(name, { skipCloudUpload: true }),
+        setMode,
+        tick,
+        currentFolder: () => currentSaveName,
+        memoryKb: invoke ? () => invoke('bench_memory') : null
+      };
+      report = asked.kind === 'typing' ? await runTypingBreakdown(app)
+        : asked.kind === 'hold' ? await holdTypingNote(app, { pictures: Number(new URLSearchParams(location.search).get('pictures')) || 0 })
+        : await runBenchmark(app);
+    } finally {
+      autoSyncEnabled = syncWas;
+      setMode(modeBefore);
+    }
     report.env = asked.env;
     if (invoke) await invoke('bench_report', { json: JSON.stringify(report, null, 2) });
     else { window.__benchResult = report; console.log('AUSTAVIA_BENCH', JSON.stringify(report)); }
