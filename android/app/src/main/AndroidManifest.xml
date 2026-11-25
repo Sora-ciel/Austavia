@@ -25,6 +25,14 @@
              own half of the answer. Resizing shrinks the WebView to the room
              above the keyboard, so 100dvh shrinks with it, the app re-lays out,
              and the editor's own scroller puts the caret on screen. -->
+        <!-- A native text field to compare typing by feel; staging only
+             (NativeTypingTestActivity closes at once anywhere else). Exported
+             so it can be opened over USB with adb. -->
+        <activity
+            android:name=".NativeTypingTestActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
             android:name=".MainActivity"
