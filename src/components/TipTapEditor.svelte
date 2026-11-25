@@ -29,6 +29,7 @@
   import { heldScrollTop, HOLD_MS } from '../utils/scrollHold.js';
   import { slashAt } from '../utils/slashMenu.js';
   import { readAsDataUrl } from '../utils/dataUrl.js';
+  import { SCREENSHOT_EVENT } from '../utils/screenshotDelivery.js';
 
   export let content = '';
   export let placeholder = 'Write here…';
@@ -1122,6 +1123,7 @@
     // half a second rather than watching for ever.
     putTheReaderBack(initialScrollTop);
     skipOffscreenOnceSettled();
+    window.addEventListener(SCREENSHOT_EVENT, onScreenshot);
 
     // The other thing that changes the room on a line is the line getting
     // wider or narrower — a block resized, a window resized, a panel opened.
@@ -1167,6 +1169,22 @@
     check();
   }
 
+  // A screenshot redraws the page itself and does not draw paragraphs that
+  // are skipped: a long note came out with its last fifth blank (checked
+  // 2026-11-25). Laid out whole while one is taken, and skipping again after.
+  function onScreenshot(event) {
+    if (!wrapEl) return;
+    if (event.detail?.capturing) {
+      clearTimeout(settleTimer);
+      if (wrapEl.classList.contains('skip-offscreen')) {
+        wrapEl.classList.remove('skip-offscreen');
+        event.detail.waits?.push(new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      }
+    } else {
+      skipOffscreenOnceSettled();
+    }
+  }
+
   function applyIncomingContent(next) {
     // Anything typed and not yet sent goes up first. setContent below replaces
     // the whole document, so characters still waiting would be wiped out of the
@@ -1198,6 +1216,7 @@
 
   onDestroy(() => {
     clearTimeout(settleTimer);
+    if (typeof window !== 'undefined') window.removeEventListener(SCREENSHOT_EVENT, onScreenshot);
     // Before the editor goes, or there is nothing left to serialise. Switching
     // modes and moving a block on the canvas both come through here, and either
     // one landing mid-word would have taken the word with it.

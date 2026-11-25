@@ -1145,8 +1145,9 @@ Cons of the writing-speed changes of 2026-11-25, to keep in mind: a
 divider can be a frame late or stale until its line is edited if its room
 changes without an edit there (a picture loading beside it); a long note's
 remembered paragraph heights go stale after a width change until they are
-on screen; **owed: check a screenshot of a long note** (content-visibility
-may leave skipped paragraphs blank in html2canvas).
+on screen. A screenshot of a long note lost its last fifth with
+skipping on -- checked and fixed: the editor lays the note out whole while
+a screenshot is taken (SCREENSHOT_EVENT) and skips again after.
 
 ## Typing on the phone, measured on the phone (2026-11-25)
 
